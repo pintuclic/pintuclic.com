@@ -416,8 +416,9 @@ sin redefinirse.*
 cuenta*
 
 **Alcance:** *Comprende la solicitud de recuperación, el envío y
-vigencia del enlace o código, y su efecto sobre las sesiones activas. No
-aplica a cuentas creadas exclusivamente mediante Google.*
+vigencia del enlace o código, y su efecto sobre las sesiones activas.
+Aplica a toda cuenta, incluidas las creadas mediante Google, porque toda
+cuenta tiene contraseña propia desde su registro (RF-CUE-02-04).*
 
 **Requisitos**
 
@@ -436,14 +437,16 @@ aplica a cuentas creadas exclusivamente mediante Google.*
                                             recuperación de un solo uso.                
 
   RF-CUE-05-03   RF         Restricción     **\[Deducido\]** El sistema    Deducido     Alta
-                                            debe rechazar la solicitud de               
-                                            recuperación sobre una cuenta               
-                                            creada exclusivamente mediante              
-                                            Google, informando que su                   
-                                            acceso lo gestiona el                       
-                                            proveedor: tal cuenta no tiene              
-                                            contraseña que recuperar                    
-                                            (RN-CUE-03).                                
+                                            debe admitir la recuperación                
+                                            de contraseña sobre toda                    
+                                            cuenta registrada, incluidas                
+                                            las vinculadas a Google,                    
+                                            porque toda cuenta tiene                    
+                                            contraseña propia desde su                  
+                                            registro (RF-CUE-02-04). El                 
+                                            acceso por Google no se ve                  
+                                            afectado por el cambio de                   
+                                            contraseña.                                 
 
   RF-CUE-05-04   RF         Privacidad      **\[Definido\]** El sistema no Definido     Alta
                                             debe revelar si el correo                   
@@ -480,10 +483,11 @@ aplica a cuentas creadas exclusivamente mediante Google.*
                  mediante recuperación, cuando se confirma, entonces todas
                  sus sesiones activas quedan invalidadas.
 
-  CA-CUE-05-05   Dado que una cuenta está vinculada exclusivamente a Google,
-                 cuando su titular solicita recuperación de contraseña,
-                 entonces el sistema rechaza la solicitud e indica que el
-                 acceso lo gestiona el proveedor.
+  CA-CUE-05-05   Dado que una cuenta está vinculada a Google, cuando su
+                 titular solicita recuperación de contraseña, entonces el
+                 sistema la tramita con normalidad, porque la cuenta tiene
+                 contraseña propia; el acceso mediante Google sigue
+                 disponible tras el cambio.
   ---------------------------------------------------------------------------
 
 ### HU-CUE-06 --- Gestión del perfil
