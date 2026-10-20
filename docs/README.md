@@ -18,7 +18,7 @@ docs/
 ├── 00_SISTEMA/                       <-- Gobernanza, arquitectura y plantillas del sistema
 │   ├── 01_ARQUITECTURA/              <-- Diseño estructural y dependencias
 │   │   ├── ARQUITECTURA_GENERAL.md   <-- Visión general, actores, mapa de dominios y principios
-│   │   ├── ARQUITECTURA_BACKEND.md   <-- Stack oficial: TS, Express, Kysely, Zod, JWT, BCrypt, SMTP, CORS
+│   │   ├── ARQUITECTURA_BACKEND.md   <-- Stack oficial: TS, Express 5, Prisma 6, Zod, JWT, BCrypt, SMTP, CORS
 │   │   └── MATRIZ_TRAZABILIDAD.md    <-- Mapeo HU <-> Requisitos de Seguridad <-> Diagramas
 │   │
 │   ├── 02_GUIAS_Y_ESTANDARES/        <-- Normativas de trabajo y contribución

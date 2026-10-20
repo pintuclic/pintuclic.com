@@ -71,11 +71,19 @@ El autor es la persona que realiza la entrega (nunca la IA).
 
 ---
 
-## Convenciones de commits (Conventional Commits + SDLC)
+## Convenciones de commits
 
-Formato SDLC: `[vX.Y.Z] tipo(scope): descripcion`
+**Formato del commit:** `tipo(scope): descripcion` — en minúsculas, modo imperativo, **sin prefijo de versión**.
+La versión se declara únicamente en el **título de la PR** (`tipo(scope) [X.Y.Z.W]: mensaje`).
 
-Tipos válidos: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`, `ci`.
+**Tipos válidos (12, sin excepciones):** `feat`, `fix`, `security`, `perf`, `refactor`, `test`, `docs`, `style`, `chore`, `ci`, `build`, `revert`.
+
+> 🔴 **`feat` exige una Historia de Usuario.** Si no puedes citar un código `HU-XXX-NN` que la entrega
+> satisface end-to-end, el commit **no es `feat`**: estructura de carpetas, scaffolding, arquitectura,
+> configuración y dependencias son `chore`; documentación y contratos sin implementar son `docs`.
+
+**Fuente única de verdad** (árbol de decisión, catálogo de scopes y antipatrones):
+[`docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md`](docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md) — **lectura obligatoria antes de cualquier commit**.
 
 Al finalizar un ciclo de trabajo, actualizar los artefactos SDLC:
 - `.sdlc/docs/worklog/WORKLOG.md` — registrar el trabajo realizado
