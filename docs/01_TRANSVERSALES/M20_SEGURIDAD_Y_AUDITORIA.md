@@ -93,11 +93,14 @@ bloqueada.
                                                  ni derivada, en ninguna                   
                                                  respuesta al navegador.                   
 
-  **RF-SEG-01-05**    RF         Credenciales    El sistema no debe almacenar Definido     Alta
-                                                 contraseña alguna para las                
-                                                 cuentas creadas mediante                  
-                                                 Google, cuya autenticación                
-                                                 gestiona el proveedor.                    
+  **RF-SEG-01-05**    RF         Credenciales    El sistema debe almacenar    Definido     Alta
+                                                 una contraseña derivada con               
+                                                 sal única para toda cuenta,               
+                                                 incluidas las creadas                     
+                                                 mediante Google, que debe                 
+                                                 establecerla de forma                     
+                                                 obligatoria al completar el               
+                                                 registro (RF-CUE-02-04).                  
 
   **RF-SEG-01-06**    RF         Credenciales    El sistema debe invalidar    Definido     Alta
                                                  todas las sesiones activas                
@@ -143,9 +146,11 @@ bloqueada.
                      completa, entonces todas mis sesiones abiertas quedan
                      cerradas y debo autenticarme de nuevo.
 
-  **CA-SEG-01-06**   Dado que mi cuenta se creó mediante Google, cuando
-                     intento establecer una contraseña en el sistema, entonces
-                     la operación no se permite.
+  **CA-SEG-01-06**   Dado que mi cuenta se creó mediante Google, cuando el
+                     sistema completa el registro, entonces me exige
+                     establecer una contraseña propia antes de darlo por
+                     finalizado, y esa contraseña queda almacenada de forma
+                     derivada.
   ----------------------------------------------------------------------------
 
 ### **HU-SEG-02 --- Gestión de sesión**
