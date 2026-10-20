@@ -156,20 +156,34 @@ El scope es **siempre obligatorio**. Debe ser uno de los siguientes:
 ### A. Scopes de Módulo Funcional
 
 Formato: `m[xx]-[nombre-modulo]` en minúsculas y kebab-case, idéntico al nombre de la carpeta en
-`backend/src/modules/` y `frontend/src/modules/`:
+`backend/src/modules/` y `frontend/src/modules/`.
 
-| Scope | Módulo |
-| :--- | :--- |
-| `m01-catalogo` | M01: Catálogo de Productos |
-| `m02-busqueda` | M02: Búsqueda y Filtros |
-| `m04-cuentas` | M04: Cuentas, Autenticación y Perfil |
-| `m05-carrito` | M05: Carrito |
-| `m07-checkout` | M07: Checkout y Carrito |
-| `m08-ordenes` | M08: Órdenes y Envíos |
-| `m12-facturacion` | M12: Facturación |
-| `m17-permisos` | M17: Administración, Empleados y Permisos |
-| `m18-notificaciones` | M18: Notificaciones y Comunicaciones |
-| `m20-seguridad` | M20: Seguridad, Auditoría y Protección de Datos |
+> El inventario autoritativo de los 21 módulos, sus olas y sus dependencias está en
+> [RUTA_DEL_PROYECTO.md](../01_ARQUITECTURA/RUTA_DEL_PROYECTO.md). Prohibido usar un scope de módulo que no esté en esta tabla.
+
+| Scope | Módulo | Ola |
+| :--- | :--- | :---: |
+| `m01-catalogo` | M01: Catálogo de Productos | 2 |
+| `m02-busqueda` | M02: Búsqueda, Filtros y Descubrimiento | 3 |
+| `m03-asesoria` | M03: Asesoría y IA (Simulador/Chatbot) | 6 |
+| `m04-cuentas` | M04: Cuentas, Autenticación y Perfil | 3 |
+| `m05-carrito` | M05: Carrito de Compras | 4 |
+| `m06-precios` | M06: Precios, Promociones y Descuentos | 5 |
+| `m07-checkout` | M07: Checkout y Pago | 5 |
+| `m08-ordenes` | M08: Orden de Venta | 4 |
+| `m09-cumplimiento` | M09: Cumplimiento y Preparación | 4 |
+| `m10-entrega` | M10: Entrega y Transporte | 5 |
+| `m11-postventa` | M11: Postventa (Devoluciones/Reembolsos) | 5 |
+| `m12-facturacion` | M12: Facturación | 5 |
+| `m13-inventario` | M13: Inventario e Integración SAMIT (CSV) | 2 |
+| `m14-patrocinios` | M14: Patrocinios y Campañas | 6 |
+| `m15-atencion` | M15: Atención al Cliente (WhatsApp/FAQ) | 6 |
+| `m16-contenido` | M16: Contenido Institucional | 2 |
+| `m17-permisos` | M17: Administración, Empleados y Permisos | 1 |
+| `m18-notificaciones` | M18: Notificaciones y Comunicaciones | 3 |
+| `m19-reportes` | M19: Reportes y Analítica | 6 |
+| `m20-seguridad` | M20: Seguridad, Auditoría y Protección de Datos | 1 |
+| `m21-cotizaciones` | M21: Cotizaciones | 5 |
 
 ### B. Scopes Transversales (No Modulares)
 

@@ -17,6 +17,7 @@ docs/
 │
 ├── 00_SISTEMA/                       <-- Gobernanza, arquitectura y plantillas del sistema
 │   ├── 01_ARQUITECTURA/              <-- Diseño estructural y dependencias
+│   │   ├── RUTA_DEL_PROYECTO.md      <-- 🗺️ RUTA MAESTRA: 21 módulos, 6 olas y grafo de dependencias
 │   │   ├── ARQUITECTURA_GENERAL.md   <-- Visión general, actores, mapa de dominios y principios
 │   │   ├── ARQUITECTURA_BACKEND.md   <-- Stack oficial: TS, Express 5, Prisma 6, Zod, JWT, BCrypt, SMTP, CORS
 │   │   └── MATRIZ_TRAZABILIDAD.md    <-- Mapeo HU <-> Requisitos de Seguridad <-> Diagramas
@@ -62,5 +63,6 @@ docs/
 
 ## 🚀 Guías de Inicio Rápido
 
-- **Si eres un desarrollador del equipo:** Consulta primero la [Matriz de Trazabilidad](./00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md) para ver el alcance de tu módulo y las políticas de seguridad asociadas.
-- **Si eres un Agente de IA (Copilot / Assistant):** Consulta obligatoriamente [AGENTS.md](../AGENTS.md) en la raíz del proyecto antes de proponer cambios de código o generar nuevos módulos.
+- **Si eres nuevo en el proyecto:** Empieza por la [Ruta del Proyecto](./00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) para entender los 21 módulos, las 6 olas de construcción y cómo encaja tu trabajo en el grafo de dependencias.
+- **Si eres un desarrollador del equipo:** Tras la ruta, consulta la [Matriz de Trazabilidad](./00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md) para ver el alcance de tu módulo y las políticas de seguridad asociadas.
+- **Si eres un Agente de IA (Copilot / Assistant):** Consulta obligatoriamente [AGENTS.md](../AGENTS.md) en la raíz del proyecto antes de proponer cambios de código o generar nuevos módulos. La lectura íntegra de la [Ruta del Proyecto](./00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) es obligatoria y previa a cualquier implementación.

@@ -6,9 +6,10 @@
 > **Antes de escribir una sola línea de código**, todo agente IA DEBE leer en este orden:
 >
 > 1. **[`.sdlc/AGENTS.md`](.sdlc/AGENTS.md)** — Manual rector de la metodología: roles, Stage-Gates, 11 Reglas de Oro inviolables y protocolo de aterrizaje.
-> 2. **[`.sdlc/PINTUCLIC_CONTEXT.md`](.sdlc/PINTUCLIC_CONTEXT.md)** — Stack confirmado, mapa de fuentes de verdad y estado de los 8 módulos.
-> 3. **[`.sdlc/.workflow/current_state.json`](.sdlc/.workflow/current_state.json)** — Fase activa y rol en turno.
-> 4. **[`.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md`](.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md)** — Semáforo de módulos.
+> 2. **[`docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md`](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md)** — 🗺️ **LA RUTA DEL PROYECTO.** Grafo de dependencias de los 21 módulos en 6 olas de construcción. **Lectura íntegra obligatoria:** el agente debe entender la ruta a la totalidad, no solo su módulo.
+> 3. **[`.sdlc/PINTUCLIC_CONTEXT.md`](.sdlc/PINTUCLIC_CONTEXT.md)** — Stack confirmado y mapa de fuentes de verdad.
+> 4. **[`.sdlc/.workflow/current_state.json`](.sdlc/.workflow/current_state.json)** — Fase activa y rol en turno.
+> 5. **[`.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md`](.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md)** — Semáforo de módulos.
 >
 > **El flujo de trabajo de este archivo (pasos 1–10) se ejecuta DENTRO de los Stage-Gates del SDLC.**
 > El SDLC define CUÁNDO puedes codificar. Este archivo define CÓMO codificar.
@@ -29,6 +30,7 @@ Como agente de IA responsable de implementar código, pruebas o arquitectura par
 > 3. **Protocolo de Parada e Informe de Inconsistencias:** Si para completar una HU consideras necesario modificar un archivo compartido o externo a tu módulo, **DEBES DETENER LA EJECUCIÓN INMEDIATAMENTE**, no realizar ningún cambio y presentar un reporte detallado al equipo humano explicando la inconsistencia o necesidad técnica. Solo podrás continuar tras recibir aprobación explícita.
 > 4. **Objetivo 100% Funcional:** No reconstruyas la arquitectura global del backend ni del frontend. Concéntrate en cumplir al 100% los Criterios de Aceptación (CA) y Requisitos Funcionales (RF) de cada Historia de Usuario usando el stack tecnológico aprobado.
 > 5. **Los Diagramas son Contratos de Flujo Obligatorios:** Los diagramas han sido diseñados y consensuados por todo el equipo de ingeniería. No son meras ilustraciones: **definen la máquina de estados, ramificaciones condicionales, secuencias de llamadas y manejo de errores exactos** que tu código debe respetar.
+> 5.1. **🗺️ LA RUTA DEL PROYECTO ES UN CONTRATO DE ORDEN DE CONSTRUCCIÓN:** Todo agente DEBE leer íntegramente [`docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md`](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) y **comprender la ruta a la totalidad** — los 21 módulos, las 6 olas y el grafo completo de dependencias — antes de escribir código. No basta con leer la ficha de tu módulo: debes saber qué módulos lo preceden, cuáles dependen de él y en qué ola se ubica. En ese grafo, una flecha `A --> B` significa que **`B` depende de `A`**: está PROHIBIDO implementar un módulo cuyas dependencias no estén terminadas y certificadas en [`PROJECT_STATUS.md`](.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md). Queda igualmente PROHIBIDO crear módulos no listados en esa ruta, renombrarlos, fusionarlos o saltarse olas. Si detectas un bloqueo de dependencias o una inconsistencia en la ruta, aplica la Directiva #3 (detener y reportar).
 > 6. **Walkthrough en CADA Implementación:** Tras CUALQUIER cambio o implementación de código, es MANDATORIO generar el Walkthrough de Implementación correspondiente en `docs/walkthroughs/M[XX]/` según la [guía de walkthroughs](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_VERSIONADO_Y_WALKTHROUGHS.md).
 > 7. **Convención de Commits y Push Controlado:** Los commits deben crearse usando el formato `tipo(scope): descripcion` en minúsculas y modo imperativo, **sin prefijo de versión** (la versión va únicamente en el título de la PR). La **fuente única de verdad** sobre tipos permitidos, scopes y el árbol de decisión es [docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md), **de lectura obligatoria antes de cualquier commit**.
 >    - **🔴 REGLA CRÍTICA — `feat` EXIGE UNA HU:** El tipo `feat` se reserva **exclusivamente** para funcionalidad real de negocio que satisface una Historia de Usuario con código verificable end-to-end. **Si no puedes citar un código `HU-XXX-NN` concreto que la entrega satisface, el commit NO ES `feat`.** Estructura de carpetas, scaffolding, arquitectura, configuración, dependencias, contratos Zod sin implementar y schema Prisma son **`chore`** o **`docs`**, nunca `feat`.
@@ -46,7 +48,10 @@ Como agente de IA responsable de implementar código, pruebas o arquitectura par
 
 ```mermaid
 graph TD
-    A[Requerimiento / HU Solicitada] --> B[1. Consultar docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md]
+    A[Requerimiento / HU Solicitada] --> R[0. Leer RUTA_DEL_PROYECTO.md completa:<br/>21 modulos, 6 olas, grafo de dependencias]
+    R --> R2{Las dependencias del modulo<br/>estan certificadas?}
+    R2 -- No --> RSTOP[🛑 PARAR Y REPORTAR<br/>Dependencias sin cerrar]
+    R2 -- Si --> B[1. Consultar docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md]
     B --> C[2. Leer Especificación en docs/02_MODULOS_FUNCIONALES]
     C --> D[3. Inspección OBLIGATORIA de Diagramas en docs/assets/diagrams/]
     D --> E[4. Leer Políticas Transversales en docs/01_TRANSVERSALES]
@@ -59,6 +64,13 @@ graph TD
     K --> L[9. Generar Walkthrough Oficial]
     L --> M[10. Commit Semántico y Push a la Rama Asignada]
 ```
+
+### Paso 0: Ubicación en la Ruta del Proyecto (OBLIGATORIO Y PREVIO A TODO)
+- Lee **íntegramente** [docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md). No leas solo la fila de tu módulo: **comprende la ruta a la totalidad**.
+- Identifica con precisión: (a) en qué **ola** se ubica tu módulo, (b) de qué módulos **depende**, (c) qué módulos **habilita** tu trabajo, y (d) si está en el **camino crítico**.
+- Verifica en [`.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md`](.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md) que **todas** las dependencias del grafo estén terminadas y certificadas.
+- 🛑 **Si alguna dependencia no está cerrada, DETÉN LA EJECUCIÓN y repórtalo.** No implementes un módulo cuyos predecesores no existen: producirías código contra interfaces inventadas.
+- 🛑 **Si el módulo no tiene especificación funcional** (13 de los 21 están marcados ❌ en la ruta), detente: la spec es un entregable del Gate 1 del Product Manager, no del implementador.
 
 ### Paso 1: Localización y Mapeo de Dependencias
 - Identifica el código de la Historia de Usuario (ejemplo: `HU-CUE-01`, `HU-ADM-02`, etc.).
@@ -149,6 +161,7 @@ Siguiendo el esquema de [CONTRIBUTING.md](CONTRIBUTING.md) y la [Guía de Commit
 ## 📂 Índice del Repositorio y Documentación
 
 - [docs/CHANGELOG.md](./docs/CHANGELOG.md): Registro central de versiones del proyecto.
+- 🗺️ **[docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md): LA RUTA DEL PROYECTO — grafo de dependencias de los 21 módulos en 6 olas de construcción. Lectura íntegra obligatoria antes de codificar.**
 - [docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_GENERAL.md](./docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_GENERAL.md): Resumen de dominios, actores, módulos y dependencias globales.
 - [docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_BACKEND.md](./docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_BACKEND.md): Stack oficial, directivas de aislamiento y protocolo de parada.
 - [docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md](./docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md): Mapeo directo entre Historias de Usuario, Transversales y Diagramas.
