@@ -1,0 +1,276 @@
+// ⚠️  FUENTE ÚNICA de la estructura de base de datos.
+// Ejecutar `npx prisma generate` cada vez que se modifique este archivo.
+// Los tipos TypeScript son generados automáticamente — NO definirlos manualmente en los módulos.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum TipoUsuario {
+  B2C
+  B2B
+  EMPLEADO
+  ADMIN
+
+  @@map("tipo_usuario")
+}
+
+enum EstadoOrden {
+  PENDIENTE
+  CONFIRMADA
+  EN_PREPARACION
+  DESPACHADA
+  ENTREGADA
+  CANCELADA
+  DEVOLUCION
+
+  @@map("estado_orden")
+}
+
+enum TipoDocumento {
+  CC
+  NIT
+  CE
+  PASAPORTE
+
+  @@map("tipo_documento")
+}
+
+// =============================================================================
+// MÓDULO M20 — SEGURIDAD Y AUDITORÍA
+// =============================================================================
+
+model LogAuditoria {
+  id            Int      @id @default(autoincrement())
+  usuario_id    Int?
+  accion        String
+  entidad       String
+  entidad_id    String?
+  detalle       String?
+  ip_origen     String?
+  user_agent    String?
+  creado_en     DateTime @default(now())
+
+  @@map("log_auditoria")
+}
+
+model SesionToken {
+  id           Int      @id @default(autoincrement())
+  usuario_id   Int
+  token_hash   String   @unique
+  revocado     Boolean  @default(false)
+  expira_en    DateTime
+  creado_en    DateTime @default(now())
+
+  @@map("sesion_token")
+}
+
+// =============================================================================
+// MÓDULO M17 — PERMISOS Y ROLES
+// =============================================================================
+
+model Permiso {
+  id          Int      @id @default(autoincrement())
+  codigo      String   @unique
+  descripcion String?
+  modulo      String
+  creado_en   DateTime @default(now())
+
+  usuario_permisos UsuarioPermiso[]
+
+  @@map("permiso")
+}
+
+model UsuarioPermiso {
+  id           Int      @id @default(autoincrement())
+  usuario_id   Int
+  permiso_id   Int
+  otorgado_por Int?
+  creado_en    DateTime @default(now())
+
+  permiso   Permiso @relation(fields: [permiso_id], references: [id])
+
+  @@unique([usuario_id, permiso_id])
+  @@map("usuario_permiso")
+}
+
+// =============================================================================
+// MÓDULO M04 — CUENTAS
+// =============================================================================
+
+model Usuario {
+  id               Int           @id @default(autoincrement())
+  correo           String        @unique
+  password_hash    String?
+  nombre_completo  String
+  tipo_documento   TipoDocumento?
+  numero_documento String?
+  telefono         String?
+  tipo             TipoUsuario   @default(B2C)
+  activo           Boolean       @default(true)
+  verificado       Boolean       @default(false)
+  google_id        String?       @unique
+  creado_en        DateTime      @default(now())
+  actualizado_en   DateTime      @updatedAt
+
+  empresa         EmpresaB2B?
+  direcciones     DireccionEnvio[]
+
+  @@map("usuario")
+}
+
+model EmpresaB2B {
+  id            Int      @id @default(autoincrement())
+  usuario_id    Int      @unique
+  razon_social  String
+  nit           String   @unique
+  activo        Boolean  @default(false)
+  creado_en     DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuario_id], references: [id])
+
+  @@map("empresa_b2b")
+}
+
+model DireccionEnvio {
+  id           Int      @id @default(autoincrement())
+  usuario_id   Int
+  nombre       String
+  direccion    String
+  ciudad       String
+  departamento String
+  codigo_postal String?
+  predeterminada Boolean @default(false)
+  creado_en    DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuario_id], references: [id])
+
+  @@map("direccion_envio")
+}
+
+// =============================================================================
+// MÓDULO M01 — CATÁLOGO
+// =============================================================================
+
+model Categoria {
+  id          Int         @id @default(autoincrement())
+  nombre      String
+  slug        String      @unique
+  descripcion String?
+  imagen_url  String?
+  activa      Boolean     @default(true)
+  padre_id    Int?
+
+  padre       Categoria?  @relation("CategoriaPadre", fields: [padre_id], references: [id])
+  hijos       Categoria[] @relation("CategoriaPadre")
+  productos   Producto[]
+
+  @@map("categoria")
+}
+
+model Producto {
+  id            Int       @id @default(autoincrement())
+  sku           String    @unique
+  nombre        String
+  slug          String    @unique
+  descripcion   String?
+  categoria_id  Int
+  activo        Boolean   @default(true)
+  creado_en     DateTime  @default(now())
+  actualizado_en DateTime @updatedAt
+
+  categoria   Categoria    @relation(fields: [categoria_id], references: [id])
+  variantes   VarianteProducto[]
+
+  @@map("producto")
+}
+
+model VarianteProducto {
+  id           Int      @id @default(autoincrement())
+  producto_id  Int
+  sku_variante String   @unique
+  color        String?
+  rendimiento  String?
+  acabado      String?
+  precio_b2c   Decimal  @db.Decimal(12, 2)
+  precio_b2b   Decimal? @db.Decimal(12, 2)
+  stock        Int      @default(0)
+  activa       Boolean  @default(true)
+
+  producto     Producto    @relation(fields: [producto_id], references: [id])
+  items_carrito ItemCarrito[]
+  items_orden   ItemOrden[]
+
+  @@map("variante_producto")
+}
+
+// =============================================================================
+// MÓDULO M05 — CARRITO DE COMPRAS
+// =============================================================================
+
+model Carrito {
+  id          Int      @id @default(autoincrement())
+  usuario_id  Int      @unique
+  creado_en   DateTime @default(now())
+  actualizado_en DateTime @updatedAt
+
+  items ItemCarrito[]
+
+  @@map("carrito")
+}
+
+model ItemCarrito {
+  id           Int     @id @default(autoincrement())
+  carrito_id   Int
+  variante_id  Int
+  cantidad     Int
+  precio_unitario Decimal @db.Decimal(12, 2)
+
+  carrito  Carrito          @relation(fields: [carrito_id], references: [id])
+  variante VarianteProducto @relation(fields: [variante_id], references: [id])
+
+  @@unique([carrito_id, variante_id])
+  @@map("item_carrito")
+}
+
+// =============================================================================
+// MÓDULO M08 — ÓRDENES
+// =============================================================================
+
+model Orden {
+  id              Int         @id @default(autoincrement())
+  numero          String      @unique
+  usuario_id      Int
+  estado          EstadoOrden @default(PENDIENTE)
+  total           Decimal     @db.Decimal(12, 2)
+  direccion_id    Int?
+  notas           String?
+  creado_en       DateTime    @default(now())
+  actualizado_en  DateTime    @updatedAt
+
+  items ItemOrden[]
+
+  @@map("orden")
+}
+
+model ItemOrden {
+  id              Int     @id @default(autoincrement())
+  orden_id        Int
+  variante_id     Int
+  cantidad        Int
+  precio_unitario Decimal @db.Decimal(12, 2)
+
+  orden    Orden            @relation(fields: [orden_id], references: [id])
+  variante VarianteProducto @relation(fields: [variante_id], references: [id])
+
+  @@map("item_orden")
+}
