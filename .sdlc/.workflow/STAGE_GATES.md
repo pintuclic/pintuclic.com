@@ -13,6 +13,50 @@ Ningún agente de IA puede encadenar fases de forma autónoma más allá de una 
 
 ---
 
+## 1.1. Independencia del Auditor (Separación de Funciones)
+
+**El agente que implementó un módulo en Fase 3A o Fase 3B NO puede asumir el rol
+`05_qa_security_tester` para auditar ese mismo módulo.**
+
+El SDLC define al QA Lead como *fiscal técnico imparcial con poder de veto*, y la Regla de Oro #6
+le prohíbe corregir código de producción. Ambas cosas presuponen **separación de funciones**: quien
+escribió el código conoce sus atajos y sus supuestos, y ese conocimiento sesga dónde busca. Una
+autocertificación es estructuralmente débil por bien intencionada que sea.
+
+- **Regla:** Gate 4 lo ejecuta un agente distinto del que implementó.
+- **Excepción:** si no hay otro agente disponible, el **Director Humano lo autoriza de forma
+  explícita** y el `QA_REPORT.md` **abre declarando el conflicto de interés**, con esta leyenda:
+  > ⚠️ *Auditoría realizada por el mismo agente que implementó el módulo, por indisponibilidad de un
+  > auditor independiente, con autorización del Director Humano del [fecha]. Su dictamen tiene valor
+  > reducido y debe revalidarse cuando haya un auditor independiente.*
+- **Lo que NO autoriza la excepción:** levantar un veto propio. Un agente nunca cierra una incidencia
+  que él mismo introdujo sin revisión externa.
+
+---
+
+## 1.2. Diferir o Recortar una Compuerta Exige un RFC
+
+**Ninguna compuerta se difiere, se recorta ni se declara "no aplicable" por acuerdo verbal.**
+
+Una compuerta puede no encajar con un módulo concreto —un módulo transversal sin interfaz no tiene
+nada que enseñar en Gate 3B; un módulo que no puede ejecutarse todavía no es auditable en Gate 4—.
+Esas situaciones son legítimas y se resuelven, **pero dejando rastro**: si la decisión vive solo en
+una conversación, dentro de seis meses nadie sabrá por qué una versión se publicó sin certificar.
+
+Procedimiento obligatorio:
+
+1. **Redactar un RFC** según [`../multiAgents/protocols/TECHNICAL_PROPOSALS_PROTOCOL.md`](../multiAgents/protocols/TECHNICAL_PROPOSALS_PROTOCOL.md), indicando qué compuerta, por qué no aplica tal como está escrita, qué se entrega en su lugar y bajo qué condición se retoma.
+2. **Obtener la firma del Director Humano** sobre ese RFC. La aprobación verbal no basta: se registra.
+3. **Registrarlo en `bloqueos[]`** de `current_state.json` con su identificador de RFC.
+4. **Citar el RFC en la entrada del CHANGELOG** de toda versión afectada, para que la publicación declare lo que no se verificó.
+
+> 📌 **Esta regla nace de un caso real.** En M20 se difirió Gate 4 —con buen criterio: el módulo no
+> podía ejercitarse end-to-end sin el login de M04— pero la decisión se tomó en prosa, sin RFC. La
+> condición que el QA Lead había impuesto en la mesa ATDD sobre `CA-SEG-03-05` quedó registrada solo
+> en bitácoras y **sin matriz RTM que la sostuviera**. Diferir no exime de declarar la cobertura.
+
+---
+
 ## 2. Mapa Canónico de las Compuertas del SDLC
 
 ```text
