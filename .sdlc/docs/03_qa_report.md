@@ -50,4 +50,5 @@ Cada módulo auditado genera su reporte forense independiente en:
 
 | Módulo | Versión | Tests Ejecutados | Violaciones A11y | Cero ANY | Dictamen Final |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| *(ninguno auditado todavía)* | — | — | — | — | ⚪ PENDIENTE |
+| **M20 — Seguridad y Auditoría** | `v0.2.0` | 55 (36 BE + 19 FE) | N/A (sin vistas SPA) | ✅ 0 ANYs | 🟡 CÓDIGO CONFORME / 🔵 GATE 4 DIFERIDO |
+
