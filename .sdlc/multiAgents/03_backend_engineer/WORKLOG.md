@@ -90,3 +90,29 @@ faltante. `eslint.config.js` → `.mjs` para eliminar el aviso de reparseo de No
 
 **No tocado (dominio exclusivo de DevOps):** `backend/.env.example`, los dos `Dockerfile` y los
 `.dockerignore`. Ver incidencia elevada en el `WORKLOG.md` de `06_devops_release`.
+
+### 2026-10-21 — Respuesta al QA_REPORT de M20
+
+**Hallazgo #1 (S4) — ACEPTADO Y SALDADO.** El hallazgo es correcto: entregué la implementación de
+backend sin emitir su walkthrough, dejando la evidencia solo en esta bitácora. La Directiva #6 exige
+uno por **cada** implementación y la guía de versionado impone el sufijo de capa precisamente para
+que backend y frontend no se solapen. Emitido
+`docs/walkthroughs/M20/walkthrough_v0.2.0_M20_seguridad_backend.md`.
+
+La causa raíz que el QA Lead apunta es exacta: di por bueno que el walkthrough de frontend cubría la
+entrega coordinada. No la cubría — son dos capas, dos artefactos.
+
+**Hallazgo #2 (S3) — CONFORME.** Nada que objetar: M20 es la raíz del grafo y el login es de M04.
+
+> ⚠️ **SOLICITUD DE CORRECCIÓN (FEEDBACK LOOP)**
+> **De:** `03_backend_engineer` · **Para:** `05_qa_security_tester`
+> **Artefacto:** `.sdlc/docs/qa/M20/v0.2.0/QA_REPORT.md` §3, fila `HU-SEG-02`
+> **Motivo:** el reporte consigna la cookie de sesión como **`SameSite=Lax`**. El valor implementado
+> es **`Strict`**, tanto en `backend/src/core/utils/cookieSesion.ts:13` como en el contrato
+> `m20-seguridad.contract.ts:146`, donde está fijado con `z.literal('strict')`.
+> **Por qué importa:** no es un matiz de redacción. `Lax` permite el envío de la cookie en
+> navegaciones de nivel superior desde otro sitio; `Strict` no. Un reporte de seguridad que registre
+> una propiedad anti-CSRF más débil de la real puede inducir a reforzar algo que ya está reforzado, o
+> a asumir esa defensa al auditar otro módulo.
+> **Acción requerida:** corregir la celda. No altero el artefacto porque la potestad sobre el
+> dictamen es exclusiva del QA Lead.
