@@ -171,8 +171,12 @@ los restantes que cayeran dentro de los limites del modulo.
    se calculan sobre la pagina actual exigen agregados del backend, o sea ampliar el contrato de M17.
    Se recomienda retirar las afirmaciones "100% verificado en servidor" y "Sesiones revocadas en
    0ms", que el codigo no respalda.
-3. **Activacion de `jsx-a11y` en `frontend/eslint.config.mjs`: PENDIENTE.** El hook de proteccion de
-   configuracion del entorno bloquea la edicion de ese archivo. El bloque de reglas esta redactado y
-   validado, a la espera de que el Director Humano lo aplique o autorice el bypass del hook. Sin esa
-   activacion, la compuerta de lint sigue dependiendo solo de `audit-a11y.mjs`, cuyo detector solo
-   reconoce etiquetas HTML nativas en minuscula y queda ciego ante los componentes del Core Kit.
+3. **Compuerta de accesibilidad: PARCIAL.** Se incorporo el script `npm run lint:a11y` en
+   `frontend/package.json`, que ejecuta 8 reglas de `eslint-plugin-jsx-a11y` sobre `src/app` y
+   `src/modules` con `--max-warnings=0`. Verificado que detecta de verdad: apuntado a `src/core`
+   devuelve los 2 errores conocidos del Core Kit; sobre el alcance oficial sale en 0.
+   **Pendiente:** integrarlas en `frontend/eslint.config.mjs` para que `npm run lint` las aplique de
+   forma nativa. El hook de proteccion de configuracion del entorno bloquea la edicion de ese
+   archivo, asi que queda a decision del Director Humano. El alcance debe excluir `src/core/` por la
+   Directiva #1 hasta que su equipo propietario cierre sus 2 violaciones; al cerrarse, basta ampliar
+   el `files` a todo el frontend.
