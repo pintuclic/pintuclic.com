@@ -219,5 +219,43 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 - **Reporte Oficial:** `.sdlc/docs/qa/M17/v0.3.1/QA_REPORT.md`.
 - **Acción:** M17 v0.3.1 queda plenamente listo para Gate 5 (Release SemVer) y consolida la base de Ola 1 para iniciar Ola 2 (`M01`).
 
+---
 
+### [2026-10-21 13:45] — 🟢 AUDITORÍA FORENSE Y CERTIFICACIÓN DE CALIDAD — M20 (v0.3.2)
 
+> **Insumo:** `docs/walkthroughs/M20/walkthrough_v0.3.2_M20_remediacion_accesibilidad_core_kit_frontend.md`  
+> **Auditor:** QA Lead & Security Compliance Director (`05_qa_security_tester`)  
+> **Naturaleza:** Remediación estructural de accesibilidad en Core Kit compartido (M20 Frontend Infraestructura).
+
+#### 1. Resultados de Ejecución Real y Batería Automatizada
+- **Vitest Frontend:** **57/57 tests PASS** (9 suites, +10 pruebas unitarias nuevas en `src/core/tests/foco.test.ts`).
+- **Vitest Backend:** **68/68 tests PASS** (12 suites). Total combinado: **125 tests PASS** (regresión cero).
+- **ESLint JSX-A11Y (`npm run lint:a11y`):** **0 errores** (revertida exclusión de `src/core`, pasando de 2 errores a 0 en todo el árbol `src/app src/core src/modules`).
+- **Auditoría AST Cero ANY (`npm run check:no-any`):** **75 archivos frontend auditados, 0 usos de ANY (PASS)**.
+- **Compilación TypeScript (`tsc --noEmit`):** **0 errores** en frontend.
+- **Linter Frontend (`next lint --max-warnings=0`):** **0 errores, 0 warnings**.
+- **Auditorías de Gobernanza:**
+  - `node .sdlc/tooling/audit-core-kit.mjs`: **0 violaciones** (13 archivos conformes).
+  - `node .sdlc/tooling/audit-zod-chains.mjs`: **0 anti-patrones** (14 archivos conformes).
+  - `node .sdlc/tooling/audit-a11y.mjs`: **0 violaciones WCAG 2.1 AA** (28 archivos conformes).
+
+#### 2. Validación de Defectos Remediados
+1. **`Modal.tsx` (Foco, Diálogo y WCAG 2.2):**
+   - Región de diálogo: `role="dialog"`, `aria-modal="true"` y atributos semánticos reubicados del fondo al panel (`panelRef`).
+   - Identificadores accesibles: `aria-labelledby` y `aria-describedby` vinculados con `useId()` (`idTitulo`, `idSubtitulo`); prop `ariaLabel` para modales sin título.
+   - Trampa de foco cíclica: implementación pura en `foco.ts` (`siguienteIndiceDeFoco`) con 10 pruebas unitarias cubriendo todas las ramificaciones.
+   - Retorno de foco: el foco regresa a `elementoPrevio` al cerrar el modal.
+   - Cierre exterior desacoplado: listener de `pointerdown` en `document` validando `!panel.contains(evento.target)`, eliminando handlers sobre contenedores decorativos.
+   - Preservación de seguridad `HU-SEG-06`: verificado que `CrearEmpleadoModal` mantiene la inmunidad contra cierre por Escape y backdrop mientras la credencial temporal está visible.
+2. **`ProductCard.tsx` (Interacción por Teclado):**
+   - El encabezado `<h3>` delega la interacción a un `<button type="button">` nativo cuando `onViewDetails` está presente, habilitando navegación y activación por teclado (`Tab`, `Enter`, `Espacio`).
+3. **Ampliación de `lint:a11y`:**
+   - `frontend/package.json` incluye `src/core` en la compuerta de accesibilidad, blindando el Core Kit contra futuras regresiones.
+
+#### 3. Declaración de Brechas Técnicas
+- Sin `jsdom` en vitest (entorno `node`), el cableado de eventos DOM se valida por análisis estático AST (`jsx-a11y`) e inspección de código. El algoritmo de foco está cubierto al 100% por pruebas unitarias.
+
+#### 4. Dictamen Final
+- **Veredicto Gate 4A (Infraestructura Core Kit):** 🟢 **APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA**.
+- **Reporte Oficial:** `.sdlc/docs/qa/M20/v0.3.2/QA_REPORT.md`.
+- **Acción:** Deuda técnica de accesibilidad del Core Kit cerrada. Componentes listos para habilitar M04 y M01.

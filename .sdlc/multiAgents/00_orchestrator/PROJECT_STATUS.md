@@ -1,7 +1,7 @@
 > **Última Actualización:** 2026-10-21
-> **Fase Activa:** FASE 4 COMPLETADA — **M17 CERTIFICADO TRAS REMEDIACIÓN INTEGRAL**
-> **Última entrega:** `v0.3.2` — remediación de accesibilidad del Core Kit compartido de M20 (`Modal.tsx` y `ProductCard.tsx`; 57/57 Vitest frontend, 125/125 total)
-> **Deuda abierta de M17:** ✅ **Cerrados** en `v0.3.2` los 2 defectos de accesibilidad del Core Kit (foco y teclado), y la compuerta `lint:a11y` amplía su alcance a `src/core` para impedir su reaparición. Siguen abiertos los 2 hallazgos bloqueados por dependencias: identidad real de sesión → M04; KPIs agregados → contrato de M17. Detalle en el WORKLOG de `04_frontend_engineer`.
+> **Fase Activa:** FASE 4 COMPLETADA — **M17 Y CORE KIT v0.3.2 CERTIFICADOS TRAS REMEDIACIÓN INTEGRAL**
+> **Última entrega:** `v0.3.2` — remediación de accesibilidad del Core Kit compartido de M20 (`Modal.tsx` y `ProductCard.tsx`; 57/57 Vitest frontend, 125/125 total). Certificado por QA en Gate 4A.
+> **Deuda abierta de M17:** ✅ **Cerrados y certificados por QA** en `v0.3.2` los 2 defectos de accesibilidad del Core Kit (foco y teclado), y la compuerta `lint:a11y` amplía su alcance a `src/core` para impedir su reaparición. Siguen abiertos los 2 hallazgos bloqueados por dependencias: identidad real de sesión → M04; KPIs agregados → contrato de M17. Detalle en el WORKLOG de `04_frontend_engineer` y reporte de QA.
 > **Agente en Turno:** `00_orchestrator` · **Módulo en curso: M17** (Administración y Permisos Certificado)
 > **Alcance del Sistema:** **21 módulos en 6 olas** — 8 con spec, 13 pendientes de Gate 1
 > **Ruta Maestra:** 🗺️ [`RUTA_DEL_PROYECTO.md`](../../../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) (lectura íntegra obligatoria)
