@@ -84,6 +84,24 @@ enum TipoUsuario {
   @@map("enum_tipo_usuario")
 }
 
+/// Áreas de configuración general del sistema (M17 · RFC-M17-001)
+enum AreaParametro {
+  autenticacion
+  comunicaciones
+  comercial
+
+  @@map("enum_area_parametro")
+}
+
+/// Tipos de datos para parámetros de configuración (M17 · RFC-M17-001)
+enum TipoDatoParametro {
+  numero
+  texto
+  booleano
+
+  @@map("enum_tipo_dato_parametro")
+}
+
 // =============================================================================
 // MÓDULO M04 — USUARIO (declaración mínima)
 //
@@ -102,9 +120,10 @@ model Usuario {
   estado     EstadoUsuario @default(activo)
   tipo       TipoUsuario   @default(normal)
 
-  sesiones             Sesion[]
-  consentimientos      ConsentimientoUsuario[]
-  solicitudesSupresion SolicitudSupresion[]
+  sesiones               Sesion[]
+  consentimientos        ConsentimientoUsuario[]
+  solicitudesSupresion   SolicitudSupresion[]
+  parametrosActualizados ParametroSistema[] @relation("ParametroUsuarioActualizo")
 
   rolDirecto           Rol?         @relation("UsuarioRolDirecto", fields: [idRol], references: [idRol])
   usuarioRol           UsuarioRol?
@@ -169,6 +188,26 @@ model UsuarioRol {
   @@index([idUsuario])
   @@index([idRol])
   @@map("usuario_rol")
+}
+
+/// Parámetros de configuración general modificables en caliente por el administrador (M17 · HU-ADM-05, HU-ADM-07, RFC-M17-001)
+model ParametroSistema {
+  idParametro         Int                @id @default(autoincrement()) @map("id_parametro")
+  clave               String             @unique @db.VarChar(100)
+  area                AreaParametro
+  tipoDato            TipoDatoParametro  @map("tipo_dato")
+  descripcion         String
+  valor               Json
+  valorPorDefecto     Json               @map("valor_por_defecto")
+  rangoMinimo         Decimal?           @map("rango_minimo") @db.Decimal(14, 2)
+  rangoMaximo         Decimal?           @map("rango_maximo") @db.Decimal(14, 2)
+  fechaActualizacion  DateTime           @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo  Int?               @map("id_usuario_actualizo")
+
+  usuarioActualizo    Usuario?           @relation("ParametroUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onUpdate: Cascade, onDelete: SetNull)
+
+  @@index([idUsuarioActualizo], map: "idx_parametro_sistema_usuario")
+  @@map("parametro_sistema")
 }
 
 // =============================================================================

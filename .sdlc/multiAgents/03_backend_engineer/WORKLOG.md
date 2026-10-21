@@ -139,3 +139,36 @@ entrega coordinada. No la cubría — son dos capas, dos artefactos.
 - `npm run check:types` (`tsc --noEmit`): ✅ 0 errores.
 - `npm run test` (Vitest): ✅ 12/12 suites pasadas, 68/68 tests aprobados (100% pass).
 
+---
+
+## 2026-10-21 — M17 · Persistencia Relacional de Parámetros v0.3.3 (RFC-M17-001)
+
+**Rol:** Backend Lead Engineer · **Sello:** ✅ Firmado en turno propio
+
+### Subroles convocados
+- **03 · Data Layer Optimizer** — Mapeo de `parametro_sistema` en `backend/prisma/schema.prisma` con enums `AreaParametro` y `TipoDatoParametro`. Regeneración exitosa con `prisma generate`.
+- **02 · Domain Business Rules** — Implementación de `PrismaConfiguracionRepository` con caché corta en memoria de 30s para lecturas de alta frecuencia e invalidación reactiva ante actualizaciones.
+- **01 · API Gateway & Security** — Propagación de `idAdmin` desde `req.actor?.idUsuario` en `ConfiguracionController` hasta `actualizar()` para auditar autoría en `id_usuario_actualizo`.
+- **04 · Developer TDD Tester** — Suite de pruebas para `PrismaConfiguracionRepository` (lectura con caché, invalidación reactiva) y pruebas unitarias aisladas sin hardcodear datos iniciales en código (cumplimiento Directiva #10).
+
+### Entregables
+- `backend/prisma/schema.prisma` (modelo `ParametroSistema`, relación en `Usuario`, enums `AreaParametro` y `TipoDatoParametro`).
+- `backend/src/modules/m17-permisos/`:
+  - `interfaces/configuracion.port.ts` (`idUsuarioActualizo`, `idAdmin` opcional en `actualizar`).
+  - `repositories/configuracion.repository.ts` (`PrismaConfiguracionRepository` con caché 30s + `AlmacenConfiguracionMemoria` para tests sin datos iniciales hardcodeados).
+  - `services/configuracion.service.ts` (propagación de `idAdmin`).
+  - `controllers/configuracion.controller.ts` (extracción de `req.actor?.idUsuario`).
+  - `m17.routes.ts` (inyección de `PrismaConfiguracionRepository`).
+  - `__tests__/configuracion.service.test.ts` (8 tests Vitest incluyendo suite de caché e invalidación).
+- `docs/walkthroughs/M17/walkthrough_v0.3.3_M17_persistencia_parametros_backend.md`.
+- `docs/CHANGELOG.md` y `.github/version.txt` actualizados a `v0.3.3`.
+
+### Verificación de Calidad (Zero Warnings / Zero Errors)
+- `npx tsc --noEmit`: ✅ 0 errores.
+- `npm run lint`: ✅ 0 errores, 0 advertencias.
+- `npm test` (Vitest backend): ✅ 12/12 suites pasadas, 71/71 tests aprobados (100% pass).
+- `npm run check:no-any`: ✅ 145 archivos auditados, 0 usos de `any`.
+- `npm run test:contracts`: ✅ 12/12 validaciones exitosas.
+- `npm run verify:state`: ✅ Estado SDLC validado.
+
+

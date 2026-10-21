@@ -32,6 +32,7 @@ export class ConfiguracionService {
   async actualizarParametro(
     clave: ClaveParametro,
     input: ActualizarParametroInput,
+    idAdmin?: number,
   ): Promise<ActualizarParametroOutput> {
     const actual = await this.configPort.obtener(clave);
     if (!actual) {
@@ -52,7 +53,7 @@ export class ConfiguracionService {
 
     try {
       const valorAnterior = actual.valor;
-      const actualizado = await this.configPort.actualizar(clave, input.valor);
+      const actualizado = await this.configPort.actualizar(clave, input.valor, idAdmin);
 
       return {
         clave,

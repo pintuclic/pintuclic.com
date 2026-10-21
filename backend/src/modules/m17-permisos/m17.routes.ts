@@ -11,7 +11,7 @@ import { GobernanzaAdminController } from './controllers/gobernanza-admin.contro
 import { PermisosController } from './controllers/permisos.controller';
 import type { GobernanzaAdminRepositoryPort } from './interfaces/gobernanza.interface';
 import { ClientesAdminRepository } from './repositories/clientes-admin.repository';
-import { AlmacenConfiguracionMemoria } from './repositories/configuracion.repository';
+import { PrismaConfiguracionRepository } from './repositories/configuracion.repository';
 import { EmpleadosRepository } from './repositories/empleados.repository';
 import { GobernanzaAdminRepository } from './repositories/gobernanza-admin.repository';
 import { PermisosRepository } from './repositories/permisos.repository';
@@ -56,7 +56,7 @@ export function construirModuloM17(
   const permisosRepo = new PermisosRepository();
   const empleadosRepo = new EmpleadosRepository();
   const clientesRepo = new ClientesAdminRepository();
-  const configRepo = new AlmacenConfiguracionMemoria();
+  const configRepo = new PrismaConfiguracionRepository();
   const gobernanzaRepo = new GobernanzaAdminRepository();
 
   // 2. Servicios

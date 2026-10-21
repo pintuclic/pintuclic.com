@@ -1,14 +1,14 @@
 {
   "proyecto": "Pintu Clic",
   "dominio": "pintuclic.com",
-  "version_actual": "v0.3.2",
+  "version_actual": "v0.3.3",
   "fecha_actualizacion": "2026-10-21",
-  "fase_activa": "FASE_2_ARQUITECTURA",
-  "gate_activo": "GATE_1_FIRMADO",
-  "estado": "FASE_2_EN_CURSO",
-  "rol_en_turno": "02_software_architect",
-  "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 (Cuentas, Autenticacion y Perfil): GATE 1 FIRMADO por el Director Humano el 2026-10-21 (instruccion expresa \"firma el gate 1\", transcrita por el agente), lo que valida las decisiones de producto DP-01..DP-19. RESERVA REGISTRADA: al firmarse, la mesa ATDD seguia sin los dictamenes del Arquitecto y del QA (ver bloqueos: RESERVA_DE_COMPUERTA); la firma no la resolvio. FASE 2 EN CURSO, aun sin contrato Zod ni ADRs. Por instruccion del Director se aplico al DDL (bd/sql) lo aprobado del RFC-M04-001: C-1 (tabla cuenta_empresa) y C-3 opcion A (tabla documento_soporte y solicitud_actualizacion_nit.id_documento), con version de BD 2.8 / esquema 4.0 y validacion contra PostgreSQL 18.6 en instalacion limpia y en actualizacion de una base 3.9. Siguen PENDIENTES de decision los cambios C-2 y C-4..C-9 del RFC. NO se ha tocado backend/prisma/schema.prisma (archivo compartido, Directiva #3). Salto de ola autorizado: M04 antes que M18 y que la Ola 2. El Director corregira lo pendiente de M17 antes de codificar M04. ACTUALIZACION: por instruccion del Director se creo la tabla parametro_sistema (BD 2.9 / esquema 4.1, 52 tablas) segun RFC-M17-001, que cumple el punto 4 de ADR-007. El codigo de M17 AUN lee de memoria: falta el modelo Prisma y el repositorio (cambio de M17, que corrige el Director). REVISION POSTERIOR (2026-10-21, por instruccion del Director): se corrigio el rango de contrasena de M17 (12-32, con prueba que lo ata al piso de M20; 70/70 en backend), se anadio un disparador para fecha_actualizacion y se completo la documentacion de BD (52 de 52 tablas, Kysely->Prisma). Observacion nueva: M20 no lee el parametro auth.complejidad_minima_contrasena.",
+  "fase_activa": "FASE_3A_BACKEND",
+  "gate_activo": "GATE_2_FIRMADO",
+  "estado": "FASE_3A_EN_CURSO",
+  "rol_en_turno": "03_backend_engineer",
+  "modulo_en_curso": "M17",
+  "nota_de_contexto": "M17 (Administracion, Empleados y Permisos): Fase 3A en curso para persistencia de parametros generales en base de datos segun RFC-M17-001 aprobado por el Director Humano. Reemplazo de AlmacenConfiguracionMemoria por PrismaConfiguracionRepository conectado a parametro_sistema, inclusion de idAdmin en ConfiguracionPort.actualizar y cache corta en memoria. M04 queda en espera hasta cerrar y verificar esta persistencia.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
@@ -77,8 +77,8 @@
       "tipo": "CAMBIO_PENDIENTE_EN_M17",
       "descripcion": "RFC-M17-001: la tabla parametro_sistema existe y esta sembrada, pero M17 sigue leyendo su catalogo de parametros de un Map en memoria (AlmacenConfiguracionMemoria). Falta el modelo Prisma (archivo compartido, Directiva #3), el repositorio que lo sustituya, el parametro idAdmin en ConfiguracionPort.actualizar y una cache corta.",
       "responsable": "Equipo de M17 / Director Humano",
-      "estado": "PENDIENTE",
-      "impacto": "M04 consume los parametros auth.* por un puerto, asi que no se bloquea; pero hasta entonces los cambios del administrador siguen perdiendose al reiniciar. El rango de complejidad de contrasena ya esta alineado con M20 (12-32); queda la observacion de que M20 no lee ese parametro."
+      "estado": "RESUELTA",
+      "impacto": "Resuelto en v0.3.3. Modelo ParametroSistema creado en schema.prisma, PrismaConfiguracionRepository implementado con cache de 30s e invalidacion reactiva, idAdmin propagado para auditar id_usuario_actualizo, y eliminados los arrays de datos hardcodeados en memoria (Directiva #10)."
     }
   ],
   "modulos_registrados": [
@@ -538,6 +538,13 @@
       "fecha": "2026-10-21",
       "autor": "Director Humano",
       "motivo": "Firma del Gate 1 de M04 por instruccion expresa del Director Humano, transcrita por el agente: valida las decisiones DP-01..DP-19 y habilita la Fase 2. Se firma con la ficha ATDD sin los dictamenes del Arquitecto y del QA (reserva registrada en bloqueos). En la misma instruccion el Director aprueba, sobre RFC-M04-001, C-1 (cuenta_empresa) y C-3 opcion A (documento_soporte), aplicados al DDL en version de BD 2.8."
+    },
+    {
+      "de": "FASE_3A_BACKEND",
+      "a": "FASE_3A_BACKEND",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Entrega v0.3.3: Implementación completa de persistencia en PostgreSQL para configuración general M17 según RFC-M17-001. Modelo ParametroSistema en Prisma, PrismaConfiguracionRepository con caché corta de 30s, idAdmin en ConfiguracionPort.actualizar() y retiro de datos hardcodeados en memoria (Directiva #10). Suite backend 71/71 PASS, tsc y eslint limpios."
     }
   ]
 }

@@ -47,9 +47,12 @@ export class ConfiguracionController {
         return;
       }
 
+      const idAdmin = req.actor?.idUsuario;
+
       const resultado = await this.configService.actualizarParametro(
         parseoClave.data,
         parseoBody.data,
+        idAdmin,
       );
 
       responderExito(res, resultado, 'Parámetro de configuración actualizado exitosamente.');

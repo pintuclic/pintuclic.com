@@ -6,6 +6,22 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [v0.3.3] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Commit:** `3b10811` — `feat(m17-permisos): persistir parametros en base de datos con repositorio prisma HU-ADM-05`
+- **Hito:** ⚙️ **Persistencia relacional de configuración general según RFC-M17-001.** Se elimina el almacén volátil en memoria y se conecta la API administrativa con la tabla `parametro_sistema`.
+
+### Módulo M17 — Administración, Empleados y Permisos (Backend)
+
+Esta entrega resuelve de forma definitiva la deuda técnica transitoria documentada en `ADR-007` y formalizada en el `RFC-M17-001`:
+
+- **Conexión Prisma ↔ PostgreSQL:** Mapeo de la tabla `parametro_sistema` en `backend/prisma/schema.prisma` con enums `AreaParametro` y `TipoDatoParametro`.
+- **`PrismaConfiguracionRepository`:** Implementación del puerto `ConfiguracionPort` que reemplaza `AlmacenConfiguracionMemoria` en `m17.routes.ts`.
+- **Cero Datos Iniciales en Código (Directiva #10):** Se remueve el catálogo hardcodeado de 10 parámetros de TypeScript en `configuracion.repository.ts`. Toda la siembra reside exclusivamente en `bd/sql/seed_pintuclic.sql`.
+- **Auditoría del Administrador:** Propagación de `idAdmin` desde `req.actor?.idUsuario` en `ConfiguracionController` hasta `actualizar()` para registrar la autoría en `id_usuario_actualizo`.
+- **Caché en Memoria (TTL 30s):** Consultas de alta frecuencia resuelven en `< 1ms` sin saturar la base de datos, con invalidación reactiva ante cualquier actualización.
+- **Verificación:** 71/71 tests Vitest backend PASS (+1 test de caché e invalidación), 0 errores TypeScript (`npx tsc --noEmit`), 0 advertencias ESLint, y 0 usos de `any` en 145 archivos auditados.
+
 ---
 
 ## [v0.3.2] - 2026-10-21

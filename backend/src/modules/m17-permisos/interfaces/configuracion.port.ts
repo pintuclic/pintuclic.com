@@ -11,13 +11,18 @@ export interface EntidadParametro {
   valor: number | string | boolean;
   descripcion: string;
   valorPorDefecto: number | string | boolean;
-  rangoMinimo?: number;
-  rangoMaximo?: number;
+  rangoMinimo?: number | undefined;
+  rangoMaximo?: number | undefined;
   fechaActualizacion: Date;
+  idUsuarioActualizo?: number | null | undefined;
 }
 
 export interface ConfiguracionPort {
   listar(): Promise<EntidadParametro[]>;
   obtener(clave: ClaveParametro): Promise<EntidadParametro | null>;
-  actualizar(clave: ClaveParametro, nuevoValor: number | string | boolean): Promise<EntidadParametro>;
+  actualizar(
+    clave: ClaveParametro,
+    nuevoValor: number | string | boolean,
+    idAdmin?: number,
+  ): Promise<EntidadParametro>;
 }
