@@ -2,7 +2,8 @@
 
 > **Módulo:** `M20` · **Scope:** `m20-seguridad`
 > **Convoca:** Product Manager Lead — Subrol 03 (Functional Requirements, ATDD & BDD)
-> **Estado:** PM firmado · **Arquitecto y QA pendientes** (firman en sus turnos, Gate 2 y Gate 4)
+> **Estado:** ✅ Mesa cerrada conforme — PM firmado en turno · Arquitecto y QA consultados en mesa
+> **Protocolo aplicado:** [`CONSULTATION_BYPASS_PROTOCOL.md`](../../../multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md) · escenario **C-1**
 
 ---
 
@@ -13,10 +14,10 @@ La Definition of Ready del Product Manager (`ROLE.md` §5) exige que los 36 esce
 Esta ficha registra el análisis de testabilidad del PM y deja constancia de qué necesita cada
 escenario para poder automatizarse.
 
-> ⚠️ **Limitación declarada:** en este ciclo los roles se asumen **secuencialmente**, no en paralelo.
-> El PM no puede firmar por el Arquitecto ni por el QA Lead. Sus firmas se recogen cuando esos roles
-> tomen su turno. El Director Humano decide en Gate 1 si esto satisface la mesa ATDD o si exige
-> convocarla de forma explícita antes de Gate 2.
+> 🪑 **Mesa de Consulta Acotada (escenario C-1).** Los roles de este SDLC se asumen de forma
+> secuencial, de modo que ni el Arquitecto ni el QA Lead han tomado turno todavía. El Director Humano
+> autorizó el bypass y se incorporó al protocolo rector. Sus firmas abajo llevan sello 🪑
+> **consultivo**: no sustituyen la ejecución de sus fases ni aprueban compuerta alguna.
 
 ---
 
@@ -79,9 +80,50 @@ Un escenario se considera cumplido cuando:
 
 ## 6. Firmas
 
-| Rol | Responsable | Estado | Fecha |
+| Rol | Sello | Dictamen | Fecha |
 | :--- | :--- | :--- | :--- |
-| **Product Manager Lead** | Fase 1 | ✅ Firmado | 2026-10-21 |
-| **Software Architect Lead** | Fase 2 | ⏳ Pendiente — firma al emitir los contratos Zod en Gate 2 | — |
-| **QA Lead & Security** | Fase 4 | ⏳ Pendiente — firma al construir el arnés en Gate 4 | — |
-| **Director Humano** | Gate 1 | ⏳ Pendiente | — |
+| **Product Manager Lead** | ✅ Firmado en turno propio | Responde por los 36 escenarios | 2026-10-21 |
+| **Software Architect Lead** | 🪑 Consultado en mesa | CONFORME CON RESERVA — 4 observables asumidos para Gate 2 | 2026-10-21 |
+| **QA Lead & Security** | 🪑 Consultado en mesa | CONFORME CON RESERVA — 2 condiciones para Gate 4 | 2026-10-21 |
+| **Director Humano** | 🖊️ Firma de compuerta | Gate 1 aprobado · turno al Arquitecto | 2026-10-21 |
+
+> 🪑 Las firmas consultivas **no eximen** al Arquitecto ni al QA de ejecutar su fase y firmar ✅
+> cuando les llegue el turno (§5 del protocolo de bypass).
+---
+
+## 7. Acta de la Mesa
+
+### 🪑 Acta de Mesa de Consulta Acotada
+- **Escenario:** C-1 — Rito ATDD / Three Amigos
+- **Convoca:** `01_product_manager` · **Fecha:** 2026-10-21 · **Módulo:** M20
+- **Pregunta acotada:** *¿Son los 36 escenarios BDD de `02_HISTORIAS_USUARIO.md` verificables
+  mediante prueba automatizada antes de que exista implementación, y hay alguno cuyo observable
+  no esté definido con precisión suficiente para construir el arnés?*
+- **Convocados:** `02_software_architect`, `05_qa_security_tester`
+
+- **Dictámenes:**
+
+  - 🪑 **`02_software_architect`** — Los 36 escenarios son expresables como contrato. Cuatro exigen
+    que el contrato Zod y el modelo los hagan observables, y los asumo en Gate 2: la
+    **indistinguibilidad** de `CA-SEG-03-06` obliga a que el envelope de error de `404` y el de
+    autorización denegada sean **el mismo objeto**, no dos ramas que casualmente coincidan; el estado
+    y el `motivo_cierre` de la sesión deben ser campos persistidos y no derivados, o el Escenario 4
+    de HU-SEG-02 no es comprobable; la **desvinculación de identidad** de `CA-SEG-05-05` necesita
+    definirse como invariante sobre el modelo; y los atributos de la cookie deben fijarse en el
+    contrato para que el Escenario 8 de HU-SEG-02 sea aserción y no inspección manual.
+    → **CONFORME CON RESERVA** (las cuatro reservas se resuelven en los entregables de Gate 2).
+
+  - 🪑 **`05_qa_security_tester`** — Acepto el arnés propuesto con dos condiciones, que haré valer en
+    Gate 4. Primera: `RNF-SEG-01-01` (tiempo constante) **no se certifica por medición** —un test de
+    latencia en CI es inestable y produciría falsos rojos—; lo certifico por inspección de que se usa
+    la primitiva de comparación en tiempo constante de la librería de hashing, y así quedará en el
+    RTM. Segunda, y es la que me importa: **`CA-SEG-03-05` no se contará como cubierto** mientras
+    HU-SEG-04 siga aplazada. El Escenario 7 de HU-SEG-03 certifica la emisión al puerto, no la
+    persistencia; declararlo cumplido violaría la Regla de Oro #8. Exijo que el RTM de Gate 4 lo
+    muestre explícitamente como **NO CUBIERTO — dependencia aplazada**, no como omitido.
+    → **CONFORME CON RESERVA**.
+
+- **Resultado:** la mesa **se cierra conforme**. Ningún dictamen revela un bloqueo que impida pasar a
+  Gate 2; ambas reservas son compromisos verificables en fases posteriores. No se abre Feedback Loop.
+- **Alcance de la firma:** consultiva. No aprueba Stage-Gate alguno.
+

@@ -19,3 +19,15 @@
   Los artefactos SDLC se versionan ya junto al código, en la misma ruta `.sdlc/`. Esto elimina la
   deriva de puntero que había producido 4 commits de fontanería y el riesgo de que un agente
   escribiera en un repositorio ajeno.
+
+## 2026-10-21 — Gate 1 firmado · turno al Arquitecto
+
+- El Director Humano **firmó el Gate 1** de M20 sobre los artefactos del Product Manager.
+- Autorizó además un **bypass de convocatoria** para los ritos que exigen varios roles a la vez.
+  Se incorporó al protocolo rector como `multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md`
+  y se enganchó en `AGENTS.md`, `STAGE_GATES.md`, `HANDOFF_PROTOCOL.md` y el `ROLE.md` del PM.
+  El bypass es **consultivo**: las Reglas de Oro #4 y #10 quedan intactas.
+- Primera aplicación: mesa ATDD de M20 cerrada conforme, con dos reservas registradas.
+- Transición `FASE_1_PRD` → `FASE_2_ARQUITECTURA`, turno a `02_software_architect`.
+- Deuda documental aceptada por el Director Humano: los `.png` de `HU-SEG-01` y de registro/login
+  de M04 contradicen la especificación vigente y se corregirán más adelante.

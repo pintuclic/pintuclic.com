@@ -2,8 +2,8 @@
 > **Versión Actual:** `v0.1.0` (Gobernanza Inicializada — Contexto Cargado)
 > **Versión Objetivo:** `v0.2.0` (Primer módulo con ciclo SDLC completo: contratos Zod + tests + QA)
 > **Última Actualización:** 2026-10-20
-> **Fase Activa:** GATE 1 → PRD de M20 entregado · **esperando firma del Director Humano**
-> **Agente en Turno:** `01_product_manager` (turno detenido en Gate 1) · **Módulo en curso: M20**
+> **Fase Activa:** GATE 2 → Arquitectura y contratos Zod de M20 entregados · **esperando firma**
+> **Agente en Turno:** `02_software_architect` (turno detenido en Gate 2) · **Módulo en curso: M20**
 > **Alcance del Sistema:** **21 módulos en 6 olas** — 8 con spec, 13 pendientes de Gate 1
 > **Ruta Maestra:** 🗺️ [`RUTA_DEL_PROYECTO.md`](../../../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) (lectura íntegra obligatoria)
 > **Contexto Completo:** Ver [`PINTUCLIC_CONTEXT.md`](../../PINTUCLIC_CONTEXT.md)
@@ -15,8 +15,8 @@
 | Fase | Agente Responsable | Entregable Clave | Estado | Gate | Aprobación Humana |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **00. Gobernanza** | Orquestador | Estructura SDLC, stack confirmado, mapa de docs | 🟢 COMPLETADO | Gate 0 | ✅ Aprobado |
-| **M20. PRD & Reglas** | Product Manager Lead | Contratos formales BDD Gherkin por módulo | 🟡 ENTREGADO — 5 de 6 HU, 36 escenarios BDD | Gate 1 | 🛑 **Pendiente Firma** |
-| **Arquitectura M??** | Software Architect | Contratos Zod API-First (`docs/contracts/`) | ⚪ SIGUIENTE — DDL existe, faltan contratos Zod | Gate 2 | Pendiente Gate 1 |
+| **M20. PRD & Reglas** | Product Manager Lead | Contratos formales BDD Gherkin por módulo | 🟢 COMPLETADO — 5 de 6 HU, 36 escenarios BDD | Gate 1 | ✅ Aprobado |
+| **Arquitectura M20** | Software Architect | Contratos Zod API-First (`docs/contracts/`) | 🟡 ENTREGADO — contrato + 4 ADRs, sin cambios de DDL | Gate 2 | 🛑 **Pendiente Firma** |
 | **Backend M??** | Backend Engineer | API REST tipada + Lógica + Tests Vitest 100% | ⚪ EN ESPERA — estructura existe, falta completar | Gate 3A | Pendiente Gate 2 |
 | **Frontend M??** | Frontend Engineer | SPA Next.js + Design System + Walkthrough | ⚪ EN ESPERA — estructura existe, falta completar | Gate 3B | Pendiente Gate 3A |
 | **QA Forense M??** | QA Lead & Security | Cuadrantes Q1-Q4 + Zero ANY + Fichas Bugs | ⚪ EN ESPERA | Gate 4 | Pendiente Gate 3B |
@@ -37,7 +37,7 @@
 
 | Módulo | Spec | Contratos Zod | Backend | Frontend | Tests Vitest | QA | Walkthrough |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **M20 — Seguridad y Auditoría** | ✅ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ |
+| **M20 — Seguridad y Auditoría** | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ |
 | **M17 — Admin, Empleados y Permisos** | ✅ | ⚪ | 🟡 | 🟡 | ⚪ | ⚪ | ⚪ |
 
 ### Ola 2 — Catálogo y Abastecimiento

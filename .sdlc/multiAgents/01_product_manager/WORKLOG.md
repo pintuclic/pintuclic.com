@@ -50,3 +50,14 @@ raíz absoluta del grafo de `RUTA_DEL_PROYECTO.md`: sin predecesores que certifi
 ### Alto mecánico
 Turno detenido conforme a la Regla de Oro #10 y `STAGE_GATES.md` §3. `current_state.json` en
 `GATE_1_PRD_APPROVAL` / `ESPERANDO_APROBACION_HUMANA`.
+
+### 🪑 Acta de Mesa de Consulta Acotada — M20 · rito ATDD
+- **Escenario:** C-1 · **Fecha:** 2026-10-21 · **Convoca:** `01_product_manager`
+- **Pregunta acotada:** ¿son los 36 escenarios BDD verificables por prueba automatizada antes de que
+  exista implementación, y hay alguno sin observable suficientemente preciso?
+- **Convocados:** `02_software_architect`, `05_qa_security_tester`
+- **Dictámenes:** ambos **CONFORME CON RESERVA** — 4 observables que el Arquitecto asume en Gate 2 y
+  2 condiciones que el QA hará valer en Gate 4.
+- **Resultado:** mesa cerrada conforme. Sin Feedback Loop. DoR completa.
+- **Nota:** el Director Humano autorizó el bypass y se incorporó al protocolo rector como
+  `CONSULTATION_BYPASS_PROTOCOL.md`. Primera aplicación del protocolo en el proyecto.

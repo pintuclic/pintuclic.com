@@ -3,12 +3,12 @@
   "dominio": "pintuclic.com",
   "version_actual": "v0.1.0",
   "fecha_actualizacion": "2026-10-21",
-  "fase_activa": "FASE_1_PRD",
-  "gate_activo": "GATE_1_PRD_APPROVAL",
+  "fase_activa": "FASE_2_ARQUITECTURA",
+  "gate_activo": "GATE_2_ARCHITECTURE_APPROVAL",
   "estado": "ESPERANDO_APROBACION_HUMANA",
-  "rol_en_turno": "01_product_manager",
+  "rol_en_turno": "02_software_architect",
   "modulo_en_curso": "M20",
-  "nota_de_contexto": "El Director Humano firmo el Gate 0 y designo M20 (Seguridad, Auditoria y Proteccion de Datos) como primer modulo del ciclo SDLC formal, conforme a la recomendacion del Orquestador: es la raiz absoluta del grafo de RUTA_DEL_PROYECTO.md y no tiene predecesores que certificar. El submodulo .sdlc fue absorbido en el repositorio principal, por lo que los artefactos SDLC ya se versionan junto al codigo. El Product Manager entrego los artefactos de Gate 1 en docs/modules/M20/ y detuvo su turno a la espera de firma humana. HU-SEG-04 (auditoria) quedo aplazada por decision del Product Owner.",
+  "nota_de_contexto": "El Software Architect Lead entrego los artefactos de Gate 2 de M20 y detuvo su turno: 04_ARQUITECTURA_Y_CODIGO.md, el contrato Zod m20-seguridad.contract.ts y 4 ADRs. Hallazgo principal: M20 NO requiere ningun cambio de DDL, porque con HU-SEG-04 aplazada sus cuatro tablas ya existen en bd/sql/schema_pintuclic.sql. Las 4 reservas de la mesa ATDD quedaron resueltas. Queda elevado que la invariante de desvinculacion de identidad alcanza al modelo de M08, de la Ola 4.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
@@ -300,10 +300,10 @@
       "spec": true,
       "backend": "estructura",
       "frontend": "estructura",
-      "contratos_zod": false,
+      "contratos_zod": true,
       "depende_de": [],
       "raiz_absoluta": true,
-      "estado_sdlc": "FASE_1_PRD — esperando firma de Gate 1"
+      "estado_sdlc": "FASE_2_ARQUITECTURA — esperando firma de Gate 2"
     },
     {
       "id": "M21",
@@ -358,6 +358,13 @@
       "fecha": "2026-10-21",
       "autor": "DanExl24",
       "motivo": "Firma del Gate 0 y designacion de M20 como modulo inicial del primer ciclo SDLC completo. Turno entregado al Product Manager Lead para formalizar las historias en INVEST + BDD Gherkin sobre docs/01_TRANSVERSALES/M20_SEGURIDAD_Y_AUDITORIA.md."
+    },
+    {
+      "de": "FASE_1_PRD",
+      "a": "FASE_2_ARQUITECTURA",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Firma del Gate 1 sobre los artefactos de M20: 5 historias en INVEST con 36 escenarios BDD, 15 reglas inmutables y matriz de alcance con HU-SEG-04 aplazada. El Director Humano autorizo ademas el bypass de convocatoria para ritos multi-rol, incorporado como multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md."
     }
   ]
 }
