@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 3.9 (v3.8 + copia histórica de la orden, descuentos por línea y consecutivo sin huecos - M08)
+-- VERSIÓN: 4.1 (v4.0 + M17: parametro_sistema con el catálogo de configuración general - RFC-M17-001)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 49
+-- TOTAL TABLAS: 52
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -111,6 +111,16 @@ BEGIN
     -- Clase de color de un producto (M01 - HU-CAT-02, RF-CAT-02-03)
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_clase_color') THEN
         CREATE TYPE enum_clase_color AS ENUM ('entonable', 'colores_fijos', 'sin_color');
+    END IF;
+
+    -- Área funcional de un parámetro configurable (M17 - HU-ADM-07)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_area_parametro') THEN
+        CREATE TYPE enum_area_parametro AS ENUM ('autenticacion', 'comunicaciones', 'comercial');
+    END IF;
+
+    -- Tipo de dato del valor de un parámetro configurable (M17 - HU-ADM-07)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_dato_parametro') THEN
+        CREATE TYPE enum_tipo_dato_parametro AS ENUM ('numero', 'texto', 'booleano');
     END IF;
 
     -- Modo de entrega de la orden (M08 - RF-ORD-03-06, RF-ORD-05-05; M10): envío a domicilio o recogida en almacén
@@ -489,16 +499,6 @@ CREATE TABLE IF NOT EXISTS presentacion (
 
 COMMENT ON TABLE presentacion IS 'Presentación comercial como entidad propia (RF-CAT-03-05): nombre y volumen numérico para permitir la comparación de precios entre productos. No se elimina físicamente si está referenciada por variantes; solo se desactiva (CA-CAT-03-10).';
 
--- Tabla: presentacion (entidad propia - RF-CAT-03-05)
-CREATE TABLE IF NOT EXISTS presentacion (
-    id_presentacion SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL UNIQUE,
-    volumen NUMERIC(10, 3) NOT NULL,
-    estado enum_estado_general NOT NULL DEFAULT 'activo',
-    CONSTRAINT chk_presentacion_volumen CHECK (volumen > 0)
-);
-
-COMMENT ON TABLE presentacion IS 'Presentación comercial como entidad propia (RF-CAT-03-05): nombre y volumen numérico para permitir la comparación de precios entre productos. No se elimina físicamente si está referenciada por variantes; solo se desactiva (CA-CAT-03-10).';
 
 -- Tabla: variante
 CREATE TABLE IF NOT EXISTS variante (
@@ -1060,6 +1060,34 @@ COMMENT ON COLUMN solicitud_empresa.nit IS 'Número de Identificación Tributari
 COMMENT ON COLUMN solicitud_empresa.motivo_rechazo IS 'Justificación obligatoria registrada por el administrador en caso de rechazo';
 COMMENT ON COLUMN solicitud_empresa.id_admin_revisor IS 'Administrador que dictaminó la solicitud (RF-CUE-09-03)';
 
+-- Tabla: cuenta_empresa
+-- Datos y NIT VIGENTE de cada cuenta empresa aprobada (HU-CUE-09 / HU-CUE-10, RN-CUE-13 y RN-CUE-19).
+-- Una fila por cuenta. La renovación de NIT actualiza esta fila; las solicitudes quedan como historial inmutable.
+-- Se mantiene fuera de usuario porque esa tabla la comparten M20 y M17 y la mayoría de sus filas no son empresas (RFC-M04-001 C-1).
+CREATE TABLE IF NOT EXISTS cuenta_empresa (
+    id_usuario INT PRIMARY KEY,
+    nit VARCHAR(30) NOT NULL,
+    nombre_empresa VARCHAR(150) NOT NULL,
+    nombre_representante VARCHAR(150) NOT NULL,
+    correo_empresarial VARCHAR(150) NOT NULL,
+    telefono VARCHAR(20) NOT NULL,
+    id_solicitud_origen UUID,
+    fecha_aprobacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_cuenta_empresa_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_cuenta_empresa_solicitud FOREIGN KEY (id_solicitud_origen)
+        REFERENCES solicitud_empresa (id_solicitud) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT uq_cuenta_empresa_nit UNIQUE (nit),
+    CONSTRAINT ck_cuenta_empresa_nit CHECK (length(btrim(nit)) > 0)
+);
+
+COMMENT ON TABLE cuenta_empresa IS 'Datos y NIT vigente de las cuentas empresa aprobadas; extensión 1:1 de usuario (HU-CUE-09, HU-CUE-10)';
+COMMENT ON COLUMN cuenta_empresa.id_usuario IS 'Cuenta empresa a la que pertenece (PK y FK: relación 1:1 con usuario)';
+COMMENT ON COLUMN cuenta_empresa.nit IS 'NIT o RUT VIGENTE. Solo cambia por una renovación aprobada (RN-CUE-13); único en todo el sistema (RN-CUE-14)';
+COMMENT ON COLUMN cuenta_empresa.id_solicitud_origen IS 'Solicitud de empresa cuya aprobación dio origen a esta cuenta; trazabilidad histórica';
+COMMENT ON COLUMN cuenta_empresa.fecha_aprobacion IS 'Momento en que se habilitaron las condiciones comerciales de empresa';
+
 -- Tabla: solicitud_actualizacion_nit
 -- Solicitudes formales de cambio o corrección de NIT con soporte documental adjunto (RF-CUE-09-07)
 CREATE TABLE IF NOT EXISTS solicitud_actualizacion_nit (
@@ -1081,6 +1109,49 @@ CREATE TABLE IF NOT EXISTS solicitud_actualizacion_nit (
 
 COMMENT ON TABLE solicitud_actualizacion_nit IS 'Solicitudes de actualización de NIT empresarial con soporte RUT adjunto (RF-CUE-09-07)';
 COMMENT ON COLUMN solicitud_actualizacion_nit.documento_adjunto_url IS 'Enlace o ruta del documento soporte (RUT/Cámara de Comercio) adjunto';
+
+-- Tabla: documento_soporte
+-- Archivos adjuntos sensibles (RUT de renovación de NIT) almacenados en la propia base tras un puerto de almacenamiento
+-- sustituible (RFC-M04-001 C-3, opción A). El contenido NUNCA se selecciona en listados (RN-CUE-20).
+CREATE TABLE IF NOT EXISTS documento_soporte (
+    id_documento UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre_original VARCHAR(255) NOT NULL,
+    tipo_mime VARCHAR(100) NOT NULL,
+    tamano_bytes INT NOT NULL,
+    sha256 CHAR(64) NOT NULL,
+    contenido BYTEA NOT NULL,
+    fecha_carga TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_documento_tamano CHECK (tamano_bytes > 0 AND tamano_bytes <= 5242880),
+    CONSTRAINT ck_documento_mime CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
+    CONSTRAINT ck_documento_sha256 CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT ck_documento_integridad CHECK (octet_length(contenido) = tamano_bytes)
+);
+
+COMMENT ON TABLE documento_soporte IS 'Documentos adjuntos sensibles (RUT) con tipo y tamaño acotados; custodia restringida (RN-CUE-20)';
+COMMENT ON COLUMN documento_soporte.tamano_bytes IS 'Tamaño real en bytes; tope de 5 MB (5242880) y coherente con octet_length(contenido)';
+COMMENT ON COLUMN documento_soporte.sha256 IS 'Huella SHA-256 en hexadecimal minúscula para verificar la integridad del contenido';
+COMMENT ON COLUMN documento_soporte.contenido IS 'Bytes del archivo. Prohibido seleccionarlo en listados: solo en la descarga autorizada';
+
+-- Migración idempotente: la solicitud de renovación pasa a referenciar el documento almacenado
+ALTER TABLE solicitud_actualizacion_nit ADD COLUMN IF NOT EXISTS id_documento UUID;
+ALTER TABLE solicitud_actualizacion_nit ALTER COLUMN documento_adjunto_url DROP NOT NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_solicitud_nit_documento') THEN
+        ALTER TABLE solicitud_actualizacion_nit ADD CONSTRAINT fk_solicitud_nit_documento
+            FOREIGN KEY (id_documento) REFERENCES documento_soporte (id_documento)
+            ON UPDATE CASCADE ON DELETE RESTRICT;
+    END IF;
+    -- Transitoria: toda solicitud debe aportar el RUT por una de las dos vías (RF-CUE-10-02) hasta retirar la columna URL
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_solicitud_nit_adjunto') THEN
+        ALTER TABLE solicitud_actualizacion_nit ADD CONSTRAINT ck_solicitud_nit_adjunto
+            CHECK (id_documento IS NOT NULL OR documento_adjunto_url IS NOT NULL);
+    END IF;
+END $$;
+
+COMMENT ON COLUMN solicitud_actualizacion_nit.id_documento IS 'RUT adjunto almacenado en documento_soporte (RF-CUE-10-02). Vía vigente para toda solicitud nueva';
+COMMENT ON COLUMN solicitud_actualizacion_nit.documento_adjunto_url IS 'DEPRECADA: ruta externa del diseño original (RFC-M04-001 C-3). Solo conserva solicitudes anteriores; se retirará en una entrega posterior';
 
 -- Tabla: usuario_identidad_externa
 -- Cuentas federadas y vinculaciones OAuth (Google Identity, etc.) (HU-CUE-02)
@@ -1135,6 +1206,71 @@ CREATE TABLE IF NOT EXISTS busqueda_sin_resultado (
 
 COMMENT ON TABLE busqueda_sin_resultado IS 'Analítica de búsquedas sin resultado, sin identidad de usuario (M02 HU-BUS-06 / M20 HU-SEG-06)';
 COMMENT ON COLUMN busqueda_sin_resultado.termino IS 'Término normalizado (minúsculas, sin espacios extremos) que no arrojó resultados';
+
+-- ==============================================================================
+-- 9C. CONFIGURACIÓN GENERAL DEL SISTEMA (M17 - HU-ADM-05 / HU-ADM-07)
+-- ==============================================================================
+
+-- Tabla: parametro_sistema
+-- Catálogo de parámetros que el administrador modifica en caliente, con su valor vigente, su valor por defecto y su rango
+-- (RFC-M17-001, sustituye al almacén en memoria de ADR-007). El tipo y el rango los impone la propia base de datos:
+-- el valor nunca queda nulo, del tipo equivocado ni fuera de rango (RF-ADM-05-05 / RF-ADM-05-06).
+CREATE TABLE IF NOT EXISTS parametro_sistema (
+    id_parametro SERIAL PRIMARY KEY,
+    clave VARCHAR(100) NOT NULL UNIQUE,
+    area enum_area_parametro NOT NULL,
+    tipo_dato enum_tipo_dato_parametro NOT NULL,
+    descripcion TEXT NOT NULL,
+    valor JSONB NOT NULL,
+    valor_por_defecto JSONB NOT NULL,
+    rango_minimo NUMERIC(14, 2),
+    rango_maximo NUMERIC(14, 2),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_parametro_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_parametro_clave CHECK (clave ~ '^[a-z]+\.[a-z0-9_]+$'),
+    CONSTRAINT ck_parametro_tipo_valor CHECK (
+        jsonb_typeof(valor) = CASE tipo_dato WHEN 'numero' THEN 'number' WHEN 'texto' THEN 'string' ELSE 'boolean' END),
+    CONSTRAINT ck_parametro_tipo_defecto CHECK (
+        jsonb_typeof(valor_por_defecto) = CASE tipo_dato WHEN 'numero' THEN 'number' WHEN 'texto' THEN 'string' ELSE 'boolean' END),
+    CONSTRAINT ck_parametro_rango_orden CHECK (rango_minimo IS NULL OR rango_maximo IS NULL OR rango_minimo <= rango_maximo),
+    CONSTRAINT ck_parametro_rango_solo_numero CHECK (tipo_dato = 'numero' OR (rango_minimo IS NULL AND rango_maximo IS NULL)),
+    CONSTRAINT ck_parametro_valor_en_rango CHECK (
+        CASE WHEN tipo_dato = 'numero' AND jsonb_typeof(valor) = 'number'
+             THEN (rango_minimo IS NULL OR (valor #>> '{}')::numeric >= rango_minimo)
+              AND (rango_maximo IS NULL OR (valor #>> '{}')::numeric <= rango_maximo)
+             ELSE true END),
+    CONSTRAINT ck_parametro_defecto_en_rango CHECK (
+        CASE WHEN tipo_dato = 'numero' AND jsonb_typeof(valor_por_defecto) = 'number'
+             THEN (rango_minimo IS NULL OR (valor_por_defecto #>> '{}')::numeric >= rango_minimo)
+              AND (rango_maximo IS NULL OR (valor_por_defecto #>> '{}')::numeric <= rango_maximo)
+             ELSE true END)
+);
+
+COMMENT ON TABLE parametro_sistema IS 'Parámetros de configuración general modificables en caliente por el administrador (M17 - HU-ADM-05, HU-ADM-07)';
+COMMENT ON COLUMN parametro_sistema.clave IS 'Identificador único con prefijo de área: auth.*, comms.*, comercial.*';
+COMMENT ON COLUMN parametro_sistema.valor IS 'Valor vigente en JSONB. El tipo JSON debe coincidir con tipo_dato y, si es numérico, estar dentro del rango';
+COMMENT ON COLUMN parametro_sistema.valor_por_defecto IS 'Valor al que vuelve el parámetro al restaurarlo (RF-ADM-05-07). Mismo tipo y rango que valor';
+COMMENT ON COLUMN parametro_sistema.rango_minimo IS 'Límite inferior permitido (inclusive). Solo para parámetros numéricos; NULL = sin límite';
+COMMENT ON COLUMN parametro_sistema.rango_maximo IS 'Límite superior permitido (inclusive). Solo para parámetros numéricos; NULL = sin límite';
+COMMENT ON COLUMN parametro_sistema.id_usuario_actualizo IS 'Último administrador que modificó el valor. El historial completo corresponde a la auditoría de HU-SEG-04 (aplazada)';
+
+-- Fecha de última modificación mantenida por la propia base de datos: no depende de que cada llamador la fije (RFC-M17-001 §6).
+-- Solo avanza cuando cambia el VALOR; editar la descripción o el rango no la mueve.
+CREATE OR REPLACE FUNCTION fn_parametro_sistema_fecha() RETURNS trigger AS $$
+BEGIN
+    IF NEW.valor IS DISTINCT FROM OLD.valor THEN
+        NEW.fecha_actualizacion := now();
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_parametro_sistema_fecha ON parametro_sistema;
+CREATE TRIGGER trg_parametro_sistema_fecha
+    BEFORE UPDATE ON parametro_sistema
+    FOR EACH ROW EXECUTE FUNCTION fn_parametro_sistema_fecha();
 
 -- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
@@ -1223,6 +1359,9 @@ CREATE INDEX IF NOT EXISTS idx_solicitud_empresa_usuario ON solicitud_empresa(id
 CREATE INDEX IF NOT EXISTS idx_solicitud_empresa_estado ON solicitud_empresa(estado);
 CREATE INDEX IF NOT EXISTS idx_solicitud_nit_usuario ON solicitud_actualizacion_nit(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_solicitud_nit_estado ON solicitud_actualizacion_nit(estado);
+CREATE INDEX IF NOT EXISTS idx_solicitud_nit_documento ON solicitud_actualizacion_nit(id_documento);
+CREATE INDEX IF NOT EXISTS idx_cuenta_empresa_solicitud ON cuenta_empresa(id_solicitud_origen);
+CREATE INDEX IF NOT EXISTS idx_parametro_sistema_usuario ON parametro_sistema(id_usuario_actualizo);
 CREATE INDEX IF NOT EXISTS idx_identidad_proveedor ON usuario_identidad_externa(proveedor, id_proveedor);
 CREATE INDEX IF NOT EXISTS idx_identidad_usuario ON usuario_identidad_externa(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_codigo_correo_tipo ON codigo_verificacion(correo, tipo);

@@ -97,3 +97,89 @@ El Director Humano firmó el Gate 1 de M17, habilitando formalmente la Fase 2 de
 ### Alto mecánico (Rule #10 y STAGE_GATES.md §3)
 Turno detenido. `current_state.json` actualizado a `FASE_2_ARQUITECTURA` / `GATE_2_ARQUITECTURA_APPROVAL` en estado `ESPERANDO_APROBACION_HUMANA`.
 
+---
+
+## 2026-10-21 — M04 · Cambios de modelo de datos aprobados (Fase 2, parcial)
+
+**Rol:** Software Architect Lead (ejecutado por **instrucción expresa del Director Humano**; el turno de Gate 2 no ha comenzado formalmente) · **Fase:** FASE_2_ARQUITECTURA
+
+### Contexto de entrada
+El Director Humano firmó el Gate 1 de M04 y aprobó, sobre `RFC-M04-001`, la tabla `cuenta_empresa` (C-1) y el almacenamiento del RUT en base de datos, opción A (C-3). `ADR-006` y `ADR-007` declaran que el DDL de `bd/` está bloqueado sin RFC; el RFC firmado es ese rastro.
+
+### Subroles convocados
+- **02 · Relational Data & DDL Modeler:** diseño e implementación de las dos tablas y sus restricciones.
+
+### Entregables dejados en disco
+- `bd/sql/schema_pintuclic.sql` → **v4.0 / 51 tablas:** `cuenta_empresa` (1:1 con `usuario`, `nit` UNIQUE), `documento_soporte` (BYTEA con `CHECK` de tipo, tamaño ≤ 5 MB, huella SHA-256 e integridad de tamaño) y `solicitud_actualizacion_nit.id_documento` (FK RESTRICT). Migración idempotente.
+- `bd/sql/seed_pintuclic.sql` → **v4.0:** `cuenta_empresa` rellenada desde las solicitudes aprobadas; RUT de ejemplo en `documento_soporte`.
+- `bd/docs/DOCUMENTACION_BASE_DATOS.md`, `WALKTHROUGH_DATABASE.md`, `CHANGELOG_DATABASE.md` → versión **2.8**, ER, diccionario (módulo 9 de M04) y enums.
+
+### Decisiones
+1. **Variación frente al RFC:** en lugar de `id_documento NOT NULL`, imposible mientras existan solicitudes anteriores que solo tienen URL, se aplicó el `CHECK` transitorio `ck_solicitud_nit_adjunto`. La garantía de base de datos se mantiene y pasará a `NOT NULL` al retirar la columna URL.
+2. **Interpretación de la instrucción:** se entendió "tabla cuenta_empresa… opción A" como C-1 **y** C-3 opción A (las decisiones 5 y 4 del Director). C-2 y C-4…C-9 **no** se aplicaron.
+3. **`cuenta_empresa` usa `id_usuario` como PK** en lugar de `id_[tabla]`, por ser extensión 1:1 de `usuario`.
+
+### Verificación (PostgreSQL 18.6, clúster desechable)
+Instalación limpia y actualización de una base 3.9, ambas con esquema y seed dos veces y `ON_ERROR_STOP=1`: código 0. **10/10** inserciones inválidas rechazadas por la restricción prevista; **exactamente 5 MB** aceptado y 5 MB + 1 byte rechazado.
+
+### Pendiente (no hecho)
+- `backend/prisma/schema.prisma` (archivo **compartido**, Directiva #3) y el contrato Zod `m04-cuentas.contract.ts`.
+- Cambios C-2 y C-4…C-9 del RFC, sujetos a decisión del Director.
+- Dictamen del Arquitecto en la mesa ATDD (sigue pendiente; no se redacta en este turno).
+- Errata: `GUIA_REFACTORIZACION_BD.md` y `WALKTHROUGH_DATABASE.md` aún citan **Kysely**; el stack vigente es **Prisma 6**.
+
+---
+
+## 2026-10-21 — M17 · Tabla de parámetros de configuración general (RFC-M17-001)
+
+**Rol:** Software Architect Lead (ejecutado por **instrucción expresa del Director Humano**) · **Fase:** FASE_2_ARQUITECTURA (turno de M04; este cambio pertenece a M17)
+
+### Contexto de entrada
+El Director preguntó qué tendría la tabla de parámetros y, tras la propuesta, ordenó *"dale, hagamoslo, haz la tabla, y redacta el RFC"*. `ADR-007` había dejado el catálogo en un `Map` en memoria por falta de tabla y `ADR-006/007` declaran `bd/` bloqueado sin RFC.
+
+### Entregables dejados en disco
+- `bd/sql/schema_pintuclic.sql` y `seed_pintuclic.sql` → **v4.1 / 52 tablas:** `parametro_sistema`, 2 enums nuevos, restricciones de tipo y rango, índice y 10 filas leídas del catálogo real de M17.
+- `bd/docs/` (documentación, walkthrough y changelog) → versión **2.9**.
+- `.sdlc/docs/modules/M17/RFC-M17-001_tabla_parametros.md`.
+
+### Decisiones
+1. **`JSONB` para `valor` y `valor_por_defecto`** (frente a columnas tipadas o `TEXT`): la base impone tipo y rango con 2 columnas en vez de 6.
+2. **`CASE WHEN` en las comprobaciones de rango**, porque PostgreSQL no garantiza el orden de `AND`/`OR`.
+3. **Sin disparador para `fecha_actualizacion`**, siguiendo la convención del esquema; debe fijarla la aplicación.
+4. **Sin tabla de historial**, por la aplazada `HU-SEG-04`.
+
+### Verificación (PostgreSQL 18.6, clúster desechable)
+Instalación limpia y actualización de bases en v4.0 y v3.9, esquema y seed dos veces: código 0 y mismo estado final. **15/15** valores inválidos rechazados; límites exactos aceptados; parámetros nuevos de texto y booleano sin tocar el DDL.
+
+### Pendiente (no hecho)
+- `backend/prisma/schema.prisma` (compartido) y todo el código de `m17-permisos`: lo aplica el equipo de M17 según RFC-M17-001 §5.
+- Sin resolver: rango 8–32 de la complejidad de contraseña frente al piso de 12 de M20.
+
+---
+
+## 2026-10-21 — Revisión de defectos: fecha automática, rango de contraseña y documentación de BD
+
+**Rol:** Software Architect Lead (ejecutado por **instrucción expresa del Director Humano**, que además autorizó tocar archivos de otros módulos **solo si era necesario**) · **Fase:** FASE_2_ARQUITECTURA
+
+### Alcance recibido
+"antes de hacer el commit, ayudame con los defectos, la alineacion del rango y la documentacion de la BD".
+
+### Entregables
+- **`bd/sql/` (v4.1):** disparador `trg_parametro_sistema_fecha`; rango 12–32 en el seed con corrección para bases ya sembradas; definición duplicada de `presentacion` eliminada.
+- **Archivos de otro módulo tocados (autorizado, necesario):** `m17-permisos/repositories/configuracion.repository.ts` (una línea del catálogo) y `m17-permisos/__tests__/configuracion.service.test.ts` (2 pruebas). `m20-seguridad` solo se **lee** desde la prueba.
+- **`bd/docs/`:** diccionario completo (52 de 52 tablas), enum `enum_clase_color`, diagrama ER con las 7 entidades que faltaban, FKs reales de `producto` y `variante`, y corrección de Kysely a Prisma en la guía y en la documentación vigente.
+- RFC-M17-001 §9 y los hallazgos `F-13`/`P3` de M04 actualizados.
+
+### Decisiones
+1. **Disparador en lugar de dejarlo a la aplicación.** El requisito de la fecha es del dato, y la base puede garantizarlo; se documentó como convención nueva porque es el primero del esquema.
+2. **Se incorpora a la v2.9 y no a una v2.10**, porque nada se ha publicado.
+3. **No se tocó M20.** Se detectó que su mínimo de contraseña está fijo en `.min(12)` y no lee el parámetro: queda como observación, no como cambio.
+4. **Las entradas históricas de Kysely no se reescribieron:** describen el stack de su fecha. Solo se corrigieron las vigentes (guía, plantilla y sección de recomendaciones).
+
+### Verificación (PostgreSQL 18.6, clúster desechable)
+`pg_dump` antes/después: única diferencia, la función y el disparador. Base con rango viejo y valor 10 → mínimo 12 y valor 12. Disparador: 6 comportamientos comprobados. Backend de M17: **70/70**, `tsc` y ESLint en cero; **mutación verificada** (las 2 pruebas nuevas fallan con el defecto).
+
+### Pendiente (no hecho)
+- Código de M17 que sustituya `AlmacenConfiguracionMemoria` (RFC-M17-001 §5) y el modelo Prisma.
+- Conectar `auth.complejidad_minima_contrasena` con la validación real de contraseñas (M20/M04).
+- `docs/00_SISTEMA` (plantilla de QA y plantilla de módulo) y `.sdlc/.../MODULE_TEMPLATE` aún citan Kysely: son documentos de otro dominio y no se tocaron.

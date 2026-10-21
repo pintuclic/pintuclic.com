@@ -43,7 +43,7 @@ export class AlmacenConfiguracionMemoria implements ConfiguracionPort {
           valor: 12,
           descripcion: 'Longitud mínima exigida para contraseñas de cuentas',
           valorPorDefecto: 12,
-          rangoMinimo: 8,
+          rangoMinimo: 12, // piso de M20 (RN-SEG-01): un administrador no puede exigir menos que eso
           rangoMaximo: 32,
           fechaActualizacion: new Date(),
         },

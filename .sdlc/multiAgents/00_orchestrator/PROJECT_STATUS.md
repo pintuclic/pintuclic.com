@@ -1,8 +1,8 @@
 > **Última Actualización:** 2026-10-21
-> **Fase Activa:** FASE 4 COMPLETADA — **M17 Y CORE KIT v0.3.2 CERTIFICADOS TRAS REMEDIACIÓN INTEGRAL**
+> **Fase Activa:** FASE 2 EN CURSO — **M04 (GATE 1 FIRMADO el 2026-10-21; ARQUITECTURA en curso)**. M17 y el Core Kit `v0.3.2` permanecen certificados.
 > **Última entrega:** `v0.3.2` — remediación de accesibilidad del Core Kit compartido de M20 (`Modal.tsx` y `ProductCard.tsx`; 57/57 Vitest frontend, 125/125 total). Certificado por QA en Gate 4A.
-> **Deuda abierta de M17:** ✅ **Cerrados y certificados por QA** en `v0.3.2` los 2 defectos de accesibilidad del Core Kit (foco y teclado), y la compuerta `lint:a11y` amplía su alcance a `src/core` para impedir su reaparición. Siguen abiertos los 2 hallazgos bloqueados por dependencias: identidad real de sesión → M04; KPIs agregados → contrato de M17. Detalle en el WORKLOG de `04_frontend_engineer` y reporte de QA.
-> **Agente en Turno:** `00_orchestrator` · **Módulo en curso: M17** (Administración y Permisos Certificado)
+> **Deuda abierta de M17:** ✅ **Cerrados y certificados por QA** en `v0.3.2` los 2 defectos de accesibilidad del Core Kit (foco y teclado), y la compuerta `lint:a11y` amplía su alcance a `src/core` para impedir su reaparición. Siguen abiertos los 2 hallazgos bloqueados por dependencias: identidad real de sesión → M04; KPIs agregados → contrato de M17. Detalle en el WORKLOG de `04_frontend_engineer` y reporte de QA. **Tabla de parámetros creada en BD v2.9 (`RFC-M17-001`); el código de M17 sigue leyendo de memoria hasta aplicar su plan de cambio.** **Rango de contraseña alineado con M20 (12–32) y fecha de parámetros automática (BD v2.9).**
+> **Agente en Turno:** `02_software_architect` · **Módulo en curso: M04** (Cuentas, Autenticación y Perfil — Gate 1 firmado con la mesa ATDD pendiente). **Salto de ola autorizado por el Director Humano (2026-10-21):** M04 se construye antes que M18 y antes de cerrar la Ola 2; M18 se incorpora después.
 > **Alcance del Sistema:** **21 módulos en 6 olas** — 8 con spec, 13 pendientes de Gate 1
 > **Ruta Maestra:** 🗺️ [`RUTA_DEL_PROYECTO.md`](../../../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) (lectura íntegra obligatoria)
 > **Contexto Completo:** Ver [`PINTUCLIC_CONTEXT.md`](../../PINTUCLIC_CONTEXT.md)
@@ -24,6 +24,8 @@
 | **Frontend M17** | Frontend Engineer | Vistas Admin Mockup + Permisos + Clientes + Config | 🟢 COMPLETADO — 47 tests Vitest, build limpio | Gate 3B | ✅ **Firmado Gate 3B** |
 | **QA Forense M17** | QA Lead & Security | Cuadrantes Q1-Q4 + Zero ANY + Auditoría Determinista | 🟢 COMPLETADO | Gate 4A | ✅ **Certificado (v0.3.1)** |
 | **Release M17** | DevOps Engineer | Docker + Seeders + Release SemVer `v0.3.1` | 🟢 AUTORIZADO | Gate 5 | ✅ Listo para release |
+| **M04. PRD & Reglas** | Product Manager Lead | 10 HU INVEST, 94 BDD Gherkin, 26 RN-CUE, Diagramas Mermaid | 🟢 COMPLETADO — firmado con la reserva de la mesa ATDD (dictámenes de Arquitecto y QA pendientes) | Gate 1 | ✅ **Firmado (2026-10-21)** |
+| **Arquitectura M04** | Software Architect | Contrato Zod (`m04-cuentas.contract.ts`) + ADRs + DDL | 🟡 EN CURSO — DDL parcial aplicado (C-1 `cuenta_empresa`, C-3 `documento_soporte`; BD v2.8). Contrato, ADRs y modelo Prisma pendientes | Gate 2 | ⏳ Pendiente |
 
 *Leyenda:* 🟢 Completado | 🟡 En Proceso / Parcial | 🔴 Bloqueado (Veto) | ⚪ No Iniciado
 

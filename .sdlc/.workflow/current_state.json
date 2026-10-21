@@ -3,12 +3,12 @@
   "dominio": "pintuclic.com",
   "version_actual": "v0.3.2",
   "fecha_actualizacion": "2026-10-21",
-  "fase_activa": "FASE_4_QA",
-  "gate_activo": "GATE_4A_RATIFICADO_V0.3.2",
-  "estado": "CERTIFICADO_CON_REMEDIACION",
-  "rol_en_turno": "00_orchestrator",
-  "modulo_en_curso": "M17",
-  "nota_de_contexto": "VETO STOP-THE-LINE LEVANTADO Y M17 CERTIFICADO. Subsanados los 4 defectos (BUG-M17-04 a BUG-M17-07) con autorización humana. Batería de auditoría 100% verde: 68/68 backend tests, 38/38 frontend tests, 0 violaciones de Core Kit, 0 anti-patrones Zod, 0 violaciones A11y, 0 any en 141 archivos. Se autoriza la transición a Gate 5 y la habilitación de Ola 2 (M01). ENTREGA v0.3.1: una revisión de pares posterior cerró 6 defectos adicionales de frontend dentro de m17-permisos (teléfono vacío en edición, mensajes de Axios sin traducir, respuestas de listado desordenadas sin debounce, mensaje de éxito autodestruido, accesibilidad de la navegación y credencial de un solo uso destruible con Escape), con 47/47 pruebas Vitest de frontend y 0 errores de jsx-a11y en M17. Quedan abiertos 2 defectos de accesibilidad del Core Kit compartido y 2 hallazgos bloqueados por dependencias (identidad real de sesión en M04; KPIs agregados en el contrato de M17), más la activación de las reglas jsx-a11y en frontend/eslint.config.mjs, bloqueada por el hook de protección de configuración del entorno. ENTREGA v0.3.2: cerrados los 2 defectos de accesibilidad del Core Kit compartido que v0.3.1 habia elevado sin tocar, con autorizacion explicita del Director Humano y sobre el ticket tecnico que QA asigno al custodio del Core Kit. Modal.tsx recibe aria-labelledby, aria-describedby, foco inicial, retorno de foco y trampa de foco, y se corrige un tercer defecto no reportado: el role de dialogo estaba sobre el fondo decorativo en lugar del panel. ProductCard.tsx delega la accion del encabezado a un button real. La compuerta lint:a11y amplia su alcance a src/core, revirtiendo la exclusion de v0.3.1. CERTIFICACIÓN QA v0.3.2: Gate 4A ratificado por 05_qa_security_tester en .sdlc/docs/qa/M20/v0.3.2/QA_REPORT.md. Verificación determinista independiente: 57/57 Vitest frontend (10 nuevas), 68/68 backend, 125/125 total, jsx-a11y de 2 errores a 0 en src/core (0 en app+core+modules), tsc y eslint limpios, 0 any en 75 archivos, 3 auditores de gobernanza sin violaciones. BRECHA DECLARADA: sin jsdom ni Testing Library, el cableado DOM del foco queda verificado por inspeccion y no por prueba automatizada, formalmente aceptada por QA bajo Regla #8 para evaluación futura en mesa técnica. Sigue bloqueada la integracion nativa de jsx-a11y en frontend/eslint.config.mjs por el hook de proteccion de configuracion. Deuda técnica de accesibilidad del Core Kit cerrada al 100%.",
+  "fase_activa": "FASE_2_ARQUITECTURA",
+  "gate_activo": "GATE_1_FIRMADO",
+  "estado": "FASE_2_EN_CURSO",
+  "rol_en_turno": "02_software_architect",
+  "modulo_en_curso": "M04",
+  "nota_de_contexto": "M04 (Cuentas, Autenticacion y Perfil): GATE 1 FIRMADO por el Director Humano el 2026-10-21 (instruccion expresa \"firma el gate 1\", transcrita por el agente), lo que valida las decisiones de producto DP-01..DP-19. RESERVA REGISTRADA: al firmarse, la mesa ATDD seguia sin los dictamenes del Arquitecto y del QA (ver bloqueos: RESERVA_DE_COMPUERTA); la firma no la resolvio. FASE 2 EN CURSO, aun sin contrato Zod ni ADRs. Por instruccion del Director se aplico al DDL (bd/sql) lo aprobado del RFC-M04-001: C-1 (tabla cuenta_empresa) y C-3 opcion A (tabla documento_soporte y solicitud_actualizacion_nit.id_documento), con version de BD 2.8 / esquema 4.0 y validacion contra PostgreSQL 18.6 en instalacion limpia y en actualizacion de una base 3.9. Siguen PENDIENTES de decision los cambios C-2 y C-4..C-9 del RFC. NO se ha tocado backend/prisma/schema.prisma (archivo compartido, Directiva #3). Salto de ola autorizado: M04 antes que M18 y que la Ola 2. El Director corregira lo pendiente de M17 antes de codificar M04. ACTUALIZACION: por instruccion del Director se creo la tabla parametro_sistema (BD 2.9 / esquema 4.1, 52 tablas) segun RFC-M17-001, que cumple el punto 4 de ADR-007. El codigo de M17 AUN lee de memoria: falta el modelo Prisma y el repositorio (cambio de M17, que corrige el Director). REVISION POSTERIOR (2026-10-21, por instruccion del Director): se corrigio el rango de contrasena de M17 (12-32, con prueba que lo ata al piso de M20; 70/70 en backend), se anadio un disparador para fecha_actualizacion y se completo la documentacion de BD (52 de 52 tablas, Kysely->Prisma). Observacion nueva: M20 no lee el parametro auth.complejidad_minima_contrasena.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
@@ -50,6 +50,35 @@
       "estado": "RESUELTO_Y_LEVANTADO",
       "resolucion": "Remediados los 4 defectos (BUG-M17-04 a BUG-M17-07) con tests automatizados pasando al 100%, 0 violaciones de Core Kit, 0 violaciones Zod, 0 violaciones A11y, tsc limpio y eslint limpio. Veto levantado formalmente.",
       "impacto": "M17 certificado. Se desbloquea la construcción de Ola 2 (M01 Catálogo)."
+    },
+    {
+      "tipo": "SALTO_DE_OLA_AUTORIZADO",
+      "descripcion": "M04 es Ola 3 y depende de M18, que no existe; la Ola 2 (M13, M01, M16) tampoco esta construida. El Director Humano autorizo explicitamente el 2026-10-21 construir M04 antes que M18 y antes de cerrar la Ola 2, e incorporar M18 despues de M04. M04 se especifica contra un puerto de notificacion con adaptador no-op (precedente: AuditoriaPort de M20).",
+      "responsable": "Director Humano",
+      "estado": "AUTORIZADO",
+      "impacto": "No se certifica el despacho real de correo hasta que exista M18. La dependencia M18 -> M04 sigue en el grafo y forma parte de la inconsistencia 7.1 de RUTA_DEL_PROYECTO.md, pendiente del Product Owner."
+    },
+    {
+      "tipo": "DECISION_PENDIENTE",
+      "descripcion": "RFC-M04-001 (.sdlc/docs/modules/M04/RFC-M04-001_cambios_ddl.md): 9 cambios propuestos al modelo de datos de M04, entre ellos donde vive el NIT vigente de una cuenta empresa (C-1) y el almacenamiento del RUT adjunto (C-3). Redactado por peticion del Director como insumo de Gate 2.",
+      "responsable": "Director Humano",
+      "estado": "PARCIALMENTE_RESUELTA",
+      "impacto": "Gate 2 de M04 no puede cerrar el modelo de datos sin esta decision. Aplica la Directiva #3 a schema.prisma y al catalogo de permisos de M17.",
+      "resolucion": "El Director Humano aprobo el 2026-10-21 C-1 (cuenta_empresa) y C-3 opcion A (documento_soporte); aplicados a bd/sql con validacion en PostgreSQL 18.6. Quedan pendientes C-2 (unicidad de pendientes) y C-4..C-9 (direcciones, codigos hasheados, control de intentos, correo sin mayusculas, marca de cambio de clave, permiso empresas.validar). Este RFC firmado es el rastro que exigen ADR-006 y ADR-007 para modificar el DDL de bd/."
+    },
+    {
+      "tipo": "RESERVA_DE_COMPUERTA",
+      "descripcion": "Gate 1 de M04 se firmo con la ficha ATDD (.sdlc/docs/modules/M04/01_ATDD_SPEC.md) sin los dictamenes consultivos del Arquitecto y del QA. El PM dejo escrita la pregunta acotada y NO redacto dictamenes en nombre de otros roles. La instruccion de firma del Director no abordo ese punto.",
+      "responsable": "02_software_architect / 05_qa_security_tester",
+      "estado": "PENDIENTE",
+      "impacto": "El item \"Ficha ATDD firmada por los Three Amigos\" de la DoR no esta cumplido. Debe resolverse antes de cerrar Gate 2, con dictamenes emitidos por cada rol en su turno."
+    },
+    {
+      "tipo": "CAMBIO_PENDIENTE_EN_M17",
+      "descripcion": "RFC-M17-001: la tabla parametro_sistema existe y esta sembrada, pero M17 sigue leyendo su catalogo de parametros de un Map en memoria (AlmacenConfiguracionMemoria). Falta el modelo Prisma (archivo compartido, Directiva #3), el repositorio que lo sustituya, el parametro idAdmin en ConfiguracionPort.actualizar y una cache corta.",
+      "responsable": "Equipo de M17 / Director Humano",
+      "estado": "PENDIENTE",
+      "impacto": "M04 consume los parametros auth.* por un puerto, asi que no se bloquea; pero hasta entonces los cambios del administrador siguen perdiendose al reiniciar. El rango de complejidad de contrasena ya esta alineado con M20 (12-32); queda la observacion de que M20 no lee ese parametro."
     }
   ],
   "modulos_registrados": [
@@ -104,7 +133,8 @@
       "contratos_zod": false,
       "depende_de": [
         "M18"
-      ]
+      ],
+      "estado_sdlc": "Gate 1 firmado (2026-10-21) con la mesa ATDD pendiente. Fase 2 en curso: DDL parcial aplicado (C-1, C-3); contrato Zod, ADRs y modelo Prisma pendientes."
     },
     {
       "id": "M05",
@@ -494,6 +524,20 @@
       "fecha": "2026-10-21",
       "autor": "05_qa_security_tester",
       "motivo": "Certificación de M20 Core Kit v0.3.2 tras auditoría forense independiente en .sdlc/docs/qa/M20/v0.3.2/QA_REPORT.md. Defectos de accesibilidad en Modal.tsx y ProductCard.tsx completamente subsanados: 57/57 Vitest frontend (+10 tests foco), 68/68 backend (125 total PASS), 0 errores en lint:a11y sobre app+core+modules, 0 ANY en 75 archivos frontend, tsc y eslint limpios. Brecha de jsdom aceptada formalmente bajo Regla #8 para evaluación futura en mesa técnica. Gate 4A ratificado para v0.3.2."
+    },
+    {
+      "de": "GATE_4A_RATIFICADO_V0.3.2",
+      "a": "FASE_1_PRD",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Activacion de Fase 1 para M04 por decision explicita del Director Humano, que autoriza el salto de ola sobre M18 y la Ola 2. Entregables del PM dejados en .sdlc/docs/modules/M04/ (spec funcional, 10 HU con 94 escenarios BDD, flujo y estados, ficha ATDD) mas RFC-M04-001 sobre el modelo de datos. Esperando firma de Gate 1."
+    },
+    {
+      "de": "FASE_1_PRD",
+      "a": "FASE_2_ARQUITECTURA",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Firma del Gate 1 de M04 por instruccion expresa del Director Humano, transcrita por el agente: valida las decisiones DP-01..DP-19 y habilita la Fase 2. Se firma con la ficha ATDD sin los dictamenes del Arquitecto y del QA (reserva registrada en bloqueos). En la misma instruccion el Director aprueba, sobre RFC-M04-001, C-1 (cuenta_empresa) y C-3 opcion A (documento_soporte), aplicados al DDL en version de BD 2.8."
     }
   ]
 }
