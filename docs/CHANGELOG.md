@@ -8,6 +8,60 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 
 ---
 
+## [v0.3.2] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Commit:** `160b077` — `fix(ui): cerrar defectos de accesibilidad de modal y tarjeta del core kit`
+- **Hito:** ♿ **Cierre de la deuda de accesibilidad del Core Kit compartido.** La compuerta de accesibilidad pasa a cubrir todo el frontend.
+
+### Core Kit compartido — M20, infraestructura frontend
+
+Los 2 defectos que la revisión de pares de `v0.3.1` dejó abiertos vivían fuera de `m17-permisos`,
+en `frontend/src/core/`, y se reportaron sin tocar conforme a la Directiva #3. Esta entrega los
+cierra con autorización explícita del Director Humano y sobre el ticket técnico que QA asignó al
+custodio del Core Kit.
+
+**Diálogo modal accesible.** `Modal.tsx` declaraba `role="dialog"` y `aria-modal` pero sin nombre
+accesible, sin foco inicial, sin retorno de foco y sin trampa de foco: `Tab` desde el último control
+salía del diálogo hacia la página de detrás, que seguía siendo tabulable bajo el fondo opaco. Se
+añaden `aria-labelledby` y `aria-describedby` mediante `useId()`, la prop opcional `ariaLabel` para
+modales sin título, foco inicial, retorno del foco al disparador y trampa de foco cíclica. Los 7
+consumidores de M17 pasan `title`, así que ninguno requirió cambios.
+
+**Tercer defecto corregido, no reportado antes.** El `role="dialog"` estaba sobre el **fondo**
+decorativo y no sobre el panel, de modo que la región del diálogo abarcaba toda la pantalla.
+
+**Causa raíz del lint, no su síntoma.** El cierre por clic exterior pasa de un `onClick` en el fondo
+a un escucha de `pointerdown` en `document` —el mismo patrón que `AdminLayout.tsx` ya usaba en
+`v0.3.1`—, con lo que el contenedor decorativo deja de necesitar semántica interactiva.
+
+**Tarjeta de producto operable por teclado.** El `<h3>` de `ProductCard.tsx` llevaba `onClick` sin
+manejador de teclado: "ver producto" era inalcanzable sin ratón. El encabezado conserva su semántica
+y delega la acción a un `<button>` real, que obtiene `Enter`, `Espacio`, foco y anuncio de rol de
+forma nativa. Sin `onViewDetails` se renderiza un `<span>` en lugar de un botón inerte.
+
+**La compuerta de accesibilidad se amplía.** `v0.3.1` había acotado `lint:a11y` a `src/app` y
+`src/modules` precisamente porque estas 2 violaciones habrían dejado el lint en rojo para todo el
+equipo. Cerradas, el alcance incorpora `src/core`: una reaparición ahora rompe la verificación.
+
+**Verificación.** `eslint-plugin-jsx-a11y` sobre `src/core` pasa de **2 errores a 0**. 57/57 pruebas
+Vitest de frontend (eran 47) con 10 nuevas sobre el contrato de recorrido del foco; 68/68 de backend
+sin afectación, **125/125 en total**; `tsc`, ESLint y `check:no-any` (75 archivos) limpios; los tres
+auditores del repositorio sin violaciones. Se preserva la protección de la credencial de un solo uso
+de `HU-SEG-06`.
+
+**Brecha declarada.** El proyecto no tiene `jsdom` ni Testing Library y `vitest.config.ts` corre en
+`environment: node`. Las pruebas nuevas cubren el **contrato de recorrido** de la trampa de foco y el
+instrumento externo cubre la ausencia de manejador de teclado, pero el cableado DOM —`querySelectorAll`,
+la llamada efectiva a `focus()`, el retorno del foco y la resolución de `aria-labelledby` por un lector
+de pantalla— queda **verificado por inspección, no por prueba automatizada**. Se recomienda incorporar
+`jsdom` y `@testing-library/react` como dependencias de desarrollo; es un cambio de dependencias del
+proyecto y excedía el alcance autorizado de esta remediación.
+
+**Sin cambios.** Sigue bloqueada la integración nativa de las 8 reglas en `frontend/eslint.config.mjs`
+por el hook de protección de configuración del entorno. No se declara ninguna compuerta aprobada.
+
+---
+
 ## [v0.3.1] - 2026-10-21
 - **Autor:** DanExl24 (@DanExl24)
 - **Commit:** `cb21b6a` — `fix(m17): cerrar hallazgos de revision de pares en dtos stores y accesibilidad`
