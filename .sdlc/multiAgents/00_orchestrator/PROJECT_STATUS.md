@@ -2,8 +2,8 @@
 > **Versión Actual:** `v0.1.0` (Gobernanza Inicializada — Contexto Cargado)
 > **Versión Objetivo:** `v0.2.0` (Primer módulo con ciclo SDLC completo: contratos Zod + tests + QA)
 > **Última Actualización:** 2026-10-20
-> **Fase Activa:** GATE 0 → Gobernanza, Contexto y Ruta de Construcción Registrados
-> **Agente en Turno:** Orquestador / Director Humano (decisión de módulo inicial)
+> **Fase Activa:** GATE 1 → PRD de M20 entregado · **esperando firma del Director Humano**
+> **Agente en Turno:** `01_product_manager` (turno detenido en Gate 1) · **Módulo en curso: M20**
 > **Alcance del Sistema:** **21 módulos en 6 olas** — 8 con spec, 13 pendientes de Gate 1
 > **Ruta Maestra:** 🗺️ [`RUTA_DEL_PROYECTO.md`](../../../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) (lectura íntegra obligatoria)
 > **Contexto Completo:** Ver [`PINTUCLIC_CONTEXT.md`](../../PINTUCLIC_CONTEXT.md)
@@ -15,7 +15,7 @@
 | Fase | Agente Responsable | Entregable Clave | Estado | Gate | Aprobación Humana |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **00. Gobernanza** | Orquestador | Estructura SDLC, stack confirmado, mapa de docs | 🟢 COMPLETADO | Gate 0 | ✅ Aprobado |
-| **M??. PRD & Reglas** | Product Manager Lead | Contratos formales BDD Gherkin por módulo | 🟡 PENDIENTE — specs existentes, falta formalización ATDD | Gate 1 | 🛑 Pendiente Firma |
+| **M20. PRD & Reglas** | Product Manager Lead | Contratos formales BDD Gherkin por módulo | 🟡 ENTREGADO — 5 de 6 HU, 36 escenarios BDD | Gate 1 | 🛑 **Pendiente Firma** |
 | **Arquitectura M??** | Software Architect | Contratos Zod API-First (`docs/contracts/`) | ⚪ SIGUIENTE — DDL existe, faltan contratos Zod | Gate 2 | Pendiente Gate 1 |
 | **Backend M??** | Backend Engineer | API REST tipada + Lógica + Tests Vitest 100% | ⚪ EN ESPERA — estructura existe, falta completar | Gate 3A | Pendiente Gate 2 |
 | **Frontend M??** | Frontend Engineer | SPA Next.js + Design System + Walkthrough | ⚪ EN ESPERA — estructura existe, falta completar | Gate 3B | Pendiente Gate 3A |
@@ -37,7 +37,7 @@
 
 | Módulo | Spec | Contratos Zod | Backend | Frontend | Tests Vitest | QA | Walkthrough |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **M20 — Seguridad y Auditoría** | ✅ | ⚪ | 🟡 | 🟡 | ⚪ | ⚪ | ⚪ |
+| **M20 — Seguridad y Auditoría** | ✅ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ |
 | **M17 — Admin, Empleados y Permisos** | ✅ | ⚪ | 🟡 | 🟡 | ⚪ | ⚪ | ⚪ |
 
 ### Ola 2 — Catálogo y Abastecimiento
@@ -111,17 +111,21 @@
 
 ## 4. Próxima Acción Recomendada (Director Humano)
 
-> **Decisión pendiente:** ¿Con qué módulo iniciamos el primer ciclo SDLC formal?
+> 🛑 **ALTO MECÁNICO EN GATE 1.** El Product Manager Lead entregó los artefactos de M20 y detuvo su
+> turno (Regla de Oro #10). **No se escribirá código hasta que firmes.**
 >
-> **Recomendación del Orquestador:** comenzar con **M20 (Seguridad y Auditoría)**, que la ruta
-> identifica como **raíz absoluta del grafo**: no depende de nada y todo depende de ella
-> (transitivamente, los 20 módulos restantes). Establece hashing BCrypt, sesiones JWT, autorización
-> en servidor y bitácora inmutable. Su contrato Zod y su certificación desbloquean M17, y con él
-> toda la Ola 2.
+> **Entregables en `docs/modules/M20/`:**
+> - `01_SPEC_FUNCIONAL.md` — 15 reglas inmutables y matriz In-Scope / Out-of-Scope
+> - `02_HISTORIAS_USUARIO.md` — 5 HU en INVEST, **36 escenarios BDD**
+> - `03_FLUJO_Y_ESTADOS.md` — los 6 diagramas transcritos a Mermaid + máquina de estados
+> - `01_ATDD_SPEC.md` — testabilidad (Arquitecto y QA firman en sus turnos)
 >
-> Una vez decidido el módulo, el Product Manager Lead (Gate 1) formalizará
-> las Historias de Usuario en formato INVEST + BDD Gherkin tomando como base
-> `../docs/01_TRANSVERSALES/M20_SEGURIDAD_Y_AUDITORIA.md`.
+> **Qué estás firmando:** el alcance (5 de 6 historias; HU-SEG-04 aplazada), las 6 posturas sobre
+> preguntas abiertas de `01_SPEC_FUNCIONAL.md` §6, y la decisión RN-SEG-15 del puerto de auditoría.
+>
+> **Al firmar,** el turno pasa a `02_software_architect` (Gate 2), que emitirá
+> `docs/contracts/m20-seguridad.contract.ts`. Sin ese contrato Zod no puede escribirse código
+> (Regla de Oro #1).
 
 ---
 
