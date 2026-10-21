@@ -3,12 +3,12 @@
   "dominio": "pintuclic.com",
   "version_actual": "v0.1.0",
   "fecha_actualizacion": "2026-10-21",
-  "fase_activa": "FASE_2_ARQUITECTURA",
-  "gate_activo": "GATE_2_ARCHITECTURE_APPROVAL",
-  "estado": "ESPERANDO_APROBACION_HUMANA",
-  "rol_en_turno": "02_software_architect",
+  "fase_activa": "FASE_3A_BACKEND",
+  "gate_activo": "FASE_3A_PASE_CONTINUO",
+  "estado": "EN_EJECUCION",
+  "rol_en_turno": "03_backend_engineer",
   "modulo_en_curso": "M20",
-  "nota_de_contexto": "El Software Architect Lead entrego los artefactos de Gate 2 de M20 y detuvo su turno: 04_ARQUITECTURA_Y_CODIGO.md, el contrato Zod m20-seguridad.contract.ts y 4 ADRs. Hallazgo principal: M20 NO requiere ningun cambio de DDL, porque con HU-SEG-04 aplazada sus cuatro tablas ya existen en bd/sql/schema_pintuclic.sql. Las 4 reservas de la mesa ATDD quedaron resueltas. Queda elevado que la invariante de desvinculacion de identidad alcanza al modelo de M08, de la Ola 4.",
+  "nota_de_contexto": "Backend de M20 implementado y verificado: 32 archivos TypeScript, barrera de Fase 3A completa (check:no-any, tsc, eslint 0/0, build y Vitest 36/36) y pruebas de mutacion superadas. Se podaron de schema.prisma los modelos especulativos de M01, M04, M05 y M08 por ser incompatibles con bd/sql/schema_pintuclic.sql; cada modulo los redeclarara en su Gate 2. Siguiente: Fase 3B Frontend.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
@@ -298,12 +298,12 @@
       "ola": 1,
       "scope": "m20-seguridad",
       "spec": true,
-      "backend": "estructura",
+      "backend": "implementado",
       "frontend": "estructura",
       "contratos_zod": true,
       "depende_de": [],
       "raiz_absoluta": true,
-      "estado_sdlc": "FASE_2_ARQUITECTURA — esperando firma de Gate 2"
+      "estado_sdlc": "FASE_3A completada — listo para Fase 3B"
     },
     {
       "id": "M21",
@@ -365,6 +365,13 @@
       "fecha": "2026-10-21",
       "autor": "DanExl24",
       "motivo": "Firma del Gate 1 sobre los artefactos de M20: 5 historias en INVEST con 36 escenarios BDD, 15 reglas inmutables y matriz de alcance con HU-SEG-04 aplazada. El Director Humano autorizo ademas el bypass de convocatoria para ritos multi-rol, incorporado como multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md."
+    },
+    {
+      "de": "FASE_2_ARQUITECTURA",
+      "a": "FASE_3A_BACKEND",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Firma del Gate 2 sobre el contrato Zod m20-seguridad.contract.ts, 04_ARQUITECTURA_Y_CODIGO.md y los ADR-002 a ADR-005."
     }
   ]
 }
