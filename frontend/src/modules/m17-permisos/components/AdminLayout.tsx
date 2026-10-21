@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -30,6 +30,53 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const perfilRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * En escritorio el sidebar está siempre visible; en móvil se desplaza fuera
+   * de pantalla con `translate-x`, que no lo saca del orden de tabulación. Se
+   * necesita saber el ancho real para marcarlo `inert` solo cuando procede.
+   */
+  const [esEscritorio, setEsEscritorio] = useState(true);
+
+  useEffect(() => {
+    const consulta = window.matchMedia('(min-width: 1024px)');
+    const sincronizar = () => setEsEscritorio(consulta.matches);
+    sincronizar();
+    consulta.addEventListener('change', sincronizar);
+    return () => consulta.removeEventListener('change', sincronizar);
+  }, []);
+
+  // Escape cierra el menú de perfil y, en móvil, el sidebar. Sin esto el
+  // dropdown solo se cerraba con `onMouseLeave`: inalcanzable con teclado o
+  // en pantallas táctiles.
+  useEffect(() => {
+    if (!profileMenuOpen && !sidebarOpen) return;
+
+    const alPulsarTecla = (evento: KeyboardEvent) => {
+      if (evento.key !== 'Escape') return;
+      setProfileMenuOpen(false);
+      setSidebarOpen(false);
+    };
+
+    window.addEventListener('keydown', alPulsarTecla);
+    return () => window.removeEventListener('keydown', alPulsarTecla);
+  }, [profileMenuOpen, sidebarOpen]);
+
+  // Un clic fuera del menú de perfil lo cierra, igual que haría un menú nativo.
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+
+    const alPulsarFuera = (evento: PointerEvent) => {
+      const destino = evento.target;
+      if (destino instanceof Node && !perfilRef.current?.contains(destino)) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', alPulsarFuera);
+    return () => window.removeEventListener('pointerdown', alPulsarFuera);
+  }, [profileMenuOpen]);
 
   const navItems = [
     {
@@ -95,7 +142,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             variant="ghost"
             size="sm"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Abrir menú"
+            aria-label={sidebarOpen ? 'Cerrar menú lateral' : 'Abrir menú lateral'}
+            aria-expanded={sidebarOpen}
+            aria-controls="admin-sidebar"
             className="lg:hidden p-2 text-neutral-dark hover:bg-neutral-lightest min-h-[36px]"
           >
             <Menu className="w-5 h-5" />
@@ -151,13 +200,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <div className="h-6 w-px bg-neutral-light mx-1" aria-hidden="true" />
 
           {/* Perfil Administrador (CA Carlos Álvarez) */}
-          <div className="relative">
+          <div className="relative" ref={perfilRef}>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => setProfileMenuOpen(!profileMenuOpen)}
               aria-label="Menú de perfil"
+              aria-haspopup="true"
+              aria-expanded={profileMenuOpen}
+              aria-controls="admin-menu-perfil"
               className="flex items-center gap-2.5 p-1 sm:px-2 sm:py-1 rounded-btn hover:bg-neutral-lightest transition-colors cursor-pointer select-none min-h-[36px]"
             >
               <div className="w-8 h-8 rounded-full bg-corporate text-neutral-white font-title font-bold text-xs flex items-center justify-center shadow-xs">
@@ -177,8 +229,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             {/* Dropdown del perfil */}
             {profileMenuOpen && (
               <div
+                id="admin-menu-perfil"
                 className="absolute right-0 mt-2 w-56 bg-neutral-white rounded-card shadow-card-hover border border-neutral-light/70 p-2 z-50 animate-in fade-in zoom-in-95"
-                onMouseLeave={() => setProfileMenuOpen(false)}
               >
                 <div className="px-3 py-2 border-b border-neutral-light/50">
                   <p className="font-title font-semibold text-xs text-neutral-black">
@@ -250,6 +302,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
         {/* SIDEBAR (Blanco oficial según páginas 2 y 3 del mockup) */}
         <aside
+          id="admin-sidebar"
+          inert={!esEscritorio && !sidebarOpen}
           className={`
             fixed lg:sticky top-0 lg:top-16 z-40 lg:z-10
             w-64 h-screen lg:h-[calc(100vh-4rem)] bg-neutral-white border-r border-neutral-light/70
@@ -304,6 +358,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   key={item.href}
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
+                  aria-current={active ? 'page' : undefined}
                   className={`
                     w-full flex items-center gap-3 px-3.5 py-2.5 rounded-btn text-xs font-title font-medium transition-all duration-150
                     ${

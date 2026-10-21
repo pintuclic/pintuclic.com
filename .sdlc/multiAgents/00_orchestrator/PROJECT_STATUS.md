@@ -1,5 +1,7 @@
 > **Última Actualización:** 2026-10-21
 > **Fase Activa:** FASE 4 COMPLETADA — **M17 CERTIFICADO TRAS REMEDIACIÓN INTEGRAL**
+> **Última entrega:** `v0.3.1` — remediación de frontend de M17 (6 defectos de revisión de pares; 47/47 Vitest)
+> **Deuda abierta de M17:** 2 defectos de accesibilidad del Core Kit compartido (`Modal.tsx` sin trampa de foco, `ProductCard.tsx` sin manejador de teclado) y 2 hallazgos bloqueados por dependencias (identidad real de sesión → M04; KPIs agregados → contrato de M17). Detalle en el WORKLOG de `04_frontend_engineer`.
 > **Agente en Turno:** `00_orchestrator` · **Módulo en curso: M17** (Administración y Permisos Certificado)
 > **Alcance del Sistema:** **21 módulos en 6 olas** — 8 con spec, 13 pendientes de Gate 1
 > **Ruta Maestra:** 🗺️ [`RUTA_DEL_PROYECTO.md`](../../../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) (lectura íntegra obligatoria)

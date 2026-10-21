@@ -47,6 +47,24 @@ export const EmpleadosTable: React.FC = () => {
   const [empleadoADesactivar, setEmpleadoADesactivar] = useState<ResumenEmpleado | null>(null);
   const [empleadoPermisos, setEmpleadoPermisos] = useState<ResumenEmpleado | null>(null);
 
+  /**
+   * El input escribe en un estado local y solo consulta al servidor 300 ms
+   * después de la última tecla. Enviar una petición por pulsación saturaba la
+   * API y dejaba la tabla a merced del orden en que llegaran las respuestas.
+   */
+  const [busquedaLocal, setBusquedaLocal] = useState(busqueda);
+
+  useEffect(() => {
+    if (busquedaLocal === busqueda) return;
+    const temporizador = setTimeout(() => establecerBusqueda(busquedaLocal), 300);
+    return () => clearTimeout(temporizador);
+  }, [busquedaLocal, busqueda, establecerBusqueda]);
+
+  const handleLimpiarFiltros = () => {
+    setBusquedaLocal('');
+    limpiarFiltros();
+  };
+
   useEffect(() => {
     void cargarEmpleados();
   }, [cargarEmpleados]);
@@ -69,8 +87,8 @@ export const EmpleadosTable: React.FC = () => {
             <Input
               id="buscar-empleados"
               type="text"
-              value={busqueda}
-              onChange={(e) => establecerBusqueda(e.target.value)}
+              value={busquedaLocal}
+              onChange={(e) => setBusquedaLocal(e.target.value)}
               placeholder="Buscar por nombre, documento o correo..."
               aria-label="Buscar por nombre, documento o correo"
               leftIcon={<Search className="w-4 h-4 text-neutral-medium" />}
@@ -98,7 +116,7 @@ export const EmpleadosTable: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={limpiarFiltros}
+                onClick={handleLimpiarFiltros}
                 className="text-xs text-neutral-medium hover:text-danger min-h-[40px]"
               >
                 Limpiar
@@ -165,7 +183,7 @@ export const EmpleadosTable: React.FC = () => {
                 : 'Aún no has registrado colaboradores en la plataforma.'}
             </p>
             {busqueda || filtroEstado ? (
-              <Button variant="outline" size="sm" onClick={limpiarFiltros}>
+              <Button variant="outline" size="sm" onClick={handleLimpiarFiltros}>
                 Restablecer Filtros
               </Button>
             ) : (

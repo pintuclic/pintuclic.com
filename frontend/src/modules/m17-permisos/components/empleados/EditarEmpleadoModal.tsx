@@ -47,7 +47,13 @@ export const EditarEmpleadoModal: React.FC<EditarEmpleadoModalProps> = ({
   if (!empleado) return null;
 
   const onSubmit = async (data: EditarEmpleadoFormData) => {
-    const ok = await actualizarEmpleado(empleado.idUsuario, data);
+    // El contrato del backend acepta que `telefono` esté ausente, pero no que
+    // llegue vacío. Un colaborador sin teléfono se edita omitiendo el campo.
+    const cambios: EditarEmpleadoFormData = {
+      nombre: data.nombre,
+      telefono: data.telefono?.trim() ? data.telefono.trim() : undefined,
+    };
+    const ok = await actualizarEmpleado(empleado.idUsuario, cambios);
     if (ok) {
       onClose();
     }

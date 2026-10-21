@@ -15,6 +15,7 @@ import {
   listarEmpleados,
   reactivarEmpleado,
 } from '../services/empleados.service';
+import { mensajeDeError } from '../services/mensaje-error';
 
 interface EmpleadosState {
   empleados: ResumenEmpleado[];
@@ -43,6 +44,16 @@ interface EmpleadosState {
   reactivar: (id: number) => Promise<boolean>;
 }
 
+/**
+ * Secuencia de la última petición de listado emitida.
+ *
+ * Cada cambio de búsqueda, página o filtro dispara una consulta nueva sin
+ * cancelar la anterior. Sin este contador, una respuesta lenta que llega
+ * después de otra más reciente sobrescribe la lista y deja la tabla mostrando
+ * datos que no corresponden a los filtros visibles.
+ */
+let peticionListadoActiva = 0;
+
 export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
   empleados: [],
   total: 0,
@@ -57,6 +68,7 @@ export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
   credencialTemporalGenerada: null,
 
   cargarEmpleados: async () => {
+    const idPeticion = ++peticionListadoActiva;
     set({ cargando: true, error: null });
     try {
       const { busqueda, filtroEstado, pagina, limite } = get();
@@ -66,6 +78,7 @@ export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
         pagina,
         limite,
       });
+      if (idPeticion !== peticionListadoActiva) return;
       set({
         empleados: resultado.empleados,
         total: resultado.total,
@@ -73,8 +86,11 @@ export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
         cargando: false,
       });
     } catch (err: unknown) {
-      const mensaje = err instanceof Error ? err.message : 'Error al cargar empleados';
-      set({ error: mensaje, cargando: false });
+      if (idPeticion !== peticionListadoActiva) return;
+      set({
+        error: mensajeDeError(err, 'Error al cargar empleados'),
+        cargando: false,
+      });
     }
   },
 
@@ -113,8 +129,10 @@ export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
       await get().cargarEmpleados();
       return true;
     } catch (err: unknown) {
-      const mensaje = err instanceof Error ? err.message : 'Error al crear colaborador';
-      set({ error: mensaje, cargando: false });
+      set({
+        error: mensajeDeError(err, 'Error al crear colaborador'),
+        cargando: false,
+      });
       return false;
     }
   },
@@ -127,8 +145,10 @@ export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
       await get().cargarEmpleados();
       return true;
     } catch (err: unknown) {
-      const mensaje = err instanceof Error ? err.message : 'Error al actualizar colaborador';
-      set({ error: mensaje, cargando: false });
+      set({
+        error: mensajeDeError(err, 'Error al actualizar colaborador'),
+        cargando: false,
+      });
       return false;
     }
   },
@@ -141,8 +161,10 @@ export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
       await get().cargarEmpleados();
       return true;
     } catch (err: unknown) {
-      const mensaje = err instanceof Error ? err.message : 'Error al desactivar colaborador';
-      set({ error: mensaje, cargando: false });
+      set({
+        error: mensajeDeError(err, 'Error al desactivar colaborador'),
+        cargando: false,
+      });
       return false;
     }
   },
@@ -155,8 +177,10 @@ export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
       await get().cargarEmpleados();
       return true;
     } catch (err: unknown) {
-      const mensaje = err instanceof Error ? err.message : 'Error al reactivar colaborador';
-      set({ error: mensaje, cargando: false });
+      set({
+        error: mensajeDeError(err, 'Error al reactivar colaborador'),
+        cargando: false,
+      });
       return false;
     }
   },

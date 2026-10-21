@@ -18,6 +18,7 @@ import type { CodigoPermiso } from '../../dtos/permisos.dto';
 import type { ResumenEmpleado } from '../../interfaces/empleados.interface';
 import type { ItemPermisoCatalogo } from '../../interfaces/permisos.interface';
 import { actualizarPermisos, obtenerMatrizPermisos } from '../../services/permisos.service';
+import { mensajeDeError } from '../../services/mensaje-error';
 import { useEmpleadosStore } from '../../store/empleadosStore';
 
 export interface PermisosModalProps {
@@ -94,7 +95,7 @@ export const PermisosModal: React.FC<PermisosModalProps> = ({ empleado, isOpen, 
       })
       .catch((err: unknown) => {
         if (!montado) return;
-        const msg = err instanceof Error ? err.message : 'Error al cargar la matriz de permisos';
+        const msg = mensajeDeError(err, 'Error al cargar la matriz de permisos');
         setError(msg);
         setCargando(false);
       });
@@ -171,7 +172,7 @@ export const PermisosModal: React.FC<PermisosModalProps> = ({ empleado, isOpen, 
       setGuardando(false);
       await cargarEmpleados();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al guardar los permisos';
+      const msg = mensajeDeError(err, 'Error al guardar los permisos');
       setError(msg);
       setGuardando(false);
     }

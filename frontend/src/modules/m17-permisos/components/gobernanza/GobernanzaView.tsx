@@ -13,6 +13,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { Button, Input } from '@/core/components';
+import { mensajeDeError } from '../../services/mensaje-error';
 import {
   confirmarSustitucionCorreoDto,
   solicitarSustitucionCorreoDto,
@@ -54,7 +55,7 @@ export const GobernanzaView: React.FC = () => {
       setPaso('confirmacion');
       setCargando(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al solicitar sustitución de correo';
+      const msg = mensajeDeError(err, 'Error al solicitar sustitución de correo');
       setMensajeError(msg);
       setCargando(false);
     }
@@ -75,7 +76,7 @@ export const GobernanzaView: React.FC = () => {
       setCargando(false);
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : 'Error al validar el token de confirmación';
+        mensajeDeError(err, 'Error al validar el token de confirmación');
       setMensajeError(msg);
       setCargando(false);
     }

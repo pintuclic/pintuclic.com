@@ -17,6 +17,7 @@ export const CrearEmpleadoModal: React.FC<CrearEmpleadoModalProps> = ({ isOpen, 
   const { crearNuevoEmpleado, cargando, credencialTemporalGenerada, limpiarCredencialTemporal } =
     useEmpleadosStore();
   const [copiado, setCopiado] = useState(false);
+  const [errorCopia, setErrorCopia] = useState<string | null>(null);
 
   const {
     register,
@@ -44,7 +45,20 @@ export const CrearEmpleadoModal: React.FC<CrearEmpleadoModalProps> = ({ isOpen, 
     limpiarCredencialTemporal();
     reset();
     setCopiado(false);
+    setErrorCopia(null);
     onClose();
+  };
+
+  /**
+   * HU-SEG-06: la credencial temporal es de un solo uso y no puede volver a
+   * consultarse. Mientras está en pantalla, cerrar con Escape o con un clic en
+   * el fondo la destruiría sin aviso, así que ambos caminos se desactivan y
+   * solo el botón explícito "Entendido y Cerrar" la descarta.
+   */
+  const credencialVisible = credencialTemporalGenerada !== null;
+
+  const cierreIgnorado = () => {
+    // Intencionalmente vacío: ver `credencialVisible`.
   };
 
   const copiarCredencial = async () => {
@@ -52,16 +66,20 @@ export const CrearEmpleadoModal: React.FC<CrearEmpleadoModalProps> = ({ isOpen, 
     try {
       await navigator.clipboard.writeText(credencialTemporalGenerada);
       setCopiado(true);
+      setErrorCopia(null);
       setTimeout(() => setCopiado(false), 2500);
     } catch {
-      // Fallback
+      // El portapapeles falla en contexto no seguro o sin permiso. Callarlo
+      // deja al usuario creyendo que copió una clave irrecuperable.
+      setErrorCopia('No se pudo copiar. Selecciona la credencial y cópiala manualmente.');
     }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={handleCerrar}
+      onClose={credencialVisible ? cierreIgnorado : handleCerrar}
+      closeOnOutsideClick={!credencialVisible}
       title={
         credencialTemporalGenerada ? (
           <span className="flex items-center gap-2 text-conversion">
@@ -106,6 +124,12 @@ export const CrearEmpleadoModal: React.FC<CrearEmpleadoModalProps> = ({ isOpen, 
                 {copiado ? 'Copiado' : 'Copiar'}
               </Button>
             </div>
+
+            {errorCopia && (
+              <p role="alert" className="mt-2 font-sans text-xs text-danger">
+                {errorCopia}
+              </p>
+            )}
           </div>
 
           <div className="p-3 bg-neutral-lightest border border-neutral-light/70 rounded-btn flex items-start gap-2.5 text-xs text-neutral-medium">

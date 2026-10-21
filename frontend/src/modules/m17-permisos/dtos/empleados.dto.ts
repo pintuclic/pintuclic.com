@@ -17,9 +17,33 @@ export const correoSchema = z
 
 export const telefonoSchema = z
   .string()
+  .trim()
   .min(7, 'El teléfono debe tener al menos 7 dígitos')
   .max(20, 'El teléfono no puede superar los 20 caracteres')
   .regex(/^[0-9+\s()-]+$/, 'El teléfono solo debe contener números o caracteres de marcado');
+
+/**
+ * Teléfono en edición: admite además la cadena vacía.
+ *
+ * Un colaborador puede tener `telefono: null`, y el formulario lo precarga como
+ * `''`. Con `telefonoSchema.optional()` —que solo acepta `undefined`— ese caso
+ * fallaba el mínimo de 7 dígitos y bloqueaba la edición incluso para cambiar
+ * solo el nombre. El vacío se valida aquí y la vista lo omite del payload,
+ * porque el contrato del backend tampoco acepta `''`
+ * (`editarEmpleadoInputSchema`).
+ */
+export const telefonoEdicionSchema = z
+  .string()
+  .trim()
+  .max(20, 'El teléfono no puede superar los 20 caracteres')
+  .regex(
+    /^[0-9+\s()-]*$/,
+    'El teléfono solo debe contener números o caracteres de marcado',
+  )
+  .refine(
+    (valor) => valor === '' || valor.length >= 7,
+    'El teléfono debe tener al menos 7 dígitos',
+  );
 
 export const documentoIdentidadSchema = z
   .string()
@@ -53,7 +77,7 @@ export const editarEmpleadoDto = z.object({
     .min(3, 'El nombre debe tener al menos 3 caracteres')
     .max(150, 'El nombre no puede superar los 150 caracteres')
     .optional(),
-  telefono: telefonoSchema.optional(),
+  telefono: telefonoEdicionSchema.optional(),
 });
 export type EditarEmpleadoFormData = z.infer<typeof editarEmpleadoDto>;
 

@@ -5,6 +5,7 @@ import type {
   TipoCuentaCliente,
 } from '../interfaces/clientes-admin.interface';
 import { buscarClientes, desactivarCliente, obtenerFichaCliente } from '../services/clientes-admin.service';
+import { mensajeDeError } from '../services/mensaje-error';
 
 interface ClientesState {
   clientes: ClienteResumen[];
@@ -30,6 +31,13 @@ interface ClientesState {
   desactivar: (idCliente: number, motivo: string) => Promise<boolean>;
 }
 
+/**
+ * Secuencia de la última búsqueda emitida. Descarta las respuestas que llegan
+ * fuera de orden, para que la tabla no quede mostrando el resultado de un
+ * término o una página que el usuario ya cambió.
+ */
+let peticionBusquedaActiva = 0;
+
 export const useClientesStore = create<ClientesState>((set, get) => ({
   clientes: [],
   total: 0,
@@ -44,6 +52,7 @@ export const useClientesStore = create<ClientesState>((set, get) => ({
   cargandoFicha: false,
 
   cargarClientes: async () => {
+    const idPeticion = ++peticionBusquedaActiva;
     set({ cargando: true, error: null });
     try {
       const { termino, filtroTipo, pagina, limite } = get();
@@ -53,6 +62,7 @@ export const useClientesStore = create<ClientesState>((set, get) => ({
         pagina,
         limite,
       });
+      if (idPeticion !== peticionBusquedaActiva) return;
       set({
         clientes: resultado.clientes,
         total: resultado.total,
@@ -60,8 +70,11 @@ export const useClientesStore = create<ClientesState>((set, get) => ({
         cargando: false,
       });
     } catch (err: unknown) {
-      const mensaje = err instanceof Error ? err.message : 'Error al buscar clientes';
-      set({ error: mensaje, cargando: false });
+      if (idPeticion !== peticionBusquedaActiva) return;
+      set({
+        error: mensajeDeError(err, 'Error al buscar clientes'),
+        cargando: false,
+      });
     }
   },
 
@@ -91,8 +104,10 @@ export const useClientesStore = create<ClientesState>((set, get) => ({
       const ficha = await obtenerFichaCliente(idCliente);
       set({ fichaSeleccionada: ficha, cargandoFicha: false });
     } catch (err: unknown) {
-      const mensaje = err instanceof Error ? err.message : 'Error al obtener ficha de cliente';
-      set({ error: mensaje, cargandoFicha: false });
+      set({
+        error: mensajeDeError(err, 'Error al obtener ficha de cliente'),
+        cargandoFicha: false,
+      });
     }
   },
 
@@ -106,8 +121,10 @@ export const useClientesStore = create<ClientesState>((set, get) => ({
       await get().cargarClientes();
       return true;
     } catch (err: unknown) {
-      const mensaje = err instanceof Error ? err.message : 'Error al desactivar cliente';
-      set({ error: mensaje, cargando: false });
+      set({
+        error: mensajeDeError(err, 'Error al desactivar cliente'),
+        cargando: false,
+      });
       return false;
     }
   },

@@ -44,6 +44,24 @@ export const ClientesTable: React.FC = () => {
 
   const [clienteADesactivar, setClienteADesactivar] = useState<ClienteResumen | null>(null);
 
+  /**
+   * El input escribe en un estado local y solo consulta al servidor 300 ms
+   * después de la última tecla. Enviar una petición por pulsación saturaba la
+   * API y dejaba la tabla a merced del orden en que llegaran las respuestas.
+   */
+  const [terminoLocal, setTerminoLocal] = useState(termino);
+
+  useEffect(() => {
+    if (terminoLocal === termino) return;
+    const temporizador = setTimeout(() => establecerTermino(terminoLocal), 300);
+    return () => clearTimeout(temporizador);
+  }, [terminoLocal, termino, establecerTermino]);
+
+  const handleLimpiarFiltros = () => {
+    setTerminoLocal('');
+    limpiarFiltros();
+  };
+
   useEffect(() => {
     void cargarClientes();
   }, [cargarClientes]);
@@ -60,8 +78,8 @@ export const ClientesTable: React.FC = () => {
             <Input
               id="buscar-clientes"
               type="text"
-              value={termino}
-              onChange={(e) => establecerTermino(e.target.value)}
+              value={terminoLocal}
+              onChange={(e) => setTerminoLocal(e.target.value)}
               placeholder="Buscar por nombre, correo, NIT o documento..."
               aria-label="Buscar clientes"
               leftIcon={<Search className="w-4 h-4 text-neutral-medium" />}
@@ -89,7 +107,7 @@ export const ClientesTable: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={limpiarFiltros}
+                onClick={handleLimpiarFiltros}
                 className="text-xs text-neutral-medium hover:text-danger min-h-[40px]"
               >
                 Limpiar
@@ -143,7 +161,7 @@ export const ClientesTable: React.FC = () => {
               Intenta con un término diferente o restablece los filtros aplicados.
             </p>
             {(termino || filtroTipo !== 'todos') && (
-              <Button variant="outline" size="sm" onClick={limpiarFiltros}>
+              <Button variant="outline" size="sm" onClick={handleLimpiarFiltros}>
                 Restablecer Filtros
               </Button>
             )}

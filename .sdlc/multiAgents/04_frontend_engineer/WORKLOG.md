@@ -121,3 +121,58 @@ Siguiendo la instrucción explícita del Director Humano de tomar el diseño vis
 - Backend Vitest: ✅ PASS (12 suites, 68/68 tests pasando, cero regresiones).
 - Walkthrough generado en [`docs/walkthroughs/M17/walkthrough_v0.3.0_M17_administracion_empleados_permisos_frontend.md`](../../../docs/walkthroughs/M17/walkthrough_v0.3.0_M17_administracion_empleados_permisos_frontend.md).
 
+
+---
+
+## 2026-10-21 — M17 - v0.3.1 - Remediacion de hallazgos de revision de pares
+
+### Contexto
+Una revision de pares sobre `v0.3.0` registro 1 defecto bloqueante y 12 mayores. El ciclo
+Stop-the-Line de QA resolvio 4 (`BUG-M17-04` a `BUG-M17-07`). El Director Humano instruyo cerrar
+los restantes que cayeran dentro de los limites del modulo.
+
+### Acciones Realizadas
+1. **`dtos/empleados.dto.ts`** - nuevo `telefonoEdicionSchema`: un colaborador con `telefono: null`
+   no podia editarse porque el modal precarga la cadena vacia y `telefonoSchema.optional()` solo
+   admite `undefined`. Se anadio `.trim()` a `telefonoSchema` por coherencia anti-bypass.
+2. **`EditarEmpleadoModal.tsx`** - omite el telefono vacio del payload, porque
+   `editarEmpleadoInputSchema` del backend tampoco lo acepta.
+3. **`services/mensaje-error.ts`** (nuevo) - helper que prefiere el mensaje del envelope canonico
+   via `esRespuestaError`. Aplicado en los 3 stores, `PermisosModal` y `GobernanzaView`: eran 15
+   puntos mostrando "Request failed with status code 409" en vez del motivo de negocio.
+4. **`empleadosStore.ts` / `clientesStore.ts`** - contador de secuencia que descarta respuestas
+   obsoletas; antes una respuesta lenta sobrescribia una mas reciente.
+5. **`ClientesTable.tsx` / `EmpleadosTable.tsx`** - debounce de 300 ms con estado local, en lugar de
+   una peticion por pulsacion de tecla.
+6. **`configuracionStore.ts`** - el refresco se ejecuta antes de anunciar el exito; el banner de
+   confirmacion nunca llegaba a verse porque `cargarParametros` lo borraba.
+7. **`AdminLayout.tsx`** - cierre por Escape y por puntero externo, `inert` condicionado por
+   `matchMedia`, y `aria-expanded` / `aria-controls` / `aria-haspopup` / `aria-current`.
+8. **`CrearEmpleadoModal.tsx`** - la credencial de un solo uso ya no se destruye con Escape ni con
+   clic en el fondo (`HU-SEG-06`); el fallo del portapapeles se informa con `role="alert"`.
+9. **`tests/regresiones-qa.test.ts`** (nuevo) - 9 pruebas que ejercitan el limite exacto de cada
+   defecto corregido.
+
+### Verificacion y Metricas
+- `vitest run`: PASS - 8 suites, **47/47** tests (eran 38).
+- `npx tsc --noEmit`: PASS - 0 errores.
+- `npm run lint`: PASS - 0 errores, 0 advertencias.
+- `check:no-any`: PASS - 73 archivos, 0 usos de `any`.
+- `audit-a11y.mjs`, `audit-core-kit.mjs`, `audit-zod-chains.mjs`: PASS - 0 violaciones.
+- `eslint-plugin-jsx-a11y` como instrumento externo: **0 errores en M17** por primera vez.
+- Walkthrough: `docs/walkthroughs/M17/walkthrough_v0.3.1_M17_remediacion_hallazgos_revision_pares_frontend.md`.
+
+### Elevado al Director Humano (Directiva #3)
+1. **2 defectos del Core Kit compartido, no tocados:** `core/components/overlays/Modal.tsx:70` sin
+   `aria-labelledby`, sin foco inicial, sin retorno de foco y sin trampa de foco (afecta a los 6
+   modales de M17); y `core/components/data-display/ProductCard.tsx:88` sin manejador de teclado.
+2. **2 hallazgos bloqueados por dependencias:** la identidad simulada del panel ("Hola, Carlos",
+   `admin@pintuclic.com`, KPIs `12`/`20`/`1.840`) exige la sesion real de **M04**; los KPIs que hoy
+   se calculan sobre la pagina actual exigen agregados del backend, o sea ampliar el contrato de M17.
+   Se recomienda retirar las afirmaciones "100% verificado en servidor" y "Sesiones revocadas en
+   0ms", que el codigo no respalda.
+3. **Activacion de `jsx-a11y` en `frontend/eslint.config.mjs`: PENDIENTE.** El hook de proteccion de
+   configuracion del entorno bloquea la edicion de ese archivo. El bloque de reglas esta redactado y
+   validado, a la espera de que el Director Humano lo aplique o autorice el bypass del hook. Sin esa
+   activacion, la compuerta de lint sigue dependiendo solo de `audit-a11y.mjs`, cuyo detector solo
+   reconoce etiquetas HTML nativas en minuscula y queda ciego ante los componentes del Core Kit.

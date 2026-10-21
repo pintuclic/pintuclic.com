@@ -8,6 +8,7 @@ import {
   actualizarParametro,
   obtenerCatalogoParametros,
 } from '../services/configuracion.service';
+import { mensajeDeError } from '../services/mensaje-error';
 
 interface ConfiguracionState {
   parametros: ParametroConfiguracion[];
@@ -41,9 +42,10 @@ export const useConfiguracionStore = create<ConfiguracionState>((set, get) => ({
       const res = await obtenerCatalogoParametros();
       set({ parametros: res.parametros, cargando: false });
     } catch (err: unknown) {
-      const mensaje =
-        err instanceof Error ? err.message : 'Error al cargar catálogo de parámetros';
-      set({ error: mensaje, cargando: false });
+      set({
+        error: mensajeDeError(err, 'Error al cargar catálogo de parámetros'),
+        cargando: false,
+      });
     }
   },
 
@@ -53,16 +55,26 @@ export const useConfiguracionStore = create<ConfiguracionState>((set, get) => ({
     set({ actualizando: true, error: null, exitoMensaje: null });
     try {
       await actualizarParametro(clave, valor);
+      // El refresco se hace ANTES de anunciar el éxito: `cargarParametros`
+      // limpia `exitoMensaje` al arrancar, así que fijarlo antes lo borraba
+      // y el banner de confirmación nunca llegaba a verse.
+      await get().cargarParametros();
+      if (get().error) {
+        // El parámetro sí se guardó, pero la lista quedó obsoleta: se informa
+        // el fallo del refresco en lugar de un éxito engañoso.
+        set({ actualizando: false });
+        return true;
+      }
       set({
         actualizando: false,
         exitoMensaje: `Parámetro ${clave} actualizado correctamente`,
       });
-      await get().cargarParametros();
       return true;
     } catch (err: unknown) {
-      const mensaje =
-        err instanceof Error ? err.message : 'Error al actualizar parámetro';
-      set({ error: mensaje, actualizando: false });
+      set({
+        error: mensajeDeError(err, 'Error al actualizar parámetro'),
+        actualizando: false,
+      });
       return false;
     }
   },

@@ -8,6 +8,58 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 
 ---
 
+## [v0.3.1] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔎 **Primera remediación guiada por revisión de pares.** Cierra defectos que las compuertas estáticas no podían detectar.
+
+### Módulo M17 — Administración, Empleados y Permisos (remediación de frontend)
+
+Una revisión de pares sobre `v0.3.0` registró 1 defecto bloqueante y 12 mayores. El ciclo
+*Stop-the-Line* de QA resolvió 4 de ellos; esta entrega cierra **6 de los 8 restantes**, todos dentro
+de los límites de `m17-permisos`.
+
+**Corrección de datos y contrato.** Un colaborador con `telefono: null` no podía editarse —ni para
+cambiarle solo el nombre— porque el modal precarga la cadena vacía y `telefonoSchema.optional()` solo
+admite `undefined`. Se introduce `telefonoEdicionSchema`, que acepta el vacío y conserva el rango
+7–20 cuando hay valor, y la vista omite el campo del payload, ya que el contrato del backend tampoco
+acepta la cadena vacía.
+
+**Mensajes de error reales.** 15 puntos del módulo leían `err.message` de un `AxiosError`, que
+también es un `Error`, de modo que el usuario veía "Request failed with status code 409" en lugar del
+motivo de negocio. El nuevo helper `mensajeDeError` prefiere el mensaje del envelope canónico
+mediante `esRespuestaError`.
+
+**Consistencia de los listados.** Contador de secuencia por store que descarta las respuestas
+obsoletas —antes una respuesta lenta sobrescribía una más reciente y la tabla dejaba de corresponder
+a los filtros visibles— y debounce de 300 ms que sustituye a una petición por pulsación de tecla.
+
+**Accesibilidad de la navegación.** El menú de perfil solo se cerraba con `onMouseLeave`, inalcanzable
+con teclado o en pantalla táctil; el sidebar móvil oculto seguía siendo tabulable. Se añaden cierre
+por `Escape` y por puntero externo, `inert` condicionado por `matchMedia`, y los atributos
+`aria-expanded`, `aria-controls`, `aria-haspopup` y `aria-current`.
+
+**Protección de la credencial de un solo uso (`HU-SEG-06`).** `Escape` o un clic en el fondo
+destruían la clave temporal sin recuperación posible; ahora solo la descarta el botón explícito, y el
+fallo del portapapeles se informa en vez de silenciarse.
+
+**Confirmación de guardado (`HU-ADM-05`).** El banner de éxito de configuración nunca llegaba a verse
+porque el refresco posterior lo borraba. Se corrige el orden.
+
+**Verificación.** 47/47 pruebas Vitest de frontend (eran 38) con **9 pruebas de regresión nuevas** que
+ejercitan el límite exacto de cada defecto; `tsc`, ESLint y `check:no-any` (73 archivos) limpios; los
+tres scripts de auditoría del repositorio sin violaciones; y `eslint-plugin-jsx-a11y` ejecutado como
+instrumento externo con **0 errores en M17** por primera vez.
+
+**Pendiente declarado.** Quedan abiertos 2 defectos de accesibilidad del Core Kit compartido
+(`Modal.tsx` sin trampa de foco, `ProductCard.tsx` sin manejador de teclado), reportados sin tocar
+conforme a la Directiva #3, y 2 hallazgos bloqueados por dependencias: la identidad simulada del
+panel exige la sesión real de M04, y los KPIs agregados exigen ampliar el contrato de M17.
+
+> **Nota:** la entrega `v0.3.0` (implementación inicial de M17, backend y frontend) no tiene entrada
+> propia en este registro. Sus walkthroughs sí están publicados en `docs/walkthroughs/M17/`.
+
+---
+
 ## [v0.2.0] - 2026-10-21
 - **Autor:** DanExl24 (@DanExl24)
 - **Commit:** `c5e6492` — `feat(m20-seguridad): implementar la infraestructura de seguridad del frontend`
