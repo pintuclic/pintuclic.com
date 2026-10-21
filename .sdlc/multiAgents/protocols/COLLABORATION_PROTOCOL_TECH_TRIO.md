@@ -122,7 +122,9 @@ Para que el Frontend siempre sepa qué esperar de cualquier controlador del Back
 Si durante la construcción de la interfaz el Frontend nota que la vista necesita un dato adicional (ejemplo: mostrar el estado de auditoría junto al registro):
 
 1. **El Frontend NO simula datos fijos (hardcodeados) en la UI.**
-2. Agrega una nota en su `WORKLOG.md` y en el del Backend:
+2. Agrega el bloque en el **`WORKLOG.md` del Backend Engineer**, que es el destinatario, y deja en el
+   propio una sola línea de referencia. El destino único del feedback loop lo fija
+   [`HANDOFF_PROTOCOL.md` §2.1](HANDOFF_PROTOCOL.md), que **prevalece** sobre este protocolo:
    ```markdown
    > ⚠️ **SOLICITUD DE EXTENSIÓN DE ENDPOINT**
    > **Módulo:** 02_operaciones

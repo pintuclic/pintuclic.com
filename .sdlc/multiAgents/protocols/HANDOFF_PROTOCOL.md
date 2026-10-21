@@ -53,17 +53,44 @@ Esta tabla debe actualizar en tiempo real el estado de los roles líderes, los s
 ## 2. Reglas del Feedback Loop y Sub-Bucle de Defectos (Incidencias)
 
 ### 2.1. Inconsistencias en Requerimientos o Arquitectura
-Si el agente receptor encuentra vacíos en los insumos del agente anterior:
-1. **NO modificar el artefacto del agente emisor directamente.**
-2. Crear un bloque formal de devolución:
+
+Si un agente encuentra un error o un vacío en el artefacto de otro:
+
+1. **NO modificar el artefacto ajeno directamente.** La potestad sobre un entregable es de quien lo
+   emitió; eso vale especialmente para un dictamen de QA.
+
+2. **📍 DESTINO ÚNICO DEL BLOQUE: el `WORKLOG.md` del DESTINATARIO.**
+
+   > El bloque de devolución se escribe en la bitácora de **quien debe corregir**, no en la de quien
+   > detecta. Una solicitud archivada en la bitácora propia solo la encuentra quien ya sabe que
+   > existe, y el destinatario no tiene ningún motivo para leer bitácoras ajenas. **Una devolución
+   > que nadie ve no es una devolución.**
+
+3. **El emisor deja en su propia bitácora una sola línea de referencia**, para que su registro no
+   mienta por omisión:
+   `> Solicitud de corrección abierta hacia [rol] sobre [artefacto] — ver su WORKLOG.md.`
+
+4. **Si además bloquea el avance**, se registra en `bloqueos[]` de `.workflow/current_state.json`,
+   para que el Orquestador y cualquier agente que aterrice lo vean sin leer bitácora alguna.
+
+5. **Formato del bloque:**
    ```markdown
    > ⚠️ **SOLICITUD DE CORRECCIÓN (FEEDBACK LOOP)**
-   > **De:** Software Architect Agent
-   > **Para:** Product Manager Agent
-   > **Motivo:** En la Historia de Usuario HU-02-04 (Cierre de Ciclo) no se especifica qué ocurre con los registros que tienen operaciones pendientes de liquidación.
-   > **Acción requerida:** Aclarar la regla de negocio antes de definir la transacción DDL.
+   > **De:** [rol emisor] · **Para:** [rol destinatario] · **Fecha:** [AAAA-MM-DD]
+   > **Artefacto:** [ruta exacta y sección o fila concreta]
+   > **Motivo:** [qué está mal, con la evidencia: ruta y línea del código que lo contradice]
+   > **Por qué importa:** [consecuencia real si no se corrige; si no la hay, quizá no merece una devolución]
+   > **Acción requerida:** [qué debe hacer el destinatario]
    ```
-3. El Orquestador reactiva temporalmente al agente emisor para resolver la aclaración.
+
+6. **El destinatario responde en su propia bitácora**, bajo el mismo bloque: `ACEPTADA` con la
+   corrección aplicada, o `RECHAZADA` con su motivo. Una solicitud sin respuesta queda abierta y el
+   Orquestador la reactiva.
+
+> 📌 **Esta regla resuelve una contradicción real entre protocolos.** `COLLABORATION_PROTOCOL_TECH_TRIO.md`
+> §4 pedía anotar «en ambas» bitácoras y esta sección no decía dónde, así que cada agente elegía. En
+> M20, una solicitud de corrección sobre el `QA_REPORT.md` acabó solo en la bitácora del emisor,
+> donde el auditor no iba a verla nunca. **Este criterio prevalece sobre cualquier otro protocolo.**
 
 ### 2.2. Sub-Bucle de Incidencias de Software (Veto QA - Stop-the-Line)
 Cuando el QA Lead o sus subroles detectan un defecto funcional o de seguridad durante Fase 4, se ejecuta mandatoriamente la **Máquina de Estados de Incidencias (7 Estados)** utilizando la ficha técnica de 10 campos (`protocols/TEMPLATES/INCIDENT_DEFECT_TEMPLATE.md`):

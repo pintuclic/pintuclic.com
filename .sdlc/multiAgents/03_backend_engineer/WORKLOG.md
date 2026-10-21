@@ -104,15 +104,7 @@ entrega coordinada. No la cubría — son dos capas, dos artefactos.
 
 **Hallazgo #2 (S3) — CONFORME.** Nada que objetar: M20 es la raíz del grafo y el login es de M04.
 
-> ⚠️ **SOLICITUD DE CORRECCIÓN (FEEDBACK LOOP)**
-> **De:** `03_backend_engineer` · **Para:** `05_qa_security_tester`
-> **Artefacto:** `.sdlc/docs/qa/M20/v0.2.0/QA_REPORT.md` §3, fila `HU-SEG-02`
-> **Motivo:** el reporte consigna la cookie de sesión como **`SameSite=Lax`**. El valor implementado
-> es **`Strict`**, tanto en `backend/src/core/utils/cookieSesion.ts:13` como en el contrato
-> `m20-seguridad.contract.ts:146`, donde está fijado con `z.literal('strict')`.
-> **Por qué importa:** no es un matiz de redacción. `Lax` permite el envío de la cookie en
-> navegaciones de nivel superior desde otro sitio; `Strict` no. Un reporte de seguridad que registre
-> una propiedad anti-CSRF más débil de la real puede inducir a reforzar algo que ya está reforzado, o
-> a asumir esa defensa al auditar otro módulo.
-> **Acción requerida:** corregir la celda. No altero el artefacto porque la potestad sobre el
-> dictamen es exclusiva del QA Lead.
+> 📍 Solicitud de corrección abierta hacia `05_qa_security_tester` sobre
+> `.sdlc/docs/qa/M20/v0.2.0/QA_REPORT.md` §3 (fila `HU-SEG-02`, `SameSite`) — **ver su `WORKLOG.md`**.
+> Reubicada conforme al destino único que fija `HANDOFF_PROTOCOL.md` §2.1: el bloque va en la
+> bitácora de quien debe corregir, no en la de quien detecta.

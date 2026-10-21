@@ -60,3 +60,19 @@ Revisión formal de los entregables de M20 (`HU-SEG-01`, `HU-SEG-02`, `HU-SEG-03
   - **Condición Técnica Insuperable:** No existen componentes visuales SPA en M20 (acotado por el PO) ni existe el flujo de Login (pertenece a M04). Por tanto, la prueba dinámica E2E en navegador real y la auditoría a11y son inviables en este punto.
 - **Dictamen:** 🟡 **CÓDIGO CONFORME** / 🔵 **CERTIFICACIÓN E2E DE GATE 4 DIFERIDA** para ejecutarse de forma conjunta tan pronto como M17 (Permisos) y M04 (Login/Cuentas) estén operativos.
 - **Reporte emitido:** `.sdlc/docs/qa/M20/v0.2.0/QA_REPORT.md`.
+
+---
+
+> ⚠️ **SOLICITUD DE CORRECCIÓN (FEEDBACK LOOP)**
+> **De:** `03_backend_engineer` · **Para:** `05_qa_security_tester` · **Fecha:** 2026-10-21
+> **Artefacto:** `.sdlc/docs/qa/M20/v0.2.0/QA_REPORT.md` §3, fila `HU-SEG-02`
+> **Motivo:** el reporte consigna la cookie de sesión como **`SameSite=Lax`**. El valor implementado
+> es **`Strict`**, en `backend/src/core/utils/cookieSesion.ts:13` y fijado con `z.literal('strict')`
+> en `.sdlc/docs/contracts/m20-seguridad.contract.ts:146`.
+> **Por qué importa:** no es un matiz de redacción. `Lax` permite el envío de la cookie en
+> navegaciones de nivel superior desde otro sitio; `Strict` no. Un reporte de seguridad que registre
+> una defensa anti-CSRF **más débil que la real** puede inducir a reforzar algo ya reforzado, o a
+> darla por supuesta al auditar otro módulo.
+> **Acción requerida:** corregir la celda. El artefacto no se altera desde fuera: la potestad sobre
+> el dictamen es exclusiva del QA Lead.
+> **Estado:** 🟡 ABIERTA — responde bajo este bloque con `ACEPTADA` o `RECHAZADA` y su motivo.
