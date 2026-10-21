@@ -180,3 +180,58 @@ los restantes que cayeran dentro de los limites del modulo.
    archivo, asi que queda a decision del Director Humano. El alcance debe excluir `src/core/` por la
    Directiva #1 hasta que su equipo propietario cierre sus 2 violaciones; al cerrarse, basta ampliar
    el `files` a todo el frontend.
+
+---
+
+## 2026-10-21 — Core Kit · v0.3.2 · Remediacion de accesibilidad (Modal y ProductCard)
+
+### Contexto
+Cierre de los 2 defectos del Core Kit compartido que `v0.3.1` elevo sin tocar por la Directiva #3.
+Habilitantes: instruccion explicita del Director Humano, ticket tecnico de QA en
+`.sdlc/docs/qa/M17/v0.3.1/QA_REPORT.md` seccion 4.1 que asigna el defecto de `Modal.tsx` al custodio
+del Core Kit (este rol), y la elevacion previa ya registrada en esta bitacora.
+
+Los archivos corregidos viven en `frontend/src/core/`, entregable de infraestructura frontend de
+**M20**, no de `m17-permisos`. M17 era consumidor, no propietario.
+
+### Acciones Realizadas
+1. **`Modal.tsx`** — `role="dialog"` y `aria-modal` trasladados del fondo decorativo al panel, que
+   es donde corresponde la region del dialogo (tercer defecto, no reportado antes). Añadidos
+   `aria-labelledby` sobre el titulo y `aria-describedby` sobre el subtitulo via `useId()`, mas la
+   prop opcional `ariaLabel` para modales sin titulo. Implementados foco inicial, retorno del foco
+   al disparador y trampa de foco ciclica. El cierre por clic exterior pasa de `onClick` en el fondo
+   a `pointerdown` en `document`, el mismo patron que ya usaba `AdminLayout.tsx`.
+2. **`foco.ts`** (nuevo) — selector de focalizables y `siguienteIndiceDeFoco`, recorrido puro y sin
+   dependencias del DOM para poder probarlo sin `jsdom`.
+3. **`ProductCard.tsx`** — el `<h3>` conserva su semantica y delega la accion a un `<button>` real
+   interior; `<span>` sin afordancia cuando no hay `onViewDetails`. `line-clamp-2` reubicado sobre
+   el nodo del texto para no alterar la altura de la tarjeta.
+4. **`package.json`** — `lint:a11y` amplia su alcance a `src/core`, revirtiendo la exclusion que
+   `v0.3.1` habia decidido para no dejar el lint en rojo para todo el equipo.
+5. **Dos efectos separados en el Modal a proposito:** el de apertura depende solo de `isOpen`.
+   Unificarlo con el de escuchas haria que recrear `onClose` en el padre volviese a disparar el foco
+   inicial en cada render y le robase el foco al usuario mientras escribe.
+
+### Verificacion y Metricas
+- `eslint-plugin-jsx-a11y` sobre `src/core`: **2 errores ANTES → 0 DESPUES**.
+- Vitest frontend: **57/57 PASS** (9 suites) — eran 47; 10 pruebas nuevas en `core/tests/foco.test.ts`.
+- Vitest backend: 68/68 PASS, sin afectacion. **Total 125/125** (eran 115).
+- `tsc --noEmit`: PASS. `npm run lint`: 0 errores, 0 advertencias. `check:no-any`: 75 archivos, 0 any.
+- `audit-a11y.mjs`, `audit-core-kit.mjs`, `audit-zod-chains.mjs`: 0 violaciones.
+- Contrato de `CrearEmpleadoModal` preservado: `Escape` sigue cayendo en el no-op y el puntero
+  exterior sigue bloqueado mientras la credencial de un solo uso esta visible (`HU-SEG-06`).
+- Walkthrough: `docs/walkthroughs/M20/walkthrough_v0.3.2_M20_remediacion_accesibilidad_core_kit_frontend.md`.
+
+### Declarado al equipo (sin sobre-afirmar)
+1. **Brecha de cobertura real.** El proyecto no tiene `jsdom` ni Testing Library y `vitest.config.ts`
+   corre en `environment: 'node'`. Las 10 pruebas nuevas cubren el **contrato de recorrido** de la
+   trampa de foco, y el instrumento `jsx-a11y` cubre la ausencia de manejador de teclado. El cableado
+   DOM (`querySelectorAll`, la llamada a `focus()`, el retorno del foco y la resolucion de
+   `aria-labelledby` por un lector de pantalla) queda **verificado por inspeccion, no por prueba
+   automatizada**. Se recomienda incorporar `jsdom` y `@testing-library/react` como dependencias de
+   desarrollo; es un cambio de dependencias del proyecto y excede el alcance autorizado aqui.
+2. **Sigue bloqueado:** integrar las 8 reglas en `frontend/eslint.config.mjs` para que `npm run lint`
+   las aplique de forma nativa. El hook de proteccion de configuracion del entorno impide editar ese
+   archivo. El script `lint:a11y` continua siendo el instrumento.
+3. **No se declara ninguna compuerta aprobada.** El entregable de este rol termina en el walkthrough
+   y el commit; Gate 4 es potestad del QA Lead.

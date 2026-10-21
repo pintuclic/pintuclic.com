@@ -86,11 +86,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         )}
 
         <h3
-          onClick={() => onViewDetails?.(id)}
-          className="font-title font-semibold text-base text-neutral-black line-clamp-2 leading-snug cursor-pointer hover:text-action transition-colors"
+          className="font-title font-semibold text-base text-neutral-black leading-snug"
           title={name}
         >
-          {name}
+          {onViewDetails ? (
+            <button
+              type="button"
+              onClick={() => onViewDetails(id)}
+              className="text-left line-clamp-2 cursor-pointer hover:text-action transition-colors rounded-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
+            >
+              {name}
+            </button>
+          ) : (
+            <span className="line-clamp-2">{name}</span>
+          )}
         </h3>
 
         {description && (
