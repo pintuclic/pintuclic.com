@@ -31,3 +31,23 @@
 - Transición `FASE_1_PRD` → `FASE_2_ARQUITECTURA`, turno a `02_software_architect`.
 - Deuda documental aceptada por el Director Humano: los `.png` de `HU-SEG-01` y de registro/login
   de M04 contradicen la especificación vigente y se corregirán más adelante.
+
+## 2026-10-21 — Gate 3B firmado · v0.2.0 publicada · M20 cerrado
+
+- El Director Humano **firmó el Gate 3B** en la modalidad **"3B de infraestructura, sin revisión
+  visual por el momento"**. La compuerta exige explorar la interfaz en el navegador y esta entrega
+  no tiene interfaz, porque el PO acotó la Fase 3B. La revisión visual corresponderá a quien
+  construya las pantallas sobre estos servicios.
+- **Gate 4 (QA) de M20 queda DIFERIDO** por acuerdo. M20 está probado unitariamente —36 pruebas de
+  backend y 19 de frontend— pero **nunca se ha ejecutado contra una sesión real**, porque no existe
+  login hasta M04. Certificarlo ahora sería auditar un módulo que QA no puede ejecutar. Se
+  certificará junto a M17 y M04.
+- **Publicada `v0.2.0`**, primer feature del sistema: primera entrega con código de aplicación y no
+  solo documentación. Registrada en `docs/CHANGELOG.md` y en `.github/version.txt`.
+- **Siguiente:** `M17` (cierra la Ola 1), después `M04`. En paralelo, el Líder Frontend puede montar
+  los componentes base en `core/components/` sin depender de ningún gate.
+
+> ⚠️ Persiste la decisión pendiente sobre el versionado: `CONTRIBUTING.md` exige cuatro segmentos y
+> `.github/version.txt`, el CHANGELOG usa tres, y los workflows `pr-title-lint.yml` y `version.yml`
+> que validarían la coherencia **no existen**. Se publicó con tres segmentos, por coherencia con el
+> CHANGELOG reconstruido y con los tags del repositorio. Restituir esos workflows es de DevOps.

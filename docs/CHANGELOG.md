@@ -8,6 +8,48 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 
 ---
 
+## [v0.2.0] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Commit:** `c5e6492` — `feat(m20-seguridad): implementar la infraestructura de seguridad del frontend`
+- **Hito:** 🥇 **Primer feature del sistema.** Primera entrega con código de aplicación, no solo documentación.
+
+### Módulo M20 — Seguridad, Auditoría y Protección de Datos (parcial)
+
+Primer módulo recorrido por el ciclo SDLC formal: Gate 0 → Gate 1 → Gate 2 → Fase 3A → Gate 3B.
+M20 es la raíz absoluta del grafo de construcción, de la que dependen los 20 módulos restantes.
+
+**Requerimientos (Gate 1).** 5 historias formalizadas en INVEST con **36 escenarios BDD** trazados
+uno a uno a su criterio de aceptación, 15 reglas inmutables (`RN-SEG-01`…`RN-SEG-15`) y los 6
+diagramas contractuales transcritos a Mermaid.
+
+**Arquitectura (Gate 2).** Contrato Zod API-First en `.sdlc/docs/contracts/m20-seguridad.contract.ts`
+y 4 ADRs. Hallazgo principal: **M20 no requiere ningún cambio de DDL**, porque sus cuatro tablas ya
+existían en `bd/sql/schema_pintuclic.sql`. Prisma pasa a mapear ese DDL con `@@map` en lugar de
+describir un modelo paralelo incompatible.
+
+**Backend (Fase 3A).** Derivación BCrypt con coste ajustable y verificación en tiempo constante; la
+máquina de 8 estados de la sesión con ventana deslizante e invalidación en masa con causa; el
+validador central de autorización que resuelve permisos en cada petición; y el manejador global de
+errores sin detalle interno. **36 pruebas Vitest.**
+
+**Frontend (Gate 3B, acotado).** Guarda de rutas que conserva el destino pretendido, interceptor
+`401`, DTOs transversales de seguridad y traducción de errores sin fugas. La sesión viaja en cookie
+`HttpOnly`: ni el cliente HTTP ni el store tocan el identificador. **19 pruebas Vitest.**
+
+**Gobernanza.** Se incorporó `CONSULTATION_BYPASS_PROTOCOL.md` (Mesa de Consulta Acotada) para los
+ritos que exigen varios roles a la vez, como la mesa ATDD. Se absorbió el submódulo `.sdlc` en el
+repositorio principal y se eliminó el residuo del clon en `backend/` y `frontend/` — que, entre otras
+cosas, impedía instalar el frontend por un conflicto de dependencias.
+
+> ⚠️ **Entrega parcial y sin certificar.** Alcance: 5 de 6 historias — **HU-SEG-04 (auditoría) está
+> aplazada por el Product Owner**, y con ella `CA-SEG-03-05` queda **NO CUBIERTO**. **Gate 4 (QA) está
+> diferido**: M20 está probado unitariamente pero nunca se ha ejecutado contra una sesión real,
+> porque no existe login hasta M04. Se certificará junto a M17 y M04.
+
+- 🔗 **Walkthrough:** [walkthroughs/M20/walkthrough_v0.2.0_M20_seguridad_frontend.md](./walkthroughs/M20/walkthrough_v0.2.0_M20_seguridad_frontend.md)
+
+---
+
 ## [v0.1.8] - 2026-10-20
 - **Autor:** DanExl24 (@DanExl24)
 - **Commit:** `081066e` — `docs(arquitectura): agregar RUTA_DEL_PROYECTO.md como ruta maestra`

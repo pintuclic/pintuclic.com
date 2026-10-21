@@ -1,9 +1,9 @@
 > **Proyecto:** Pintu Clic (`pintuclic.com`)
-> **Versión Actual:** `v0.1.0` (Gobernanza Inicializada — Contexto Cargado)
-> **Versión Objetivo:** `v0.2.0` (Primer módulo con ciclo SDLC completo: contratos Zod + tests + QA)
+> **Versión Actual:** `v0.2.0` 🥇 (Primer feature del sistema — M20 parcial)
+> **Versión Objetivo:** `v0.3.0` (M17 Permisos, cerrando la Ola 1)
 > **Última Actualización:** 2026-10-20
-> **Fase Activa:** GATE 2 → Arquitectura y contratos Zod de M20 entregados · **esperando firma**
-> **Agente en Turno:** `02_software_architect` (turno detenido en Gate 2) · **Módulo en curso: M20**
+> **Fase Activa:** GATE 0 → M20 cerrado en Gate 3B · **seleccionando el siguiente módulo: M17**
+> **Agente en Turno:** `00_orchestrator` · **Módulo en curso: ninguno** (siguiente: M17)
 > **Alcance del Sistema:** **21 módulos en 6 olas** — 8 con spec, 13 pendientes de Gate 1
 > **Ruta Maestra:** 🗺️ [`RUTA_DEL_PROYECTO.md`](../../../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) (lectura íntegra obligatoria)
 > **Contexto Completo:** Ver [`PINTUCLIC_CONTEXT.md`](../../PINTUCLIC_CONTEXT.md)
@@ -16,10 +16,10 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **00. Gobernanza** | Orquestador | Estructura SDLC, stack confirmado, mapa de docs | 🟢 COMPLETADO | Gate 0 | ✅ Aprobado |
 | **M20. PRD & Reglas** | Product Manager Lead | Contratos formales BDD Gherkin por módulo | 🟢 COMPLETADO — 5 de 6 HU, 36 escenarios BDD | Gate 1 | ✅ Aprobado |
-| **Arquitectura M20** | Software Architect | Contratos Zod API-First (`docs/contracts/`) | 🟡 ENTREGADO — contrato + 4 ADRs, sin cambios de DDL | Gate 2 | 🛑 **Pendiente Firma** |
-| **Backend M??** | Backend Engineer | API REST tipada + Lógica + Tests Vitest 100% | ⚪ EN ESPERA — estructura existe, falta completar | Gate 3A | Pendiente Gate 2 |
-| **Frontend M??** | Frontend Engineer | SPA Next.js + Design System + Walkthrough | ⚪ EN ESPERA — estructura existe, falta completar | Gate 3B | Pendiente Gate 3A |
-| **QA Forense M??** | QA Lead & Security | Cuadrantes Q1-Q4 + Zero ANY + Fichas Bugs | ⚪ EN ESPERA | Gate 4 | Pendiente Gate 3B |
+| **Arquitectura M20** | Software Architect | Contratos Zod API-First (`docs/contracts/`) | 🟢 COMPLETADO — contrato + 4 ADRs, sin cambios de DDL | Gate 2 | ✅ Aprobado |
+| **Backend M20** | Backend Engineer | API REST tipada + Lógica + Tests Vitest 100% | 🟢 COMPLETADO — 32 archivos, 36/36 Vitest | Gate 3A | ✅ Pase continuo |
+| **Frontend M20** | Frontend Engineer | SPA Next.js + Design System + Walkthrough | 🟡 PARCIAL — solo infraestructura, 19/19 Vitest | Gate 3B | ✅ **Firmado: 3B de infraestructura, sin revisión visual** |
+| **QA Forense M20** | QA Lead & Security | Cuadrantes Q1-Q4 + Zero ANY + Fichas Bugs | 🔵 **DIFERIDO** — se certifica junto a M17 y M04 | Gate 4 | Diferido por acuerdo |
 | **Release M??** | DevOps Engineer | Docker + Seeders + Release SemVer `v0.2.0` | ⚪ EN ESPERA | Gate 5 | Pendiente Gate 4 |
 | **Kaizen M??** | Comité de Calidad | Ishikawa + Pareto 80/20 + Matriz Priorización | ⚪ EN ESPERA | Gate 6 | Pendiente Gate 5 |
 
@@ -37,7 +37,7 @@
 
 | Módulo | Spec | Contratos Zod | Backend | Frontend | Tests Vitest | QA | Walkthrough |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **M20 — Seguridad y Auditoría** | ✅ | ✅ | ⚪ | ⚪ | ⚪ | ⚪ | ⚪ |
+| **M20 — Seguridad y Auditoría** | ✅ | ✅ | ✅ | 🟡 | ✅ | 🔵 | ✅ |
 | **M17 — Admin, Empleados y Permisos** | ✅ | ⚪ | 🟡 | 🟡 | ⚪ | ⚪ | ⚪ |
 
 ### Ola 2 — Catálogo y Abastecimiento
@@ -111,21 +111,19 @@
 
 ## 4. Próxima Acción Recomendada (Director Humano)
 
-> 🛑 **ALTO MECÁNICO EN GATE 1.** El Product Manager Lead entregó los artefactos de M20 y detuvo su
-> turno (Regla de Oro #10). **No se escribirá código hasta que firmes.**
+> ✅ **M20 cerrado en Gate 3B.** Publicada la versión **v0.2.0**, primer feature del sistema.
 >
-> **Entregables en `docs/modules/M20/`:**
-> - `01_SPEC_FUNCIONAL.md` — 15 reglas inmutables y matriz In-Scope / Out-of-Scope
-> - `02_HISTORIAS_USUARIO.md` — 5 HU en INVEST, **36 escenarios BDD**
-> - `03_FLUJO_Y_ESTADOS.md` — los 6 diagramas transcritos a Mermaid + máquina de estados
-> - `01_ATDD_SPEC.md` — testabilidad (Arquitecto y QA firman en sus turnos)
+> **Siguiente módulo acordado: `M17` — Administración, Empleados y Permisos**, que cierra la Ola 1.
+> Es el único predecesor certificado que tiene (M20), y aporta lo que a M20 le falta: el catálogo de
+> permisos atómicos que el validador central consulta, y el almacén de parámetros de `HU-ADM-05` del
+> que depende `RF-SEG-02-07`.
 >
-> **Qué estás firmando:** el alcance (5 de 6 historias; HU-SEG-04 aplazada), las 6 posturas sobre
-> preguntas abiertas de `01_SPEC_FUNCIONAL.md` §6, y la decisión RN-SEG-15 del puerto de auditoría.
+> Después, **`M04` — Cuentas, Autenticación y Perfil**, que aporta el login. Solo entonces M20 podrá
+> ejercitarse end-to-end y los tres se certificarán juntos en Gate 4.
 >
-> **Al firmar,** el turno pasa a `02_software_architect` (Gate 2), que emitirá
-> `docs/contracts/m20-seguridad.contract.ts`. Sin ese contrato Zod no puede escribirse código
-> (Regla de Oro #1).
+> 🎨 **En paralelo:** el Líder Frontend puede empezar ya a montar los componentes base en
+> `frontend/src/core/components/`. No depende de ningún gate: M20 dejó el cliente HTTP, el store de
+> sesión, los DTOs y el mapeo de errores listos para que las pantallas se apoyen en ellos.
 
 ---
 
