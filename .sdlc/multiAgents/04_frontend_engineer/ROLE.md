@@ -7,6 +7,10 @@
 > **Stack Prohibido:** Vue 3, Pinia, Vite standalone, ECharts standalone, Redux, MobX, o cualquier alternativa no listada arriba
 > **Contexto del Proyecto:** [`PINTUCLIC_CONTEXT.md`](../../PINTUCLIC_CONTEXT.md) — leer antes de cualquier tarea
 > **Design System Oficial:** `../frontend/src/core/theme/colors.ts` + `../frontend/src/core/theme/GUIA_COLORES.md`
+> **Fuentes Visuales de Verdad (Mockups):**
+>   - **Documento Rector Supremo UI/UX:** [`../../../docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md`](../../../docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md) (versión Markdown) y [`../../../docs/assets/mockups/Pintu_Clic_UI_Oficial.docx.pdf`](../../../docs/assets/mockups/Pintu_Clic_UI_Oficial.docx.pdf) (UI Spec v1.0)
+>   - **Panel Admin M01/M02:** [`../../../docs/assets/mockups/pintu_clic_admin_m01_m02_.pdf`](../../../docs/assets/mockups/pintu_clic_admin_m01_m02_.pdf)
+>   - **Vistas del Ecosistema:** [`../../../docs/assets/mockups/VISTAS.pdf`](../../../docs/assets/mockups/VISTAS.pdf)
 > **Referencia SDLC Design System:** `docs/04_ui_design_system.md`
 > **Protocolo Rector de Propuestas:** `multiAgents/protocols/TECHNICAL_PROPOSALS_PROTOCOL.md`
 > **Protocolo Bilateral de Sincronización:** `multiAgents/protocols/BACKEND_FRONTEND_SUBROLES_SYNC_PROTOCOL.md`
@@ -70,8 +74,8 @@ Si se detecta código duplicado en validaciones de formulario, formateo de fecha
 
 ## 5. Reglas de Oro Innegotiables
 1. ❌ **PROHIBIDO el uso de APIs obsoletas:** Se utiliza exclusivamente **React 19 Hooks** con TypeScript en el contexto de **Next.js 15 App Router**. Prohibidos Class Components, Pages Router legacy o patrones de Vue 3.
-2. ❌ **PROHIBIDO los colores arbitrarios hardcodeados:** Toda la interfaz debe apegarse estrictamente a `docs/04_ui_design_system.md` (**Regla de Oro #7**).
-3. ❌ **PROHIBIDO maquetar modales y botones nativos desde cero:** Todo modal debe consumir `BaseModal` y todo botón `BaseButton`.
+2. ❌ **PROHIBIDO los colores arbitrarios y estilos fuera de la especificación técnica:** Toda la interfaz debe apegarse estrictamente a `docs/04_ui_design_system.md` y a la UI Spec v1.0 ([`Pintu_Clic_UI_Oficial.docx.pdf`](../../../docs/assets/mockups/Pintu_Clic_UI_Oficial.docx.pdf)) (**Regla de Oro #7 y Directiva Crítica #13**).
+3. ❌ **PROHIBIDO maquetar componentes huérfanos o nativos desde cero:** Todo botón debe consumir `Button` (`buttons/Button.tsx`), todo modal `Modal` (`overlays/Modal.tsx`), todo campo `Input` (`forms/Input.tsx`), y todo producto `ProductCard` (`data-display/ProductCard.tsx`) de `frontend/src/core/components/`.
 4. ❌ **PROHIBIDO invocar clientes HTTP con URLs quemadas en las vistas:** Toda petición debe pasar por los servicios del módulo o las stores de estado.
 5. ❌ **PROHIBIDO omitir los 4 estados de la UI:** Toda pantalla debe contemplar *Loading*, *Empty*, *Error* y *Success*.
 6. ❌ **PROHIBIDO pintar datos falsos o mocks en dashboards de producción:** Toda métrica y gráfica debe provenir 100% de la base de datos en tiempo real.

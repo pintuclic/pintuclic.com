@@ -9,12 +9,14 @@
 ---
 
 > ⚠️ **INSTRUCCIÓN PARA EL AGENTE FRONTEND ENGINEER:**
-> Los tokens de color oficiales de Pintu Clic ya están definidos.
-> **Fuente de verdad de colores:** [`../frontend/src/core/theme/colors.ts`](../frontend/src/core/theme/colors.ts)
-> **Guía de uso:** [`../frontend/src/core/theme/GUIA_COLORES.md`](../frontend/src/core/theme/GUIA_COLORES.md)
+> Los tokens de color y la especificación técnica de UI de Pintu Clic son innegociables:
+> - **Documento Rector Supremo de UI/UX:** [`../../docs/assets/mockups/Pintu_Clic_UI_Oficial.docx.pdf`](../../docs/assets/mockups/Pintu_Clic_UI_Oficial.docx.pdf) (UI Spec v1.0).
+> - **Especificación Panel Admin:** [`../../docs/assets/mockups/pintu_clic_admin_m01_m02_.pdf`](../../docs/assets/mockups/pintu_clic_admin_m01_m02_.pdf) (Vistas M01 y M02).
+> - **Catálogo de Referencia Visual Global:** [`../../docs/assets/mockups/VISTAS.pdf`](../../docs/assets/mockups/VISTAS.pdf).
+> - **Fuente de verdad de colores en código:** [`../frontend/src/core/theme/colors.ts`](../frontend/src/core/theme/colors.ts)
+> - **Guía de uso:** [`../frontend/src/core/theme/GUIA_COLORES.md`](../frontend/src/core/theme/GUIA_COLORES.md)
 >
-> PROHIBIDO usar colores arbitrarios. Todo color debe venir de estos tokens o de las
-> clases Tailwind que los implementen. Si faltan tokens, proponer via RFC.
+> PROHIBIDO usar colores arbitrarios o maquetar componentes huérfanos que no pertenezcan al kit canónico de `src/core/components/`. Todo diseño debe apegarse a la UI Spec v1.0.
 
 ---
 
@@ -63,27 +65,49 @@ Ambas se cargan con `next/font/google` en `src/app/layout.tsx`. **Prohibido** im
 
 ---
 
-## 3. Componentes Canónicos (Core Components)
+## 3. Especificación Técnica de UI (Pintu_Clic_UI_Oficial.docx.pdf)
+
+### 3.1. Radios de Borde y Esquinas
+| Elemento | Radio | Clase Tailwind recomendada |
+| :--- | :--- | :--- |
+| **Inputs / Campos** | 4–6 px | `rounded-input` / `rounded-[6px]` |
+| **Botones** | 5–7 px | `rounded-btn` / `rounded-[6px]` |
+| **Tarjetas (Cards)** | 6–10 px | `rounded-card` / `rounded-[8px]` |
+| **Modales** | 12–16 px | `rounded-modal` / `rounded-[14px]` |
+
+### 3.2. Elevaciones y Sombras
+* **Card Default:** `0 2px 8px rgba(0,0,0,0.08)` (`shadow-card`)
+* **Card Hover:** `0 8px 16px rgba(0,0,0,0.12)` (`shadow-card-hover`), acompañado de `transform: translateY(-4px)` y transición `all 0.3s ease`.
+
+### 3.3. Jerarquía y Variantes Oficiales de Botón (5 Variantes)
+1. **Primario Acción:** Fondo `#0877E8`, texto blanco, hover `#0661BF`.
+2. **Primario Conversión:** Fondo `#41BF5A`, texto blanco, hover `#1B6D24` (usado para "Agregar al Carrito" y confirmaciones de compra).
+3. **Selección / Opción:** Fondo `#DAEEFC`, borde sutil, estado seleccionado con check `#0877E8` (procesos paso a paso / calculadora).
+4. **Outline:** Fondo blanco, borde 1px `#0877E8`, texto `#0877E8`. Hover: fondo `#0877E8`, texto blanco.
+5. **Con Ícono:** Ícono integrado (Lucide React, unistroke outline) que acompaña al texto sin competir con él.
+* **Estados Innegociables:** Normal, Hover, Active (efecto de hundimiento), Disabled (Fondo `#E5E7EB`, texto `#6B7280`, cursor `not-allowed`).
+
+### 3.4. Componentes Canónicos (Core Components)
 
 Los componentes base se encuentran en `../frontend/src/core/components/`:
 
 ```
 core/components/
-├── buttons/        # Botones con variantes semánticas y estados
-├── data-display/   # Tablas, badges, listas de datos
-├── dev/            # Componentes de desarrollo/debugging
-├── feedback/       # Alerts, toasts, estados vacíos, loading
-├── forms/          # Inputs, selects, checkboxes con accesibilidad
-├── layout/         # Containers, grids, wrappers de página
-├── navigation/     # Navbar, sidebar, breadcrumbs
-└── overlays/       # Modales, drawers, popovers
+├── buttons/        # Button.tsx (5 variantes oficiales + estados)
+├── forms/          # Input.tsx, Checkbox.tsx (radios 4-6px, bordes accesibles)
+├── overlays/       # Modal.tsx (overlay oscuro, franja arcoíris, focus trap, Escape)
+├── data-display/   # ProductCard.tsx, Badge.tsx (patrocinado #FFC107, oferta #E63946)
+├── feedback/       # Skeleton.tsx (esqueletos pulsantes grises), Toasts, Estados Vacíos
+├── layout/         # Containers, grids de página (márgenes 24px escritorio / 16px móvil)
+└── navigation/     # Header con Mega-menú modal, Navbar, Breadcrumbs
 ```
 
 **Reglas de uso obligatorio:**
 1. Todo botón usa el componente canónico de `buttons/` — no `<button>` nativo sin wrapper.
-2. Todo modal usa el componente de `overlays/` con focus trap y cierre por Escape.
+2. Todo modal usa el componente de `overlays/Modal.tsx` con franja superior arcoíris corporativa, focus trap y cierre por Escape.
 3. Todo input y select usa el componente de `forms/` con label, helper text y aria-describedby.
-4. Toda pantalla implementa los **4 estados de UI:** Loading, Empty, Error, Success.
+4. Todo producto se renderiza con `ProductCard.tsx` respetando sombras, imagen con `object-fit: contain`, badges y tipografía Poppins.
+5. Toda pantalla implementa los **4 estados de UI:** Loading (Skeleton), Empty, Error, Success.
 
 ---
 

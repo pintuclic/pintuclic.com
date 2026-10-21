@@ -4,8 +4,9 @@
 > **Líder Inmediato:** Frontend Lead Engineer (`04_frontend_engineer/ROLE.md`)  
 > **Directorio de Acción:** `frontend/src/core/components/`, `frontend/src/core/theme/`, `frontend/tailwind.config.ts`  
 > **Fuente de Verdad de Color:** [`frontend/src/core/theme/colors.ts`](../../../../frontend/src/core/theme/colors.ts) — la constante `PINTUCLIC_COLORS`  
-> **Guía de Uso:** [`frontend/src/core/theme/GUIA_COLORES.md`](../../../../frontend/src/core/theme/GUIA_COLORES.md)  
-> **Documento Rector:** `docs/04_ui_design_system.md`
+> **Documento Rector Supremo UI/UX:** [`docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md`](../../../../docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md) (versión Markdown) y [`docs/assets/mockups/Pintu_Clic_UI_Oficial.docx.pdf`](../../../../docs/assets/mockups/Pintu_Clic_UI_Oficial.docx.pdf) (UI Spec v1.0)  
+> **Referencias Visuales Complementarias:** `docs/assets/mockups/pintu_clic_admin_m01_m02_.pdf` y `docs/assets/mockups/VISTAS.pdf`  
+> **Documento SDLC:** `docs/04_ui_design_system.md`
 
 ---
 

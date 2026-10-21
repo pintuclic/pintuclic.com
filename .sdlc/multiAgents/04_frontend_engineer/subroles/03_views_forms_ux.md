@@ -1,9 +1,9 @@
 # 📋 SUBROL FRONTEND 03: Views, Forms & UX Specialist
 
 > **Área:** Pantallas de Negocio, Formularios de Alta Densidad, Validación en Cliente y Enrutamiento RBAC  
-> **Líder Inmediato:** Frontend Lead Engineer (`04_frontend_engineer/ROLE.md`)  
 > **Directorio de Acción:** `frontend/src/modules/m[xx]-[nombre]/components/`, `frontend/src/app/{(admin),(auth),(public)}/`  
-> **Tecnologías Clave:** Next.js 15 App Router, React 19, React Hook Form + `zodResolver`, Core Base Kit (`frontend/src/core/components/`)
+> **Tecnologías Clave:** Next.js 15 App Router, React 19, React Hook Form + `zodResolver`, Core Base Kit (`frontend/src/core/components/`)  
+> **Documento Rector Supremo UI/UX:** [`docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md`](../../../../docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md) (UI Spec v1.0)
 
 ---
 

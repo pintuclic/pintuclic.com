@@ -1,6 +1,16 @@
-import ts from 'typescript';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+
+// Cargar typescript desde el directorio de trabajo (cwd) o fallback a importación directa
+let ts;
+try {
+  const requireFromCwd = createRequire(path.join(process.cwd(), 'package.json'));
+  ts = requireFromCwd('typescript');
+} catch {
+  const mod = await import('typescript');
+  ts = mod.default || mod;
+}
 
 /**
  * 🔍 Verificador AST Estricto: Erradicación del tipo 'any' (.ts, .tsx, .vue)

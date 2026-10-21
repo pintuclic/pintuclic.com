@@ -20,6 +20,7 @@ docs/
 │   │   ├── RUTA_DEL_PROYECTO.md      <-- 🗺️ RUTA MAESTRA: 21 módulos, 6 olas y grafo de dependencias
 │   │   ├── ARQUITECTURA_GENERAL.md   <-- Visión general, actores, mapa de dominios y principios
 │   │   ├── ARQUITECTURA_BACKEND.md   <-- Stack oficial: TS, Express 5, Prisma 6, Zod, JWT, BCrypt, SMTP, CORS
+│   │   ├── ESPECIFICACION_TECNICA_UI_UX.md <-- 🎨 UI Spec v1.0 Markdown rector (tokens, componentes, vistas, mobile)
 │   │   └── MATRIZ_TRAZABILIDAD.md    <-- Mapeo HU <-> Requisitos de Seguridad <-> Diagramas
 │   │
 │   ├── 02_GUIAS_Y_ESTANDARES/        <-- Normativas de trabajo y contribución
@@ -39,24 +40,35 @@ docs/
 │   └── POLITICAS/                    <-- Políticas transversales (Unicidad, Control Servidor, Datos Sensibles)
 │
 ├── 02_MODULOS_FUNCIONALES/           <-- Especificación funcional detallada por módulo
+│   ├── M01_ESPECIFICACION_CATALOGO.md <-- Catálogo de productos, filtros y categorías
+│   ├── M02_ESPECIFICACION_BUSQUEDA.md <-- Motor de búsqueda y autocompletado
 │   ├── M04_CUENTAS_AUTH_PERFIL.md    <-- Registro, login B2C/B2B, perfil, direcciones y aprobación
-│   └── ...                           <-- Futuros módulos funcionales (M07, M08, M12...)
+│   ├── M05_ESPECIFICACION_CARRITO.md <-- Carrito de compras, persistencia y cálculos
+│   ├── M08_ESPECIFICACION_ORDEN.md   <-- Órdenes de venta, checkout y ciclo de pedido
+│   └── ...                           <-- Módulos futuros según RUTA_DEL_PROYECTO.md
 │
 ├── walkthroughs/                     <-- Entregables y walkthroughs de implementación por módulo
-│   └── M20/
+│   └── M20/                          <-- Walkthroughs certificados de M20 (Backend y Frontend)
 │
 ├── reviews/                          <-- Auditorías técnicas y revisiones de código del Tech Lead
 │   ├── README.md                     <-- Normativa, criterios de evaluación y dictámenes
 │   ├── backend/                      <-- Revisiones de arquitectura en módulos Backend
 │   └── frontend/                     <-- Revisiones de componentes en Frontend
 │
-└── assets/                           <-- Recursos visuales y diagramas
-    ├── diagrams/                     <-- Diagramas en formato imagen (PNG/SVG) organizados por módulo
-    │   ├── M04/
-    │   ├── M17/
-    │   ├── M18/
-    │   └── M20/
-    └── raw_drawio/                   <-- Archivos originales editables de Diagrams.net (.drawio)
+└── assets/                           <-- Recursos visuales, maquetas y diagramas
+    ├── mockups/                      <-- 🎨 Fuentes Visuales de Verdad (Directiva Crítica #13)
+    │   ├── Pintu_Clic_UI_Oficial.docx.pdf / .md <-- 📜 RECTOR SUPREMO: UI Spec v1.0 (PDF original y versión Markdown completa)
+    │   ├── pintu_clic_admin_m01_m02_.pdf  <-- 🖥️ Panel Admin: Contrato visual exclusivo M01/M02
+    │   └── VISTAS.pdf                     <-- 🖼️ Catálogo de referencia de vistas del ecosistema
+    └── diagrams/                     <-- Diagramas en formato imagen (PNG/SVG) por módulo
+        ├── M01/
+        ├── M02/
+        ├── M04/
+        ├── M05-M08/
+        ├── M08/
+        ├── M17/
+        ├── M18/
+        └── M20/
 ```
 
 ---
