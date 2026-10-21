@@ -1,0 +1,49 @@
+services:
+  db:
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pintuclic}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pintuclic}
+      POSTGRES_DB: ${POSTGRES_DB:-pintuclic_dev}
+    volumes:
+      - ./bd/sql:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    deploy: !reset null
+
+  backend:
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://${POSTGRES_USER:-pintuclic}:${POSTGRES_PASSWORD:-pintuclic}@db:5432/${POSTGRES_DB:-pintuclic_dev}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_pintuclic_32_caracteres_min}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    ports: !override
+      - "${BACKEND_PORT:-3000}:3000"
+    healthcheck:
+      disable: true
+    deploy: !reset null
+
+  frontend:
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports: !override
+      - "${FRONTEND_PORT:-3001}:3001"
+    depends_on: !override
+      - backend
+    healthcheck:
+      disable: true
+    deploy: !reset null
+
+networks:
+  backend_net:
+    internal: false
