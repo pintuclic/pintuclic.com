@@ -1,22 +1,19 @@
 # Protocolo y Guía de Desarrollo para Agentes de IA - PINTU CLIC
 
-> ## 🚦 PUNTO DE ENTRADA OBLIGATORIO — METODOLOGÍA SDLC MULTIAGENTE
+> ## 🛑 ALTO OBLIGATORIO (CIRCUIT BREAKER - PASO 0 INVIOLABLE)
 >
-> Este proyecto está gobernado por la metodología **SDLC Multiagente Guiado por Artefactos y Compuertas de Calidad (Stage-Gates)**.
-> **Antes de escribir una sola línea de código**, todo agente IA DEBE leer en este orden:
+> **ESTÁ TERMINANTEMENTE PROHIBIDO ESCRIBIR O MODIFICAR CÓDIGO SIN ANTES EJECUTAR ESTE PROTOCOLO.**
+> Existe un **guardarraíl mecánico activo en `.agents/hooks.json`** que bloqueará físicamente cualquier intento indebido de edición.
 >
-> 1. **[`.sdlc/AGENTS.md`](.sdlc/AGENTS.md)** — Manual rector de la metodología: roles, Stage-Gates, 11 Reglas de Oro inviolables y protocolo de aterrizaje.
-> 2. **[`docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md`](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md)** — 🗺️ **LA RUTA DEL PROYECTO.** Grafo de dependencias de los 21 módulos en 6 olas de construcción. **Lectura íntegra obligatoria:** el agente debe entender la ruta a la totalidad, no solo su módulo.
-> 3. **[`.sdlc/PINTUCLIC_CONTEXT.md`](.sdlc/PINTUCLIC_CONTEXT.md)** — Stack confirmado y mapa de fuentes de verdad.
-> 4. **[`.sdlc/.workflow/current_state.json`](.sdlc/.workflow/current_state.json)** — Fase activa y rol en turno.
-> 5. **[`.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md`](.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md)** — Semáforo de módulos.
+> **Antes de realizar cualquier acción o invocar herramientas de edición (`write_to_file`, `replace_file_content`):**
+> 1. **Lee obligatoriamente [`.sdlc/.workflow/current_state.json`](.sdlc/.workflow/current_state.json)** para conocer `modulo_en_curso`, `fase_activa`, `gate_activo`, `estado` y `rol_en_turno`.
+> 2. ⛔ **PROHIBICIÓN EN FASE 1 (PRD):** Si `fase_activa === "FASE_1_PRD"`, NO se escribe código en `backend/src/` ni `frontend/src/`, ni se modifica el schema de BD. Solo se producen especificaciones y HUs en `.sdlc/docs/modules/M[XX]/`.
+> 3. ⛔ **PROHIBICIÓN EN FASE 2 (ARQUITECTURA):** Si `fase_activa === "FASE_2_ARQUITECTURA"`, solo se crean DTOs/interfaces Zod y DDL. PROHIBIDO implementar servicios, controladores o componentes.
+> 4. ⛔ **AISLAMIENTO DE MÓDULO (Directiva #1):** Solo puedes editar archivos de tu módulo asignado `src/modules/m[xx]-[nombre]`. Prohibido tocar otros módulos.
+> 5. ⛔ **ESPERA HUMANA:** Si `estado === "ESPERANDO_APROBACION_HUMANA"`, detén la ejecución y solicita la firma del Director Humano.
 >
-> **El flujo de trabajo de este archivo (pasos 1–10) se ejecuta DENTRO de los Stage-Gates del SDLC.**
-> El SDLC define CUÁNDO puedes codificar. Este archivo define CÓMO codificar.
->
-> **Stack confirmado (NO proponer alternativas sin RFC aprobado):**
-> - Backend: `Express 5` + `Prisma 6` + `Zod 4` + `Vitest 3` + `JWT` + `bcrypt` + `nodemailer`
-> - Frontend: `Next.js 15` + `React 19` + `Tailwind CSS 4` + `Zustand 5` + `React Hook Form` + `Axios`
+> 🗺️ **Ruta canónica obligatoria:** [`.sdlc/AGENTS.md`](.sdlc/AGENTS.md) y [`docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md`](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md).
+> **Stack confirmado:** Backend: `Express 5` + `Prisma 6` + `Zod 4` + `Vitest 3` + `JWT` + `bcrypt` (sal 12). Frontend: `Next.js 15` + `React 19` + `Tailwind CSS 4` + `Zustand 5` + `React Hook Form`.
 
 ---
 
