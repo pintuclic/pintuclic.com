@@ -1,0 +1,47 @@
+name: 🚦 Stage-Gate 4 — Quality & AST Security Gates
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  ast-quality-audit:
+    name: 🛡️ Audit Zero ANY & Governance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci || npm install
+
+      - name: 🔍 Run AST Zero ANY Audit (Frontend & TypeScript)
+        run: npm run check:no-any
+
+      - name: 📋 Validate Zod API & DTO Contracts
+        run: npm run test:contracts
+
+      - name: ♿ Run Automated A11y Static Audit (WCAG 2.1 AA)
+        run: npm run audit:a11y
+
+      - name: 📋 Verify Stage-Gate Machine State Integrity
+        run: |
+          node -e '
+            const state = JSON.parse(require("fs").readFileSync(".workflow/current_state.json", "utf8"));
+            const activePhase = state.fase_activa || state.ciclo_vida?.fase_actual;
+            const activeGate = state.gate_activo || state.ciclo_vida?.gate_actual;
+            if (!activePhase || !activeGate) {
+              console.error("❌ Invalid current_state.json format! Missing fase_activa or gate_activo.");
+              process.exit(1);
+            }
+            console.log("✅ State Machine Valid. Active Phase:", activePhase, "| Active Gate:", activeGate);
+          '

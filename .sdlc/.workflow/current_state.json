@@ -1,0 +1,72 @@
+{
+  "proyecto": "Pintu Clic",
+  "dominio": "pintuclic.com",
+  "version_actual": "v0.1.0",
+  "fecha_actualizacion": "2026-10-20",
+  "fase_activa": "FASE_0_GOBERNANZA",
+  "gate_activo": "GATE_0_GOBERNANZA_APPROVAL",
+  "estado": "CONTEXTO_INICIALIZADO",
+  "rol_en_turno": "00_orchestrator",
+  "modulo_en_curso": null,
+  "nota_de_contexto": "Proyecto con estructura modular existente. Ruta maestra de construccion en ../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md: 21 modulos en 6 olas con grafo de dependencias, de lectura integra obligatoria antes de codificar. 8 modulos tienen spec funcional y estructura; 13 estan pendientes de Gate 1 y no se implementan hasta tener spec. Schema de BD en ../bd/. Contratos Zod pendientes de definicion formal. Ver PINTUCLIC_CONTEXT.md para el mapa completo de fuentes de verdad.",
+  "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
+  "total_modulos": 21,
+  "modulos_con_spec": 8,
+  "modulos_pendientes_gate_1": 13,
+  "bloqueos": [
+    {
+      "tipo": "INCONSISTENCIA_RUTA",
+      "descripcion": "El grafo de RUTA_DEL_PROYECTO.md tiene 4 inconsistencias registradas en su seccion 7: ciclo M18 -> M04 -> M07 -> M08 -> M18; M05 y M08 en Ola 4 dependen de M06, M07 y M21 de Ola 5; M16 sin conexiones; classDef declarados sin aplicar.",
+      "responsable": "Product Owner",
+      "estado": "PENDIENTE_CORRECCION",
+      "impacto": "La Ola 4 no puede cerrarse sin construir antes tres modulos de la Ola 5. Hasta la correccion, la ruta se respeta tal como esta y todo bloqueo se reporta."
+    }
+  ],
+  "modulos_registrados": [
+    { "id": "M01", "nombre": "Catalogo de Productos", "ola": 2, "scope": "m01-catalogo", "spec": true, "backend": "estructura", "frontend": "estructura", "contratos_zod": false, "depende_de": ["M17", "M13"] },
+    { "id": "M02", "nombre": "Busqueda, Filtros y Descubrimiento", "ola": 3, "scope": "m02-busqueda", "spec": true, "backend": "estructura", "frontend": "estructura", "contratos_zod": false, "depende_de": ["M01"] },
+    { "id": "M03", "nombre": "Asesoria y IA (Simulador/Chatbot)", "ola": 6, "scope": "m03-asesoria", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M01"] },
+    { "id": "M04", "nombre": "Cuentas, Autenticacion y Perfil", "ola": 3, "scope": "m04-cuentas", "spec": true, "backend": "estructura", "frontend": "estructura", "contratos_zod": false, "depende_de": ["M18"] },
+    { "id": "M05", "nombre": "Carrito de Compras", "ola": 4, "scope": "m05-carrito", "spec": true, "backend": "estructura", "frontend": "estructura", "contratos_zod": false, "depende_de": ["M01", "M06"] },
+    { "id": "M06", "nombre": "Precios, Promociones y Descuentos", "ola": 5, "scope": "m06-precios", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M13"] },
+    { "id": "M07", "nombre": "Checkout y Pago", "ola": 5, "scope": "m07-checkout", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M04", "M05", "M06", "M21"] },
+    { "id": "M08", "nombre": "Orden de Venta", "ola": 4, "scope": "m08-ordenes", "spec": true, "backend": "estructura", "frontend": "estructura", "contratos_zod": false, "depende_de": ["M06", "M07", "M21"], "nodo_critico": true, "habilita": ["M09", "M10", "M11", "M12", "M18", "M19"] },
+    { "id": "M09", "nombre": "Cumplimiento y Preparacion", "ola": 4, "scope": "m09-cumplimiento", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M08"] },
+    { "id": "M10", "nombre": "Entrega y Transporte", "ola": 5, "scope": "m10-entrega", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M08", "M09"] },
+    { "id": "M11", "nombre": "Postventa (Devoluciones/Reembolsos)", "ola": 5, "scope": "m11-postventa", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M08"] },
+    { "id": "M12", "nombre": "Facturacion", "ola": 5, "scope": "m12-facturacion", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M08"] },
+    { "id": "M13", "nombre": "Inventario e Integracion SAMIT (CSV)", "ola": 2, "scope": "m13-inventario", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": [] },
+    { "id": "M14", "nombre": "Patrocinios y Campanas", "ola": 6, "scope": "m14-patrocinios", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M01", "M02", "M19"] },
+    { "id": "M15", "nombre": "Atencion al Cliente (WhatsApp/FAQ)", "ola": 6, "scope": "m15-atencion", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M03"] },
+    { "id": "M16", "nombre": "Contenido Institucional", "ola": 2, "scope": "m16-contenido", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": [] },
+    { "id": "M17", "nombre": "Administracion, Empleados y Permisos", "ola": 1, "scope": "m17-permisos", "spec": true, "backend": "estructura", "frontend": "estructura", "contratos_zod": false, "depende_de": ["M20"] },
+    { "id": "M18", "nombre": "Notificaciones y Comunicaciones", "ola": 3, "scope": "m18-notificaciones", "spec": true, "backend": "estructura", "frontend": false, "contratos_zod": false, "depende_de": ["M08"] },
+    { "id": "M19", "nombre": "Reportes y Analitica", "ola": 6, "scope": "m19-reportes", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M08"] },
+    { "id": "M20", "nombre": "Seguridad, Auditoria y Proteccion de Datos", "ola": 1, "scope": "m20-seguridad", "spec": true, "backend": "estructura", "frontend": "estructura", "contratos_zod": false, "depende_de": [], "raiz_absoluta": true },
+    { "id": "M21", "nombre": "Cotizaciones", "ola": 5, "scope": "m21-cotizaciones", "spec": false, "backend": false, "frontend": false, "contratos_zod": false, "depende_de": ["M05"] }
+  ],
+  "camino_critico": ["M20", "M17", "M01", "M05", "M21", "M07", "M08", "M09", "M10"],
+  "historial_transiciones": [
+    {
+      "de": "ORIGEN",
+      "a": "FASE_0_GOBERNANZA",
+      "fecha": "2026-10-20",
+      "autor": "DanExl24",
+      "motivo": "Inicializacion del repositorio bajo Starter Kit Multiagente SDLC"
+    },
+    {
+      "de": "FASE_0_GOBERNANZA",
+      "a": "CONTEXTO_INICIALIZADO",
+      "fecha": "2026-10-20",
+      "autor": "DanExl24",
+      "motivo": "Adaptacion del SDLC al stack y documentacion existente de pintuclic.com. PINTUCLIC_CONTEXT.md creado como mapa de fuentes de verdad."
+    },
+    {
+      "de": "CONTEXTO_INICIALIZADO",
+      "a": "RUTA_REGISTRADA",
+      "fecha": "2026-10-20",
+      "autor": "DanExl24",
+      "motivo": "El Product Owner entrego el grafo de olas y dependencias. Registrado en docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md y en los registros del SDLC: el inventario pasa de 8 a 21 modulos. Nombres alineados a los del Product Owner (M08 pasa de 'Ordenes y Envios' a 'Orden de Venta', ya que los envios corresponden a M10). 13 modulos quedan pendientes de Gate 1."
+    }
+  ]
+}
