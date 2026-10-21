@@ -21,9 +21,9 @@
 | **M17. PRD & Reglas** | Product Manager Lead | 7 HU INVEST, 47 BDD Gherkin, Diagramas Mermaid, DoR | 🟢 COMPLETADO | Gate 1 | ✅ Aprobado |
 | **Arquitectura M17** | Software Architect | Contratos Zod (`m17-permisos.contract.ts`) + 3 ADRs | 🟢 COMPLETADO | Gate 2 | ✅ Aprobado |
 | **Backend M17** | Backend Engineer | API REST tipada + Permisos en DB + Tests Vitest | 🟢 COMPLETADO — 32 tests Vitest, walkthrough emitido | Gate 3A | ✅ Aprobado |
-| **Frontend M17** | Frontend Engineer | Vistas Admin Mockup + Permisos + Clientes + Config | 🟢 COMPLETADO — 38 tests Vitest, build limpio | Gate 3B | ✅ **Firmado Gate 3B** |
-| **QA Forense M17** | QA Lead & Security | Cuadrantes Q1-Q4 + Zero ANY + Auditoría Determinista | 🟢 COMPLETADO | Gate 4A | ✅ **Certificado** |
-| **Release M17** | DevOps Engineer | Docker + Seeders + Release SemVer `v0.3.0` | 🟢 AUTORIZADO | Gate 5 | ✅ Listo para release |
+| **Frontend M17** | Frontend Engineer | Vistas Admin Mockup + Permisos + Clientes + Config | 🟢 COMPLETADO — 47 tests Vitest, build limpio | Gate 3B | ✅ **Firmado Gate 3B** |
+| **QA Forense M17** | QA Lead & Security | Cuadrantes Q1-Q4 + Zero ANY + Auditoría Determinista | 🟢 COMPLETADO | Gate 4A | ✅ **Certificado (v0.3.1)** |
+| **Release M17** | DevOps Engineer | Docker + Seeders + Release SemVer `v0.3.1` | 🟢 AUTORIZADO | Gate 5 | ✅ Listo para release |
 
 *Leyenda:* 🟢 Completado | 🟡 En Proceso / Parcial | 🔴 Bloqueado (Veto) | ⚪ No Iniciado
 

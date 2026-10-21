@@ -181,5 +181,43 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 - **Veredicto Gate 4A:** 🟢 **APROBADO Y CERTIFICADO**.
 - **Acción:** M17 v0.3.0 queda listo para Gate 5 (Release) y habilita la construcción de Ola 2 (`M01 — Catálogo de Productos`).
 
+---
+
+### [2026-10-21 04:00] — 🟢 AUDITORÍA FORENSE Y CERTIFICACIÓN DE CALIDAD — M17 (v0.3.1)
+
+> **Insumo:** `docs/walkthroughs/M17/walkthrough_v0.3.1_M17_remediacion_hallazgos_revision_pares_frontend.md`  
+> **Auditor:** QA Lead & Security Compliance Director (`05_qa_security_tester`)  
+> **Naturaleza:** Remediación quirúrgica frontend de 6 casos de borde derivados de la revisión de pares.
+
+#### 1. Resultados de Ejecución Real y Batería Automatizada
+- **Vitest Frontend:** **47/47 tests PASS** (8 suites, +9 pruebas de regresión en `regresiones-qa.test.ts`).
+- **Vitest Backend:** **68/68 tests PASS** (12 suites). Total suite combinada: **115 tests PASS**.
+- **Auditoría AST Cero ANY (`npm run check:no-any`):** **140 archivos auditados, 0 usos de ANY (PASS)** (Frontend: 73, Backend: 67).
+- **Compilación TypeScript (`tsc --noEmit`):** **0 errores** en Backend y Frontend.
+- **Linter (`next lint` / `eslint`):** **0 errores, 0 warnings**.
+- **Validación de Contratos Zod (`npm run test:contracts`):** **12/12 validaciones exitosas (PASS)**.
+- **Auditorías de Gobernanza:**
+  - `node .sdlc/tooling/audit-core-kit.mjs`: **0 violaciones** (13 archivos conformes).
+  - `node .sdlc/tooling/audit-zod-chains.mjs`: **0 anti-patrones** (14 archivos conformes).
+  - `node .sdlc/tooling/audit-a11y.mjs`: **0 violaciones WCAG 2.1 AA** (28 archivos conformes).
+
+#### 2. Validación de Defectos Remediados
+1. **Edición sin teléfono (`HU-ADM-01`):** `telefonoEdicionSchema` admite cadena vacía y el modal la omite del payload. Test en verde.
+2. **Mensajes de error legibles (`HU-CUE-08` / `HU-ADM-03`):** Helper `mensajeDeError` prioriza el mensaje del envelope canónico sobre mensajes genéricos de Axios. Tests en verde.
+3. **Race conditions y debounce (`HU-ADM-01` / `HU-ADM-04`):** IDs de secuencia monotónicos en stores y debounce de 300ms en tablas de clientes y empleados.
+4. **Confirmación de guardado visible (`HU-ADM-05`):** Refresco ejecutado antes de fijar `exitoMensaje`. Test en verde.
+5. **Accesibilidad en navegación (`AdminLayout.tsx`):** Cierre por `Escape` y clic fuera, atributo `inert` en sidebar móvil oculto, y juego completo de atributos ARIA.
+6. **Protección de credencial temporal (`HU-SEG-06`):** Desactivado cierre por backdrop/Escape mientras esté visible; alerta accesible ante fallo de portapapeles.
+
+#### 3. Protocolo de Parada y Alcance (Directiva #3)
+- Se valida que ningún archivo fuera de `frontend/src/modules/m17-permisos/` fue modificado.
+- Se registran 2 observaciones del Core Kit compartido (`Modal.tsx` trampa de foco, `ProductCard.tsx` teclado en onClick) para ticket de mantenimiento.
+- Se confirman 2 bloqueos externos normales (identidad real en dashboard pendiente de M04, agregados de KPIs en tablas pendientes de backend).
+
+#### 4. Dictamen Final
+- **Veredicto Gate 4A:** 🟢 **APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA**.
+- **Reporte Oficial:** `.sdlc/docs/qa/M17/v0.3.1/QA_REPORT.md`.
+- **Acción:** M17 v0.3.1 queda plenamente listo para Gate 5 (Release SemVer) y consolida la base de Ola 1 para iniciar Ola 2 (`M01`).
+
 
 

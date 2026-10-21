@@ -473,6 +473,13 @@
       "fecha": "2026-10-21",
       "autor": "05_qa_security_tester",
       "motivo": "Levantamiento formal del Veto Stop-the-Line. Subsanados los 4 defectos (BUG-M17-04 a BUG-M17-07) con autorización humana y verificación determinista: 68/68 backend Vitest, 38/38 frontend Vitest, 0 ANY en 141 archivos, 0 violaciones de Core Kit, 0 violaciones Zod, 0 violaciones A11y, tsc y eslint limpios. M17 queda técnicamente certificado para habilitar la Ola 2 (M01)."
+    },
+    {
+      "de": "GATE_4A_APROBADO_CERTIFICADO",
+      "a": "GATE_4A_RATIFICADO_V0.3.1",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "Certificación de M17 v0.3.1 tras revisión de pares. 6 defectos de borde subsanados en m17-permisos: 47/47 Vitest frontend (+9 de regresión), 68/68 backend (115 total PASS), 0 ANY en 140 archivos, 0 violaciones Core Kit, Zod y A11y. Gate 4A ratificado con excelencia."
     }
   ]
 }
