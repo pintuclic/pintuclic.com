@@ -57,6 +57,62 @@ Procedimiento obligatorio:
 
 ---
 
+## 1.3. Perfiles de Compuerta según la Naturaleza del Módulo
+
+Las compuertas de la Sección 2 están escritas suponiendo un **módulo vertical**: uno que entrega
+funcionalidad visible de punta a punta, con pantallas que mirar en Gate 3B y un flujo que recorrer en
+Gate 4. Esa suposición **no se cumple para los módulos transversales**, que entregan primitivas que
+otros consumen.
+
+Cuando no se cumple, el agente de turno se encuentra ante una compuerta que no puede satisfacer e
+improvisa una salida. Para que eso deje de pasar, se definen **dos perfiles**. El perfil se declara
+**en Gate 1**, junto con la matriz de alcance, y no se decide sobre la marcha.
+
+### Perfil A — Vertical *(por defecto)*
+
+El módulo entrega funcionalidad que un usuario puede ejercitar por sí misma. **Las cinco compuertas
+se aplican tal como están escritas**, sin variación.
+
+### Perfil B — Transversal
+
+El módulo entrega primitivas consumidas por otros módulos y **no es ejercitable de forma aislada**.
+Aplica a `M20 Seguridad`, `M17 Permisos` y `M18 Notificaciones`, y a cualquier otro que el Product
+Owner clasifique así en Gate 1.
+
+Solo cambian dos compuertas:
+
+| Compuerta | Perfil A (vertical) | Perfil B (transversal) |
+| :--- | :--- | :--- |
+| **Gate 3B** | El Director Humano **explora la interfaz** en el navegador | **Revisión de superficie de consumo**: el Director Humano revisa lo que otros módulos van a consumir — contratos, firmas de servicios, mapa de rutas— no pantallas. Se firma como **«3B de infraestructura»** |
+| **Gate 4** | Certificación única con los 4 Pilares | **Se parte en dos**, ver abajo |
+
+#### Gate 4 partido en dos
+
+- **Gate 4-A · Certificación de unidad.** Pruebas unitarias y de contrato, auditoría AST, compilación
+  estricta y linters. **Ejecutable de inmediato**, sin depender de nadie. La firma un auditor
+  independiente (§1.1).
+- **Gate 4-B · Certificación de integración.** E2E, accesibilidad, carga y DAST. **Se difiere hasta
+  que exista un módulo consumidor que permita recorrer un flujo real.** Al diferirlo, el RFC exigido
+  por §1.2 **debe nombrar qué módulo lo desbloquea**; «más adelante» no es una condición.
+
+> 🔴 **Un módulo de Perfil B NO se declara «certificado» hasta superar 4-B.** Mientras tanto su estado
+> es **«certificado en unidad»**, y así debe constar en `PROJECT_STATUS.md`, en el `QA_REPORT.md` y en
+> la entrada del CHANGELOG de toda versión que lo incluya. Publicar una versión de un módulo
+> transversal es legítimo; llamarla certificada antes de 4-B, no.
+
+### Por qué existe esta regla
+
+En M20 **dos de las cinco compuertas no encajaron**: Gate 3B pedía revisar una interfaz que, por
+decreto del Product Owner, no se había construido; y Gate 4 pedía certificar un módulo que no podía
+ejecutarse sin el login de M04. Ambas se resolvieron conversando, con buen criterio y con firma
+humana, pero **improvisando dos veces lo que debería ser un perfil declarado desde Gate 1**.
+
+La lección no es que las compuertas estuvieran mal, sino que estaban escritas para un solo tipo de
+módulo. M20 es la **raíz del grafo**: por construcción, nunca podrá ejercitarse antes que sus
+consumidores. Eso no es una excepción — es la norma de todo módulo transversal.
+
+---
+
 ## 2. Mapa Canónico de las Compuertas del SDLC
 
 ```text

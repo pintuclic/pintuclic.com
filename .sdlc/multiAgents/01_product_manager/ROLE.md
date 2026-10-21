@@ -71,6 +71,10 @@ graph TD
       [`CONSULTATION_BYPASS_PROTOCOL.md`](file:///multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md).
       La firma consultiva **no sustituye** la del Director Humano en Gate 1.
 - [ ] Matriz In-Scope / Out-of-Scope validada con el usuario.
+- [ ] **Perfil de compuerta declarado** (A vertical / B transversal), según
+      [`.workflow/STAGE_GATES.md` §1.3](../../.workflow/STAGE_GATES.md). Un módulo transversal no
+      es ejercitable de forma aislada: declararlo en Gate 1 evita que Gate 3B y Gate 4 se
+      improvisen después.
 - [ ] Reglas de negocio identificadas unívocamente (`RN-MOD-01`, `RN-MOD-02`, etc.).
 - [ ] Bitácora actualizada en `multiAgents/01_product_manager/WORKLOG.md`.
 - [ ] Firma aprobatoria del Director Humano registrada en Gate 1.
