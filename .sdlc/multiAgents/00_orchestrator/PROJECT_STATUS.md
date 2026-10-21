@@ -1,9 +1,6 @@
-> **Proyecto:** Pintu Clic (`pintuclic.com`)
-> **Versión Actual:** `v0.2.0` 🥇 (Primer feature del sistema — M20 parcial)
-> **Versión Objetivo:** `v0.3.0` (M17 Permisos, cerrando la Ola 1)
-> **Última Actualización:** 2026-10-20
-> **Fase Activa:** GATE 0 → M20 cerrado en Gate 3B · **seleccionando el siguiente módulo: M17**
-> **Agente en Turno:** `00_orchestrator` · **Módulo en curso: ninguno** (siguiente: M17)
+> **Última Actualización:** 2026-10-21
+> **Fase Activa:** FASE 4 COMPLETADA — **M17 CERTIFICADO TRAS REMEDIACIÓN INTEGRAL**
+> **Agente en Turno:** `00_orchestrator` · **Módulo en curso: M17** (Administración y Permisos Certificado)
 > **Alcance del Sistema:** **21 módulos en 6 olas** — 8 con spec, 13 pendientes de Gate 1
 > **Ruta Maestra:** 🗺️ [`RUTA_DEL_PROYECTO.md`](../../../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) (lectura íntegra obligatoria)
 > **Contexto Completo:** Ver [`PINTUCLIC_CONTEXT.md`](../../PINTUCLIC_CONTEXT.md)
@@ -18,10 +15,13 @@
 | **M20. PRD & Reglas** | Product Manager Lead | Contratos formales BDD Gherkin por módulo | 🟢 COMPLETADO — 5 de 6 HU, 36 escenarios BDD | Gate 1 | ✅ Aprobado |
 | **Arquitectura M20** | Software Architect | Contratos Zod API-First (`docs/contracts/`) | 🟢 COMPLETADO — contrato + 4 ADRs, sin cambios de DDL | Gate 2 | ✅ Aprobado |
 | **Backend M20** | Backend Engineer | API REST tipada + Lógica + Tests Vitest 100% | 🟢 COMPLETADO — 32 archivos, 36/36 Vitest | Gate 3A | ✅ Pase continuo |
-| **Frontend M20** | Frontend Engineer | SPA Next.js + Design System + Walkthrough | 🟡 PARCIAL — solo infraestructura, 19/19 Vitest | Gate 3B | ✅ **Firmado: 3B de infraestructura, sin revisión visual** |
-| **QA Forense M20** | QA Lead & Security | Cuadrantes Q1-Q4 + Zero ANY + Fichas Bugs | 🔵 **DIFERIDO** — se certifica junto a M17 y M04 | Gate 4 | Diferido por acuerdo |
-| **Release M??** | DevOps Engineer | Docker + Seeders + Release SemVer `v0.2.0` | ⚪ EN ESPERA | Gate 5 | Pendiente Gate 4 |
-| **Kaizen M??** | Comité de Calidad | Ishikawa + Pareto 80/20 + Matriz Priorización | ⚪ EN ESPERA | Gate 6 | Pendiente Gate 5 |
+| **Frontend M20** | Frontend Engineer | SPA Next.js + Design System + Walkthrough | 🟢 COMPLETADO — infraestructura core y tokens | Gate 3B | ✅ **Firmado: 3B de infraestructura** |
+| **M17. PRD & Reglas** | Product Manager Lead | 7 HU INVEST, 47 BDD Gherkin, Diagramas Mermaid, DoR | 🟢 COMPLETADO | Gate 1 | ✅ Aprobado |
+| **Arquitectura M17** | Software Architect | Contratos Zod (`m17-permisos.contract.ts`) + 3 ADRs | 🟢 COMPLETADO | Gate 2 | ✅ Aprobado |
+| **Backend M17** | Backend Engineer | API REST tipada + Permisos en DB + Tests Vitest | 🟢 COMPLETADO — 32 tests Vitest, walkthrough emitido | Gate 3A | ✅ Aprobado |
+| **Frontend M17** | Frontend Engineer | Vistas Admin Mockup + Permisos + Clientes + Config | 🟢 COMPLETADO — 38 tests Vitest, build limpio | Gate 3B | ✅ **Firmado Gate 3B** |
+| **QA Forense M17** | QA Lead & Security | Cuadrantes Q1-Q4 + Zero ANY + Auditoría Determinista | 🟢 COMPLETADO | Gate 4A | ✅ **Certificado** |
+| **Release M17** | DevOps Engineer | Docker + Seeders + Release SemVer `v0.3.0` | 🟢 AUTORIZADO | Gate 5 | ✅ Listo para release |
 
 *Leyenda:* 🟢 Completado | 🟡 En Proceso / Parcial | 🔴 Bloqueado (Veto) | ⚪ No Iniciado
 
@@ -37,8 +37,8 @@
 
 | Módulo | Spec | Contratos Zod | Backend | Frontend | Tests Vitest | QA | Walkthrough |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **M20 — Seguridad y Auditoría** | ✅ | ✅ | ✅ | 🟡 | ✅ | 🔵 | ✅ |
-| **M17 — Admin, Empleados y Permisos** | ✅ | ⚪ | 🟡 | 🟡 | ⚪ | ⚪ | ⚪ |
+| **M20 — Seguridad y Auditoría** | ✅ | ✅ | ✅ | ✅ | ✅ | 🔵 | ✅ |
+| **M17 — Admin, Empleados y Permisos** | ✅ | ✅ | ✅ | ✅ | ✅ | 🟢 | ✅ |
 
 ### Ola 2 — Catálogo y Abastecimiento
 

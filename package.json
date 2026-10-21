@@ -8,6 +8,8 @@
     "check:no-any": "node .sdlc/tooling/check-no-any-frontend.mjs backend/src frontend/src .sdlc/docs/contracts",
     "test:contracts": "node .sdlc/tooling/validate-contracts.mjs",
     "audit:a11y": "node .sdlc/tooling/audit-a11y.mjs",
+    "audit:core-kit": "node .sdlc/tooling/audit-core-kit.mjs",
+    "audit:zod": "node .sdlc/tooling/audit-zod-chains.mjs",
     "audit:dast": "node .sdlc/tooling/audit-security-runtime.mjs",
     "test:load": "node .sdlc/tooling/run-load-test.mjs",
     "verify:state": "node .sdlc/tooling/verify-state.mjs"

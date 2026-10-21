@@ -20,7 +20,8 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
+// __dirname is .sdlc/tooling, so repo root is two levels up: ../..
+const rootDir = path.resolve(__dirname, '../..');
 
 console.log('\n=============================================================');
 console.log('♿  [AUDIT-A11Y] Escáner Automatizado de Accesibilidad WCAG 2.1 AA');
@@ -35,7 +36,14 @@ function scanFilesRecursively(dir, extensions, fileList = []) {
   if (!fs.existsSync(dir)) return fileList;
   const items = fs.readdirSync(dir);
   for (const item of items) {
-    if (item === 'node_modules' || item === '.git' || item === 'dist' || item === '.workflow') continue;
+    if (
+      item === 'node_modules' ||
+      item === '.git' ||
+      item === 'dist' ||
+      item === '.next' ||
+      item === 'coverage' ||
+      item === '.workflow'
+    ) continue;
     const fullPath = path.join(dir, item);
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
@@ -48,8 +56,7 @@ function scanFilesRecursively(dir, extensions, fileList = []) {
 }
 
 const targetDirs = [
-  path.join(rootDir, 'frontend'),
-  path.join(rootDir, 'src'),
+  path.join(rootDir, 'frontend', 'src'),
   path.join(rootDir, 'docs', '04_ui_design_system.md'),
 ];
 
@@ -111,32 +118,50 @@ for (const filePath of filesToAudit) {
       console.log(`  ❌ [FAIL] ${relPath}:${lineNum} ➔ tabindex > 0 destruye el orden de foco.`);
     }
 
-    // 3. Inputs sin labels accesibles
-    if (/<input\b/i.test(line) && !line.includes('type="hidden"') && !line.includes('aria-label') && !line.includes('id=')) {
-      warningCount++;
-      findings.push({
-        file: relPath,
-        line: lineNum,
-        rule: 'WCAG-3.3.2-Labels-or-Instructions',
-        severity: 'WARN',
-        message: 'Input potencialmente huérfano sin id asociado a <label> ni aria-label.',
-        snippet: line.trim(),
-      });
-      console.log(`  ⚠️  [WARN] ${relPath}:${lineNum} ➔ Input sin id o aria-label.`);
+    // 3. Inputs sin labels accesibles (HTML nativo minúscula)
+    if (/<input\b/.test(line)) {
+      const tagContext = lines.slice(index, Math.min(lines.length, index + 30)).join(' ');
+      const inputTag = tagContext.match(/<input\b[^>]*>/)?.[0] || line;
+      if (
+        !inputTag.includes('type="hidden"') &&
+        !inputTag.includes('aria-label') &&
+        !inputTag.includes('id=') &&
+        !inputTag.includes('aria-labelledby')
+      ) {
+        warningCount++;
+        findings.push({
+          file: relPath,
+          line: lineNum,
+          rule: 'WCAG-3.3.2-Labels-or-Instructions',
+          severity: 'WARN',
+          message: 'Input potencialmente huérfano sin id asociado a <label> ni aria-label.',
+          snippet: line.trim(),
+        });
+        console.log(`  ⚠️  [WARN] ${relPath}:${lineNum} ➔ Input sin id o aria-label.`);
+      }
     }
 
-    // 4. Div con click sin rol semántico
-    if (/<div\b[^>]*(?:@click|onClick)[^>]*>/i.test(line) && !line.includes('role=') && !line.includes('tabindex=')) {
-      failCount++;
-      findings.push({
-        file: relPath,
-        line: lineNum,
-        rule: 'WCAG-4.1.2-Name-Role-Value',
-        severity: 'FAIL',
-        message: 'Elemento <div> interactivo sin role="button" ni soporte de teclado.',
-        snippet: line.trim(),
-      });
-      console.log(`  ❌ [FAIL] ${relPath}:${lineNum} ➔ <div> interactivo sin semántica de botón.`);
+    // 4. Div con click sin rol semántico (inspeccionando contexto multilínea)
+    if (/<div\b/.test(line)) {
+      const tagContext = lines.slice(index, Math.min(lines.length, index + 10)).join(' ');
+      const divTag = tagContext.match(/<div\b[^>]*>/)?.[0];
+      if (
+        divTag &&
+        /(?:@click|onClick)/i.test(divTag) &&
+        !divTag.includes('role=') &&
+        !divTag.includes('tabindex=')
+      ) {
+        failCount++;
+        findings.push({
+          file: relPath,
+          line: lineNum,
+          rule: 'WCAG-4.1.2-Name-Role-Value',
+          severity: 'FAIL',
+          message: 'Elemento <div> interactivo sin role="button" ni soporte de teclado.',
+          snippet: line.trim(),
+        });
+        console.log(`  ❌ [FAIL] ${relPath}:${lineNum} ➔ <div> interactivo sin semántica de botón.`);
+      }
     }
   });
 }

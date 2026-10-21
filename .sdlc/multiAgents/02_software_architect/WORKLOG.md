@@ -66,3 +66,34 @@ debe honrarlo o abrir un Feedback Loop.
 
 ### Alto mecánico
 Turno detenido conforme a la Regla de Oro #10 y `STAGE_GATES.md` §3 (Gate 2).
+
+---
+
+## 2026-10-21 — M17 · Entregables de Gate 2
+
+**Rol:** Software Architect Lead · **Sello:** ✅ Firmado en turno propio · **Fase:** FASE_2_ARQUITECTURA
+
+### Contexto de entrada
+El Director Humano firmó el Gate 1 de M17, habilitando formalmente la Fase 2 de Arquitectura. El módulo define el modelo de permisos atómicos individuales por colaborador, gobernanza de administrador y parámetros del sistema.
+
+### Subroles convocados
+- **01 · System & Modular Topologist:** 3 ADRs (`ADR-006`, `ADR-007`, `ADR-008`), topología modular y mapa de rutas canónicas REST.
+- **02 · Relational Data & DDL Modeler:** Mapeo de tablas de roles y permisos (`rol`, `permisos`, `asignacion_permiso`, `usuario_rol`) en `backend/prisma/schema.prisma` respetando el DDL de `bd/sql/schema_pintuclic.sql` sin alteraciones.
+- **03 · API Contracts & Protocol Designer:** Redacción formal de `.sdlc/docs/contracts/m17-permisos.contract.ts` con tipado bidireccional Zod, cero `any` y envelopes canónicos.
+- **04 · Security & Multi-Tenant Architect:** Opacidad absoluta en respuestas 403 (`RESPUESTA_ACCESO_DENEGADO_OPACA`), bypass para admin raíz y resolución dinámica en tiempo real (`ResolutorPermisosDatabaseAdapter`).
+
+### Entregables dejados en disco
+- `.sdlc/docs/modules/M17/04_ARQUITECTURA_Y_CODIGO.md`: Especificación técnica completa, modelos Prisma, mapa de rutas y estructura de capas de backend y frontend.
+- `.sdlc/docs/contracts/m17-permisos.contract.ts`: Contrato Zod oficial para las 7 HUs de M17.
+- `.sdlc/docs/adrs/ADR-006-modelo-permisos-individuales-sobre-ddl.md`: Mapeo de permisos individuales por empleado sobre el DDL bloqueado de `bd/`.
+- `.sdlc/docs/adrs/ADR-007-puerto-almacen-configuracion.md`: Patrón de Puertos y Adaptadores para configuración general sin tabla en DDL.
+- `.sdlc/docs/adrs/ADR-008-resolutor-permisos-en-caliente.md`: Implementación en tiempo real del puerto `ResolutorPermisos` para M20.
+
+### Hallazgos y Resoluciones Arquitectónicas
+1. **Permisos individuales sin tocar DDL (`ADR-006`):** Se aprovecha la relación 1:1 `usuario_rol` asociando a cada empleado su propio perfil de asignación atómica en `asignacion_permiso`.
+2. **Configuración sin tabla DDL (`ADR-007`):** Se introduce `ConfiguracionPort` con `AlmacenConfiguracionMemoria` precargado con el catálogo tipado del contrato, listo para sustitución por tabla SQL futura sin impacto en llamadores.
+3. **Integración limpia con M20 (`ADR-008`):** Se implementa el puerto `ResolutorPermisos` que `AutorizacionService` dejó listo en M20, resolviendo la comprobación en tiempo real contra la base de datos sin cachear privilegios en JWT.
+
+### Alto mecánico (Rule #10 y STAGE_GATES.md §3)
+Turno detenido. `current_state.json` actualizado a `FASE_2_ARQUITECTURA` / `GATE_2_ARQUITECTURA_APPROVAL` en estado `ESPERANDO_APROBACION_HUMANA`.
+

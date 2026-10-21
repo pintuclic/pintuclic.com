@@ -108,3 +108,34 @@ entrega coordinada. No la cubría — son dos capas, dos artefactos.
 > `.sdlc/docs/qa/M20/v0.2.0/QA_REPORT.md` §3 (fila `HU-SEG-02`, `SameSite`) — **ver su `WORKLOG.md`**.
 > Reubicada conforme al destino único que fija `HANDOFF_PROTOCOL.md` §2.1: el bloque va en la
 > bitácora de quien debe corregir, no en la de quien detecta.
+
+---
+
+## 2026-10-21 — M17 · Implementación de Backend (Fase 3A)
+
+**Rol:** Backend Lead Engineer · **Sello:** ✅ Firmado en turno propio · **Fase:** FASE_3A_BACKEND
+
+### Subroles convocados
+- **01 · API Gateway & Security:** Enrutador de Express montado bajo `/api/v1/admin`, middlewares `requirePermission` en tiempo real y `requireAdmin` exclusivo.
+- **02 · Domain Business Rules:** Implementación de servicios para colaboradores (`RN-ADM-01` a `RN-ADM-06`), asignación de permisos con acoplamiento y cascada (`RN-ADM-07` a `RN-ADM-10`), gestión de clientes (`RN-ADM-13`/`RN-ADM-14`), parámetros dinámicos (`RN-ADM-15`/`RN-ADM-16`) y gobernanza de administrador supremo (`RN-ADM-17`/`RN-ADM-18`).
+- **03 · Data Layer Optimizer:** Mapeo de modelos Prisma (`Rol`, `Permiso`, `AsignacionPermiso`, `UsuarioRol`) respetando el DDL inmutable de `bd/sql/schema_pintuclic.sql`.
+- **04 · Developer TDD Tester:** Suite Vitest de 32 pruebas específicas para M17 (68/68 pruebas globales pasando).
+
+### Entregables
+- `backend/prisma/schema.prisma` actualizado con modelos de M17 y regenerado con `npx prisma generate`.
+- `backend/src/modules/m17-permisos/`:
+  - `dtos/m17-permisos.dto.ts` (espejo Zod del contrato rector).
+  - `interfaces/` (5 contratos TypeScript puros, cero runtime, cero datos inline).
+  - `repositories/` (5 repositorios tipados con Prisma y `AlmacenConfiguracionMemoria` ADR-007).
+  - `services/` (6 servicios de dominio + `ResolutorPermisosDatabaseAdapter` ADR-008).
+  - `controllers/` (5 controladores HTTP tipados).
+  - `m17.routes.ts` (ensamblador modular inyectado en `app.routes.ts`).
+  - `__tests__/` (6 suites de prueba Vitest con 32 tests específicos).
+- `docs/walkthroughs/M17/walkthrough_v0.3.0_M17_administracion_empleados_permisos_backend.md`.
+
+### Verificación de Calidad (Zero Warnings / Zero Errors)
+- `npm run check:no-any`: ✅ 67 archivos auditados, 0 usos de `any`.
+- `npm run lint`: ✅ 0 errores, 0 advertencias.
+- `npm run check:types` (`tsc --noEmit`): ✅ 0 errores.
+- `npm run test` (Vitest): ✅ 12/12 suites pasadas, 68/68 tests aprobados (100% pass).
+

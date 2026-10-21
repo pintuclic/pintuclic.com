@@ -8,7 +8,8 @@ export type ButtonVariant =
   | 'primary-conversion'
   | 'selection'
   | 'outline'
-  | 'ghost';
+  | 'ghost'
+  | 'danger';
 
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
@@ -65,6 +66,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         'bg-neutral-white text-action border border-action hover:bg-action hover:text-neutral-white active:scale-[0.98]',
       ghost:
         'bg-transparent text-neutral-dark hover:bg-neutral-light/60 active:scale-[0.98]',
+      danger:
+        'bg-danger text-neutral-white shadow-sm hover:bg-danger/90 active:scale-[0.98]',
     };
 
     // Estado deshabilitado oficial (#E5E7EB fondo, #6B7280 texto, cursor not-allowed)

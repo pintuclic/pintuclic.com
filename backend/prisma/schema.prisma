@@ -68,12 +68,27 @@ enum EstadoUsuario {
   @@map("enum_estado_usuario")
 }
 
+/// Estado general de entidades de configuración y catálogos (M17)
+enum EstadoGeneral {
+  activo
+  inactivo
+
+  @@map("enum_estado_general")
+}
+
+/// Tipo de cuenta de usuario (M04 / M17)
+enum TipoUsuario {
+  normal
+  empresa
+
+  @@map("enum_tipo_usuario")
+}
+
 // =============================================================================
 // MÓDULO M04 — USUARIO (declaración mínima)
 //
-// ⚠️ La tabla `usuario` pertenece a M04. M20 la necesita únicamente para resolver
-// sus relaciones y para leer `estado` y `contrasena`. Cuando M04 alcance su
-// Gate 2, ampliará este modelo con el resto de sus columnas y relaciones.
+// ⚠️ La tabla `usuario` pertenece a M04. M20 y M17 la necesitan para resolver
+// sus relaciones y para leer `estado`, `tipo`, `contrasena` y vínculos a roles.
 // =============================================================================
 
 model Usuario {
@@ -85,12 +100,75 @@ model Usuario {
   contrasena String        @db.VarChar(255)
   idRol      Int?          @map("id_rol")
   estado     EstadoUsuario @default(activo)
+  tipo       TipoUsuario   @default(normal)
 
   sesiones             Sesion[]
   consentimientos      ConsentimientoUsuario[]
   solicitudesSupresion SolicitudSupresion[]
 
+  rolDirecto           Rol?         @relation("UsuarioRolDirecto", fields: [idRol], references: [idRol])
+  usuarioRol           UsuarioRol?
+
   @@map("usuario")
+}
+
+// =============================================================================
+// MÓDULO M17 — ADMINISTRACIÓN, EMPLEADOS Y PERMISOS
+// =============================================================================
+
+/// Rol o perfil de asignación relacional (ADR-006)
+model Rol {
+  idRol            Int           @id @default(autoincrement()) @map("id_rol")
+  nombre           String        @unique @db.VarChar(100)
+  idSubRolEmpresa  Int?          @map("id_sub_rol_empresa")
+  estado           EstadoGeneral @default(activo)
+
+  asignaciones     AsignacionPermiso[]
+  usuariosConRol   UsuarioRol[]
+  usuariosDirectos Usuario[]     @relation("UsuarioRolDirecto")
+
+  @@map("rol")
+}
+
+/// Catálogo maestro de permisos atómicos del sistema
+model Permiso {
+  idPermiso   Int           @id @default(autoincrement()) @map("id_permiso")
+  nombre      String        @unique @db.VarChar(100)
+  descripcion String?
+  estado      EstadoGeneral @default(activo)
+
+  asignaciones AsignacionPermiso[]
+
+  @@map("permisos")
+}
+
+/// Asignación N:M de permisos a perfiles individuales
+model AsignacionPermiso {
+  idAsignacionPermiso Int @id @default(autoincrement()) @map("id_asignacion_permiso")
+  idRol               Int @map("id_rol")
+  idPermiso           Int @map("id_permiso")
+
+  rol     Rol     @relation(fields: [idRol], references: [idRol], onDelete: Cascade)
+  permiso Permiso @relation(fields: [idPermiso], references: [idPermiso], onDelete: Cascade)
+
+  @@unique([idRol, idPermiso], map: "uq_rol_permiso")
+  @@index([idRol])
+  @@index([idPermiso])
+  @@map("asignacion_permiso")
+}
+
+/// Relación 1:1 Usuario - Rol con restricción UNIQUE(id_usuario)
+model UsuarioRol {
+  idUsuarioRol Int @id @default(autoincrement()) @map("id_usuario_rol")
+  idUsuario    Int @unique @map("id_usuario")
+  idRol        Int @map("id_rol")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  rol     Rol     @relation(fields: [idRol], references: [idRol], onDelete: Cascade)
+
+  @@index([idUsuario])
+  @@index([idRol])
+  @@map("usuario_rol")
 }
 
 // =============================================================================

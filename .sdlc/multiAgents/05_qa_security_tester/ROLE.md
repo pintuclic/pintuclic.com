@@ -92,6 +92,24 @@ El QA Lead tiene el mandato explícito e irrenunciable de ejecutar la auditoría
 - **Cero Tolerancia (Stop-the-Line):** La detección de un solo uso de `any` (`: any`, `as any`, `<any>`, etc.) en cualquier componente, ruta, controlador, servicio o store constituye un defecto de severidad **S1 — Blocker**.
 - **Acción:** Disparar inmediatamente el **Poder de Veto (Stop-the-Line)**, rechazar el Stage-Gate 4 y devolver el módulo al Backend o Frontend Engineer para su erradicación total mediante tipado estricto o `unknown` con type guards.
 
+### Regla 6: Prohibición de Certificación en Papel (Auditoría de Ejecución Real)
+Queda terminantemente prohibido emitir certificados de "CONFORME", "0 violaciones" o "100% CUBIERTO" basados únicamente en que el compilador `tsc` o el linter finalicen con código 0:
+- **A11y:** Exige escaneo real con `npm run audit:a11y` sobre `frontend/src`. Prohibido asumir que inputs tienen labels sin verificar el AST o el DOM.
+- **Criterios Funcionales:** No certificar una HU de frontend basándose exclusivamente en tests de servicios de backend.
+- **Riesgo:** Quien audita artefactos en lugar de ejecución produce certificaciones falsas que tumban la aplicación en producción.
+
+### Regla 7: Verificación Automatizada del Core Kit (Directiva #13)
+El QA Lead ejecuta obligatoriamente `npm run audit:core-kit`:
+- **Cero Elementos Crudos:** Prohibido el uso de `<input>`, `<button>`, `<textarea>` nativos o reemplazos informales de `<Badge>` con `<span>` en `frontend/src/modules/`.
+- **Cero Hacks !important:** Prohibido el uso de modificadores `!important` (`!bg-`, `!text-`) para sobreescribir botones o modales. Las acciones destructivas deben usar la variante oficial `variant="danger"`.
+
+### Regla 8: Pruebas de Borde Adversarias y Cadenas Zod
+El QA Lead ejecuta obligatoriamente `npm run audit:zod`:
+- **Sanitización Previa (.trim().min()):** Todo esquema Zod que exija longitud mínima en texto debe aplicar `.trim()` antes de `.min()`. Si se detecta `.min().trim()`, se veta inmediatamente por permitir evasión con espacios en blanco (`'      '`).
+- **Coerción Numérica Segura:** Todo campo numérico debe someterse a prueba con string vacío `''`. Si `Number('')` produce `0` y muta indebidamente el estado, el módulo se rechaza.
+- **Paridad de Contratos Endpoint ↔ Store:** La interfaz que tipa el estado del store debe ser idéntica a la que el endpoint REST retorna. Prohibido tipar arrays de lista con interfaces de detalle/ficha completa.
+- **Click-Path Audit Mandatorio:** Probar el flujo completo de los botones y disparadores de modales para descartar `TypeError: Cannot read properties of undefined` en tiempo de ejecución.
+
 ---
 
 ## 4. Sub-Estructura Operativa del Equipo de QA (Los 4 Cuadrantes Ágiles)

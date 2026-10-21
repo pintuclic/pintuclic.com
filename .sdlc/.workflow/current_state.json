@@ -1,14 +1,14 @@
 {
   "proyecto": "Pintu Clic",
   "dominio": "pintuclic.com",
-  "version_actual": "v0.2.0",
+  "version_actual": "v0.3.0",
   "fecha_actualizacion": "2026-10-21",
-  "fase_activa": "FASE_0_GOBERNANZA",
-  "gate_activo": "GATE_0_SELECCION_DE_MODULO",
-  "estado": "ESPERANDO_DECISION_HUMANA",
+  "fase_activa": "FASE_4_QA",
+  "gate_activo": "GATE_4A_APROBADO_CERTIFICADO",
+  "estado": "CERTIFICADO_CON_REMEDIACION",
   "rol_en_turno": "00_orchestrator",
-  "modulo_en_curso": null,
-  "nota_de_contexto": "Gate 3B firmado por el Director Humano como '3B de infraestructura, sin revision visual por el momento': la entrega de M20 no contiene interfaz, por decreto del PO. Gate 4 (QA) de M20 queda DIFERIDO: certificarlo ahora auditaria un modulo que no puede ejecutarse end-to-end, porque no existe login. Se certificara junto a M17 y M04. Publicada la version v0.2.0, primer feature del sistema. El Lider Frontend puede empezar a montar los componentes base en core/components/. Siguiente modulo acordado: M17, y despues M04.",
+  "modulo_en_curso": "M17",
+  "nota_de_contexto": "VETO STOP-THE-LINE LEVANTADO Y M17 CERTIFICADO. Subsanados los 4 defectos (BUG-M17-04 a BUG-M17-07) con autorización humana. Batería de auditoría 100% verde: 68/68 backend tests, 38/38 frontend tests, 0 violaciones de Core Kit, 0 anti-patrones Zod, 0 violaciones A11y, 0 any en 141 archivos. Se autoriza la transición a Gate 5 y la habilitación de Ola 2 (M01).",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
@@ -42,6 +42,14 @@
       "estado": "RESUELTA",
       "resolucion": "Corregido a SameSite=Strict en QA_REPORT.md tras verificacion del contrato Zod y cookieSesion.ts. Feedback loop cerrado.",
       "impacto": "Resuelto. El informe de seguridad refleja con exactitud la defensa anti-CSRF estricta implementada."
+    },
+    {
+      "tipo": "VETO_STOP_THE_LINE",
+      "descripcion": "M17 v0.3.0 rechazado por QA tras validación de hallazgos de auditoría de pares. Defectos críticos: crash en /admin/clientes (BUG-M17-04), bypass de espacios en motivo (BUG-M17-05), coerción silenciosa Number('')===0 en configuración (BUG-M17-06) y 60 violaciones de Core Kit/A11y (BUG-M17-07).",
+      "responsable": "05_qa_security_tester",
+      "estado": "RESUELTO_Y_LEVANTADO",
+      "resolucion": "Remediados los 4 defectos (BUG-M17-04 a BUG-M17-07) con tests automatizados pasando al 100%, 0 violaciones de Core Kit, 0 violaciones Zod, 0 violaciones A11y, tsc limpio y eslint limpio. Veto levantado formalmente.",
+      "impacto": "M17 certificado. Se desbloquea la construcción de Ola 2 (M01 Catálogo)."
     }
   ],
   "modulos_registrados": [
@@ -274,12 +282,13 @@
       "ola": 1,
       "scope": "m17-permisos",
       "spec": true,
-      "backend": "estructura",
-      "frontend": "estructura",
-      "contratos_zod": false,
+      "backend": "implementado",
+      "frontend": "implementado",
+      "contratos_zod": true,
       "depende_de": [
         "M20"
-      ]
+      ],
+      "estado_sdlc": "Gate 4A certificado en unidad — Gate 4B diferido hasta M04"
     },
     {
       "id": "M18",
@@ -408,6 +417,62 @@
       "fecha": "2026-10-21",
       "autor": "DanExl24",
       "motivo": "Gate 4 de M20 diferido por acuerdo: se certificara junto a M17 y M04, cuando exista un flujo real que recorrer. Turno devuelto al Orquestador para iniciar M17."
+    },
+    {
+      "de": "GATE_0_SELECCION_DE_MODULO",
+      "a": "FASE_1_PRD",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Activación de Fase 1 para M17. Formalización de 7 HUs bajo INVEST, 47 escenarios BDD Gherkin, diagramas Mermaid y mesa ATDD en .sdlc/docs/modules/M17/. Esperando firma de Gate 1."
+    },
+    {
+      "de": "FASE_1_PRD",
+      "a": "FASE_2_ARQUITECTURA",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Firma del Gate 1 para M17. Entregables de Fase 2 completados: contrato Zod m17-permisos.contract.ts, ADR-006 a ADR-008 y 04_ARQUITECTURA_Y_CODIGO.md. Esperando firma de Gate 2."
+    },
+    {
+      "de": "FASE_2_ARQUITECTURA",
+      "a": "FASE_3A_BACKEND",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Firma del Gate 2 para M17. Aprobación de especificación técnica, ADRs 006-008 y contrato Zod m17-permisos.contract.ts. Inicio de la Fase 3A (Backend API)."
+    },
+    {
+      "de": "FASE_3A_BACKEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Backend de M17 finalizado con 100% de pruebas pasando (68/68 Vitest). Aprobación para iniciar la Fase 3B de Frontend tomando el mockup admin pintu_clic_admin_m01_m02_.pdf."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "GATE_3B_FRONTEND_CODE_REVIEW",
+      "fecha": "2026-10-21",
+      "autor": "04_frontend_engineer",
+      "motivo": "Fase 3B completada. Despliegue de vistas de administración (/admin, /admin/empleados, /admin/clientes, /admin/configuracion, /admin/gobernanza), DTOs Zod 4, Zustand stores, 38/38 tests pasando, 0 any, 0 errores tsc y 0 warnings ESLint. Walkthrough generado."
+    },
+    {
+      "de": "GATE_3B_FRONTEND_CODE_REVIEW",
+      "a": "GATE_4A_CERTIFICACION_UNIDAD",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "Auditoría preliminar de unidad realizada."
+    },
+    {
+      "de": "GATE_4A_CERTIFICACION_UNIDAD",
+      "a": "GATE_4A_RECHAZADO_STOP_THE_LINE",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "VETO STOP-THE-LINE activado tras Peer QA Review. Se constatan 4 defectos críticos: crash runtime en /admin/clientes (BUG-M17-04), evasión en motivo por encadenamiento Zod (BUG-M17-05), coerción silenciosa Number('')===0 y validación inline en ConfiguracionView (BUG-M17-06), y 60 infracciones de Core Kit y A11y (BUG-M17-07). Módulo devuelto a desarrollo."
+    },
+    {
+      "de": "GATE_4A_RECHAZADO_STOP_THE_LINE",
+      "a": "GATE_4A_APROBADO_CERTIFICADO",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "Levantamiento formal del Veto Stop-the-Line. Subsanados los 4 defectos (BUG-M17-04 a BUG-M17-07) con autorización humana y verificación determinista: 68/68 backend Vitest, 38/38 frontend Vitest, 0 ANY en 141 archivos, 0 violaciones de Core Kit, 0 violaciones Zod, 0 violaciones A11y, tsc y eslint limpios. M17 queda técnicamente certificado para habilitar la Ola 2 (M01)."
     }
   ]
 }

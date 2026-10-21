@@ -76,3 +76,48 @@ Siguiendo las fuentes visuales de verdad aprobadas en `docs/assets/mockups/` (`P
 - `npm run lint`: ✅ PASS (0 warnings, 0 errores ESLint).
 - `vitest run`: ✅ PASS (5 suites, 19 tests unitarios pasando al 100%).
 - `next build`: ✅ PASS (Compilación de producción standalone exitosa en 3.1s).
+
+---
+
+## 2026-10-21 — M17 · Fase 3B Frontend Completa
+
+**Rol:** Frontend Lead Engineer (`04_frontend_engineer`) · **Sello:** ✅ Entrega Canónica M17
+
+### Contexto y Directiva del Director Humano
+Siguiendo la instrucción explícita del Director Humano de tomar el diseño visual del panel de administración oficial ([`docs/assets/mockups/pintu_clic_admin_m01_m02_.pdf`](../../../docs/assets/mockups/pintu_clic_admin_m01_m02_.pdf)) y reemplazar las funcionalidades de catálogo por las 7 historias de usuario del módulo M17.
+
+### Acciones Realizadas
+1. **DTOs con Zod 4 y Tipado Estricto (`src/modules/m17-permisos/dtos/`):**
+   - `empleados.dto.ts`: Creación, edición, primer acceso con clave temporal y desactivación confirmada.
+   - `permisos.dto.ts`: Catálogo oficial de 20 permisos atómicos.
+   - `clientes-admin.dto.ts`: Desactivación con motivo justificado obligatorio (mínimo 5 caracteres - RN-ADM-08).
+   - `configuracion.dto.ts`: 10 parámetros maestros del sistema.
+   - `gobernanza.dto.ts`: Sustitución de correo maestro con token criptográfico (mínimo 16 caracteres).
+2. **Interfaces TypeScript de Dominio (`src/modules/m17-permisos/interfaces/`):**
+   - Cero runtime, 100% type-safe sin uso de `any`.
+3. **Servicios de Consumo API (`src/modules/m17-permisos/services/`):**
+   - `empleados.service.ts`, `permisos.service.ts`, `clientes-admin.service.ts`, `configuracion.service.ts`, `gobernanza.service.ts`.
+4. **Manejo de Estado Global con Zustand (`src/modules/m17-permisos/store/`):**
+   - `empleadosStore.ts`, `clientesStore.ts`, `configuracionStore.ts`.
+5. **Componentes y Vistas con Fidelidad al Mockup Oficial (`src/modules/m17-permisos/components/`):**
+   - `AdminLayout.tsx`: Shell con Sidebar blanco, Topbar con buscador y perfil, navegación activa, y widget inferior.
+   - `AdminStatCard.tsx`: KPI cards canónicas con iconos tintados, Poppins Bold y tendencias.
+   - `AdminPagination.tsx`: Paginación oficial con botones numéricos y selector de registros por página.
+   - `EmpleadosTable.tsx`, `CrearEmpleadoModal.tsx`, `EditarEmpleadoModal.tsx`, `DesactivarEmpleadoModal.tsx` (estilo página 13 del mockup con métricas de 0ms e impacto), `PermisosModal.tsx` (matriz atómica de 20 permisos con cascadas automáticas).
+   - `ClientesTable.tsx`, `FichaClienteModal.tsx`, `DesactivarClienteModal.tsx`.
+   - `ConfiguracionView.tsx`: Pestañas por área y edición validada de los 10 parámetros del sistema.
+   - `GobernanzaView.tsx`: Protocolo seguro de cambio de correo y reglas inmutables.
+6. **Rutas Desplegadas en Next.js App Router (`src/app/admin/`):**
+   - `/admin` (Dashboard Overview), `/admin/empleados`, `/admin/clientes`, `/admin/configuracion`, `/admin/gobernanza`.
+7. **Pruebas Automatizadas Unitarias (`src/modules/m17-permisos/tests/`):**
+   - `dtos.test.ts` (13 tests), `stores.test.ts` (6 tests).
+
+### Verificación y Métricas
+- `check:no-any`: ✅ PASS (70 archivos auditados, 0 usos de `any`).
+- `npx tsc --noEmit`: ✅ PASS (0 errores TypeScript).
+- `npm run lint`: ✅ PASS (0 warnings, 0 errores ESLint).
+- `vitest run`: ✅ PASS (7 suites, 38/38 tests unitarios pasando al 100%).
+- `next build`: ✅ PASS (Todas las rutas administrativas generadas como estáticas).
+- Backend Vitest: ✅ PASS (12 suites, 68/68 tests pasando, cero regresiones).
+- Walkthrough generado en [`docs/walkthroughs/M17/walkthrough_v0.3.0_M17_administracion_empleados_permisos_frontend.md`](../../../docs/walkthroughs/M17/walkthrough_v0.3.0_M17_administracion_empleados_permisos_frontend.md).
+

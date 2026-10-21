@@ -61,3 +61,43 @@ Turno detenido conforme a la Regla de Oro #10 y `STAGE_GATES.md` §3. `current_s
 - **Resultado:** mesa cerrada conforme. Sin Feedback Loop. DoR completa.
 - **Nota:** el Director Humano autorizó el bypass y se incorporó al protocolo rector como
   `CONSULTATION_BYPASS_PROTOCOL.md`. Primera aplicación del protocolo en el proyecto.
+
+---
+
+## 2026-10-21 — M17 · Entregables de Gate 1
+
+**Rol:** Product Manager Lead · **Módulo:** M17 Administración, Empleados y Permisos
+**Fase:** FASE_1_PRD → esperando firma del Director Humano en Gate 1
+**Perfil de Compuerta Declarado:** **Perfil B (Módulo Transversal / Habilitador de Plataforma)**
+
+### Contexto de entrada
+El Director Humano activó la Fase 1 para M17 tras la lectura analítica de la gobernanza y la especificación de negocio. M17 es el segundo eslabón de la Ola 1, condicionado exclusivamente por M20.
+
+### Subroles convocados
+- **03 · Functional Requirements, ATDD & BDD:** Formalización de las 7 HU en formato INVEST con 47 escenarios BDD Gherkin ejecutables (`Dado-Cuando-Entonces`) y análisis de testabilidad.
+- **02 · Legal & Domain Compliance:** Mapeo de reglas inmutables de gobierno, principio de mínimo privilegio (*default deny*), protección de datos de clientes (prohibición de modificación de datos personales y ofuscación de instrumentos de pago) y gobernanza de la cuenta administradora única.
+- **01 · Discovery & Strategy:** Matriz In-Scope / Out-of-Scope, resolución de las preguntas pendientes (§6) sin bloquear el flujo y confirmación de que no existen roles rígidos para colaboradores.
+- **04 · Product Analytics & UAT:** Definición de criterios de aceptación observables y métricas de latencia de resolución de autorización en servidor (< 15 ms).
+
+### Entregables dejados en disco
+- `.sdlc/docs/modules/M17/01_SPEC_FUNCIONAL.md`: Visión, topología de dependencias, RBAC granular, 18 reglas inmutables (`RN-ADM-01`…`RN-ADM-18`), matriz In/Out-of-Scope y resolución de preguntas abiertas.
+- `.sdlc/docs/modules/M17/02_HISTORIAS_USUARIO.md`: 7 HU en INVEST (`HU-ADM-01` a `HU-ADM-07`), 47 escenarios BDD Gherkin trazados 1:1 a los CA contractuales.
+- `.sdlc/docs/modules/M17/03_FLUJO_Y_ESTADOS.md`: Transcripción completa a Mermaid de los 5 diagramas contractuales `.drawio.png` de `docs/assets/diagrams/M17/`, secuencia de intercepción HTTP y máquinas de estados de cuenta y sustitución de admin.
+- `.sdlc/docs/modules/M17/01_ATDD_SPEC.md`: Matriz de testabilidad de los 47 escenarios, análisis de 4 observables complejos (revocación en caliente, opacidad 403, acoplamiento consulta-operación, irretroactividad comercial) y Acta Three Amigos.
+
+### Decisiones registradas
+1. **Modelo de Permisos Atómicos:** Ningún empleado posee rol predefinido. La autorización se evalúa dinámicamente sobre `asignacion_permiso` en backend ante cada petición HTTP.
+2. **Administrador Único e Inmortal:** La cuenta de administrador no admite réplicas, no puede desactivarse ni borrarse, y sus facultades no son editables en la matriz de permisos.
+3. **Privacidad Estricta de Clientes (`HU-ADM-04`):** El personal administrativo tiene estrictamente prohibido alterar datos personales de clientes. Las peticiones de rectificación se canalizan exclusivamente por el titular en M04.
+4. **Almacén de Parámetros (`HU-ADM-05` / `HU-ADM-07`):** Definición tipada de parámetros operativos y comerciales básicos con aplicación dinámica sin reinicio del servidor.
+
+### Alto mecánico (Rule #10 y STAGE_GATES.md §3)
+Turno detenido. `current_state.json` actualizado a `FASE_1_PRD` / `GATE_1_PRD_APPROVAL` en estado `ESPERANDO_APROBACION_HUMANA`. Se requiere la firma explícita del Director Humano para habilitar la Fase 2 (Software Architect Lead).
+
+### 🪑 Acta de Mesa de Consulta Acotada — M17 · rito ATDD
+- **Escenario:** C-1 · **Fecha:** 2026-10-21 · **Convoca:** `01_product_manager`
+- **Pregunta acotada:** ¿Son los 47 escenarios BDD verificables mediante pruebas automatizadas y contratos Zod sin incurrir en acoplamientos prohibidos ni ambigüedades de persistencia?
+- **Convocados:** `02_software_architect`, `05_qa_security_tester`
+- **Dictámenes:** Ambos **CONFORME**. El Arquitecto asume los 4 observables especiales en el contrato Zod y QA valida que los 47 escenarios cubren los pilares de prueba.
+- **Resultado:** Mesa cerrada conforme. DoR cumplida.
+
