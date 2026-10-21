@@ -1,0 +1,32 @@
+# Dependencias
+node_modules/
+
+# Entorno y credenciales
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Salidas de build
+dist/
+build/
+.next/
+out/
+
+# Logs y cache
+*.log
+npm-debug.log*
+.cache/
+.eslintcache
+
+# Reportes de pruebas y cobertura
+coverage/
+test-results/
+playwright-report/
+
+# Sistema operativo e IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
