@@ -94,7 +94,7 @@ stateDiagram-v2
 
 | Gate | Fase Origen -> Destino | Aprobador Requerido | Condición de Desbloqueo |
 | :--- | :--- | :--- | :--- |
-| **Gate 1** | Requerimientos -> Arquitectura | **Director Humano** | PRD completo, HUs INVEST con BDD Gherkin y firma de *Testability* del rito ATDD (*Three Amigos*). Detención obligatoria del agente. |
+| **Gate 1** | Requerimientos -> Arquitectura | **Director Humano** | PRD completo, HUs INVEST con BDD Gherkin y firma de *Testability* del rito ATDD (*Three Amigos*), admitida en Mesa de Consulta Acotada con sello 🪑 ([`CONSULTATION_BYPASS_PROTOCOL.md`](file:///multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md)). Detención obligatoria del agente. |
 | **Gate 2** | Arquitectura -> Construcción TDD | **Director Humano** | DDL relacional normalizado 3FN, contratos de API Zod compartidos y matriz RBAC revisados. Detención obligatoria del agente. |
 | **Fase 3A**| Backend TDD -> Frontend TDD | **Orquestador** | Endpoints implementados con Prisma, suite Vitest en verde y contratos sincronizados. Pase continuo sin detención. |
 | **Gate 3B**| Frontend TDD -> QA Cuadrantes | **Director Humano** | Componentes y vistas SPA validados con tests unitarios (`@testing-library`) y Walkthrough reproducible emitido. Detención para revisión UI/UX. |

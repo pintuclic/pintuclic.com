@@ -66,6 +66,10 @@ graph TD
 - [ ] Documento `docs/01_prd.md` o `docs/modules/[XX]/01_SPEC_FUNCIONAL.md` completo.
 - [ ] 100% de HUs bajo formato INVEST con al menos 3 escenarios BDD ejecutables.
 - [ ] Ficha `docs/modules/[XX]/01_ATDD_SPEC.md` firmada por los Three Amigos (PM + Arquitecto + QA).
+      Como los roles se asumen de forma secuencial, el Arquitecto y el QA firman en **Mesa de
+      Consulta Acotada** con sello 🪑, conforme a
+      [`CONSULTATION_BYPASS_PROTOCOL.md`](file:///multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md).
+      La firma consultiva **no sustituye** la del Director Humano en Gate 1.
 - [ ] Matriz In-Scope / Out-of-Scope validada con el usuario.
 - [ ] Reglas de negocio identificadas unívocamente (`RN-MOD-01`, `RN-MOD-02`, etc.).
 - [ ] Bitácora actualizada en `multiAgents/01_product_manager/WORKLOG.md`.

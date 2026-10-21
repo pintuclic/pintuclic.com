@@ -66,6 +66,10 @@ Ningún agente de IA puede encadenar fases de forma autónoma más allá de una 
   - `docs/modules/[XX_modulo]/01_SPEC_FUNCIONAL.md`: Reglas funcionales del dominio y casos de uso.
   - `docs/modules/[XX_modulo]/02_HISTORIAS_USUARIO.md`: Historias bajo estándar **INVEST** y criterios en formato **BDD (Given-When-Then)**.
   - `docs/modules/[XX_modulo]/03_FLUJO_Y_ESTADOS.md`: Diagramas de flujo y ciclo de vida en Mermaid.
+  - `docs/modules/[XX_modulo]/01_ATDD_SPEC.md`: Certificación de testabilidad del rito ATDD. Dado que
+    los roles se asumen de forma secuencial, el Arquitecto y el QA Lead firman en **Mesa de Consulta
+    Acotada** (sello 🪑), según [`../multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md`](../multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md).
+    Esa firma es **consultiva** y no aprueba la compuerta: la aprobación sigue siendo del Director Humano.
 - **Acción del Agente al Terminar:**
   1. Actualizar `.workflow/current_state.json` con `gate_activo: "GATE_1_PRD_APPROVAL"`, `estado: "ESPERANDO_APROBACION_HUMANA"`.
   2. **DETENERSE INMEDIATAMENTE (Halt).** Presentar el resumen ejecutivo al Director Humano.

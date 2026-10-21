@@ -85,6 +85,7 @@ flowchart LR
 │   └── protocols/                       # 🤝 Protocolos de Colaboración e Interoperabilidad
 │       ├── HANDOFF_PROTOCOL.md          # Protocolo general de traspaso entre fases
 │       ├── COLLABORATION_PROTOCOL_TECH_TRIO.md # Sincronización Arquitecto ↔ Backend ↔ Frontend
+│       ├── CONSULTATION_BYPASS_PROTOCOL.md # 🪑 Mesa de Consulta Acotada (ritos multi-rol)
 │       ├── BACKEND_FRONTEND_SUBROLES_SYNC_PROTOCOL.md # Protocolo Exclusivo Subroles Backend ↔ Frontend
 │       ├── TECHNICAL_PROPOSALS_PROTOCOL.md # Protocolo de Iniciativas y Propuestas Técnicas (RFCs)
 │       ├── GIT_COMMIT_CONVENTION.md     # Estándar canónico: tipo(scope): descripcion (sin version)
@@ -195,6 +196,9 @@ Si eres un agente nuevo ingresando al repositorio:
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ PASO 3: EJECUCIÓN CON KIT DE SUBROLES                                                  │
 │ 1. Convoca al subrol especializado exacto para la tarea (no cargues todo a la vez).    │
+│ 1b. Si el entregable exige un rito con OTROS roles líderes (p. ej. la mesa ATDD),      │
+│    convócalos en Mesa de Consulta Acotada:                                             │
+│    multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md (consultivo, NO aprueba Gate).│
 │ 2. Si detectas código repetitivo o deuda técnica, formula un RFC bajo                  │
 │    multiAgents/protocols/TECHNICAL_PROPOSALS_PROTOCOL.md.                              │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
