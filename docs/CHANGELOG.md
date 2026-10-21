@@ -10,6 +10,7 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 
 ## [v0.3.1] - 2026-10-21
 - **Autor:** DanExl24 (@DanExl24)
+- **Commit:** `cb21b6a` — `fix(m17): cerrar hallazgos de revision de pares en dtos stores y accesibilidad`
 - **Hito:** 🔎 **Primera remediación guiada por revisión de pares.** Cierra defectos que las compuertas estáticas no podían detectar.
 
 ### Módulo M17 — Administración, Empleados y Permisos (remediación de frontend)
