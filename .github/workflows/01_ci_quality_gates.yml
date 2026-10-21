@@ -2,15 +2,40 @@ name: 🚦 Stage-Gate 4 — Quality & AST Security Gates
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ main, develop ]
 
 jobs:
+  # Las capas aún no existen en el árbol (M20 es el primer módulo en construirse).
+  # Este job detecta qué hay realmente y activa los jobs correspondientes.
+  detect:
+    name: 🔎 Detect layers
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.check.outputs.backend }}
+      frontend: ${{ steps.check.outputs.frontend }}
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔎 Detect implemented layers
+        id: check
+        run: |
+          if [ -d backend/src ]; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -d frontend/src/modules ]; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          fi
+
   ast-quality-audit:
     name: 🛡️ Audit Zero ANY & Governance
     runs-on: ubuntu-latest
-
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -19,29 +44,92 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: 📦 Install dependencies
-        run: npm ci || npm install
+      - name: 📦 Install governance tooling
+        run: npm install --no-audit --no-fund
 
-      - name: 🔍 Run AST Zero ANY Audit (Frontend & TypeScript)
+      - name: 📋 Verify Stage-Gate machine state integrity
+        run: npm run verify:state
+
+      - name: 🔍 AST Zero ANY audit (backend + frontend + contratos)
         run: npm run check:no-any
 
-      - name: 📋 Validate Zod API & DTO Contracts
+      - name: 📋 Validate Zod API & DTO contracts
         run: npm run test:contracts
 
-      - name: ♿ Run Automated A11y Static Audit (WCAG 2.1 AA)
+      - name: ♿ Automated A11y static audit (WCAG 2.1 AA)
         run: npm run audit:a11y
 
-      - name: 📋 Verify Stage-Gate Machine State Integrity
-        run: |
-          node -e '
-            const state = JSON.parse(require("fs").readFileSync(".workflow/current_state.json", "utf8"));
-            const activePhase = state.fase_activa || state.ciclo_vida?.fase_actual;
-            const activeGate = state.gate_activo || state.ciclo_vida?.gate_actual;
-            if (!activePhase || !activeGate) {
-              console.error("❌ Invalid current_state.json format! Missing fase_activa or gate_activo.");
-              process.exit(1);
-            }
-            console.log("✅ State Machine Valid. Active Phase:", activePhase, "| Active Gate:", activeGate);
-          '
+  backend-quality:
+    name: ⚙️ Backend — lint, types & tests
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install governance tooling (resuelve typescript del verificador AST)
+        run: npm install --no-audit --no-fund
+
+      - name: 📦 Install backend dependencies
+        working-directory: backend
+        run: npm ci || npm install
+
+      - name: 🔍 Zero ANY (Regla de Oro #11)
+        working-directory: backend
+        run: npm run check:no-any
+
+      - name: 🧹 ESLint (0 errores / 0 advertencias)
+        working-directory: backend
+        run: npm run lint -- --max-warnings=0
+
+      - name: 🔎 TypeScript estricto
+        working-directory: backend
+        run: npm run check:types
+
+      - name: 🧪 Vitest
+        working-directory: backend
+        run: npm test
+
+  frontend-quality:
+    name: 🎨 Frontend — lint, types & tests
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install governance tooling (resuelve typescript del verificador AST)
+        run: npm install --no-audit --no-fund
+
+      - name: 📦 Install frontend dependencies
+        working-directory: frontend
+        run: npm ci || npm install
+
+      - name: 🔍 Zero ANY (Regla de Oro #11)
+        working-directory: frontend
+        run: npm run check:no-any
+
+      - name: 🧹 ESLint (0 errores / 0 advertencias)
+        working-directory: frontend
+        run: npm run lint -- --max-warnings=0
+
+      - name: 🔎 TypeScript estricto
+        working-directory: frontend
+        run: npm run check:types
+
+      - name: 🧪 Vitest
+        working-directory: frontend
+        run: npm test
