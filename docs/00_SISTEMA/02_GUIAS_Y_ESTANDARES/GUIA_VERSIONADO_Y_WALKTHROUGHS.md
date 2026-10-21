@@ -6,9 +6,35 @@ Aplica de forma estricta tanto a **desarrolladores humanos** como a **Agentes de
 
 ---
 
+> ## 🚧 ESTADO DE LA AUTOMATIZACIÓN DE VERSIONADO: **EN DESARROLLO**
+>
+> La **mecánica manual** de este documento —actualizar `.github/version.txt` y registrar la entrada
+> en `docs/CHANGELOG.md`— **rige desde ya y es obligatoria en cada entrega**.
+>
+> La **automatización en CI está pendiente de construcción**. Los siguientes archivos se describen
+> aquí como diseño objetivo y **todavía no existen en el repositorio**:
+>
+> | Archivo | Estado |
+> | :--- | :--- |
+> | `.github/workflows/pr-title-lint.yml` | 🚧 **PENDIENTE** |
+> | `.github/workflows/version.yml` | 🚧 **PENDIENTE** |
+> | `CONTRIBUTING.md` (raíz) | 🚧 **PENDIENTE** — en reescritura por su responsable |
+>
+> **📌 Instrucción explícita para agentes de IA:** su ausencia es **conocida y deliberada**, no una
+> inconsistencia del repositorio. **No la reportes** como hallazgo ni la eleves como bloqueo: ya está
+> asignada al DevOps designado. Limítate a cumplir la parte manual.
+>
+> ⚠️ **Contradicción abierta mientras tanto.** Este documento describe **cuatro segmentos**
+> (`X.Y.Z.W`), pero `docs/CHANGELOG.md` y los tags del repositorio usan **tres**
+> (`vMAJOR.MINOR.PATCH`), y la versión vigente `v0.2.0` se publicó con tres. **Hasta que el
+> responsable unifique el esquema, sigue el formato que ya usa `docs/CHANGELOG.md`** y no reabras la
+> discusión en cada entrega.
+
+---
+
 ## 1. Versionado Semántico del Proyecto
 
-El tipo de versión que se utiliza es semántica y está conformado por cuatro segmentos, según [CONTRIBUTING.md](../../../CONTRIBUTING.md):
+El tipo de versión que se utiliza es semántica y está conformado por cuatro segmentos, según `CONTRIBUTING.md` *(🚧 pendiente de reescritura)*:
 
 | Versión | Nombre | Descripción |
 | :--- | :--- | :--- |
@@ -25,7 +51,11 @@ El tipo de versión que se utiliza es semántica y está conformado por cuatro s
 - Ningún otro archivo, documento o commit define la versión del proyecto. La metadata `version` de cada `package.json` es de npm y no representa la versión del release.
 - **Excepción vigente (`backend/`):** el backend no se modifica en esta migración; el campo informativo `version` de su respuesta raíz (`backend/src/index.ts`) no representa la versión del release y se conserva tal cual.
 
-### 1.2 Publicación Automática con GitHub Actions
+### 1.2 Publicación Automática con GitHub Actions — 🚧 EN DESARROLLO
+
+> 🚧 **Diseño objetivo, aún no operativo.** Los dos workflows de esta sección están pendientes de
+> construcción. Mientras tanto, **el tag y el Release no se generan solos**: el único workflow
+> presente es `release.yml`, que auto-incrementa un `patch` en cada push a `main`.
 
 La versión se declara en el título de la PR y el bot publica el tag y el Release cuando la PR se fusiona. El workflow `.github/workflows/pr-title-lint.yml` valida cada PR antes del merge y `.github/workflows/version.yml` publica el tag `vX.Y.Z.W` con el Release (que adjunta automáticamente el zip del código fuente).
 
@@ -51,9 +81,20 @@ La versión se declara en el título de la PR y el bot publica el tag y el Relea
 
 ### 1.3 Reglas Obligatorias
 
+**✅ Vigentes hoy, de cumplimiento obligatorio en cada entrega:**
+
+- Actualizar `.github/version.txt` con la versión de la entrega.
+- Registrar en [docs/CHANGELOG.md](../../CHANGELOG.md) la entrada con su fecha y la línea
+  `- **Autor:** Nombre (@usuario)` de la persona real; **nunca** un agente de IA.
+- Generar el Walkthrough de la sección 2.
+- No crear tags ni Releases a mano.
+
+**🚧 Pendientes de que exista la automatización** *(no son exigibles todavía, y su incumplimiento no
+se reporta como hallazgo)*:
+
 - **Fuente única:** toda versión se deriva de `.github/version.txt`; queda prohibido declarar la versión del proyecto en otros archivos de código o documentación.
 - **Título obligatorio:** cada PR debe declarar la versión en el título (`tipo(scope) [X.Y.Z.W]: mensaje`), actualizar `.github/version.txt` con ese mismo número y registrar la entrada `## [vX.Y.Z.W] - AAAA-MM-DD` con `- **Autor:** Nombre (@usuario)` (la persona real de la entrega) en [docs/CHANGELOG.md](../../CHANGELOG.md); los registros históricos no se reescriben. El lint bloquea la PR si algo no coincide.
-- **Agentes IA:** los agentes de IA declaran la versión en el título de la PR y actualizan `.github/version.txt` y el CHANGELOG en cada entrega, aplicando el esquema de [CONTRIBUTING.md](../../../CONTRIBUTING.md); está prohibido crear tags o Releases a mano.
+- **Agentes IA:** los agentes de IA declaran la versión en el título de la PR y actualizan `.github/version.txt` y el CHANGELOG en cada entrega, aplicando el esquema de `CONTRIBUTING.md` *(🚧 pendiente de reescritura)*; está prohibido crear tags o Releases a mano.
 - **Publicación:** el tag y el Release con el zip se generan automáticamente con `.github/workflows/version.yml` al fusionar la PR hacia `main` o `develop`; el bot no crea commits en las ramas protegidas.
 
 ---

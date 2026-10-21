@@ -151,7 +151,12 @@ Al completar la implementación, **DEBES SI O SI**:
 > (el protocolo del SDLC está subordinado a esta guía).
 
 Siguiendo el esquema de [CONTRIBUTING.md](CONTRIBUTING.md) y la [Guía de Commits y Push](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md):
-1. **Versión Obligatoria en el Título de la PR:** declarar la versión con el formato `tipo(scope) [X.Y.Z.W]: mensaje` (ver [CONTRIBUTING.md](CONTRIBUTING.md)), dejar `.github/version.txt` con ese mismo número y agregar en [docs/CHANGELOG.md](./docs/CHANGELOG.md) la entrada `## [vX.Y.Z.W] - AAAA-MM-DD` con la línea `- **Autor:** Nombre (@usuario)` (la persona real que realiza la entrega, nunca la IA). El workflow `PR Title Lint` bloquea el merge si el formato, el siguiente paso de la tabla, el archivo, la fecha o el autor no coinciden. El tag y el Release se publican automáticamente al fusionar hacia `main` o `develop` mediante `.github/workflows/version.yml`.
+1. **Versión Obligatoria:** dejar `.github/version.txt` con la versión de la entrega y agregar en [docs/CHANGELOG.md](./docs/CHANGELOG.md) su entrada con fecha y la línea `- **Autor:** Nombre (@usuario)` (la persona real que realiza la entrega, nunca la IA).
+   > 🚧 **La automatización en CI está EN DESARROLLO.** Los workflows `pr-title-lint.yml` y
+   > `version.yml`, y el `CONTRIBUTING.md` de la raíz, **aún no existen**. Su ausencia es conocida y
+   > está asignada al DevOps designado: **no la reportes como hallazgo**. Sigue el formato de versión
+   > que ya usa `docs/CHANGELOG.md`. Detalle y estado en
+   > [GUIA_VERSIONADO_Y_WALKTHROUGHS.md](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_VERSIONADO_Y_WALKTHROUGHS.md).
 2. **Verificación Previa Obligatoria:** Comprobar que TypeScript compila sin errores (`npx tsc --noEmit`), que ESLint no arroja errores ni advertencias (`npm run lint`), que las pruebas unitarias pasan al 100% y que solo se modificaron archivos del módulo asignado.
 3. **Formato del Commit:** Crear commits atómicos utilizando el estándar Conventional Commits (`tipo(modulo): descripcion`, ej: `feat(M04): implementar registro con verificacion HU-CUE-01` o `fix(M04): corregir expiracion de tokens`).
 4. **Push Seguro:** Ejecutar `git push origin <rama_asignada>` únicamente sobre la rama de trabajo correspondiente. Nunca hacer push forzado (`--force`) sobre ramas compartidas.
@@ -181,9 +186,9 @@ Siguiendo el esquema de [CONTRIBUTING.md](CONTRIBUTING.md) y la [Guía de Commit
 
 
 ### Version
-- El esquema oficial de versiones es el de [CONTRIBUTING.md](CONTRIBUTING.md), de cuatro segmentos (`Mayor`, `Minior estable`, `Minior-feat`, `Patch`).
+- 🚧 **El esquema de versiones está en revisión.** `GUIA_VERSIONADO_Y_WALKTHROUGHS.md` describe cuatro segmentos, pero `docs/CHANGELOG.md` y los tags del repositorio usan tres. **Hasta que su responsable lo unifique, sigue el formato de `docs/CHANGELOG.md`** y no reabras la discusión en cada entrega.
 - En CADA entrega, el agente de IA DEBE declarar la versión en el título de la PR (`tipo(scope) [X.Y.Z.W]: mensaje`), dejar `.github/version.txt` con ese mismo número y agregar en [docs/CHANGELOG.md](./docs/CHANGELOG.md) la entrada `## [vX.Y.Z.W] - AAAA-MM-DD` con la línea `- **Autor:** Nombre (@usuario)`.
 - El **autor registrado es la persona real** que realiza/publica la entrega (el humano responsable), con su `@usuario` de GitHub. Queda **prohibido** registrarse como `Agente de IA` o mencionar a la IA en el CHANGELOG.
-- El workflow `PR Title Lint` bloquea la PR si el formato, el siguiente paso de la tabla, `.github/version.txt`, la fecha o el autor no coinciden.
-- El tag y el Release se publican automáticamente cuando la PR se fusiona hacia `main` o `develop` mediante `.github/workflows/version.yml`; está prohibido crearlos a mano.
+- 🚧 Los workflows `PR Title Lint` y `version.yml` **están pendientes de construcción**: hoy no validan ni publican nada. Su ausencia **no se reporta**.
+- Está prohibido crear tags o Releases a mano.
 - La versión del proyecto vive únicamente en `.github/version.txt`; no se duplica en otros archivos de código.
