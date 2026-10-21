@@ -3,12 +3,12 @@
   "dominio": "pintuclic.com",
   "version_actual": "v0.1.0",
   "fecha_actualizacion": "2026-10-21",
-  "fase_activa": "FASE_3A_BACKEND",
-  "gate_activo": "FASE_3A_PASE_CONTINUO",
-  "estado": "EN_EJECUCION",
-  "rol_en_turno": "03_backend_engineer",
+  "fase_activa": "FASE_3B_FRONTEND",
+  "gate_activo": "GATE_3B_FRONTEND_UI_APPROVAL",
+  "estado": "ESPERANDO_APROBACION_HUMANA",
+  "rol_en_turno": "04_frontend_engineer",
   "modulo_en_curso": "M20",
-  "nota_de_contexto": "Backend de M20 implementado y verificado: 32 archivos TypeScript, barrera de Fase 3A completa (check:no-any, tsc, eslint 0/0, build y Vitest 36/36) y pruebas de mutacion superadas. Se podaron de schema.prisma los modelos especulativos de M01, M04, M05 y M08 por ser incompatibles con bd/sql/schema_pintuclic.sql; cada modulo los redeclarara en su Gate 2. Siguiente: Fase 3B Frontend.",
+  "nota_de_contexto": "Fase 3B acotada completada: infraestructura de seguridad del frontend y servicio tipado de privacidad, sin componentes ni pantallas por decreto del PO. Verificacion en verde (tsc, next lint, check:no-any 58 archivos, Vitest 19/19, next build) y sin regresion en backend (36/36). ELEVADO: Gate 3B exige revisar la interfaz en el navegador y esta entrega no tiene interfaz visible.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
@@ -299,11 +299,11 @@
       "scope": "m20-seguridad",
       "spec": true,
       "backend": "implementado",
-      "frontend": "estructura",
+      "frontend": "infraestructura",
       "contratos_zod": true,
       "depende_de": [],
       "raiz_absoluta": true,
-      "estado_sdlc": "FASE_3A completada — listo para Fase 3B"
+      "estado_sdlc": "FASE_3B acotada — esperando firma de Gate 3B"
     },
     {
       "id": "M21",
@@ -372,6 +372,13 @@
       "fecha": "2026-10-21",
       "autor": "DanExl24",
       "motivo": "Firma del Gate 2 sobre el contrato Zod m20-seguridad.contract.ts, 04_ARQUITECTURA_Y_CODIGO.md y los ADR-002 a ADR-005."
+    },
+    {
+      "de": "FASE_3A_BACKEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Backend de M20 verificado (36/36 Vitest) y residuo del clon limpiado. El PO acota la Fase 3B a infraestructura y servicio de privacidad, sin componentes ni pantallas."
     }
   ]
 }
