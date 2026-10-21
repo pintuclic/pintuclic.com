@@ -57,3 +57,36 @@ del estado de la cuenta; en ambos casos la prueba correspondiente **falló**. La
 ### Pendiente para Gate 4 (QA)
 `CA-SEG-03-05` **no está cubierto**: el adaptador emite al registro técnico, no persiste. Es la
 condición que el QA Lead impuso en la mesa ATDD y está anotada en `auditoria.port.test.ts`.
+
+### 2026-10-21 — Limpieza del residuo del clon en `backend/` y `frontend/`
+
+Encargo del Director Humano. Auditoría de los 33 archivos rastreados fuera de `src/`.
+
+**Corregido por mí, y era mío:** `backend/vitest.config.{js,js.map,d.ts,d.ts.map}` habían quedado
+**rastreados en git**. Los emitió mi propio `npm run build` antes de acotar el `include` del
+tsconfig, y entraron al commit `69f03fe` por un `git add -A`. Eliminados del índice y cubiertos en
+`backend/.gitignore`.
+
+**Residuo del clon:**
+- `db:seed` apuntaba a `src/core/db/seed.ts`, que no existe y además **viola la Directiva #10**
+  (prohibido sembrar desde TypeScript). Ahora aplica `bd/sql/seed_pintuclic.sql`.
+- Los dos `ARQUITECTURA.md` usaban el scope `m05-carrito-compras`, que no es el canónico de
+  `RUTA_DEL_PROYECTO.md` (`m05-carrito`), y describían el transporte de sesión por Bearer token.
+- `frontend/src/core/auth/useAuth.ts` estaba **vacío (0 bytes)**.
+- `usuario.type.ts` declaraba `id` y `tipo: 'B2C'|'B2B'|'EMPLEADO'|'ADMIN'`, que no existen en la base
+  (`id_usuario`, `enum_tipo_usuario = normal|empresa`), y **cacheaba `permisos: string[]`** en el
+  cliente: una copia que sobreviviría a su revocación y rompería CA-SEG-02-05.
+- `respuesta-api.type.ts` declaraba un envelope de error distinto del canónico.
+- `authStore.ts` guardaba `accessToken` en estado JavaScript, contra el ADR-005.
+- `apiClient.ts` leía el token de `localStorage`, incumpliendo RNF-SEG-02-01 de forma directa.
+
+**Hallazgo grave: el frontend nunca había sido instalable.** `npm install` fallaba con ERESOLVE:
+`eslint@^10.9.1` contra `eslint-config-next`, que exige `^7 || ^8 || ^9`. Además `eslint.config.js`
+importaba `@eslint/eslintrc` sin declararlo. Alineado a `eslint@^9.37.0` y añadida la dependencia
+faltante. `eslint.config.js` → `.mjs` para eliminar el aviso de reparseo de Node.
+
+**Verificación:** backend `tsc` · `eslint` · `build` · **Vitest 36/36**; frontend `tsc` · `eslint` ·
+`next build`; raíz `check:no-any` · `test:contracts` · `verify:state`. Todo en verde.
+
+**No tocado (dominio exclusivo de DevOps):** `backend/.env.example`, los dos `Dockerfile` y los
+`.dockerignore`. Ver incidencia elevada en el `WORKLOG.md` de `06_devops_release`.
