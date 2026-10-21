@@ -50,8 +50,6 @@ flowchart LR
 / (Raíz del Proyecto)
 ├── AGENTS.md                            # 📍 Este manual rector (Lectura y aterrizaje obligatorio)
 ├── LANDING_PROMPT.md                    # 🚀 Prompt para inicializar sesiones con nuevas IAs
-├── CHANGELOG.md                         # Historial de versiones bajo estándar Keep a Changelog
-├── README.md                            # Documentación y guía del proyecto
 │
 ├── .workflow/                           # 🚦 Máquina de Estados y Gobernanza HITL
 │   ├── STAGE_GATES.md                   # Protocolo canónico de compuertas y altos obligatorios
@@ -106,8 +104,7 @@ flowchart LR
 │
 ├── tooling/                             # 🛡️ Scripts de Verificación y Scaffolding
 │   ├── check-no-any-backend.ts          # Verificador AST contra 'any' en Backend
-│   ├── check-no-any-frontend.mjs        # Verificador AST contra 'any' en Frontend
-│   └── init-project.mjs                 # Wizard de configuración para nuevos proyectos
+│   └── check-no-any-frontend.mjs        # Verificador AST contra 'any' en Frontend
 │
 ├── walkthroughs/                        # Guías de Verificación Versionadas Jerárquicas
 │   └── [XX_modulo]/[vX.Y.Z]/WALKTHROUGH.md
@@ -189,7 +186,7 @@ Si eres un agente nuevo ingresando al repositorio:
 │ PASO 1: LECTURA DE CONTEXTO VIVO                                                       │
 │ 1. Consulta .workflow/current_state.json para conocer la fase activa y el rol en turno.│
 │ 2. Consulta multiAgents/00_orchestrator/PROJECT_STATUS.md para el estado de los módulos│
-│ 3. Lee el ROLE.md de tu agente y el último commit en CHANGELOG.md.                     │
+│ 3. Lee el ROLE.md de tu agente y el último commit en ../docs/CHANGELOG.md.                     │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ PASO 2: VERIFICACIÓN DE INSUMOS (DOR / PRECONDICIONES)                                 │
 │ 1. Verifica que la fase previa esté aprobada por el Director Humano.                   │
@@ -203,7 +200,7 @@ Si eres un agente nuevo ingresando al repositorio:
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ PASO 4: CIERRE, BITÁCORA Y ALTO MECÁNICO (STAGE-GATE)                                  │
 │ 1. Registra tus acciones en multiAgents/[tu_agente]/WORKLOG.md.                        │
-│ 2. Si modificaste código, actualiza CHANGELOG.md con estándar SemVer.                  │
+│ 2. Si modificaste código, actualiza ../docs/CHANGELOG.md con estándar SemVer.                  │
 │ 3. Si eres Frontend o QA, actualiza el walkthrough versionado.                         │
 │ 4. Si estás en Gate 1, 2, 3B, 4 o 5, DETÉN EL USO DE HERRAMIENTAS (Halt/Yield) y       │
 │    solicita la aprobación explícita del Director Humano.                               │

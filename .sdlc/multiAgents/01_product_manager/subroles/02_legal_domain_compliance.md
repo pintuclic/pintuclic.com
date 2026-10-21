@@ -27,7 +27,7 @@ Este subrol debe configurarse al inicio del proyecto según el sector:
 
 ```mermaid
 graph TD
-    Dom["Dominio del Proyecto: {{PROJECT_DOMAIN}}"]
+    Dom["Dominio del Proyecto: E-commerce B2C/B2B (pintuclic.com)"]
     
     Dom --> F["Fintech / Pagos<br/>(PCI-DSS, KYC/AML, SOX, Banco Central)"]
     Dom --> H["Salud / HealthTech<br/>(HIPAA, HL7 FHIR, FDA, Consentimiento Informado)"]

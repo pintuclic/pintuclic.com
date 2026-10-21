@@ -1,6 +1,6 @@
 # 🗺️ Matriz Bidireccional de Versiones y Trazabilidad del Ciclo de Vida
 
-> **Proyecto:** `{{PROJECT_NAME}}`  
+> **Proyecto:** Pintu Clic (`pintuclic.com`)  
 > **Estándar Semántico:** SemVer 2.0.0 (`MAJOR.MINOR.PATCH`)  
 > **Convención Git:** `tipo(scope): descripcion` (commit, sin versión) · `tipo(scope) [X.Y.Z.W]: mensaje` (título de PR)  
 > **Última Actualización:** 2026-10-07  
@@ -11,7 +11,6 @@
 
 | Módulo ID | Nombre del Módulo | Versión Activa | Stage-Gate Actual | Estado de QA | Walkthrough Asociado |
 | :---: | :--- | :---: | :---: | :---: | :--- |
-| `00_starter` | Plantilla Base de Gobernanza | `v1.0.0` | **Gate 5 (Release)** | ✅ PASS | [WALKTHROUGH.md](file:///walkthroughs/00_starter/v1.0.0/WALKTHROUGH.md) |
 | `01_auth` | Autenticación y Sesiones | `v0.1.0` | **Gate 0 (Gobernanza)** | ⏳ PENDIENTE | `walkthroughs/01_auth/v0.1.0/` |
 
 ---
