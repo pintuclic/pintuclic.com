@@ -8,6 +8,155 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 
 ---
 
+## [v0.3.2] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Commit:** `160b077` — `fix(ui): cerrar defectos de accesibilidad de modal y tarjeta del core kit`
+- **Hito:** ♿ **Cierre de la deuda de accesibilidad del Core Kit compartido.** La compuerta de accesibilidad pasa a cubrir todo el frontend.
+
+### Core Kit compartido — M20, infraestructura frontend
+
+Los 2 defectos que la revisión de pares de `v0.3.1` dejó abiertos vivían fuera de `m17-permisos`,
+en `frontend/src/core/`, y se reportaron sin tocar conforme a la Directiva #3. Esta entrega los
+cierra con autorización explícita del Director Humano y sobre el ticket técnico que QA asignó al
+custodio del Core Kit.
+
+**Diálogo modal accesible.** `Modal.tsx` declaraba `role="dialog"` y `aria-modal` pero sin nombre
+accesible, sin foco inicial, sin retorno de foco y sin trampa de foco: `Tab` desde el último control
+salía del diálogo hacia la página de detrás, que seguía siendo tabulable bajo el fondo opaco. Se
+añaden `aria-labelledby` y `aria-describedby` mediante `useId()`, la prop opcional `ariaLabel` para
+modales sin título, foco inicial, retorno del foco al disparador y trampa de foco cíclica. Los 7
+consumidores de M17 pasan `title`, así que ninguno requirió cambios.
+
+**Tercer defecto corregido, no reportado antes.** El `role="dialog"` estaba sobre el **fondo**
+decorativo y no sobre el panel, de modo que la región del diálogo abarcaba toda la pantalla.
+
+**Causa raíz del lint, no su síntoma.** El cierre por clic exterior pasa de un `onClick` en el fondo
+a un escucha de `pointerdown` en `document` —el mismo patrón que `AdminLayout.tsx` ya usaba en
+`v0.3.1`—, con lo que el contenedor decorativo deja de necesitar semántica interactiva.
+
+**Tarjeta de producto operable por teclado.** El `<h3>` de `ProductCard.tsx` llevaba `onClick` sin
+manejador de teclado: "ver producto" era inalcanzable sin ratón. El encabezado conserva su semántica
+y delega la acción a un `<button>` real, que obtiene `Enter`, `Espacio`, foco y anuncio de rol de
+forma nativa. Sin `onViewDetails` se renderiza un `<span>` en lugar de un botón inerte.
+
+**La compuerta de accesibilidad se amplía.** `v0.3.1` había acotado `lint:a11y` a `src/app` y
+`src/modules` precisamente porque estas 2 violaciones habrían dejado el lint en rojo para todo el
+equipo. Cerradas, el alcance incorpora `src/core`: una reaparición ahora rompe la verificación.
+
+**Verificación.** `eslint-plugin-jsx-a11y` sobre `src/core` pasa de **2 errores a 0**. 57/57 pruebas
+Vitest de frontend (eran 47) con 10 nuevas sobre el contrato de recorrido del foco; 68/68 de backend
+sin afectación, **125/125 en total**; `tsc`, ESLint y `check:no-any` (75 archivos) limpios; los tres
+auditores del repositorio sin violaciones. Se preserva la protección de la credencial de un solo uso
+de `HU-SEG-06`.
+
+**Brecha declarada.** El proyecto no tiene `jsdom` ni Testing Library y `vitest.config.ts` corre en
+`environment: node`. Las pruebas nuevas cubren el **contrato de recorrido** de la trampa de foco y el
+instrumento externo cubre la ausencia de manejador de teclado, pero el cableado DOM —`querySelectorAll`,
+la llamada efectiva a `focus()`, el retorno del foco y la resolución de `aria-labelledby` por un lector
+de pantalla— queda **verificado por inspección, no por prueba automatizada**. Se recomienda incorporar
+`jsdom` y `@testing-library/react` como dependencias de desarrollo; es un cambio de dependencias del
+proyecto y excedía el alcance autorizado de esta remediación.
+
+**Sin cambios.** Sigue bloqueada la integración nativa de las 8 reglas en `frontend/eslint.config.mjs`
+por el hook de protección de configuración del entorno. No se declara ninguna compuerta aprobada.
+
+---
+
+## [v0.3.1] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Commit:** `cb21b6a` — `fix(m17): cerrar hallazgos de revision de pares en dtos stores y accesibilidad`
+- **Hito:** 🔎 **Primera remediación guiada por revisión de pares.** Cierra defectos que las compuertas estáticas no podían detectar.
+
+### Módulo M17 — Administración, Empleados y Permisos (remediación de frontend)
+
+Una revisión de pares sobre `v0.3.0` registró 1 defecto bloqueante y 12 mayores. El ciclo
+*Stop-the-Line* de QA resolvió 4 de ellos; esta entrega cierra **6 de los 8 restantes**, todos dentro
+de los límites de `m17-permisos`.
+
+**Corrección de datos y contrato.** Un colaborador con `telefono: null` no podía editarse —ni para
+cambiarle solo el nombre— porque el modal precarga la cadena vacía y `telefonoSchema.optional()` solo
+admite `undefined`. Se introduce `telefonoEdicionSchema`, que acepta el vacío y conserva el rango
+7–20 cuando hay valor, y la vista omite el campo del payload, ya que el contrato del backend tampoco
+acepta la cadena vacía.
+
+**Mensajes de error reales.** 15 puntos del módulo leían `err.message` de un `AxiosError`, que
+también es un `Error`, de modo que el usuario veía "Request failed with status code 409" en lugar del
+motivo de negocio. El nuevo helper `mensajeDeError` prefiere el mensaje del envelope canónico
+mediante `esRespuestaError`.
+
+**Consistencia de los listados.** Contador de secuencia por store que descarta las respuestas
+obsoletas —antes una respuesta lenta sobrescribía una más reciente y la tabla dejaba de corresponder
+a los filtros visibles— y debounce de 300 ms que sustituye a una petición por pulsación de tecla.
+
+**Accesibilidad de la navegación.** El menú de perfil solo se cerraba con `onMouseLeave`, inalcanzable
+con teclado o en pantalla táctil; el sidebar móvil oculto seguía siendo tabulable. Se añaden cierre
+por `Escape` y por puntero externo, `inert` condicionado por `matchMedia`, y los atributos
+`aria-expanded`, `aria-controls`, `aria-haspopup` y `aria-current`.
+
+**Protección de la credencial de un solo uso (`HU-SEG-06`).** `Escape` o un clic en el fondo
+destruían la clave temporal sin recuperación posible; ahora solo la descarta el botón explícito, y el
+fallo del portapapeles se informa en vez de silenciarse.
+
+**Confirmación de guardado (`HU-ADM-05`).** El banner de éxito de configuración nunca llegaba a verse
+porque el refresco posterior lo borraba. Se corrige el orden.
+
+**Verificación.** 47/47 pruebas Vitest de frontend (eran 38) con **9 pruebas de regresión nuevas** que
+ejercitan el límite exacto de cada defecto; `tsc`, ESLint y `check:no-any` (73 archivos) limpios; los
+tres scripts de auditoría del repositorio sin violaciones; y `eslint-plugin-jsx-a11y` ejecutado como
+instrumento externo con **0 errores en M17** por primera vez.
+
+**Pendiente declarado.** Quedan abiertos 2 defectos de accesibilidad del Core Kit compartido
+(`Modal.tsx` sin trampa de foco, `ProductCard.tsx` sin manejador de teclado), reportados sin tocar
+conforme a la Directiva #3, y 2 hallazgos bloqueados por dependencias: la identidad simulada del
+panel exige la sesión real de M04, y los KPIs agregados exigen ampliar el contrato de M17.
+
+> **Nota:** la entrega `v0.3.0` (implementación inicial de M17, backend y frontend) no tiene entrada
+> propia en este registro. Sus walkthroughs sí están publicados en `docs/walkthroughs/M17/`.
+
+---
+
+## [v0.2.0] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Commit:** `c5e6492` — `feat(m20-seguridad): implementar la infraestructura de seguridad del frontend`
+- **Hito:** 🥇 **Primer feature del sistema.** Primera entrega con código de aplicación, no solo documentación.
+
+### Módulo M20 — Seguridad, Auditoría y Protección de Datos (parcial)
+
+Primer módulo recorrido por el ciclo SDLC formal: Gate 0 → Gate 1 → Gate 2 → Fase 3A → Gate 3B.
+M20 es la raíz absoluta del grafo de construcción, de la que dependen los 20 módulos restantes.
+
+**Requerimientos (Gate 1).** 5 historias formalizadas en INVEST con **36 escenarios BDD** trazados
+uno a uno a su criterio de aceptación, 15 reglas inmutables (`RN-SEG-01`…`RN-SEG-15`) y los 6
+diagramas contractuales transcritos a Mermaid.
+
+**Arquitectura (Gate 2).** Contrato Zod API-First en `.sdlc/docs/contracts/m20-seguridad.contract.ts`
+y 4 ADRs. Hallazgo principal: **M20 no requiere ningún cambio de DDL**, porque sus cuatro tablas ya
+existían en `bd/sql/schema_pintuclic.sql`. Prisma pasa a mapear ese DDL con `@@map` en lugar de
+describir un modelo paralelo incompatible.
+
+**Backend (Fase 3A).** Derivación BCrypt con coste ajustable y verificación en tiempo constante; la
+máquina de 8 estados de la sesión con ventana deslizante e invalidación en masa con causa; el
+validador central de autorización que resuelve permisos en cada petición; y el manejador global de
+errores sin detalle interno. **36 pruebas Vitest.**
+
+**Frontend (Gate 3B, acotado).** Guarda de rutas que conserva el destino pretendido, interceptor
+`401`, DTOs transversales de seguridad y traducción de errores sin fugas. La sesión viaja en cookie
+`HttpOnly`: ni el cliente HTTP ni el store tocan el identificador. **19 pruebas Vitest.**
+
+**Gobernanza.** Se incorporó `CONSULTATION_BYPASS_PROTOCOL.md` (Mesa de Consulta Acotada) para los
+ritos que exigen varios roles a la vez, como la mesa ATDD. Se absorbió el submódulo `.sdlc` en el
+repositorio principal y se eliminó el residuo del clon en `backend/` y `frontend/` — que, entre otras
+cosas, impedía instalar el frontend por un conflicto de dependencias.
+
+> ⚠️ **Entrega parcial y sin certificar.** Alcance: 5 de 6 historias — **HU-SEG-04 (auditoría) está
+> aplazada por el Product Owner**, y con ella `CA-SEG-03-05` queda **NO CUBIERTO**. **Gate 4 (QA) está
+> diferido**: M20 está probado unitariamente pero nunca se ha ejecutado contra una sesión real,
+> porque no existe login hasta M04. Se certificará junto a M17 y M04.
+
+- 🔗 **Walkthrough:** [walkthroughs/M20/walkthrough_v0.2.0_M20_seguridad_frontend.md](./walkthroughs/M20/walkthrough_v0.2.0_M20_seguridad_frontend.md)
+
+---
+
 ## [v0.1.8] - 2026-10-20
 - **Autor:** DanExl24 (@DanExl24)
 - **Commit:** `081066e` — `docs(arquitectura): agregar RUTA_DEL_PROYECTO.md como ruta maestra`

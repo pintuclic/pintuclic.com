@@ -1,0 +1,12 @@
+import React from 'react';
+import type { Metadata } from 'next';
+import { AdminLayout } from '@/modules/m17-permisos/components/AdminLayout';
+
+export const metadata: Metadata = {
+  title: 'Panel Administrativo — Pintu Clic',
+  description: 'Sistema integral de administración, gestión de colaboradores y permisos de Pintu Clic.',
+};
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return <AdminLayout>{children}</AdminLayout>;
+}

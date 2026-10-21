@@ -1,2 +1,43 @@
 @import "tailwindcss";
-@config "../../tailwind.config.ts";
+
+@source "../";
+@source "../modules";
+@source "../core";
+@source "../app";
+
+@theme {
+  --color-corporate: #002855;
+  --color-corporate-dark: #002855;
+  --color-action: #0877E8;
+  --color-action-hover: #0661BF;
+  --color-subaction: #DAEEFC;
+  --color-conversion: #41BF5A;
+  --color-conversion-hover: #1B6D24;
+  --color-conversion-accent: #3CB148;
+  --color-highlight: #FFC107;
+  --color-danger: #E63946;
+  --color-danger-hover: #D62828;
+  --color-danger-subtle: #FDEDEE;
+  --color-offer: #E63946;
+  --color-offer-hover: #D62839;
+
+  --color-neutral-white: #FFFFFF;
+  --color-neutral-lightest: #F7F8FA;
+  --color-neutral-light: #E5E7EB;
+  --color-neutral-medium: #6B7280;
+  --color-neutral-dark: #374151;
+  --color-neutral-black: #111827;
+
+  --font-sans: var(--font-inter), 'Inter', sans-serif;
+  --font-title: var(--font-poppins), 'Poppins', sans-serif;
+
+  --radius-input: 6px;
+  --radius-btn: 6px;
+  --radius-card: 8px;
+  --radius-modal: 14px;
+
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 8px 16px rgba(0, 0, 0, 0.12);
+
+  --background-image-brand-rainbow: linear-gradient(90deg, #0877E8 0%, #41BF5A 35%, #FFC107 70%, #E63946 100%);
+}

@@ -350,6 +350,17 @@ Todas las preguntas que quedan abiertas en esta tanda, agrupadas por
 historia. Ninguna impide comenzar a construir: cada una admite avanzar
 con el mecanismo especificado y decidir el valor o la política después.
 
+> **Resueltas por la refactorización de historias de M04 (Juan David Trujillo):**
+> 
+> - *HU-CUE-02 — ¿Un cliente vinculado a Google puede además establecer una
+>   contraseña propia?* **Sí, y es obligatorio.** El sistema exige establecerla al
+>   completar el registro mediante Google, de modo que la cuenta nazca con ambas
+>   vías de acceso (`RF-CUE-02-04`, `RF-CUE-02-05`, `RF-SEG-01-05`).
+> - *HU-CUE-08 — ¿Un cliente particular puede convertirse en cliente empresa sin
+>   crear una cuenta nueva?* **Sí, mediante solicitud sobre la misma cuenta.** El
+>   particular la solicita digitando su NIT desde su panel (`RF-CUE-06-07`) y el
+>   administrador la aprueba o rechaza en una vista propia (`RF-CUE-09-08`).
+
   --------------------------------------------------------------------------
   **Historia**   **Pregunta**
   -------------- -----------------------------------------------------------
@@ -360,9 +371,6 @@ con el mecanismo especificado y decidir el valor o la política después.
   HU-CUE-01 /    ¿La dirección se captura durante el registro o solo
   HU-CUE-07 /    después, en la gestión de direcciones, una vez que M10
   C-20           defina el modelo de entrega?
-
-  HU-CUE-02      ¿Un cliente vinculado a Google puede además establecer una
-                 contraseña propia para acceder sin depender del proveedor?
 
   HU-CUE-03 /    ¿Qué puede hacer una empresa mientras su solicitud está en
   HU-CUE-09      revisión: navegar, comprar con condiciones de cliente
@@ -380,10 +388,6 @@ con el mecanismo especificado y decidir el valor o la política después.
   C-21           de empleado con el mismo correo electrónico? Si es así,
                  ¿cómo distingue el sistema con cuál se autentica en cada
                  inicio de sesión?
-
-  HU-CUE-08      ¿Un cliente particular puede convertirse en cliente empresa
-                 sin crear una cuenta nueva, o la conversión exige una
-                 solicitud independiente?
 
   HU-CUE-09      ¿La aprobación de una cuenta empresa es facultad exclusiva
                  del administrador, o un empleado con permiso específico

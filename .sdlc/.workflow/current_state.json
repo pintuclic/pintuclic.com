@@ -1,0 +1,499 @@
+{
+  "proyecto": "Pintu Clic",
+  "dominio": "pintuclic.com",
+  "version_actual": "v0.3.2",
+  "fecha_actualizacion": "2026-10-21",
+  "fase_activa": "FASE_4_QA",
+  "gate_activo": "GATE_4A_RATIFICADO_V0.3.2",
+  "estado": "CERTIFICADO_CON_REMEDIACION",
+  "rol_en_turno": "00_orchestrator",
+  "modulo_en_curso": "M17",
+  "nota_de_contexto": "VETO STOP-THE-LINE LEVANTADO Y M17 CERTIFICADO. Subsanados los 4 defectos (BUG-M17-04 a BUG-M17-07) con autorización humana. Batería de auditoría 100% verde: 68/68 backend tests, 38/38 frontend tests, 0 violaciones de Core Kit, 0 anti-patrones Zod, 0 violaciones A11y, 0 any en 141 archivos. Se autoriza la transición a Gate 5 y la habilitación de Ola 2 (M01). ENTREGA v0.3.1: una revisión de pares posterior cerró 6 defectos adicionales de frontend dentro de m17-permisos (teléfono vacío en edición, mensajes de Axios sin traducir, respuestas de listado desordenadas sin debounce, mensaje de éxito autodestruido, accesibilidad de la navegación y credencial de un solo uso destruible con Escape), con 47/47 pruebas Vitest de frontend y 0 errores de jsx-a11y en M17. Quedan abiertos 2 defectos de accesibilidad del Core Kit compartido y 2 hallazgos bloqueados por dependencias (identidad real de sesión en M04; KPIs agregados en el contrato de M17), más la activación de las reglas jsx-a11y en frontend/eslint.config.mjs, bloqueada por el hook de protección de configuración del entorno. ENTREGA v0.3.2: cerrados los 2 defectos de accesibilidad del Core Kit compartido que v0.3.1 habia elevado sin tocar, con autorizacion explicita del Director Humano y sobre el ticket tecnico que QA asigno al custodio del Core Kit. Modal.tsx recibe aria-labelledby, aria-describedby, foco inicial, retorno de foco y trampa de foco, y se corrige un tercer defecto no reportado: el role de dialogo estaba sobre el fondo decorativo en lugar del panel. ProductCard.tsx delega la accion del encabezado a un button real. La compuerta lint:a11y amplia su alcance a src/core, revirtiendo la exclusion de v0.3.1. CERTIFICACIÓN QA v0.3.2: Gate 4A ratificado por 05_qa_security_tester en .sdlc/docs/qa/M20/v0.3.2/QA_REPORT.md. Verificación determinista independiente: 57/57 Vitest frontend (10 nuevas), 68/68 backend, 125/125 total, jsx-a11y de 2 errores a 0 en src/core (0 en app+core+modules), tsc y eslint limpios, 0 any en 75 archivos, 3 auditores de gobernanza sin violaciones. BRECHA DECLARADA: sin jsdom ni Testing Library, el cableado DOM del foco queda verificado por inspeccion y no por prueba automatizada, formalmente aceptada por QA bajo Regla #8 para evaluación futura en mesa técnica. Sigue bloqueada la integracion nativa de jsx-a11y en frontend/eslint.config.mjs por el hook de proteccion de configuracion. Deuda técnica de accesibilidad del Core Kit cerrada al 100%.",
+  "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
+  "total_modulos": 21,
+  "modulos_con_spec": 8,
+  "modulos_pendientes_gate_1": 13,
+  "bloqueos": [
+    {
+      "tipo": "INCONSISTENCIA_RUTA",
+      "descripcion": "El grafo de RUTA_DEL_PROYECTO.md tiene 4 inconsistencias registradas en su seccion 7: ciclo M18 -> M04 -> M07 -> M08 -> M18; M05 y M08 en Ola 4 dependen de M06, M07 y M21 de Ola 5; M16 sin conexiones; classDef declarados sin aplicar.",
+      "responsable": "Product Owner",
+      "estado": "PENDIENTE_CORRECCION",
+      "impacto": "La Ola 4 no puede cerrarse sin construir antes tres modulos de la Ola 5. Hasta la correccion, la ruta se respeta tal como esta y todo bloqueo se reporta."
+    },
+    {
+      "tipo": "ALCANCE_APLAZADO",
+      "descripcion": "El Product Owner aplazo HU-SEG-04 (Registro de auditoria de acciones relevantes): la tabla de auditoria aun no se establece. Arrastra RF-SEG-03-07 y CA-SEG-03-05 de HU-SEG-03, y CA-ADM-03-06 de la politica de cierre, que exigen registrar todo acceso denegado. M20 entrega el puerto AuditoriaPort con adaptador no-op y log tecnico interno para que al desbloquearse HU-SEG-04 solo se sustituya el adaptador.",
+      "responsable": "Product Owner",
+      "estado": "APLAZADO_POR_DECISION",
+      "impacto": "M20 cierra con 5 de 6 historias. RF-SEG-03-07 se declara cubierto por diseno, no por persistencia."
+    },
+    {
+      "tipo": "CERTIFICACION_DIFERIDA",
+      "descripcion": "Gate 4 (QA) de M20 diferido. M20 esta probado unitariamente (36 pruebas backend + 19 frontend) pero NUNCA se ha ejecutado contra una sesion real: no existe login hasta M04. Auditarlo ahora certificaria un modulo que QA no puede ejecutar. Ademas CA-SEG-03-05 sigue sin cubrir por el aplazamiento de HU-SEG-04.",
+      "responsable": "Director Humano / 05_qa_security_tester",
+      "estado": "DIFERIDO_POR_ACUERDO",
+      "impacto": "v0.2.0 se publica SIN certificacion de QA. Debe quedar explicito en el CHANGELOG."
+    },
+    {
+      "tipo": "SOLICITUD_DE_CORRECCION",
+      "descripcion": "QA_REPORT.md de M20 v0.2.0, seccion 3, fila HU-SEG-02: consigna la cookie de sesion como SameSite=Lax cuando el valor implementado es Strict, fijado con z.literal en el contrato. Bloque completo en el WORKLOG de 05_qa_security_tester, conforme a HANDOFF_PROTOCOL.md 2.1.",
+      "responsable": "05_qa_security_tester",
+      "estado": "RESUELTA",
+      "resolucion": "Corregido a SameSite=Strict en QA_REPORT.md tras verificacion del contrato Zod y cookieSesion.ts. Feedback loop cerrado.",
+      "impacto": "Resuelto. El informe de seguridad refleja con exactitud la defensa anti-CSRF estricta implementada."
+    },
+    {
+      "tipo": "VETO_STOP_THE_LINE",
+      "descripcion": "M17 v0.3.0 rechazado por QA tras validación de hallazgos de auditoría de pares. Defectos críticos: crash en /admin/clientes (BUG-M17-04), bypass de espacios en motivo (BUG-M17-05), coerción silenciosa Number('')===0 en configuración (BUG-M17-06) y 60 violaciones de Core Kit/A11y (BUG-M17-07).",
+      "responsable": "05_qa_security_tester",
+      "estado": "RESUELTO_Y_LEVANTADO",
+      "resolucion": "Remediados los 4 defectos (BUG-M17-04 a BUG-M17-07) con tests automatizados pasando al 100%, 0 violaciones de Core Kit, 0 violaciones Zod, 0 violaciones A11y, tsc limpio y eslint limpio. Veto levantado formalmente.",
+      "impacto": "M17 certificado. Se desbloquea la construcción de Ola 2 (M01 Catálogo)."
+    }
+  ],
+  "modulos_registrados": [
+    {
+      "id": "M01",
+      "nombre": "Catalogo de Productos",
+      "ola": 2,
+      "scope": "m01-catalogo",
+      "spec": true,
+      "backend": "estructura",
+      "frontend": "estructura",
+      "contratos_zod": false,
+      "depende_de": [
+        "M17",
+        "M13"
+      ]
+    },
+    {
+      "id": "M02",
+      "nombre": "Busqueda, Filtros y Descubrimiento",
+      "ola": 3,
+      "scope": "m02-busqueda",
+      "spec": true,
+      "backend": "estructura",
+      "frontend": "estructura",
+      "contratos_zod": false,
+      "depende_de": [
+        "M01"
+      ]
+    },
+    {
+      "id": "M03",
+      "nombre": "Asesoria y IA (Simulador/Chatbot)",
+      "ola": 6,
+      "scope": "m03-asesoria",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M01"
+      ]
+    },
+    {
+      "id": "M04",
+      "nombre": "Cuentas, Autenticacion y Perfil",
+      "ola": 3,
+      "scope": "m04-cuentas",
+      "spec": true,
+      "backend": "estructura",
+      "frontend": "estructura",
+      "contratos_zod": false,
+      "depende_de": [
+        "M18"
+      ]
+    },
+    {
+      "id": "M05",
+      "nombre": "Carrito de Compras",
+      "ola": 4,
+      "scope": "m05-carrito",
+      "spec": true,
+      "backend": "estructura",
+      "frontend": "estructura",
+      "contratos_zod": false,
+      "depende_de": [
+        "M01",
+        "M06"
+      ]
+    },
+    {
+      "id": "M06",
+      "nombre": "Precios, Promociones y Descuentos",
+      "ola": 5,
+      "scope": "m06-precios",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M13"
+      ]
+    },
+    {
+      "id": "M07",
+      "nombre": "Checkout y Pago",
+      "ola": 5,
+      "scope": "m07-checkout",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M04",
+        "M05",
+        "M06",
+        "M21"
+      ]
+    },
+    {
+      "id": "M08",
+      "nombre": "Orden de Venta",
+      "ola": 4,
+      "scope": "m08-ordenes",
+      "spec": true,
+      "backend": "estructura",
+      "frontend": "estructura",
+      "contratos_zod": false,
+      "depende_de": [
+        "M06",
+        "M07",
+        "M21"
+      ],
+      "nodo_critico": true,
+      "habilita": [
+        "M09",
+        "M10",
+        "M11",
+        "M12",
+        "M18",
+        "M19"
+      ]
+    },
+    {
+      "id": "M09",
+      "nombre": "Cumplimiento y Preparacion",
+      "ola": 4,
+      "scope": "m09-cumplimiento",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M08"
+      ]
+    },
+    {
+      "id": "M10",
+      "nombre": "Entrega y Transporte",
+      "ola": 5,
+      "scope": "m10-entrega",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M08",
+        "M09"
+      ]
+    },
+    {
+      "id": "M11",
+      "nombre": "Postventa (Devoluciones/Reembolsos)",
+      "ola": 5,
+      "scope": "m11-postventa",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M08"
+      ]
+    },
+    {
+      "id": "M12",
+      "nombre": "Facturacion",
+      "ola": 5,
+      "scope": "m12-facturacion",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M08"
+      ]
+    },
+    {
+      "id": "M13",
+      "nombre": "Inventario e Integracion SAMIT (CSV)",
+      "ola": 2,
+      "scope": "m13-inventario",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": []
+    },
+    {
+      "id": "M14",
+      "nombre": "Patrocinios y Campanas",
+      "ola": 6,
+      "scope": "m14-patrocinios",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M01",
+        "M02",
+        "M19"
+      ]
+    },
+    {
+      "id": "M15",
+      "nombre": "Atencion al Cliente (WhatsApp/FAQ)",
+      "ola": 6,
+      "scope": "m15-atencion",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M03"
+      ]
+    },
+    {
+      "id": "M16",
+      "nombre": "Contenido Institucional",
+      "ola": 2,
+      "scope": "m16-contenido",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": []
+    },
+    {
+      "id": "M17",
+      "nombre": "Administracion, Empleados y Permisos",
+      "ola": 1,
+      "scope": "m17-permisos",
+      "spec": true,
+      "backend": "implementado",
+      "frontend": "implementado",
+      "contratos_zod": true,
+      "depende_de": [
+        "M20"
+      ],
+      "estado_sdlc": "Gate 4A certificado en unidad — Gate 4B diferido hasta M04"
+    },
+    {
+      "id": "M18",
+      "nombre": "Notificaciones y Comunicaciones",
+      "ola": 3,
+      "scope": "m18-notificaciones",
+      "spec": true,
+      "backend": "estructura",
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M08"
+      ]
+    },
+    {
+      "id": "M19",
+      "nombre": "Reportes y Analitica",
+      "ola": 6,
+      "scope": "m19-reportes",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M08"
+      ]
+    },
+    {
+      "id": "M20",
+      "nombre": "Seguridad, Auditoria y Proteccion de Datos",
+      "ola": 1,
+      "scope": "m20-seguridad",
+      "spec": true,
+      "backend": "implementado",
+      "frontend": "infraestructura",
+      "contratos_zod": true,
+      "depende_de": [],
+      "raiz_absoluta": true,
+      "estado_sdlc": "Gate 3B firmado (infraestructura) — Gate 4 diferido hasta M17 y M04"
+    },
+    {
+      "id": "M21",
+      "nombre": "Cotizaciones",
+      "ola": 5,
+      "scope": "m21-cotizaciones",
+      "spec": false,
+      "backend": false,
+      "frontend": false,
+      "contratos_zod": false,
+      "depende_de": [
+        "M05"
+      ]
+    }
+  ],
+  "camino_critico": [
+    "M20",
+    "M17",
+    "M01",
+    "M05",
+    "M21",
+    "M07",
+    "M08",
+    "M09",
+    "M10"
+  ],
+  "historial_transiciones": [
+    {
+      "de": "ORIGEN",
+      "a": "FASE_0_GOBERNANZA",
+      "fecha": "2026-10-20",
+      "autor": "DanExl24",
+      "motivo": "Inicializacion del repositorio bajo Starter Kit Multiagente SDLC"
+    },
+    {
+      "de": "FASE_0_GOBERNANZA",
+      "a": "CONTEXTO_INICIALIZADO",
+      "fecha": "2026-10-20",
+      "autor": "DanExl24",
+      "motivo": "Adaptacion del SDLC al stack y documentacion existente de pintuclic.com. PINTUCLIC_CONTEXT.md creado como mapa de fuentes de verdad."
+    },
+    {
+      "de": "CONTEXTO_INICIALIZADO",
+      "a": "RUTA_REGISTRADA",
+      "fecha": "2026-10-20",
+      "autor": "DanExl24",
+      "motivo": "El Product Owner entrego el grafo de olas y dependencias. Registrado en docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md y en los registros del SDLC: el inventario pasa de 8 a 21 modulos. Nombres alineados a los del Product Owner (M08 pasa de 'Ordenes y Envios' a 'Orden de Venta', ya que los envios corresponden a M10). 13 modulos quedan pendientes de Gate 1."
+    },
+    {
+      "de": "RUTA_REGISTRADA",
+      "a": "FASE_1_PRD",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Firma del Gate 0 y designacion de M20 como modulo inicial del primer ciclo SDLC completo. Turno entregado al Product Manager Lead para formalizar las historias en INVEST + BDD Gherkin sobre docs/01_TRANSVERSALES/M20_SEGURIDAD_Y_AUDITORIA.md."
+    },
+    {
+      "de": "FASE_1_PRD",
+      "a": "FASE_2_ARQUITECTURA",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Firma del Gate 1 sobre los artefactos de M20: 5 historias en INVEST con 36 escenarios BDD, 15 reglas inmutables y matriz de alcance con HU-SEG-04 aplazada. El Director Humano autorizo ademas el bypass de convocatoria para ritos multi-rol, incorporado como multiAgents/protocols/CONSULTATION_BYPASS_PROTOCOL.md."
+    },
+    {
+      "de": "FASE_2_ARQUITECTURA",
+      "a": "FASE_3A_BACKEND",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Firma del Gate 2 sobre el contrato Zod m20-seguridad.contract.ts, 04_ARQUITECTURA_Y_CODIGO.md y los ADR-002 a ADR-005."
+    },
+    {
+      "de": "FASE_3A_BACKEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Backend de M20 verificado (36/36 Vitest) y residuo del clon limpiado. El PO acota la Fase 3B a infraestructura y servicio de privacidad, sin componentes ni pantallas."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "GATE_3B_FIRMADO",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Firma de Gate 3B en la modalidad '3B de infraestructura, sin revision visual por el momento'. La compuerta exige explorar la interfaz en el navegador y esta entrega no tiene interfaz: el PO acoto la Fase 3B a infraestructura. La revision visual correspondera a quien construya las pantallas."
+    },
+    {
+      "de": "GATE_3B_FIRMADO",
+      "a": "GATE_0_SELECCION_DE_MODULO",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Gate 4 de M20 diferido por acuerdo: se certificara junto a M17 y M04, cuando exista un flujo real que recorrer. Turno devuelto al Orquestador para iniciar M17."
+    },
+    {
+      "de": "GATE_0_SELECCION_DE_MODULO",
+      "a": "FASE_1_PRD",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Activación de Fase 1 para M17. Formalización de 7 HUs bajo INVEST, 47 escenarios BDD Gherkin, diagramas Mermaid y mesa ATDD en .sdlc/docs/modules/M17/. Esperando firma de Gate 1."
+    },
+    {
+      "de": "FASE_1_PRD",
+      "a": "FASE_2_ARQUITECTURA",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Firma del Gate 1 para M17. Entregables de Fase 2 completados: contrato Zod m17-permisos.contract.ts, ADR-006 a ADR-008 y 04_ARQUITECTURA_Y_CODIGO.md. Esperando firma de Gate 2."
+    },
+    {
+      "de": "FASE_2_ARQUITECTURA",
+      "a": "FASE_3A_BACKEND",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Firma del Gate 2 para M17. Aprobación de especificación técnica, ADRs 006-008 y contrato Zod m17-permisos.contract.ts. Inicio de la Fase 3A (Backend API)."
+    },
+    {
+      "de": "FASE_3A_BACKEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Backend de M17 finalizado con 100% de pruebas pasando (68/68 Vitest). Aprobación para iniciar la Fase 3B de Frontend tomando el mockup admin pintu_clic_admin_m01_m02_.pdf."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "GATE_3B_FRONTEND_CODE_REVIEW",
+      "fecha": "2026-10-21",
+      "autor": "04_frontend_engineer",
+      "motivo": "Fase 3B completada. Despliegue de vistas de administración (/admin, /admin/empleados, /admin/clientes, /admin/configuracion, /admin/gobernanza), DTOs Zod 4, Zustand stores, 38/38 tests pasando, 0 any, 0 errores tsc y 0 warnings ESLint. Walkthrough generado."
+    },
+    {
+      "de": "GATE_3B_FRONTEND_CODE_REVIEW",
+      "a": "GATE_4A_CERTIFICACION_UNIDAD",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "Auditoría preliminar de unidad realizada."
+    },
+    {
+      "de": "GATE_4A_CERTIFICACION_UNIDAD",
+      "a": "GATE_4A_RECHAZADO_STOP_THE_LINE",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "VETO STOP-THE-LINE activado tras Peer QA Review. Se constatan 4 defectos críticos: crash runtime en /admin/clientes (BUG-M17-04), evasión en motivo por encadenamiento Zod (BUG-M17-05), coerción silenciosa Number('')===0 y validación inline en ConfiguracionView (BUG-M17-06), y 60 infracciones de Core Kit y A11y (BUG-M17-07). Módulo devuelto a desarrollo."
+    },
+    {
+      "de": "GATE_4A_RECHAZADO_STOP_THE_LINE",
+      "a": "GATE_4A_APROBADO_CERTIFICADO",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "Levantamiento formal del Veto Stop-the-Line. Subsanados los 4 defectos (BUG-M17-04 a BUG-M17-07) con autorización humana y verificación determinista: 68/68 backend Vitest, 38/38 frontend Vitest, 0 ANY en 141 archivos, 0 violaciones de Core Kit, 0 violaciones Zod, 0 violaciones A11y, tsc y eslint limpios. M17 queda técnicamente certificado para habilitar la Ola 2 (M01)."
+    },
+    {
+      "de": "GATE_4A_APROBADO_CERTIFICADO",
+      "a": "GATE_4A_RATIFICADO_V0.3.1",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "Certificación de M17 v0.3.1 tras revisión de pares. 6 defectos de borde subsanados en m17-permisos: 47/47 Vitest frontend (+9 de regresión), 68/68 backend (115 total PASS), 0 ANY en 140 archivos, 0 violaciones Core Kit, Zod y A11y. Gate 4A ratificado con excelencia."
+    },
+    {
+      "de": "GATE_4A_RATIFICADO_V0.3.1",
+      "a": "GATE_4A_RATIFICADO_V0.3.1",
+      "fecha": "2026-10-21",
+      "autor": "DanExl24",
+      "motivo": "Entrega v0.3.2 de mantenimiento del Core Kit compartido (M20, infraestructura frontend), autorizada expresamente por el Director Humano. Cierra los 2 defectos de accesibilidad elevados en v0.3.1 y amplia la compuerta lint:a11y a src/core. No altera la fase ni la compuerta activa: es trabajo de implementacion y no declara ninguna aprobacion de Gate."
+    },
+    {
+      "de": "GATE_4A_RATIFICADO_V0.3.1",
+      "a": "GATE_4A_RATIFICADO_V0.3.2",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "Certificación de M20 Core Kit v0.3.2 tras auditoría forense independiente en .sdlc/docs/qa/M20/v0.3.2/QA_REPORT.md. Defectos de accesibilidad en Modal.tsx y ProductCard.tsx completamente subsanados: 57/57 Vitest frontend (+10 tests foco), 68/68 backend (125 total PASS), 0 errores en lint:a11y sobre app+core+modules, 0 ANY en 75 archivos frontend, tsc y eslint limpios. Brecha de jsdom aceptada formalmente bajo Regla #8 para evaluación futura en mesa técnica. Gate 4A ratificado para v0.3.2."
+    }
+  ]
+}

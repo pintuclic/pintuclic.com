@@ -17,8 +17,7 @@ backend/
     ├── core/                      # Infraestructura técnica global (NO contiene lógica de negocio)
     │   ├── db/
     │   │   ├── client.ts          # Singleton PrismaClient (instancia global reutilizable)
-    │   │   └── seed.ts            # Carga de datos iniciales idempotentes (prisma db seed)
-    │   ├── middlewares/
+        │   ├── middlewares/
     │   │   ├── auth.middleware.ts # Verifica JWT y adjunta req.user
     │   │   ├── cors.middleware.ts # Configuración restrictiva de orígenes
     │   │   └── errorHandler.ts   # Captura global de errores — respuestas genéricas (HU-SEG-06)
@@ -38,7 +37,7 @@ backend/
     │   ├── m04-cuentas/           # Depende de m20, m17, m18
     │   ├── m01-catalogo/          # Depende de m20, m17
     │   ├── m02-busqueda/          # Depende de m01
-    │   ├── m05-carrito-compras/   # Depende de m04, m01
+    │   ├── m05-carrito/           # Depende de m04, m01
     │   └── m08-ordenes/           # Depende de m05, m04, m18
     │
     │   Cada módulo tiene la estructura interna:
@@ -87,7 +86,7 @@ Cliente → index.ts → app.routes.ts → m[xx].routes.ts
 npx prisma generate          # Regenera tipos TypeScript desde schema.prisma
 npx prisma migrate dev       # Crea y aplica nueva migración (desarrollo)
 npx prisma migrate deploy    # Aplica migraciones pendientes (producción)
-npx prisma db seed           # Ejecuta src/core/db/seed.ts
+npm run db:seed              # Aplica bd/sql/seed_pintuclic.sql (Directiva #10)
 npx prisma studio            # Abre UI visual de la BD
 ```
 
@@ -98,4 +97,4 @@ npx prisma studio            # Abre UI visual de la BD
 3. `m17-permisos` (permisos atómicos de empleados)
 4. `m18-notificaciones` (SMTP desacoplado)
 5. `m04-cuentas` (auth B2C/B2B)
-6. `m01-catalogo` → `m02-busqueda` → `m05-carrito-compras` → `m08-ordenes`
+6. `m01-catalogo` → `m02-busqueda` → `m05-carrito` → `m08-ordenes`

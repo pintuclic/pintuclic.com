@@ -1,0 +1,22 @@
+{
+  "name": "pintuclic-gobernanza",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tooling de gobernanza SDLC de Pintu Clic: verificadores AST de Tolerancia Cero al tipo any (Regla de Oro #11), validacion de contratos Zod, auditoria de accesibilidad e integridad de la maquina de Stage-Gates. No empaqueta aplicacion: el backend vive en backend/ y el frontend en frontend/.",
+  "type": "module",
+  "scripts": {
+    "check:no-any": "node .sdlc/tooling/check-no-any-frontend.mjs backend/src frontend/src .sdlc/docs/contracts",
+    "test:contracts": "node .sdlc/tooling/validate-contracts.mjs",
+    "audit:a11y": "node .sdlc/tooling/audit-a11y.mjs",
+    "audit:core-kit": "node .sdlc/tooling/audit-core-kit.mjs",
+    "audit:zod": "node .sdlc/tooling/audit-zod-chains.mjs",
+    "audit:dast": "node .sdlc/tooling/audit-security-runtime.mjs",
+    "test:load": "node .sdlc/tooling/run-load-test.mjs",
+    "verify:state": "node .sdlc/tooling/verify-state.mjs"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "zod": "^4.6.7"
+  }
+}
