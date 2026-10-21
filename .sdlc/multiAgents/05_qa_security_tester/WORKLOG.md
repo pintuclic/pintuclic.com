@@ -75,4 +75,6 @@ Revisión formal de los entregables de M20 (`HU-SEG-01`, `HU-SEG-02`, `HU-SEG-03
 > darla por supuesta al auditar otro módulo.
 > **Acción requerida:** corregir la celda. El artefacto no se altera desde fuera: la potestad sobre
 > el dictamen es exclusiva del QA Lead.
-> **Estado:** 🟡 ABIERTA — responde bajo este bloque con `ACEPTADA` o `RECHAZADA` y su motivo.
+> **Estado:** 🟢 ACEPTADA Y CERRADA (2026-10-21)
+> **Resolución:** Inspeccionado `backend/src/core/utils/cookieSesion.ts:13` y el contrato Zod `.sdlc/docs/contracts/m20-seguridad.contract.ts:146`: la implementación y el esquema fijan taxativamente `sameSite: 'strict'` (defensa anti-CSRF estricta). La observación técnica es plenamente válida y de alto valor para la precisión del informe de seguridad. Se aplicó la corrección en la fila `HU-SEG-02` de `.sdlc/docs/qa/M20/v0.2.0/QA_REPORT.md`. Feedback loop cerrado satisfactoriamente.
+

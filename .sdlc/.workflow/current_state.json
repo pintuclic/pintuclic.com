@@ -39,8 +39,9 @@
       "tipo": "SOLICITUD_DE_CORRECCION",
       "descripcion": "QA_REPORT.md de M20 v0.2.0, seccion 3, fila HU-SEG-02: consigna la cookie de sesion como SameSite=Lax cuando el valor implementado es Strict, fijado con z.literal en el contrato. Bloque completo en el WORKLOG de 05_qa_security_tester, conforme a HANDOFF_PROTOCOL.md 2.1.",
       "responsable": "05_qa_security_tester",
-      "estado": "ABIERTA",
-      "impacto": "No bloquea el avance. Registra una defensa anti-CSRF mas debil que la real en un reporte de seguridad."
+      "estado": "RESUELTA",
+      "resolucion": "Corregido a SameSite=Strict en QA_REPORT.md tras verificacion del contrato Zod y cookieSesion.ts. Feedback loop cerrado.",
+      "impacto": "Resuelto. El informe de seguridad refleja con exactitud la defensa anti-CSRF estricta implementada."
     }
   ],
   "modulos_registrados": [
