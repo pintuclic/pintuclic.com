@@ -92,22 +92,28 @@ export const CODIGOS_ERROR_CUENTAS = {
  * 3. SCHEMAS DE FORMULARIOS: HU-CUE-01 REGISTRO B2C Y ACTIVACIÓN
  * ─────────────────────────────────────────────────────────────────────────── */
 
-export const registroClienteFormSchema = z
-  .object({
-    nombre: nombreSchema,
-    correo: correoSchema,
-    telefono: telefonoSchema,
-    contrasena: contrasenaSchema,
-    confirmarContrasena: z.string().min(1, 'Debe confirmar su contraseña'),
-  })
-  .refine((data) => data.contrasena === data.confirmarContrasena, {
-    message: 'Las contraseñas no coinciden',
-    path: ['confirmarContrasena'],
+/**
+ * Aceptación de términos (mockup de registro). Decisión del Director (2026-10-22):
+ * se valida solo en el cliente; el backend aún no registra el consentimiento.
+ */
+export const aceptaTerminosSchema = z
+  .boolean()
+  .refine((acepta) => acepta, {
+    message: 'Debes aceptar los Términos y Condiciones y la Política de Tratamiento de Datos',
   });
+
+/** Registro de persona natural (mockup pág. 3): una sola contraseña, con mostrar/ocultar. */
+export const registroClienteFormSchema = z.object({
+  nombre: nombreSchema,
+  correo: correoSchema,
+  telefono: telefonoSchema,
+  contrasena: contrasenaSchema,
+  aceptaTerminos: aceptaTerminosSchema,
+});
 export type RegistroClienteFormData = z.infer<typeof registroClienteFormSchema>;
 
+/** Paso 2 del registro: el correo y el identificador de verificación vienen del paso 1. */
 export const verificarCodigoOtpFormSchema = z.object({
-  correo: correoSchema,
   codigo: codigoOtpSchema,
 });
 export type VerificarCodigoOtpFormData = z.infer<typeof verificarCodigoOtpFormSchema>;
@@ -132,20 +138,16 @@ export type CompletarRegistroGoogleFormData = z.infer<typeof completarRegistroGo
  * 5. SCHEMAS DE FORMULARIOS: HU-CUE-03 REGISTRO EMPRESA B2B
  * ─────────────────────────────────────────────────────────────────────────── */
 
-export const registroEmpresaFormSchema = z
-  .object({
-    nombreEmpresa: nombreSchema,
-    nit: nitSchema,
-    nombreRepresentante: nombreSchema,
-    correoEmpresarial: correoSchema,
-    telefono: telefonoSchema,
-    contrasena: contrasenaSchema,
-    confirmarContrasena: z.string().min(1, 'Debe confirmar su contraseña'),
-  })
-  .refine((data) => data.contrasena === data.confirmarContrasena, {
-    message: 'Las contraseñas no coinciden',
-    path: ['confirmarContrasena'],
-  });
+/** Registro de empresa (mockup pág. 4): sin paso de verificación; lo valida el administrador. */
+export const registroEmpresaFormSchema = z.object({
+  nombreEmpresa: nombreSchema,
+  nombreRepresentante: nombreSchema,
+  correoEmpresarial: correoSchema,
+  telefono: telefonoSchema,
+  nit: nitSchema,
+  contrasena: contrasenaSchema,
+  aceptaTerminos: aceptaTerminosSchema,
+});
 export type RegistroEmpresaFormData = z.infer<typeof registroEmpresaFormSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -242,11 +244,17 @@ export const direccionClienteFormSchema = z.object({
   apartamentoCasa: z.string().trim().max(100).optional(),
   nombreApellido: nombreSchema,
   telefono: telefonoSchema,
-  esPredeterminada: z.boolean().default(false),
+  esPredeterminada: z.boolean(),
   latitud: z.number().min(-90).max(90).optional(),
   longitud: z.number().min(-180).max(180).optional(),
 });
 export type DireccionClienteFormData = z.infer<typeof direccionClienteFormSchema>;
+
+/** Desactivación de la propia cuenta: exige la contraseña actual. */
+export const desactivarCuentaFormSchema = z.object({
+  contrasena: z.string().min(1, 'La contraseña es requerida para confirmar'),
+});
+export type DesactivarCuentaFormData = z.infer<typeof desactivarCuentaFormSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 10. SCHEMAS: HU-CUE-08 RESPUESTA DE PERFIL

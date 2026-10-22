@@ -13,6 +13,8 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
    * para componerlo dentro de otro contenedor (p. ej. el buscador del header).
    */
   appearance?: 'field' | 'bare';
+  /** Control interactivo al final del campo (p. ej. mostrar/ocultar contraseña). Sí recibe clics. */
+  endAdornment?: React.ReactNode;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -26,6 +28,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       rightIcon,
       disabled,
       appearance = 'field',
+      endAdornment,
       className = '',
       ...props
     },
@@ -42,6 +45,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       disabled:bg-neutral-light/70 disabled:text-neutral-medium disabled:cursor-not-allowed
       ${leftIcon ? 'pl-10' : ''}
       ${rightIcon ? 'pr-10' : ''}
+      ${endAdornment ? 'pr-12' : ''}
       ${
         error
           ? 'border-danger focus:border-danger focus:ring-danger/20 text-danger'
@@ -89,6 +93,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               {rightIcon}
             </div>
           )}
+
+          {endAdornment && <div className="absolute right-0.5 flex items-center">{endAdornment}</div>}
         </div>
 
         {error ? (

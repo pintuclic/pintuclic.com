@@ -8,6 +8,8 @@ import { Button } from '../buttons/Button';
 import { IconButton } from '../buttons/IconButton';
 import { Badge } from '../data-display/Badge';
 import { Modal } from '../overlays/Modal';
+import { useAuthStore } from '../../store/authStore';
+import type { UsuarioAutenticado } from '../../types/usuario.type';
 import { formatCOP } from '../../utils/moneda';
 import { CategoriesMegaMenu, type MegaMenuAssistant, type MegaMenuGroup } from './CategoriesMegaMenu';
 import { Container } from './Container';
@@ -31,6 +33,15 @@ export interface HeaderProps {
 
 const FOCO = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50';
 
+/** Con sesión abierta, "Mi cuenta" saluda por el primer nombre y lleva al perfil (M04). */
+export function cuentaDeEncabezado(
+  usuario: Pick<UsuarioAutenticado, 'nombre'> | null,
+  anonima: HeaderProps['account'],
+): HeaderProps['account'] {
+  if (!usuario) return anonima;
+  return { label: usuario.nombre.trim().split(/\s+/)[0] || usuario.nombre, sublabel: 'Mi perfil', href: '/perfil' };
+}
+
 /**
  * Cabecera principal (UI Spec §3.1): logo, botón "Categorías" (abre el mega-menú
  * modal), navegación, acceso a "Mi cuenta" y carrito con contador y monto.
@@ -45,6 +56,8 @@ export function Header({
   cart,
 }: HeaderProps) {
   const pathname = usePathname();
+  const usuario = useAuthStore((s) => s.usuario);
+  const cuenta = cuentaDeEncabezado(usuario, account);
   const [megaAbierto, setMegaAbierto] = useState(false);
   const [movilAbierto, setMovilAbierto] = useState(false);
   const cerrarMega = useCallback(() => setMegaAbierto(false), []);
@@ -116,14 +129,14 @@ export function Header({
 
         <div className="ml-auto flex items-center gap-1 lg:gap-6">
           <Link
-            href={account.href}
-            aria-label={`${account.label}, ${account.sublabel}`}
+            href={cuenta.href}
+            aria-label={`${cuenta.label}, ${cuenta.sublabel}`}
             className={`flex min-h-[44px] items-center gap-2 rounded-btn p-2 ${FOCO}`}
           >
             <User className="h-6 w-6 text-neutral-dark" aria-hidden="true" />
             <span className="hidden flex-col leading-tight lg:flex">
-              <span className="font-title text-sm font-semibold text-neutral-black">{account.label}</span>
-              <span className="text-xs text-neutral-medium">{account.sublabel}</span>
+              <span className="font-title text-sm font-semibold text-neutral-black">{cuenta.label}</span>
+              <span className="text-xs text-neutral-medium">{cuenta.sublabel}</span>
             </span>
           </Link>
 

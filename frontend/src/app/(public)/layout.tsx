@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 import { Footer, Header, Topbar } from '@/core/components';
+import { SesionBootstrap } from '@/modules/m04-cuentas/components/sesion/SesionBootstrap';
 import { footer, header, topbarItems } from './_data/shell.content';
 
 /**
  * Estructura común de las páginas públicas: topbar, cabecera, contenido y pie.
  * Incluye el enlace "Saltar al contenido" para navegación por teclado (WCAG 2.4.1).
+ * `modal` es el slot paralelo `@modal`: login y registro abiertos sobre la página actual.
  */
-export default function PublicLayout({ children }: { children: ReactNode }) {
+export default function PublicLayout({ children, modal }: { children: ReactNode; modal: ReactNode }) {
   return (
     <>
       <a
@@ -21,6 +23,8 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
         {children}
       </main>
       <Footer {...footer} />
+      {modal}
+      <SesionBootstrap />
     </>
   );
 }
