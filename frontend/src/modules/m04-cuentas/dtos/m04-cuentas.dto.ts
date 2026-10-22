@@ -38,11 +38,18 @@ export const nombreSchema = z
   .min(2, 'El nombre debe tener al menos 2 caracteres')
   .max(150, 'El nombre no puede exceder 150 caracteres');
 
+/** Misma normalización que el contrato (RN-CUE-14): sin espacios ni puntos; el guion se conserva. */
+export const normalizarNit = (nit: string): string => nit.replace(/[\s.]/g, '');
+
 export const nitSchema = z
   .string()
-  .trim()
-  .min(5, 'El NIT debe tener al menos 5 caracteres')
-  .max(30, 'El NIT no puede exceder 30 caracteres');
+  .transform(normalizarNit)
+  .pipe(
+    z
+      .string()
+      .min(5, 'El NIT debe tener al menos 5 caracteres')
+      .max(30, 'El NIT no puede exceder 30 caracteres'),
+  );
 
 export const codigoOtpSchema = z
   .string()

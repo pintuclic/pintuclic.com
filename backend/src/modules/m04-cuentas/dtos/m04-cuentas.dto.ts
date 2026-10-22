@@ -37,11 +37,23 @@ export const nombreSchema = z
   .min(2, 'El nombre debe tener al menos 2 caracteres')
   .max(150, 'El nombre no puede exceder 150 caracteres');
 
+/**
+ * RN-CUE-14 / RFC-M04-001: el contrato normaliza el NIT antes de compararlo o
+ * guardarlo. Se quitan espacios y puntos (separadores de miles: "900.555.666-1" y
+ * "900555666-1" son el mismo NIT); el guion del dígito de verificación se conserva
+ * tal cual, porque el formato definitivo lo fija el Product Owner.
+ */
+export const normalizarNit = (nit: string): string => nit.replace(/[\s.]/g, '');
+
 export const nitSchema = z
   .string()
-  .trim()
-  .min(5, 'El NIT debe tener al menos 5 caracteres')
-  .max(30, 'El NIT no puede exceder 30 caracteres');
+  .transform(normalizarNit)
+  .pipe(
+    z
+      .string()
+      .min(5, 'El NIT debe tener al menos 5 caracteres')
+      .max(30, 'El NIT no puede exceder 30 caracteres'),
+  );
 
 export const codigoOtpSchema = z
   .string()
