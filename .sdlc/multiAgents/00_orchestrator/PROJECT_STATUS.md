@@ -58,7 +58,7 @@
 | Módulo | Spec | Contratos Zod | Backend | Frontend | Tests Vitest | QA | Walkthrough |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **M18 — Notificaciones y Comunicaciones** | ✅ | ⚪ | 🟡 | ⚪ | ⚪ | ⚪ | ⚪ |
-| **M04 — Cuentas, Autenticación y Perfil** | ✅ | ✅ | 🟡 | ⚪ | ✅ | 🔴 | ✅ |
+| **M04 — Cuentas, Autenticación y Perfil** | ✅ | ✅ | ✅ | 🟡 | ✅ | 🟢 | ✅ |
 | **M02 — Búsqueda y Descubrimiento** | ✅ | ⚪ | 🟡 | 🟡 | ⚪ | ⚪ | ⚪ |
 
 ### Ola 4 — Intención y Operación

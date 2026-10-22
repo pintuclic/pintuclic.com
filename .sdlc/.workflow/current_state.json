@@ -1,14 +1,14 @@
 {
   "proyecto": "Pintu Clic",
   "dominio": "pintuclic.com",
-  "version_actual": "v0.4.0",
-  "fecha_actualizacion": "2026-10-21",
-  "fase_activa": "FASE_3A_BACKEND",
-  "gate_activo": "GATE_3A_RECHAZADO",
-  "estado": "BLOQUEADO_POR_VETO_QA",
-  "rol_en_turno": "03_backend_engineer",
+  "version_actual": "v0.4.1",
+  "fecha_actualizacion": "2026-10-22",
+  "fase_activa": "FASE_3B_FRONTEND",
+  "gate_activo": "GATE_3A_APROBADO",
+  "estado": "FASE_3B_EN_CURSO",
+  "rol_en_turno": "04_frontend_engineer",
   "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 (Cuentas, Autenticación y Perfil): Auditoría forense de QA completada para el backend v0.4.0. Se activó VETO STOP-THE-LINE por defecto S1 Blocker BUG-M04-01 (Broken Access Control en /admin/empresas/*: ausencia de validación de rol administrativo o permisos). El rol en turno regresa a 03_backend_engineer para remediación obligatoria con blindaje perimetral HTTP 404 opaco y pruebas de seguridad en m04.routes.test.ts.",
+  "nota_de_contexto": "M04 (Cuentas, Autenticación y Perfil): Fase 3A (Backend) remediada en v0.4.1 y certificada al 100% por QA tras re-auditoría forense y code review. Defecto BUG-M04-01 resuelto con guarda requirePermission('empresas.validar'), respuesta opaca 404, atomicidad transaccional y 188/188 tests Vitest pasando (+72 nuevos). Se LEVANTA formalmente el Veto Stop-the-Line. El Frontend Lead Engineer (04_frontend_engineer) queda habilitado para construir las vistas de las 10 HUs de M04 consumiendo la API asegurada.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
@@ -17,9 +17,11 @@
     {
       "tipo": "VETO_STOP_THE_LINE",
       "descripcion": "M04 v0.4.0 backend rechazado por QA tras auditoría forense. Defecto S1 Blocker BUG-M04-01: Broken Access Control y escalada vertical de privilegios en /api/v1/admin/empresas/* (falta validación de actor.tipoSesion === 'admin' o permisos administrativos; clientes ordinarios pueden listar solicitudes corporativas con datos sensibles y dictaminar aprobaciones/rechazos).",
-      "responsable": "03_backend_engineer",
-      "estado": "ACTIVO",
-      "impacto": "Construcción y certificación detenidas hasta la remediación por el Backend Lead Engineer con blindaje HTTP 404 opaco y pruebas de seguridad en m04.routes.test.ts."
+      "responsable": "05_qa_security_tester",
+      "estado": "RESUELTO_Y_LEVANTADO",
+      "resolucion": "Remediado y certificado en v0.4.1 tras re-auditoría forense de QA. Guarda requirePermission('empresas.validar') activa en router, respuesta opaca HTTP 404 para actores no autorizados, atomicidad transaccional con updateMany condicional en prisma.$transaction y 45 tests HTTP en admin-empresas.acceso.test.ts (188/188 tests backend pasando). Veto Stop-the-Line levantado formalmente por 05_qa_security_tester.",
+      "remediacion_entregada": "v0.4.1 (2026-10-21): guarda de router sesión -> requirePermission('empresas.validar') con 404 opaco; nueva suite HTTP admin-empresas.acceso.test.ts (45 pruebas) y suite transaccional (12 pruebas). Walkthrough: docs/walkthroughs/M04/walkthrough_v0.4.1_M04_remediacion_bug_m04_01_backend.md.",
+      "impacto": "Resuelto. Defecto BUG-M04-01 corregido con blindaje perimetral HTTP 404 opaco, exclusión mutua de decisiones y 188 tests pasando. Veto levantado y Gate 3A certificado."
     },
     {
       "tipo": "INCONSISTENCIA_RUTA",
@@ -142,7 +144,7 @@
       "depende_de": [
         "M18"
       ],
-      "estado_sdlc": "Fase 3A (Backend) rechazada por QA en v0.4.0 con Veto Stop-the-Line (BUG-M04-01: Broken Access Control en /admin/empresas). Asignado a 03_backend_engineer para remediación prioritaria."
+      "estado_sdlc": "Fase 3A (Backend) certificada en v0.4.1 tras remediación de BUG-M04-01 y levantamiento de Veto Stop-the-Line (188/188 tests backend, 0 ANY en 102 archivos, tsc/eslint limpios). Fase 3B (Frontend) en curso por 04_frontend_engineer: vistas de HU-CUE-01 a HU-CUE-10."
     },
     {
       "id": "M05",
@@ -588,6 +590,20 @@
       "fecha": "2026-10-21",
       "autor": "05_qa_security_tester",
       "motivo": "VETO STOP-THE-LINE activado por QA en auditoría forense del backend M04 v0.4.0. Detección de defecto S1 Blocker BUG-M04-01 (Broken Function-Level Access Control en /api/v1/admin/empresas/*). Se regresa a Fase 3A asignado a 03_backend_engineer para remediación perimetral y pruebas de seguridad."
+    },
+    {
+      "de": "FASE_3A_BACKEND",
+      "a": "FASE_3A_BACKEND",
+      "fecha": "2026-10-21",
+      "autor": "03_backend_engineer",
+      "motivo": "Remediación v0.4.1 de BUG-M04-01 entregada por instrucción del Director Humano: /admin/empresas/* exige sesión y permiso empresas.validar (404 opaco), 20 pruebas HTTP nuevas, 136/136 backend, tsc/eslint/no-any limpios. El veto no se levanta aquí: se entrega al 05_qa_security_tester para re-auditoría. Declarado cambio de una línea en el archivo compartido app.routes.ts, pendiente de ratificación."
+    },
+    {
+      "de": "FASE_3A_BACKEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-22",
+      "autor": "05_qa_security_tester",
+      "motivo": "Levantamiento formal del Veto Stop-the-Line para M04 tras re-auditoría forense y code review de la versión remediada v0.4.1. Defecto BUG-M04-01 resuelto al 100%, 188/188 tests backend en verde, 0 ANY en 102 archivos, tsc y eslint limpios. Se aprueba Gate 3A y se reanuda la Fase 3B asignada a 04_frontend_engineer."
     }
   ]
 }

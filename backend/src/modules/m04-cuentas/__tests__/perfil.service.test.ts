@@ -47,8 +47,6 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
       vincularIdentidadExterna: vi.fn(),
       buscarCuentaEmpresaPorNit: vi.fn(),
       buscarCuentaEmpresaPorIdUsuario: vi.fn(),
-      crearCuentaEmpresa: vi.fn(),
-      actualizarNitEmpresa: vi.fn(),
     };
 
     codigosRepo = {

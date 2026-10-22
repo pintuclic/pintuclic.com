@@ -27,16 +27,6 @@ export interface CuentasRepository {
   }): Promise<UsuarioIdentidadExterna>;
   buscarCuentaEmpresaPorNit(nit: string): Promise<CuentaEmpresa | null>;
   buscarCuentaEmpresaPorIdUsuario(idUsuario: number): Promise<CuentaEmpresa | null>;
-  crearCuentaEmpresa(datos: {
-    idUsuario: number;
-    nit: string;
-    nombreEmpresa: string;
-    nombreRepresentante: string;
-    correoEmpresarial: string;
-    telefono: string;
-    idSolicitudOrigen?: string | null;
-  }): Promise<CuentaEmpresa>;
-  actualizarNitEmpresa(idUsuario: number, nitNuevo: string): Promise<CuentaEmpresa>;
 }
 
 export class PrismaCuentasRepository implements CuentasRepository {
@@ -171,35 +161,4 @@ export class PrismaCuentasRepository implements CuentasRepository {
     });
   }
 
-  async crearCuentaEmpresa(datos: {
-    idUsuario: number;
-    nit: string;
-    nombreEmpresa: string;
-    nombreRepresentante: string;
-    correoEmpresarial: string;
-    telefono: string;
-    idSolicitudOrigen?: string | null;
-  }): Promise<CuentaEmpresa> {
-    return prisma.cuentaEmpresa.create({
-      data: {
-        idUsuario: datos.idUsuario,
-        nit: datos.nit.trim(),
-        nombreEmpresa: datos.nombreEmpresa.trim(),
-        nombreRepresentante: datos.nombreRepresentante.trim(),
-        correoEmpresarial: datos.correoEmpresarial.trim().toLowerCase(),
-        telefono: datos.telefono.trim(),
-        idSolicitudOrigen: datos.idSolicitudOrigen ?? null,
-      },
-    });
-  }
-
-  async actualizarNitEmpresa(idUsuario: number, nitNuevo: string): Promise<CuentaEmpresa> {
-    return prisma.cuentaEmpresa.update({
-      where: { idUsuario },
-      data: {
-        nit: nitNuevo.trim(),
-        fechaActualizacion: new Date(),
-      },
-    });
-  }
 }

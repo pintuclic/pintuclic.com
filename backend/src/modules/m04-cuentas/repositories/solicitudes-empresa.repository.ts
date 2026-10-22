@@ -1,11 +1,32 @@
-import type {
-  EstadoSolicitudEmpresa,
+import {
   Prisma,
-  SolicitudActualizacionNit,
-  SolicitudEmpresa,
-  TipoSolicitudEmpresa,
+  type EstadoSolicitudEmpresa,
+  type SolicitudActualizacionNit,
+  type SolicitudEmpresa,
+  type TipoSolicitudEmpresa,
 } from '@prisma/client';
 import { prisma } from '../../../core/db/client';
+
+/** Decisión del personal autorizado sobre una solicitud (aprobar o rechazar). */
+export interface DecisionAdministrativa {
+  estado: 'aprobada' | 'rechazada';
+  idAdminRevisor: number;
+  motivoRechazo?: string | null;
+  fechaRevision?: Date;
+}
+
+/**
+ * RNF-CUE-09-01 / RN-CUE-16 — Resultado de una decisión concurrente.
+ *
+ * - `decidida`: esta petición ganó y todos sus efectos quedaron aplicados.
+ * - `ya_decidida`: otra petición decidió antes; no se modificó nada.
+ * - `nit_ocupado`: el NIT pasó a pertenecer a otra cuenta mientras la solicitud
+ *   estaba pendiente; la transacción se revirtió por completo.
+ */
+export type ResultadoDecision<T> =
+  | { resultado: 'decidida'; solicitud: T }
+  | { resultado: 'ya_decidida' }
+  | { resultado: 'nit_ocupado' };
 
 export interface SolicitudesEmpresaRepository {
   crearSolicitud(datos: {
@@ -19,6 +40,7 @@ export interface SolicitudesEmpresaRepository {
   }): Promise<SolicitudEmpresa>;
   buscarPendientePorNit(nit: string): Promise<SolicitudEmpresa | null>;
   buscarPendientePorUsuario(idUsuario: number): Promise<SolicitudEmpresa | null>;
+  buscarUltimaPorUsuario(idUsuario: number): Promise<SolicitudEmpresa | null>;
   buscarPorId(idSolicitud: string): Promise<SolicitudEmpresa | null>;
   listar(filtros?: {
     estado?: EstadoSolicitudEmpresa;
@@ -26,15 +48,15 @@ export interface SolicitudesEmpresaRepository {
     page?: number;
     limit?: number;
   }): Promise<{ items: SolicitudEmpresa[]; total: number }>;
-  dictaminar(
+  /**
+   * Decide una solicitud de forma atómica. Solo prospera si sigue `pendiente`; al
+   * aprobar, la activación, la conversión a tipo `empresa`, la fila 1:1 de
+   * `cuenta_empresa` y la baja del acceso de Google ocurren en UNA transacción.
+   */
+  decidirSolicitud(
     idSolicitud: string,
-    dictamen: {
-      estado: 'aprobada' | 'rechazada';
-      idAdminRevisor: number;
-      motivoRechazo?: string | null;
-      fechaRevision?: Date;
-    },
-  ): Promise<SolicitudEmpresa>;
+    decision: DecisionAdministrativa,
+  ): Promise<ResultadoDecision<SolicitudEmpresa>>;
 
   // Renovación de NIT
   crearSolicitudRenovacionNit(datos: {
@@ -45,21 +67,23 @@ export interface SolicitudesEmpresaRepository {
   }): Promise<SolicitudActualizacionNit>;
   buscarRenovacionPendientePorUsuario(idUsuario: number): Promise<SolicitudActualizacionNit | null>;
   buscarRenovacionPendientePorNit(nitNuevo: string): Promise<SolicitudActualizacionNit | null>;
+  buscarUltimaRenovacionPorUsuario(idUsuario: number): Promise<SolicitudActualizacionNit | null>;
   buscarRenovacionPorId(idSolicitud: string): Promise<SolicitudActualizacionNit | null>;
   listarRenovaciones(filtros?: {
     estado?: EstadoSolicitudEmpresa;
     page?: number;
     limit?: number;
   }): Promise<{ items: SolicitudActualizacionNit[]; total: number }>;
-  dictaminarRenovacionNit(
+  /** Decide una renovación de NIT de forma atómica (misma garantía que `decidirSolicitud`). */
+  decidirRenovacionNit(
     idSolicitud: string,
-    dictamen: {
-      estado: 'aprobada' | 'rechazada';
-      idAdminRevisor: number;
-      motivoRechazo?: string | null;
-      fechaRevision?: Date;
-    },
-  ): Promise<SolicitudActualizacionNit>;
+    decision: DecisionAdministrativa,
+  ): Promise<ResultadoDecision<SolicitudActualizacionNit>>;
+}
+
+/** P2002: violación de restricción única (NIT ya asignado a otra cuenta). */
+function esViolacionDeUnicidad(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
 
 export class PrismaSolicitudesEmpresaRepository implements SolicitudesEmpresaRepository {
@@ -101,6 +125,13 @@ export class PrismaSolicitudesEmpresaRepository implements SolicitudesEmpresaRep
         idUsuario,
         estado: 'pendiente',
       },
+    });
+  }
+
+  async buscarUltimaPorUsuario(idUsuario: number): Promise<SolicitudEmpresa | null> {
+    return prisma.solicitudEmpresa.findFirst({
+      where: { idUsuario },
+      orderBy: { fechaSolicitud: 'desc' },
     });
   }
 
@@ -151,24 +182,66 @@ export class PrismaSolicitudesEmpresaRepository implements SolicitudesEmpresaRep
     return { items, total };
   }
 
-  async dictaminar(
+  async decidirSolicitud(
     idSolicitud: string,
-    dictamen: {
-      estado: 'aprobada' | 'rechazada';
-      idAdminRevisor: number;
-      motivoRechazo?: string | null;
-      fechaRevision?: Date;
-    },
-  ): Promise<SolicitudEmpresa> {
-    return prisma.solicitudEmpresa.update({
-      where: { idSolicitud },
-      data: {
-        estado: dictamen.estado,
-        idAdminRevisor: dictamen.idAdminRevisor,
-        motivoRechazo: dictamen.motivoRechazo ?? null,
-        fechaRevision: dictamen.fechaRevision ?? new Date(),
-      },
-    });
+    decision: DecisionAdministrativa,
+  ): Promise<ResultadoDecision<SolicitudEmpresa>> {
+    const fechaRevision = decision.fechaRevision ?? new Date();
+
+    try {
+      return await prisma.$transaction(async (tx) => {
+        // Actualización condicionada (RN-CUE-16): solo una petición concurrente
+        // encuentra la solicitud en `pendiente`; la otra obtiene 0 filas.
+        const { count } = await tx.solicitudEmpresa.updateMany({
+          where: { idSolicitud, estado: 'pendiente' },
+          data: {
+            estado: decision.estado,
+            idAdminRevisor: decision.idAdminRevisor,
+            motivoRechazo: decision.motivoRechazo ?? null,
+            fechaRevision,
+          },
+        });
+        if (count === 0) {
+          return { resultado: 'ya_decidida' as const };
+        }
+
+        const solicitud = await tx.solicitudEmpresa.findUniqueOrThrow({ where: { idSolicitud } });
+
+        if (decision.estado === 'aprobada') {
+          // RN-CUE-15: solo la aprobación concede condiciones de empresa. El tipo se
+          // convierte sobre la MISMA cuenta (RF-CUE-08-03); no se crea otra.
+          await tx.usuario.update({
+            where: { idUsuario: solicitud.idUsuario },
+            data: { estado: 'activo', tipo: 'empresa' },
+          });
+          // ADR-010 / RFC-M04-001 C-1: fila 1:1 en cuenta_empresa.
+          await tx.cuentaEmpresa.create({
+            data: {
+              idUsuario: solicitud.idUsuario,
+              nit: solicitud.nit.trim(),
+              nombreEmpresa: solicitud.nombreEmpresa.trim(),
+              nombreRepresentante: solicitud.nombreRepresentante.trim(),
+              correoEmpresarial: solicitud.correoEmpresarial.trim().toLowerCase(),
+              telefono: solicitud.telefono.trim(),
+              idSolicitudOrigen: solicitud.idSolicitud,
+            },
+          });
+          // DP-12: una cuenta empresa no tiene acceso con Google.
+          await tx.usuarioIdentidadExterna.deleteMany({
+            where: { idUsuario: solicitud.idUsuario },
+          });
+        }
+
+        return { resultado: 'decidida' as const, solicitud };
+      });
+    } catch (error) {
+      // El NIT se asignó a otra cuenta mientras esta solicitud esperaba: la
+      // transacción ya se revirtió, la solicitud sigue `pendiente`.
+      if (esViolacionDeUnicidad(error)) {
+        return { resultado: 'nit_ocupado' };
+      }
+      throw error;
+    }
   }
 
   // Renovación de NIT
@@ -204,6 +277,13 @@ export class PrismaSolicitudesEmpresaRepository implements SolicitudesEmpresaRep
         nitNuevo: nitNuevo.trim(),
         estado: 'pendiente',
       },
+    });
+  }
+
+  async buscarUltimaRenovacionPorUsuario(idUsuario: number): Promise<SolicitudActualizacionNit | null> {
+    return prisma.solicitudActualizacionNit.findFirst({
+      where: { idUsuario },
+      orderBy: { fechaSolicitud: 'desc' },
     });
   }
 
@@ -252,23 +332,46 @@ export class PrismaSolicitudesEmpresaRepository implements SolicitudesEmpresaRep
     return { items, total };
   }
 
-  async dictaminarRenovacionNit(
+  async decidirRenovacionNit(
     idSolicitud: string,
-    dictamen: {
-      estado: 'aprobada' | 'rechazada';
-      idAdminRevisor: number;
-      motivoRechazo?: string | null;
-      fechaRevision?: Date;
-    },
-  ): Promise<SolicitudActualizacionNit> {
-    return prisma.solicitudActualizacionNit.update({
-      where: { idSolicitud },
-      data: {
-        estado: dictamen.estado,
-        idAdminRevisor: dictamen.idAdminRevisor,
-        motivoRechazo: dictamen.motivoRechazo ?? null,
-        fechaRevision: dictamen.fechaRevision ?? new Date(),
-      },
-    });
+    decision: DecisionAdministrativa,
+  ): Promise<ResultadoDecision<SolicitudActualizacionNit>> {
+    const fechaRevision = decision.fechaRevision ?? new Date();
+
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const { count } = await tx.solicitudActualizacionNit.updateMany({
+          where: { idSolicitud, estado: 'pendiente' },
+          data: {
+            estado: decision.estado,
+            idAdminRevisor: decision.idAdminRevisor,
+            motivoRechazo: decision.motivoRechazo ?? null,
+            fechaRevision,
+          },
+        });
+        if (count === 0) {
+          return { resultado: 'ya_decidida' as const };
+        }
+
+        const solicitud = await tx.solicitudActualizacionNit.findUniqueOrThrow({
+          where: { idSolicitud },
+        });
+
+        if (decision.estado === 'aprobada') {
+          // CA-CUE-09-05: el NIT vigente cambia solo con la aprobación.
+          await tx.cuentaEmpresa.update({
+            where: { idUsuario: solicitud.idUsuario },
+            data: { nit: solicitud.nitNuevo.trim(), fechaActualizacion: new Date() },
+          });
+        }
+
+        return { resultado: 'decidida' as const, solicitud };
+      });
+    } catch (error) {
+      if (esViolacionDeUnicidad(error)) {
+        return { resultado: 'nit_ocupado' };
+      }
+      throw error;
+    }
   }
 }

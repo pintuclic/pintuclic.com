@@ -5,6 +5,7 @@ import {
   crearDireccionRequestSchema,
 } from '../dtos/m04-cuentas.dto';
 import { DireccionesError, type DireccionesService } from '../services/direcciones.service';
+import { leerParamUuid } from './parametros';
 
 export class DireccionesController {
   constructor(private readonly direccionesService: DireccionesService) {}
@@ -73,13 +74,9 @@ export class DireccionesController {
       return;
     }
 
-    const paramId = req.params.idDireccion;
-    const idDireccion = Array.isArray(paramId) ? paramId[0] : paramId;
-    if (!idDireccion) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'DATOS_INVALIDOS', message: 'Identificador de dirección requerido.' },
-      });
+    const idDireccion = leerParamUuid(req, 'idDireccion');
+    if (idDireccion === null) {
+      responderRecursoNoDisponible(res);
       return;
     }
 
@@ -121,13 +118,9 @@ export class DireccionesController {
       return;
     }
 
-    const paramId = req.params.idDireccion;
-    const idDireccion = Array.isArray(paramId) ? paramId[0] : paramId;
-    if (!idDireccion) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'DATOS_INVALIDOS', message: 'Identificador de dirección requerido.' },
-      });
+    const idDireccion = leerParamUuid(req, 'idDireccion');
+    if (idDireccion === null) {
+      responderRecursoNoDisponible(res);
       return;
     }
 
@@ -157,13 +150,9 @@ export class DireccionesController {
       return;
     }
 
-    const paramId = req.params.idDireccion;
-    const idDireccion = Array.isArray(paramId) ? paramId[0] : paramId;
-    if (!idDireccion) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'DATOS_INVALIDOS', message: 'Identificador de dirección requerido.' },
-      });
+    const idDireccion = leerParamUuid(req, 'idDireccion');
+    if (idDireccion === null) {
+      responderRecursoNoDisponible(res);
       return;
     }
 

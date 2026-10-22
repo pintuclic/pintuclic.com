@@ -6,6 +6,29 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [v0.4.1] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🛡️ **Remediación de `BUG-M04-01` (S1 Blocker) — control de acceso en `/admin/empresas/*`.** Las rutas administrativas de empresas ahora exigen sesión válida y el permiso atómico `empresas.validar`, evaluado en servidor en cada petición; sin él responden el 404 opaco de M20.
+- **✅ Estado de certificación:** re-auditado y certificado formalmente por el QA Lead & Security Compliance Director en v0.4.1 tras resolución comprobada de `BUG-M04-01`. Veto Stop-the-Line levantado formalmente. Gate 3A (Backend) aprobado al 100%. Reporte oficial: `.sdlc/docs/qa/M04/v0.4.1/QA_REPORT.md`.
+
+### Módulo M04 — Cuentas, Autenticación y Perfil (Backend)
+- **Control de acceso (`HU-CUE-09` E2, `HU-ADM-03`):** guarda a nivel de router (`sesión → requirePermission('empresas.validar')`), protegida por omisión. `construirModuloM04` exige ahora el `AutorizacionService`; no se puede montar sin autorización administrativa.
+- **Por qué no `tipoSesion === 'admin'`:** el login concede ese tipo a todo usuario con rol, empleados incluidos; solo el permiso atómico impide que un colaborador sin `empresas.validar` dictamine.
+- **Raíz de composición:** `app.routes.ts` inyecta `m17.autorizacionService` (cambio de una línea en archivo compartido, por instrucción expresa del Director Humano; pendiente de su ratificación).
+
+#### Saneamiento del flujo de dictamen (defectos hallados al analizar `HU-CUE-09` / `HU-CUE-10`)
+- **Decisión atómica y transaccional (`RNF-CUE-09-01`, `ADR-010`):** `UPDATE ... WHERE estado = 'pendiente'`; la aprobación (activar cuenta, convertir a tipo `empresa`, crear `cuenta_empresa`, retirar Google) ocurre en **una** transacción que se revierte ante un conflicto de NIT. Antes eran escrituras sueltas y dos administradores simultáneos podían decidir ambos.
+- **Cuenta empresa correcta (`RN-CUE-15`, `HU-CUE-09` E8/E10):** el registro de empresa ya no nace como `empresa`; solo la aprobación convierte la cuenta (sobre la misma) y desactiva el acceso de Google.
+- **Códigos y reglas:** decisión repetida → `409 SOLICITUD_YA_DECIDIDA`; motivo de rechazo obligatorio solo en registros (`RN-CUE-17`).
+- **Identificadores mal formados** ya no provocan 500: responden el 404 opaco (solicitudes, renovaciones, documentos y direcciones).
+- **Endpoints nuevos:** `GET /cuentas/empresas/solicitudes/mias` (estado de solicitudes propias, `HU-CUE-03` E6 / `HU-CUE-10` E3), `GET /admin/empresas/renovaciones` y `/:id`, y `GET /admin/empresas/documentos/:id` (descarga del RUT con adjunto, `nosniff`, `no-store` y verificación SHA-256; `HU-CUE-09` E14).
+- **Pruebas y verificación:** 20/20 suites, **188/188 tests** (+72); `tsc` 0 errores; ESLint 0/0; 0 `any` en 102 archivos. Pruebas de mutación: la guarda de permiso, la condición `pendiente`, la conversión a `empresa` y la baja de Google fueron sabotadas una a una y cada mutante fue detectado.
+- **Límite de lo verificado:** la exclusión mutua real entre dos conexiones concurrentes requiere PostgreSQL y queda para la prueba de integración del Gate 4.
+- **Elevado para decisión (no se tocó):** el cuerpo JSON global de 100 kb impide subir un RUT de hasta 5 MB (`HU-CUE-10` E5; bloquea la renovación de punta a punta), catálogo de códigos de error divergente entre contrato y HU, motivo opcional en ascensos/renovaciones frente al DTO firmado, verificación de correo del registro de empresa, notificaciones de renovación de NIT y auditoría de decisiones. Detalle en el walkthrough §8.
+- **Errata:** el walkthrough `v0.4.0` §4.2 afirmaba una comprobación de permisos inexistente; corregido en el propio documento. Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.4.1_M04_remediacion_bug_m04_01_backend.md`.
+
+---
+
 ## [v0.4.0] - 2026-10-21
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🔐 **Implementación Backend completa de Cuentas, Autenticación y Perfil (M04).** Endpoints REST canónicos bajo `/cuentas` y `/admin/empresas`, servicios hexagonales desacoplados, autenticación con OTP, federación Google Identity, señuelos anti-fuerza bruta, libreta de direcciones y flujo B2B corporativo con custodia de RUT.

@@ -119,3 +119,33 @@ export interface EntidadUsuarioIdentidadExterna {
   correoProveedor: string | null;
   fechaVinculacion: Date;
 }
+
+/**
+ * Vista que el cliente tiene de SUS solicitudes (HU-CUE-03 E6, HU-CUE-10 E3).
+ * Contrato de salida mínimo: sin revisor, sin correo y sin contenido de documentos.
+ */
+export type EstadoSolicitudVisible = 'pendiente' | 'aprobada' | 'rechazada';
+
+export interface EstadoSolicitudEmpresaPropia {
+  idSolicitud: string;
+  tipoSolicitud: 'registro' | 'ascenso_particular';
+  estado: EstadoSolicitudVisible;
+  motivoRechazo: string | null;
+  fechaSolicitud: Date;
+  fechaRevision: Date | null;
+}
+
+export interface EstadoRenovacionNitPropia {
+  idSolicitud: string;
+  nitVigente: string;
+  nitSolicitado: string;
+  estado: EstadoSolicitudVisible;
+  motivoRechazo: string | null;
+  fechaSolicitud: Date;
+  fechaRevision: Date | null;
+}
+
+export interface MisSolicitudesEmpresa {
+  solicitudEmpresa: EstadoSolicitudEmpresaPropia | null;
+  renovacionNit: EstadoRenovacionNitPropia | null;
+}

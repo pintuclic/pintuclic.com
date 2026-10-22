@@ -293,3 +293,45 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 - **Reporte Oficial:** `.sdlc/docs/qa/M04/v0.4.0/QA_REPORT.md`.
 - **Acción SDLC:** En virtud del Mandato #2 (Prohibición estricta de autocorrección por QA), se prohíbe a QA modificar el código de producción. Se transfiere el rol a `03_backend_engineer` para remediación prioritaria de `BUG-M04-01`, blindaje de rutas con HTTP 404 opaco ante clientes ordinarios y adición de tests de seguridad en `m04.routes.test.ts`.
 
+---
+
+### [2026-10-22 00:15] — 🟢 RE-AUDITORÍA FORENSE, CODE REVIEW Y LEVANTAMIENTO DE VETO — M04 (v0.4.1)
+
+> **Insumo:** `docs/walkthroughs/M04/walkthrough_v0.4.1_M04_remediacion_bug_m04_01_backend.md`  
+> **Auditor:** QA Lead & Security Compliance Director (`05_qa_security_tester`)  
+> **Naturaleza:** Re-auditoría forense, code review e inspección `/security-review` de remediación `v0.4.1`.
+
+#### 1. Resultados de Ejecución Real y Batería Automatizada
+- **Vitest Backend:** **188/188 tests PASS** (20 suites, +72 tests respecto a v0.4.0).
+- **Vitest Frontend:** **57/57 tests PASS** (9 suites, regresión cero).
+- **Compilación TypeScript (`tsc --noEmit`):** **0 errores** en Backend y Frontend.
+- **Linter Backend (`npm run lint`):** **0 errores, 0 warnings**.
+- **Auditoría AST Cero ANY (`npm run check:no-any`):** **102 archivos auditados en `backend/src`, 0 usos de ANY (PASS)**.
+- **Validación de Contratos Zod (`node .sdlc/tooling/validate-contracts.mjs`):** **16/16 checks PASS**.
+- **Auditorías de Gobernanza:**
+  - `node .sdlc/tooling/audit-core-kit.mjs`: **0 violaciones** (13 archivos conformes).
+  - `node .sdlc/tooling/audit-zod-chains.mjs`: **0 anti-patrones** (17 archivos conformes).
+  - `node .sdlc/tooling/audit-a11y.mjs`: **0 violaciones WCAG 2.1 AA** (28 archivos conformes).
+
+#### 2. Validación de Defectos y Saneamiento Transaccional
+1. **`BUG-M04-01` (Broken Access Control) RESUELTO:**
+   - Guarda `requirePermission(autorizacion, 'empresas.validar')` montada a nivel de router en `m04.routes.ts`.
+   - Evaluación en caliente contra base de datos vía `AutorizacionService` (M20/M17).
+   - Respuesta opaca institucional HTTP 404 (`RESPUESTA_RECURSO_NO_DISPONIBLE`) ante actores no autorizados sin filtrar rutas ni nombres de permisos.
+   - Batería de 45 pruebas HTTP reales en `admin-empresas.acceso.test.ts` verificando denegación a clientes y colaboradores sin permiso.
+2. **Atomicidad y Optimistic Concurrency:**
+   - Actualización condicionada `updateMany` (`where: { estado: 'pendiente' }`) en transacción `prisma.$transaction`.
+   - 409 `SOLICITUD_YA_DECIDIDA` ante condiciones de carrera (`RNF-CUE-09-01`).
+   - Reversión atómica y 409 `NIT_YA_REGISTRADO` ante colisión de NIT.
+3. **Hardening Anti-Crash y Custodia de Archivos:**
+   - `leerParamUuid` neutraliza excepciones 500 en Prisma ante UUIDs mal formados.
+   - Anti-IDOR en `/solicitudes/mias` tomando identidad estrictamente de sesión.
+   - Descarga segura de RUT con `Content-Disposition` sanitizada, `nosniff`, `no-store` y verificación de integridad SHA-256.
+
+#### 3. Dictamen Final
+- **Veredicto Gate 3A:** 🟢 **APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA Y DE SEGURIDAD**.
+- **Veto Stop-the-Line:** **FORMALMENTE LEVANTADO**.
+- **Reporte Oficial:** `.sdlc/docs/qa/M04/v0.4.1/QA_REPORT.md`.
+- **Acción:** M04 Backend queda certificado. Se habilita formalmente la Fase 3B para el Frontend Lead Engineer (`04_frontend_engineer`).
+
+

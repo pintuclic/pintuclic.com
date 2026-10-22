@@ -51,8 +51,6 @@ describe('RecuperacionPasswordService (HU-CUE-05)', () => {
       vincularIdentidadExterna: vi.fn(),
       buscarCuentaEmpresaPorNit: vi.fn(),
       buscarCuentaEmpresaPorIdUsuario: vi.fn(),
-      crearCuentaEmpresa: vi.fn(),
-      actualizarNitEmpresa: vi.fn(),
     };
 
     codigosRepo = {

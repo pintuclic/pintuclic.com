@@ -208,3 +208,39 @@ Gate 2 de M04 firmado por el Director Humano ('confirmo'). Aprobada formalmente 
 - `npm run test:contracts`: ✅ 16/16 validaciones exitosas.
 - **Walkthrough oficial:** `docs/walkthroughs/M04/walkthrough_v0.4.0_M04_cuentas_autenticacion_backend.md`.
 - **Estado de la entrega:** Fase 3A finalizada al 100%. Módulo preparado para revisión técnica / inicio de Fase 3B (Frontend).
+
+---
+
+## 2026-10-21 — M04 · Remediación de BUG-M04-01 (Veto Stop-the-Line del QA)
+
+**Rol:** Backend Lead Engineer · **Sello:** ✅ Firmado en turno propio · **Fase:** FASE_3A_BACKEND (reabierta por el QA) · **Versión:** v0.4.1
+
+### Contexto de Entrada
+El QA rechazó `v0.4.0` con el defecto S1 `BUG-M04-01`: `/api/v1/admin/empresas/*` solo tenía `authMiddleware`, así que cualquier cliente con sesión podía listar, aprobar y rechazar solicitudes de empresa (OWASP A01 / CWE-285). Informe: `.sdlc/docs/qa/M04/v0.4.0/QA_REPORT.md`.
+
+### Decisión técnica
+El remedio mínimo del informe (`tipoSesion === 'admin'`) es insuficiente: el login concede sesión `admin` a **todo** usuario con rol, empleados incluidos, de modo que un colaborador sin `empresas.validar` seguiría pudiendo dictaminar (incumple `HU-CUE-09` E2 y `HU-ADM-03`). Se aplicó la opción que el informe contempla: `requirePermission(autorizacion, 'empresas.validar')` de M20, con respuesta 404 opaca (`RN-SEG-08` / ADR-003).
+
+### Cambios
+- **Subrol 01 · API Gateway & Security:** guarda a nivel de `adminEmpresasRouter.use(authMiddleware, requirePermission(...))` (protegido por omisión). `construirModuloM04` exige ahora el `AutorizacionService` (falla cerrada).
+- **Archivo compartido (Directiva #3):** `backend/src/app.routes.ts`, una línea, inyecta `m17.autorizacionService`. Ejecutado por instrucción expresa del Director Humano; pendiente de su ratificación.
+- **Subrol 04 · TDD:** nueva suite `admin-empresas.acceso.test.ts` (20 pruebas HTTP reales) y actualización de `m04.routes.test.ts` a la nueva firma.
+
+### Saneamiento del flujo de dictamen (segunda parte de la entrega)
+Por instrucción del Director Humano ("dejar el backend completamente sano") se analizó el flujo de `HU-CUE-09`/`HU-CUE-10` y se corrigieron los defectos que la suite verde no había detectado:
+- **Subrol 03 · Data Layer:** `decidirSolicitud` y `decidirRenovacionNit` transaccionales y atómicos (`updateMany ... WHERE estado='pendiente'`; `P2002` → `nit_ocupado` con reversión). La aprobación activa la cuenta, la convierte a `empresa`, crea `cuenta_empresa` y retira Google en una sola transacción. Retirados `crearCuentaEmpresa`/`actualizarNitEmpresa` (caminos sin transacción).
+- **Subrol 02 · Domain:** el registro de empresa nace `normal` (`RN-CUE-15`); motivo obligatorio solo en registros (`RN-CUE-17`); `SOLICITUD_YA_DECIDIDA` con 409; `consultarMisSolicitudes` (proyección mínima); `obtenerDocumentoRut` con verificación SHA-256.
+- **Subrol 01 · Gateway:** 4 rutas nuevas (`/cuentas/empresas/solicitudes/mias`, `/admin/empresas/renovaciones` y `/:id`, `/admin/empresas/documentos/:id`); `leerParamUuid` evita el 500 por ids mal formados (también en direcciones); descarga con `attachment`, `nosniff`, `no-store` y nombre construido en servidor.
+- **Subrol 04 · TDD:** nuevas `solicitudes-empresa.repository.test.ts` y ampliación de `admin-empresas.acceso.test.ts`; reescrita `empresas.service.test.ts`.
+
+### Verificación Determinista
+- `npx tsc --noEmit`: ✅ 0 errores · `npm run lint`: ✅ 0/0 · `npm run check:no-any`: ✅ 102 archivos, 0 ANY.
+- `npx vitest run`: ✅ 20/20 suites, **188/188 tests** (+72 sobre v0.4.0).
+- **Pruebas de mutación:** sabotear la guarda de permiso (10/20), la condición `pendiente` (1/12), la conversión a `empresa` (1/12) y la baja de Google (1/12) hace fallar las pruebas; archivos restaurados y verificados idénticos.
+- **Walkthrough:** `docs/walkthroughs/M04/walkthrough_v0.4.1_M04_remediacion_bug_m04_01_backend.md` (errata añadida al `v0.4.0` §4.2).
+
+### Estado y límites
+- El veto **sigue activo**: lo levanta únicamente el QA tras re-auditar (`STAGE_GATES.md` §1.1). Este agente no cierra una incidencia propia.
+- **Elevado sin resolver (requiere archivo compartido, contrato firmado o decisión de producto):** límite JSON de 100 kb en `index.ts` frente a RUT de 5 MB (bloquea la renovación de punta a punta); catálogo de códigos de error divergente; motivo opcional en ascensos/renovaciones frente al DTO firmado; verificación de correo del registro de empresa; notificaciones de renovación de NIT; auditoría de decisiones (`HU-SEG-04`); fallo de notificación posterior al commit; carga de RUT huérfana en registro/ascenso. Detalle en el walkthrough §8.
+- La exclusión mutua real entre conexiones concurrentes solo se demuestra contra PostgreSQL: prueba de integración para el Gate 4.
+- **Entrega al Agente 05 (QA)** para re-auditoría de `BUG-M04-01` y del saneamiento.

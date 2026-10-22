@@ -10,7 +10,7 @@ export function construirAppRoutes(): Router {
   const m20 = construirModuloM20();
   const auth = construirAuthMiddleware(m20.sesionService);
   const m17 = construirModuloM17(m20.sesionService, m20.auditoria);
-  const m04 = construirModuloM04(m20.sesionService);
+  const m04 = construirModuloM04(m20.sesionService, m17.autorizacionService);
 
   // M20: El aviso de privacidad es público; el resto exige sesión vigente.
   router.use('/seguridad/privacidad/aviso-vigente', m20.router);

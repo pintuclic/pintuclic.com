@@ -1,5 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import { construirAuthMiddleware } from '../../core/middlewares/auth.middleware';
+import { requirePermission } from '../../core/middlewares/autorizacion.middleware';
+import type { AutorizacionService } from '../m20-seguridad/services/autorizacion.service';
 import type { SesionService } from '../m20-seguridad/services/sesion.service';
 import { PrismaCuentasRepository } from './repositories/cuentas.repository';
 import { PrismaCodigosVerificacionRepository } from './repositories/codigos-verificacion.repository';
@@ -24,6 +26,13 @@ import type { DateProviderPort } from './interfaces/date-provider.port';
 import type { NotificacionesPort } from './interfaces/notificaciones.port';
 import type { GoogleAuthPort } from './interfaces/google-auth.port';
 
+/**
+ * RN-CUE-18 / HU-ADM-03: decidir sobre solicitudes de empresa exige este permiso
+ * atómico del catálogo de M17 (seed_pintuclic.sql). Se comprueba en servidor en
+ * cada petición; un tipo de sesión `admin` por sí solo no lo concede.
+ */
+export const PERMISO_VALIDAR_EMPRESAS = 'empresas.validar';
+
 export interface ModuloM04Config {
   dateProvider?: DateProviderPort;
   notificaciones?: NotificacionesPort;
@@ -32,6 +41,7 @@ export interface ModuloM04Config {
 
 export function construirModuloM04(
   sesionService: SesionService,
+  autorizacion: AutorizacionService,
   config?: ModuloM04Config,
 ): {
   cuentasRouter: Router;
@@ -130,15 +140,28 @@ export function construirModuloM04(
   cuentasRouter.delete('/direcciones/:idDireccion', authMiddleware, direccionesController.eliminar as RequestHandler);
   cuentasRouter.patch('/direcciones/:idDireccion/predeterminada', authMiddleware, direccionesController.establecerPredeterminada as RequestHandler);
 
+  cuentasRouter.get('/empresas/solicitudes/mias', authMiddleware, empresasController.misSolicitudes as RequestHandler);
   cuentasRouter.post('/empresas/ascenso', authMiddleware, empresasController.solicitarAscenso as RequestHandler);
   cuentasRouter.post('/empresas/renovacion-nit', authMiddleware, empresasController.solicitarRenovacionNit as RequestHandler);
 
   // 2. Router de Administración de Empresas (/admin/empresas)
+  // BUG-M04-01 · RNF-SEG-03-01: la guarda se aplica a nivel de router y no ruta por
+  // ruta, de modo que cualquier endpoint administrativo futuro nazca protegido por
+  // omisión. Sesión válida primero (401) y después permiso en servidor (404 opaco,
+  // idéntico al de un recurso inexistente: RN-SEG-08 / ADR-003).
   const adminEmpresasRouter = Router();
-  adminEmpresasRouter.get('/solicitudes', authMiddleware, empresasController.listarSolicitudes as RequestHandler);
-  adminEmpresasRouter.get('/solicitudes/:idSolicitud', authMiddleware, empresasController.obtenerDetalleSolicitud as RequestHandler);
-  adminEmpresasRouter.post('/solicitudes/:idSolicitud/dictamen', authMiddleware, empresasController.dictaminarSolicitud as RequestHandler);
-  adminEmpresasRouter.post('/renovaciones/:idSolicitud/dictamen', authMiddleware, empresasController.dictaminarRenovacionNit as RequestHandler);
+  adminEmpresasRouter.use(
+    authMiddleware,
+    requirePermission(autorizacion, PERMISO_VALIDAR_EMPRESAS) as RequestHandler,
+  );
+  adminEmpresasRouter.get('/solicitudes', empresasController.listarSolicitudes as RequestHandler);
+  adminEmpresasRouter.get('/solicitudes/:idSolicitud', empresasController.obtenerDetalleSolicitud as RequestHandler);
+  adminEmpresasRouter.post('/solicitudes/:idSolicitud/dictamen', empresasController.dictaminarSolicitud as RequestHandler);
+  adminEmpresasRouter.get('/renovaciones', empresasController.listarRenovaciones as RequestHandler);
+  adminEmpresasRouter.get('/renovaciones/:idSolicitud', empresasController.obtenerDetalleRenovacion as RequestHandler);
+  adminEmpresasRouter.post('/renovaciones/:idSolicitud/dictamen', empresasController.dictaminarRenovacionNit as RequestHandler);
+  // RN-CUE-20: el RUT solo se entrega a quien tiene empresas.validar (guarda del router).
+  adminEmpresasRouter.get('/documentos/:idDocumento', empresasController.descargarDocumento as RequestHandler);
 
   return {
     cuentasRouter,

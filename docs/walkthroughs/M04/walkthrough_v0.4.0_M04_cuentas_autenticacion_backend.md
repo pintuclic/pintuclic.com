@@ -78,6 +78,7 @@ El módulo `m04-cuentas` implementa arquitectura hexagonal desacoplada:
 * 🔒 **M20 - Credenciales (`HU-SEG-01`):** BCrypt con factor de costo 12 (`derivarContrasena`).
 * 🔒 **M20 - Sesiones y Cookies (`HU-SEG-02`):** Cookies de sesión `pc_sid` emitidas con atributos `HttpOnly`, `SameSite=Strict`, `Path=/`, `Secure` (en producción) mediante `ATRIBUTOS_COOKIE_SESION`.
 * 🔒 **M20 - Control de Acceso en Servidor (`HU-ADM-03`):** Middleware de sesión y comprobación de permisos administrativos en `/admin/empresas`.
+  > ⚠️ **ERRATA (2026-10-22).** Esta afirmación era **incorrecta** en `v0.4.0`: las rutas solo llevaban `authMiddleware` y no comprobaban ningún permiso (defecto `BUG-M04-01`, veto del QA). Corregido en [`v0.4.1`](./walkthrough_v0.4.1_M04_remediacion_bug_m04_01_backend.md). Además, el envelope real de las respuestas es `{ success, data, message }` y no `{ ok, datos }` como indica el §3.1.
 * 🔒 **M20 - No Exposición de Datos Sensibles (`HU-SEG-06`):** Respuestas filtradas y tipadas con DTOs de salida; nunca se retornan contraseñas, hashes ni secretos.
 
 ---

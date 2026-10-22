@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { AutorizacionService } from '../../m20-seguridad/services/autorizacion.service';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import { construirModuloM04 } from '../m04.routes';
+
+/** El ensamblaje no ejecuta autorización: solo exige que exista el colaborador. */
+const autorizacion = { exigirPermiso: vi.fn() } as unknown as AutorizacionService;
 
 describe('m04.routes · Ensamblaje y registro de rutas de cuentas y perfiles', () => {
   it('construye el módulo M04 con todas sus dependencias y expone los routers y servicios', () => {
@@ -11,7 +15,7 @@ describe('m04.routes · Ensamblaje y registro de rutas de cuentas y perfiles', (
       invalidarTodas: vi.fn(),
     } as unknown as SesionService;
 
-    const m04 = construirModuloM04(sesionService);
+    const m04 = construirModuloM04(sesionService, autorizacion);
 
     expect(m04.cuentasRouter).toBeDefined();
     expect(m04.adminEmpresasRouter).toBeDefined();
@@ -24,7 +28,7 @@ describe('m04.routes · Ensamblaje y registro de rutas de cuentas y perfiles', (
 
   it('el router de cuentas registra todas las rutas públicas y de perfil requeridas', () => {
     const sesionService = {} as unknown as SesionService;
-    const m04 = construirModuloM04(sesionService);
+    const m04 = construirModuloM04(sesionService, autorizacion);
 
     const paths = m04.cuentasRouter.stack
       .filter((layer) => layer.route)
@@ -58,7 +62,7 @@ describe('m04.routes · Ensamblaje y registro de rutas de cuentas y perfiles', (
 
   it('el router de administración de empresas registra las rutas de gestión de solicitudes', () => {
     const sesionService = {} as unknown as SesionService;
-    const m04 = construirModuloM04(sesionService);
+    const m04 = construirModuloM04(sesionService, autorizacion);
 
     const paths = m04.adminEmpresasRouter.stack
       .filter((layer) => layer.route)

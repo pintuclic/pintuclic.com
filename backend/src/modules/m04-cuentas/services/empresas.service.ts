@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { derivarContrasena } from '../../../core/utils/crypto';
 import type { CuentasRepository } from '../repositories/cuentas.repository';
 import type { SolicitudesEmpresaRepository } from '../repositories/solicitudes-empresa.repository';
 import type { AlmacenDocumentosPort } from '../interfaces/almacen-documentos.port';
+import type { EntidadDocumentoSoporte, MisSolicitudesEmpresa } from '../interfaces/cuentas.interfaces';
 import type { NotificacionesPort } from '../interfaces/notificaciones.port';
 import type {
   DictamenRenovacionNitRequest,
@@ -67,7 +69,9 @@ export class EmpresasService {
       );
     }
 
-    // 4. Crear usuario en estado pendiente y tipo empresa
+    // 4. Crear usuario en estado pendiente. RN-CUE-15 / HU-CUE-03 E5: hasta la
+    //    aprobación la cuenta sigue siendo de tipo `normal`; solo la decisión
+    //    administrativa la convierte en `empresa`.
     const contrasenaHash = await derivarContrasena(input.contrasena);
     let usuario = correoOcupado;
     if (!usuario) {
@@ -77,7 +81,7 @@ export class EmpresasService {
         contrasenaHash,
         telefono: input.telefono,
         estado: 'pendiente',
-        tipo: 'empresa',
+        tipo: 'normal',
       });
     }
 
@@ -156,6 +160,45 @@ export class EmpresasService {
   }
 
   /**
+   * HU-CUE-03 E6 / HU-CUE-10 E3: el cliente consulta el estado de SUS solicitudes.
+   *
+   * Proyección explícita: no se devuelve el revisor, el correo ni ningún dato
+   * interno; el motivo solo viaja si la solicitud fue rechazada (RNF-CUE-10-01).
+   */
+  async consultarMisSolicitudes(idUsuario: number): Promise<MisSolicitudesEmpresa> {
+    const [solicitud, renovacion] = await Promise.all([
+      this.solicitudesRepo.buscarUltimaPorUsuario(idUsuario),
+      this.solicitudesRepo.buscarUltimaRenovacionPorUsuario(idUsuario),
+    ]);
+
+    return {
+      solicitudEmpresa:
+        solicitud === null
+          ? null
+          : {
+              idSolicitud: solicitud.idSolicitud,
+              tipoSolicitud: solicitud.tipoSolicitud,
+              estado: solicitud.estado,
+              motivoRechazo: solicitud.estado === 'rechazada' ? solicitud.motivoRechazo : null,
+              fechaSolicitud: solicitud.fechaSolicitud,
+              fechaRevision: solicitud.fechaRevision,
+            },
+      renovacionNit:
+        renovacion === null
+          ? null
+          : {
+              idSolicitud: renovacion.idSolicitud,
+              nitVigente: renovacion.nitAnterior,
+              nitSolicitado: renovacion.nitNuevo,
+              estado: renovacion.estado,
+              motivoRechazo: renovacion.estado === 'rechazada' ? renovacion.motivoRechazo : null,
+              fechaSolicitud: renovacion.fechaSolicitud,
+              fechaRevision: renovacion.fechaRevision,
+            },
+    };
+  }
+
+  /**
    * HU-CUE-09: Listar solicitudes corporativas para administración
    */
   async listarSolicitudes(query: ListarSolicitudesEmpresaQuery) {
@@ -178,7 +221,52 @@ export class EmpresasService {
   }
 
   /**
+   * HU-CUE-09 (RF-CUE-09-08): vista independiente de renovaciones de NIT.
+   * Nunca incluye el contenido del RUT (RNF-CUE-10-01): solo su metadato.
+   */
+  async listarRenovaciones(query: ListarSolicitudesEmpresaQuery) {
+    return this.solicitudesRepo.listarRenovaciones({
+      ...(query.estado !== undefined ? { estado: query.estado } : {}),
+      ...(query.page !== undefined ? { page: query.page } : {}),
+      ...(query.limit !== undefined ? { limit: query.limit } : {}),
+    });
+  }
+
+  async obtenerDetalleRenovacion(idSolicitud: string) {
+    const renovacion = await this.solicitudesRepo.buscarRenovacionPorId(idSolicitud);
+    if (!renovacion) {
+      throw new EmpresasError('Solicitud de renovación de NIT no encontrada.', 'SOLICITUD_NO_ENCONTRADA', 404);
+    }
+    return renovacion;
+  }
+
+  /**
+   * HU-CUE-09 E14 / RN-CUE-20: entrega del RUT custodiado a personal autorizado.
+   * La autorización (`empresas.validar`) la aplica el router; aquí se garantiza la
+   * integridad: la huella SHA-256 recalculada debe coincidir con la registrada.
+   */
+  async obtenerDocumentoRut(idDocumento: string): Promise<EntidadDocumentoSoporte> {
+    const documento = await this.almacenDocumentos.obtenerDocumentoCompleto(idDocumento);
+    if (documento === null) {
+      throw new EmpresasError('Documento no encontrado.', 'DOCUMENTO_NO_ENCONTRADO', 404);
+    }
+
+    const huella = createHash('sha256').update(documento.contenido).digest('hex');
+    if (huella !== documento.sha256) {
+      throw new EmpresasError(
+        'No fue posible verificar la integridad del documento.',
+        'DOCUMENTO_INTEGRIDAD_NO_VERIFICADA',
+        500,
+      );
+    }
+    return documento;
+  }
+
+  /**
    * HU-CUE-09: Dictamen administrativo de solicitud de empresa (aprobar o rechazar)
+   *
+   * La decisión es atómica en el repositorio (RNF-CUE-09-01): ante dos decisiones
+   * simultáneas prospera exactamente una y la otra recibe SOLICITUD_YA_DECIDIDA.
    */
   async dictaminarSolicitud(
     idSolicitud: string,
@@ -191,16 +279,15 @@ export class EmpresasService {
     }
 
     if (solicitud.estado !== 'pendiente') {
-      throw new EmpresasError(
-        `La solicitud ya fue tramitada previamente con estado '${solicitud.estado}'.`,
-        'SOLICITUD_YA_TRAMITADA',
-        400,
-      );
+      throw this.errorSolicitudYaDecidida();
     }
 
     const estado = dictamen.decision === 'aprobar' ? 'aprobada' : 'rechazada';
 
-    if (estado === 'rechazada' && (!dictamen.motivoRechazo || dictamen.motivoRechazo.trim().length === 0)) {
+    // RN-CUE-17: el motivo es obligatorio solo al rechazar un REGISTRO de empresa;
+    // en ascensos es opcional.
+    const motivoVacio = !dictamen.motivoRechazo || dictamen.motivoRechazo.trim().length === 0;
+    if (estado === 'rechazada' && solicitud.tipoSolicitud === 'registro' && motivoVacio) {
       throw new EmpresasError(
         'El motivo de rechazo es obligatorio para dictámenes negativos.',
         'MOTIVO_RECHAZO_REQUERIDO',
@@ -208,27 +295,21 @@ export class EmpresasService {
       );
     }
 
-    const solicitudActualizada = await this.solicitudesRepo.dictaminar(idSolicitud, {
+    const decision = await this.solicitudesRepo.decidirSolicitud(idSolicitud, {
       estado,
       idAdminRevisor: idAdmin,
       motivoRechazo: dictamen.motivoRechazo ?? null,
       fechaRevision: new Date(),
     });
 
-    if (estado === 'aprobada') {
-      // 1. Activar usuario y fijar tipo a 'empresa'
-      await this.cuentasRepo.actualizarEstado(solicitud.idUsuario, 'activo');
-      // 2. Crear fila 1:1 en cuenta_empresa (ADR-010 / RFC-M04-001 C-1)
-      await this.cuentasRepo.crearCuentaEmpresa({
-        idUsuario: solicitud.idUsuario,
-        nit: solicitud.nit,
-        nombreEmpresa: solicitud.nombreEmpresa,
-        nombreRepresentante: solicitud.nombreRepresentante,
-        correoEmpresarial: solicitud.correoEmpresarial,
-        telefono: solicitud.telefono,
-        idSolicitudOrigen: solicitud.idSolicitud,
-      });
+    if (decision.resultado === 'ya_decidida') {
+      throw this.errorSolicitudYaDecidida();
+    }
+    if (decision.resultado === 'nit_ocupado') {
+      throw this.errorNitOcupadoAlDecidir();
+    }
 
+    if (estado === 'aprobada') {
       await this.notificaciones.notificarDictamenEmpresa(solicitud.correoEmpresarial, 'aprobada');
     } else {
       await this.notificaciones.notificarDictamenEmpresa(
@@ -239,7 +320,7 @@ export class EmpresasService {
     }
 
     return {
-      solicitud: solicitudActualizada,
+      solicitud: decision.solicitud,
       mensaje: `Solicitud corporativa ${estado === 'aprobada' ? 'aprobada y cuenta activada' : 'rechazada'} exitosamente.`,
     };
   }
@@ -301,7 +382,7 @@ export class EmpresasService {
   }
 
   /**
-   * HU-CUE-10: Dictamen de renovación de NIT
+   * HU-CUE-10: Dictamen de renovación de NIT (atómico, igual que el de solicitudes)
    */
   async dictaminarRenovacionNit(
     idSolicitud: string,
@@ -314,26 +395,46 @@ export class EmpresasService {
     }
 
     if (solicitud.estado !== 'pendiente') {
-      throw new EmpresasError('La solicitud de renovación ya fue resuelta previamente.', 'SOLICITUD_YA_TRAMITADA', 400);
+      throw this.errorSolicitudYaDecidida();
     }
 
     const estado = dictamen.decision === 'aprobar' ? 'aprobada' : 'rechazada';
 
-    const solicitudActualizada = await this.solicitudesRepo.dictaminarRenovacionNit(idSolicitud, {
+    const decision = await this.solicitudesRepo.decidirRenovacionNit(idSolicitud, {
       estado,
       idAdminRevisor: idAdmin,
       motivoRechazo: dictamen.motivoRechazo ?? null,
       fechaRevision: new Date(),
     });
 
-    if (estado === 'aprobada') {
-      // Actualizar el NIT vigente en cuenta_empresa manteniendo inmutable el histórico (C-1)
-      await this.cuentasRepo.actualizarNitEmpresa(solicitud.idUsuario, solicitud.nitNuevo);
+    if (decision.resultado === 'ya_decidida') {
+      throw this.errorSolicitudYaDecidida();
+    }
+    if (decision.resultado === 'nit_ocupado') {
+      throw this.errorNitOcupadoAlDecidir();
     }
 
     return {
-      solicitud: solicitudActualizada,
+      solicitud: decision.solicitud,
       mensaje: `Renovación de NIT ${estado === 'aprobada' ? 'aprobada' : 'rechazada'} exitosamente.`,
     };
+  }
+
+  /** CA-CUE-09-04: una solicitud decidida no se vuelve a decidir (409). */
+  private errorSolicitudYaDecidida(): EmpresasError {
+    return new EmpresasError(
+      'La solicitud ya fue decidida y no admite una nueva decisión.',
+      'SOLICITUD_YA_DECIDIDA',
+      409,
+    );
+  }
+
+  /** El NIT quedó en manos de otra cuenta mientras la solicitud esperaba; nada cambió. */
+  private errorNitOcupadoAlDecidir(): EmpresasError {
+    return new EmpresasError(
+      'El NIT pertenece ahora a otra cuenta empresa; la solicitud no se modificó.',
+      'NIT_YA_REGISTRADO',
+      409,
+    );
   }
 }
