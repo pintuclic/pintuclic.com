@@ -9,6 +9,12 @@ RUN printf 'allowBuilds:\n  esbuild: true\n  unrs-resolver: true\n' > pnpm-works
 
 FROM base AS builder
 WORKDIR /app
+# Next fija en el build los rewrites (BACKEND_URL) y las variables NEXT_PUBLIC_*:
+# sin ARG, los "args" de docker-compose se descartan.
+ARG BACKEND_URL=http://backend:3000
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=
+ENV BACKEND_URL=$BACKEND_URL \
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm exec next build

@@ -31,8 +31,9 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+      # El proxy /api -> backend se fija al compilar con el ARG BACKEND_URL
+      # (por omisión http://backend:3000, el servicio de esta red).
     ports: !override
       - "${FRONTEND_PORT:-3001}:3001"
     depends_on: !override
