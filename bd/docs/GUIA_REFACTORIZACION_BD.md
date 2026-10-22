@@ -80,6 +80,7 @@ graph TD
 - Reflejar las nuevas tablas como modelos Prisma, con `@map`/`@@map` al nombre real de la tabla y la columna, los `ENUM` como `enum` de Prisma y las claves foráneas como `@relation`.
 - Regenerar el cliente: `npm run db:generate`.
 - `schema.prisma` es un archivo **compartido** entre módulos: antes de editarlo aplica la Directiva #3 de `AGENTS.md`.
+
 ### Paso 7: Verificación de Compilación
 - Ejecutar en backend:
   ```powershell

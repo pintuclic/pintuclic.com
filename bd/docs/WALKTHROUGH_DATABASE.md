@@ -7,6 +7,7 @@ Este documento registra la evolución histórica del modelo de base de datos de 
 ---
 
 ## 📑 Índice de Versiones
+- [Versión 3.0 (M04: unicidad, hash OTP, anti-fuerza bruta y cambio de clave - 2026-10-21)](#-versión-30-2026-10-21)
 - [Versión 2.9 (M17: tabla de parámetros de configuración general - 2026-10-21)](#-versión-29-2026-10-21)
 - [Versión 2.8 (M04: NIT vigente de la cuenta empresa y RUT adjunto almacenado - 2026-10-21)](#-versión-28-2026-10-21)
 - [Versión 2.7 / v0.3.37.0 (M08: copia histórica de la orden, descuentos por línea y consecutivo - 2026-09-29)](#-versión-27--v03370-2026-09-29)
@@ -18,6 +19,65 @@ Este documento registra la evolución histórica del modelo de base de datos de 
 - [Versión 2.1 (E-Commerce Inmutable, Cotizaciones y Carrito con Variantes)](#-versión-21-2026-09-04)
 - [Versión 2.0 (Página FINAL del ER) - Reestructuración de Catálogo, Variantes y Combos](#-versión-20-2026-09-03)
 - [Versión 1.0 (Esquema Inicial Pre-Final) - Base de 21 Tablas](#-versión-10-2026-09-02)
+
+---
+
+## 📦 Versión 3.0 (2026-10-21)
+
+### 🎯 Resumen Ejecutivo
+Aprobación en bloque del Director Humano sobre los cambios C-2 y C-4 a C-9 de `RFC-M04-001` (`.sdlc/docs/modules/M04/`) para sincronizar DDL y modelo Prisma de M04. Esta entrega complementa la v2.8 (C-1 y C-3) y eleva el esquema a **v4.2 (53 tablas)** con las defensas estructurales de cuentas:
+- **Total Tablas:** Pasa de 52 a 53 tablas (+1: `control_intento_acceso`).
+- **Foco de la versión:** Cuentas, Autenticación y Perfil (M04). Blindaje contra condiciones de carrera, anti-fuerza bruta e indistinguibilidad.
+
+---
+
+### 🛑 1. Tablas Deprecadas / Eliminadas
+Ninguna en esta versión.
+
+---
+
+### ✨ 2. Tablas Nuevas Creadas
+| Nueva Tabla | Clave Primaria (PK) | Claves Foráneas (FK) | Propósito Funcional |
+| :--- | :--- | :--- | :--- |
+| `control_intento_acceso` | `correo VARCHAR(150)` | Ninguna (desacoplada de usuario) | Control anti-fuerza bruta con contador de fallos y timestamp de restricción temporal. Indexada por correo normalizado para garantizar indistinguibilidad anti-enumeración (`RN-CUE-06`, `RN-CUE-07`). |
+
+---
+
+### 🔄 3. Tablas Modificadas y Nuevas Relaciones
+- **`usuario`:** Añade columna `cambio_contrasena_pendiente BOOLEAN NOT NULL DEFAULT false` (C-8, `CA-ADM-01-03`, `RN-CUE-04`).
+- **`codigo_verificacion`:** Columna `codigo` renombrada a `codigo_hash VARCHAR(255)` (C-5, `RN-CUE-03`).
+
+---
+
+### 🔒 4. Restricciones (CONSTRAINTS) y Tipos ENUM Agregados
+- **Nuevos Índices Únicos:**
+  - `uq_usuario_correo_lower`: `ON usuario (lower(correo))` (C-7, `RN-CUE-01`).
+  - `uq_direccion_predeterminada_unica`: `ON direccion_cliente (id_usuario) WHERE es_predeterminada` (C-4, `RN-CUE-21`).
+  - `uq_direccion_no_duplicada`: `ON direccion_cliente (id_usuario, lower(direccion), lower(barrio), lower(coalesce(apartamento_casa, '')))` (C-4).
+  - `uq_solicitud_empresa_nit_pendiente`: `ON solicitud_empresa (nit) WHERE estado = 'pendiente'` (C-2, `RN-CUE-14`).
+  - `uq_solicitud_empresa_usuario_pendiente`: `ON solicitud_empresa (id_usuario) WHERE estado = 'pendiente'` (C-2).
+  - `uq_solicitud_nit_usuario_pendiente`: `ON solicitud_actualizacion_nit (id_usuario) WHERE estado = 'pendiente'` (C-2).
+  - `uq_solicitud_nit_nuevo_pendiente`: `ON solicitud_actualizacion_nit (nit_nuevo) WHERE estado = 'pendiente'` (C-2, `RN-CUE-19`).
+- **Nuevos CHECK:**
+  - `ck_control_intentos_no_negativo`: `intentos_fallidos >= 0` en `control_intento_acceso`.
+- **Catálogo de Permisos (Seed):** Permiso 21 `empresas.validar` añadido al catálogo oficial y asignado a rol 1 (administrador).
+
+---
+
+### ⚡ 5. Nuevos Índices de Rendimiento
+- `CREATE INDEX IF NOT EXISTS idx_control_intento_bloqueo ON control_intento_acceso (bloqueado_hasta);`
+
+---
+
+### 💻 6. Impacto y Acciones Requeridas en Backend y Frontend
+#### Backend (Prisma / Express):
+- Sincronización del modelo Prisma en `backend/prisma/schema.prisma` mapeando `ControlIntentoAcceso`, `CuentaEmpresa`, `DocumentoSoporte`, `DireccionCliente`, `SolicitudEmpresa`, `SolicitudActualizacionNit`, `CodigoVerificacion`, `UsuarioIdentidadExterna`.
+- Contrato Zod `m04-cuentas.contract.ts` y DTOs en `m04-cuentas/dtos/`.
+- Permiso `empresas.validar` registrado en enum `CODIGOS_PERMISO`.
+
+#### Frontend (Vistas / UI):
+- Tipos TypeScript espejados en `frontend/src/modules/m04-cuentas/`.
+- Formularios consumiendo DTOs validados con Zod.
 
 ---
 

@@ -56,6 +56,7 @@ export const CODIGOS_PERMISO = [
   'configuracion.ver',
   'configuracion.editar',
   'estadisticas.consultar',
+  'empresas.validar',
   // Alias legados soportados en seed
   'productos.crear',
   'productos.eliminar',

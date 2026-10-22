@@ -1,8 +1,8 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 2.9 — esquema 4.1 (M17: tabla de parámetros de configuración general). Pendiente de versión de entrega del proyecto  
+> **Versión Actual:** 3.0 — esquema 4.2 (M04 Cuentas: unicidad, hash OTP, anti-fuerza bruta y cambio de clave).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
-> **Total de Tablas:** 52  
+> **Total de Tablas:** 53  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script de Mocks / Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Guía Oficial de Mocks y Datos de Prueba:** [`./GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./GUIA_MOCKS_Y_DATOS_PRUEBA.md)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.0** (esquema 4.2) | 2026-10-21 | `control_intento_acceso` (1) | Ninguna | M04 Cuentas: aprobados en bloque C-2 y C-4 a C-9 de `RFC-M04-001`. Nueva tabla `control_intento_acceso` (Tabla 53) para control anti-fuerza bruta e indisitnguibilidad (`RN-CUE-06/07`). Unicidad parcial en solicitudes pendientes (`RN-CUE-14/19`). Unicidad y predeterminada única en `direccion_cliente` (`RN-CUE-21`). Hash BCrypt en `codigo_verificacion.codigo_hash` (`RN-CUE-03`). Correo insensible a mayúsculas `uq_usuario_correo_lower` (`RN-CUE-01`). Columna `cambio_contrasena_pendiente` en `usuario`. Permiso 21 `empresas.validar` en el catálogo de permisos. Total 53 tablas. | [Ver v3.0](./WALKTHROUGH_DATABASE.md#-versión-30-2026-10-21) |
 | **v2.9** (esquema 4.1) | 2026-10-21 | `parametro_sistema` (1) | Ninguna | M17 Configuración general: el catálogo de parámetros (`HU-ADM-05`, `HU-ADM-07`) pasa de un `Map` en memoria (`ADR-007`) a una tabla con clave única, valor vigente y por defecto en `JSONB`, rango y último autor. **La base impone el tipo y el rango** (`ck_parametro_*`). Seed con las 10 filas del catálogo actual. Nuevos `enum_area_parametro` y `enum_tipo_dato_parametro`. Total 52 tablas. La fecha de última modificación la mantiene un **disparador** (el primero del esquema) y el rango de la complejidad de contraseña queda alineado con el piso de M20 (12–32). **El código de M17 aún lee de memoria** (RFC-M17-001 §5). | [Ver v2.9](./WALKTHROUGH_DATABASE.md#-versión-29-2026-10-21) |
 | **v2.8** (esquema 4.0) | 2026-10-21 | `cuenta_empresa`, `documento_soporte` (2) | Ninguna (se depreca la columna `solicitud_actualizacion_nit.documento_adjunto_url`) | M04 Cuentas: `cuenta_empresa` guarda el NIT **vigente** de cada cuenta empresa aprobada (1:1 con `usuario`, `nit` UNIQUE) y deja las solicitudes como historial inmutable. `documento_soporte` almacena el RUT adjunto (PDF/JPG/PNG, hasta 5 MB, huella SHA-256) y `solicitud_actualizacion_nit` lo referencia por `id_documento`. Decisiones del Director Humano sobre el RFC-M04-001 (C-1 y C-3, opción A). Total 51 tablas. | [Ver v2.8](./WALKTHROUGH_DATABASE.md#-versión-28-2026-10-21) |
 | **v2.7 / v0.3.37.0** (esquema 3.9) | 2026-09-29 | `linea_orden_descuento`, `consecutivo` (2) | Ninguna | M08 Orden de venta: copia histórica completa. `orden` añade solicitud SOL de origen, modo y costo de entrega, base, importe y tasa de IVA (dirección opcional en recogida). `linea_orden` añade color solicitado, precio inicial, referencia a la variante sin FK, entonado y base consumida, y pasa a `ON DELETE RESTRICT`. Descuentos por línea en orden y consecutivo sin huecos para `PC-AAAA-NNNNN`. Nuevo `enum_modo_entrega`. Total 49 tablas. | [Ver v2.7](./WALKTHROUGH_DATABASE.md#-versión-27--v03370-2026-09-29) |

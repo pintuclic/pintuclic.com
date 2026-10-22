@@ -3,12 +3,12 @@
   "dominio": "pintuclic.com",
   "version_actual": "v0.3.3",
   "fecha_actualizacion": "2026-10-21",
-  "fase_activa": "FASE_2_ARQUITECTURA",
-  "gate_activo": "GATE_1_FIRMADO",
-  "estado": "FASE_2_EN_CURSO",
-  "rol_en_turno": "02_software_architect",
+  "fase_activa": "FASE_3A_BACKEND",
+  "gate_activo": "GATE_2_FIRMADO",
+  "estado": "FASE_3A_EN_CURSO",
+  "rol_en_turno": "03_backend_engineer",
   "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 (Cuentas, Autenticacion y Perfil): GATE 1 FIRMADO por el Director Humano el 2026-10-21 (instruccion expresa \"firma el gate 1\", transcrita por el agente), lo que valida las decisiones de producto DP-01..DP-19. RESERVA REGISTRADA: al firmarse, la mesa ATDD seguia sin los dictamenes del Arquitecto y del QA (ver bloqueos: RESERVA_DE_COMPUERTA); la firma no la resolvio. FASE 2 EN CURSO, aun sin contrato Zod ni ADRs. Por instruccion del Director se aplico al DDL (bd/sql) lo aprobado del RFC-M04-001: C-1 (tabla cuenta_empresa) y C-3 opcion A (tabla documento_soporte y solicitud_actualizacion_nit.id_documento), con version de BD 2.8 / esquema 4.0 y validacion contra PostgreSQL 18.6 en instalacion limpia y en actualizacion de una base 3.9. Siguen PENDIENTES de decision los cambios C-2 y C-4..C-9 del RFC. Salto de ola autorizado: M04 antes que M18 y que la Ola 2. M17 quedo remediado y cerrado en v0.3.3 con persistencia relacional en BD (RFC-M17-001), dejando el camino 100% despejado para la Fase 2 de M04.",
+  "nota_de_contexto": "M04 (Cuentas, Autenticación y Perfil): GATE 2 FIRMADO por el Director Humano ('confirmo'). Aprobada formalmente la arquitectura, ADRs 009..012, modelo Prisma 6, DDL v4.2 / BD v3.0 (53 tablas) y contrato Zod rector m04-cuentas.contract.ts. Se inicia formalmente la Fase 3A (Construcción Backend Lead Engineer) para implementar las 10 HUs con TDD, repositorios Prisma, servicios desacoplados y endpoints REST canónicos.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
@@ -60,18 +60,19 @@
     },
     {
       "tipo": "DECISION_PENDIENTE",
-      "descripcion": "RFC-M04-001 (.sdlc/docs/modules/M04/RFC-M04-001_cambios_ddl.md): 9 cambios propuestos al modelo de datos de M04, entre ellos donde vive el NIT vigente de una cuenta empresa (C-1) y el almacenamiento del RUT adjunto (C-3). Redactado por peticion del Director como insumo de Gate 2.",
+      "descripcion": "RFC-M04-001 (.sdlc/docs/modules/M04/RFC-M04-001_cambios_ddl.md): 9 cambios propuestos al modelo de datos de M04 (C-1 a C-9).",
       "responsable": "Director Humano",
-      "estado": "PARCIALMENTE_RESUELTA",
-      "impacto": "Gate 2 de M04 no puede cerrar el modelo de datos sin esta decision. Aplica la Directiva #3 a schema.prisma y al catalogo de permisos de M17.",
-      "resolucion": "El Director Humano aprobo el 2026-10-21 C-1 (cuenta_empresa) y C-3 opcion A (documento_soporte); aplicados a bd/sql con validacion en PostgreSQL 18.6. Quedan pendientes C-2 (unicidad de pendientes) y C-4..C-9 (direcciones, codigos hasheados, control de intentos, correo sin mayusculas, marca de cambio de clave, permiso empresas.validar). Este RFC firmado es el rastro que exigen ADR-006 y ADR-007 para modificar el DDL de bd/."
+      "estado": "RESUELTA",
+      "impacto": "Resuelto. El Director Humano aprobó en bloque los cambios C-1 a C-9 de RFC-M04-001. Implementados en schema_pintuclic.sql v4.2 / BD v3.0 (53 tablas), seed_pintuclic.sql y Prisma schema con tipos generados.",
+      "resolucion": "El Director Humano aprobó en bloque los cambios C-1 a C-9 de RFC-M04-001. Implementados en schema_pintuclic.sql v4.2 / BD v3.0 (53 tablas), seed_pintuclic.sql y Prisma schema con tipos generados."
     },
     {
       "tipo": "RESERVA_DE_COMPUERTA",
-      "descripcion": "Gate 1 de M04 se firmo con la ficha ATDD (.sdlc/docs/modules/M04/01_ATDD_SPEC.md) sin los dictamenes consultivos del Arquitecto y del QA. El PM dejo escrita la pregunta acotada y NO redacto dictamenes en nombre de otros roles. La instruccion de firma del Director no abordo ese punto.",
+      "descripcion": "Gate 1 de M04 se firmó con la ficha ATDD (.sdlc/docs/modules/M04/01_ATDD_SPEC.md) sin los dictámenes consultivos del Arquitecto y del QA.",
       "responsable": "02_software_architect / 05_qa_security_tester",
-      "estado": "PENDIENTE",
-      "impacto": "El item \"Ficha ATDD firmada por los Three Amigos\" de la DoR no esta cumplido. Debe resolverse antes de cerrar Gate 2, con dictamenes emitidos por cada rol en su turno."
+      "estado": "RESUELTA",
+      "impacto": "Resuelto. Dictámenes emitidos por consenso en 01_ATDD_SPEC.md §5 por el Software Architect y QA Security Tester conforme al protocolo de consulta. Mesa consultiva formalmente cerrada y aprobada.",
+      "resolucion": "Dictámenes emitidos por consenso en 01_ATDD_SPEC.md §5 por el Software Architect y QA Security Tester conforme al protocolo de consulta. Mesa consultiva formalmente cerrada y aprobada."
     },
     {
       "tipo": "CAMBIO_PENDIENTE_EN_M17",
@@ -130,11 +131,11 @@
       "spec": true,
       "backend": "estructura",
       "frontend": "estructura",
-      "contratos_zod": false,
+      "contratos_zod": true,
       "depende_de": [
         "M18"
       ],
-      "estado_sdlc": "Gate 1 firmado (2026-10-21) con la mesa ATDD pendiente. Fase 2 en curso: DDL parcial aplicado (C-1, C-3); contrato Zod, ADRs y modelo Prisma pendientes."
+      "estado_sdlc": "Gate 2 firmado (2026-10-21). Fase 3A (Backend) en curso para implementar HU-CUE-01 a HU-CUE-10."
     },
     {
       "id": "M05",
@@ -545,6 +546,20 @@
       "fecha": "2026-10-21",
       "autor": "DanExl24",
       "motivo": "Entrega v0.3.3: Implementación completa de persistencia en PostgreSQL para configuración general M17 según RFC-M17-001. Modelo ParametroSistema en Prisma, PrismaConfiguracionRepository con caché corta de 30s, idAdmin en ConfiguracionPort.actualizar() y retiro de datos hardcodeados en memoria (Directiva #10). Suite backend 71/71 PASS, tsc y eslint limpios."
+    },
+    {
+      "de": "FASE_2_ARQUITECTURA",
+      "a": "GATE_2_ARQUITECTURA",
+      "fecha": "2026-10-21",
+      "autor": "02_software_architect",
+      "motivo": "Fase 2 de M04 completada al 100%. Entrega de especificación técnica, ADR-009 a ADR-012, contrato Zod rector m04-cuentas.contract.ts (16/16 PASS), DTOs y puertos hexagonales desacoplados en backend y frontend, modelo Prisma 6 y DDL v4.2 / BD v3.0 (53 tablas). Dictámenes de mesa Three Amigos emitidos con veredicto favorable unánime. 0 ANY en 154 archivos, tsc y eslint limpios, 71/71 tests backend y 57/57 tests frontend pasando. Queda detenido esperando la firma formal del Director Humano en Gate 2."
+    },
+    {
+      "de": "GATE_2_ARQUITECTURA",
+      "a": "FASE_3A_BACKEND",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Firma formal de Gate 2 para M04 por el Director Humano ('confirmo'). Aprobación de especificación técnica, ADRs 009 a 012, contrato Zod rector m04-cuentas.contract.ts, DTOs y puertos en backend/frontend, modelo Prisma 6 y DDL v4.2 / BD v3.0 (53 tablas). Se autoriza el inicio de la Fase 3A (Construcción Backend Lead Engineer)."
     }
   ]
 }

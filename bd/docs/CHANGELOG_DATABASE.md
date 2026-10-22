@@ -10,6 +10,20 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.0] - 2026-10-21
+### Esquema 4.2 (53 Tablas) - M04 Cuentas: Unicidad, hash OTP, anti-fuerza bruta y cambio de clave
+- **Alcance General:** Aprobación en bloque del Director Humano sobre los cambios C-2 y C-4 a C-9 de `RFC-M04-001` (`.sdlc/docs/modules/M04/`) para sincronizar DDL y modelo Prisma de M04:
+  - **Nueva tabla `control_intento_acceso` (C-6, Tabla 53):** Contador y bloqueo temporal por correo normalizado (`RN-CUE-07`), permitiendo indistinguibilidad y anti-enumeración de cuentas (`RN-CUE-06`). Índice en `bloqueado_hasta`.
+  - **Unicidad de solicitudes pendientes (C-2, `RN-CUE-14`, `RN-CUE-19`):** Índices parciales `uq_solicitud_empresa_nit_pendiente`, `uq_solicitud_empresa_usuario_pendiente`, `uq_solicitud_nit_usuario_pendiente`, `uq_solicitud_nit_nuevo_pendiente`.
+  - **Direcciones: predeterminada única y sin duplicados (C-4, `RN-CUE-21`):** Índice único parcial `uq_direccion_predeterminada_unica` e índice único multi-columna `uq_direccion_no_duplicada` sobre `(id_usuario, lower(direccion), lower(barrio), lower(coalesce(apartamento_casa, '')))`.
+  - **Códigos OTP derivados (C-5, `RN-CUE-03`):** Columna `codigo` renombrada a `codigo_hash VARCHAR(255)` en `codigo_verificacion`. Seed actualizado con hash BCrypt costo 12.
+  - **Correo insensible a mayúsculas (C-7, `RN-CUE-01`):** Índice único funcional `uq_usuario_correo_lower` sobre `usuario (lower(correo))`.
+  - **Marca de cambio forzoso de clave (C-8, `CA-ADM-01-03`, `RN-CUE-04`):** Columna `cambio_contrasena_pendiente BOOLEAN NOT NULL DEFAULT false` en `usuario`.
+  - **Permiso `empresas.validar` (C-9, `DP-09`):** Permiso 21 añadido a `permisos` y asignado al rol 1 (administrador).
+  - 🔗 **Detalle y DDL:** [WALKTHROUGH_DATABASE.md#📦-versión-30-2026-10-21](./WALKTHROUGH_DATABASE.md#-versión-30-2026-10-21)
+
+---
+
 ## [v2.9] - 2026-10-21
 ### Esquema 4.1 (52 Tablas) - M17 Configuración general: tabla de parámetros
 - **Alcance General:** Aprobado por el Director Humano mediante `RFC-M17-001` (`.sdlc/docs/modules/M17/`), que cumple el punto 4 de `ADR-007`:

@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.1 (v4.0 + M17: parametro_sistema con el catálogo de configuración general - RFC-M17-001)
+-- VERSIÓN: 4.2 (v4.1 + M04: RFC-M04-001 C-2 a C-8 - unicidad pendientes, direcciones, hash OTP, control intentos, cambio clave)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 52
+-- TOTAL TABLAS: 53
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -240,14 +240,20 @@ CREATE TABLE IF NOT EXISTS usuario (
     id_rol INT,
     estado enum_estado_usuario NOT NULL DEFAULT 'activo',
     tipo enum_tipo_usuario NOT NULL DEFAULT 'normal',
+    cambio_contrasena_pendiente BOOLEAN NOT NULL DEFAULT false,
     CONSTRAINT fk_usuario_rol FOREIGN KEY (id_rol) 
         REFERENCES rol (id_rol) ON UPDATE CASCADE ON DELETE SET NULL
 );
+
+-- Migración idempotente para bases existentes (RFC-M04-001 C-8 y C-7)
+ALTER TABLE usuario ADD COLUMN IF NOT EXISTS cambio_contrasena_pendiente BOOLEAN NOT NULL DEFAULT false;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_correo_lower ON usuario (lower(correo));
 
 COMMENT ON TABLE usuario IS 'Entidad de usuarios registrados en el sistema';
 COMMENT ON COLUMN usuario.contrasena IS 'Hash criptográfico seguro de la contraseña (BCrypt costo 12)';
 COMMENT ON COLUMN usuario.id_rol IS 'Rol directo asignado al usuario';
 COMMENT ON COLUMN usuario.tipo IS 'Clasificación de cuenta: normal (B2C) o empresa (B2B)';
+COMMENT ON COLUMN usuario.cambio_contrasena_pendiente IS 'Bandera de cambio de clave forzoso en primer acceso de empleado (CA-ADM-01-03, RN-CUE-04, RFC-M04-001 C-8)';
 
 -- Tabla: usuario_rol
 CREATE TABLE IF NOT EXISTS usuario_rol (
@@ -1173,11 +1179,11 @@ COMMENT ON COLUMN usuario_identidad_externa.proveedor IS 'Proveedor de identidad
 COMMENT ON COLUMN usuario_identidad_externa.id_proveedor IS 'Identificador federado único del usuario en el proveedor (sub)';
 
 -- Tabla: codigo_verificacion
--- Códigos OTP efímeros con control de intentos y expiración para activación, reseteo y cambio de correo (M04)
+-- Códigos OTP efímeros derivados criptográficamente con control de intentos y expiración para activación, reseteo y cambio de correo (M04 · HU-CUE-01, HU-CUE-05, HU-CUE-06, RFC-M04-001 C-5)
 CREATE TABLE IF NOT EXISTS codigo_verificacion (
     id_codigo UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     correo VARCHAR(150) NOT NULL,
-    codigo VARCHAR(10) NOT NULL,
+    codigo_hash VARCHAR(255) NOT NULL,
     tipo enum_tipo_codigo_otp NOT NULL,
     expiracion TIMESTAMPTZ NOT NULL,
     intentos INT NOT NULL DEFAULT 0,
@@ -1186,9 +1192,36 @@ CREATE TABLE IF NOT EXISTS codigo_verificacion (
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE codigo_verificacion IS 'Almacén de códigos OTP transaccionales efímeros (HU-CUE-01, HU-CUE-05, HU-CUE-06)';
+-- Migración idempotente para bases existentes (RFC-M04-001 C-5)
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'codigo_verificacion' AND column_name = 'codigo') THEN
+        ALTER TABLE codigo_verificacion RENAME COLUMN codigo TO codigo_hash;
+    END IF;
+END $$;
+ALTER TABLE codigo_verificacion ALTER COLUMN codigo_hash TYPE VARCHAR(255);
+
+COMMENT ON TABLE codigo_verificacion IS 'Almacén de códigos OTP transaccionales efímeros con valor derivado (HU-CUE-01, HU-CUE-05, HU-CUE-06, RFC-M04-001 C-5)';
+COMMENT ON COLUMN codigo_verificacion.codigo_hash IS 'Hash o derivado criptográfico seguro del código OTP o token de recuperación (RN-CUE-03)';
 COMMENT ON COLUMN codigo_verificacion.intentos IS 'Contador de intentos fallidos antes de invalidar el código';
 COMMENT ON COLUMN codigo_verificacion.datos_temporales IS 'Metadatos adicionales asociados al trámite (ej. nuevo_correo, id_usuario)';
+
+-- Tabla: control_intento_acceso
+-- Control de intentos de acceso fallidos y restricción temporal anti-fuerza bruta por correo (M04 · HU-CUE-04, RN-CUE-07, RFC-M04-001 C-6).
+-- Se indexa por correo normalizado (independiente de si la cuenta existe o no) para garantizar indistinguibilidad y anti-enumeración (RN-CUE-06).
+CREATE TABLE IF NOT EXISTS control_intento_acceso (
+    correo VARCHAR(150) PRIMARY KEY,
+    intentos_fallidos INT NOT NULL DEFAULT 0,
+    bloqueado_hasta TIMESTAMPTZ,
+    fecha_ultimo_intento TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_control_intentos_no_negativo CHECK (intentos_fallidos >= 0)
+);
+
+COMMENT ON TABLE control_intento_acceso IS 'Control de intentos de acceso fallidos y bloqueo temporal por correo (HU-CUE-04, RN-CUE-07, RFC-M04-001 C-6)';
+COMMENT ON COLUMN control_intento_acceso.correo IS 'Correo normalizado (minúsculas, trim) sujeto a control anti-fuerza bruta e indistinguibilidad';
+COMMENT ON COLUMN control_intento_acceso.intentos_fallidos IS 'Contador consecutivo de intentos de autenticación erróneos';
+COMMENT ON COLUMN control_intento_acceso.bloqueado_hasta IS 'Timestamp hasta el cual la cuenta está temporalmente restringida (15 min tras 5 intentos)';
+COMMENT ON COLUMN control_intento_acceso.fecha_ultimo_intento IS 'Timestamp del último intento fallido para expiración de ventana y barrido de filas obsoletas';
 
 -- ==============================================================================
 -- 9B. MÓDULO DE BÚSQUEDA — ANALÍTICA (M02 - HU-BUS-06)
@@ -1351,15 +1384,27 @@ CREATE INDEX IF NOT EXISTS idx_consentimiento_aviso ON consentimiento_usuario(id
 CREATE INDEX IF NOT EXISTS idx_supresion_usuario ON solicitud_supresion(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_supresion_estado ON solicitud_supresion(estado);
 
--- Índices en Cuentas, Direcciones y Solicitudes Empresa (M04)
+-- Índices en Cuentas, Direcciones y Solicitudes Empresa (M04 · RFC-M04-001)
 CREATE INDEX IF NOT EXISTS idx_direccion_usuario ON direccion_cliente(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_direccion_predeterminada ON direccion_cliente(id_usuario, es_predeterminada);
+-- C-4: Dirección predeterminada única por usuario y prevención de duplicados (RN-CUE-21)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_predeterminada_unica ON direccion_cliente (id_usuario) WHERE es_predeterminada;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_no_duplicada ON direccion_cliente (id_usuario, lower(direccion), lower(barrio), lower(coalesce(apartamento_casa, '')));
+
 CREATE INDEX IF NOT EXISTS idx_solicitud_empresa_nit ON solicitud_empresa(nit);
 CREATE INDEX IF NOT EXISTS idx_solicitud_empresa_usuario ON solicitud_empresa(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_solicitud_empresa_estado ON solicitud_empresa(estado);
+-- C-2: Unicidad de solicitudes pendientes (RN-CUE-14, RN-CUE-19)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_empresa_nit_pendiente ON solicitud_empresa (nit) WHERE estado = 'pendiente';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_empresa_usuario_pendiente ON solicitud_empresa (id_usuario) WHERE estado = 'pendiente';
+
 CREATE INDEX IF NOT EXISTS idx_solicitud_nit_usuario ON solicitud_actualizacion_nit(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_solicitud_nit_estado ON solicitud_actualizacion_nit(estado);
 CREATE INDEX IF NOT EXISTS idx_solicitud_nit_documento ON solicitud_actualizacion_nit(id_documento);
+-- C-2: Unicidad de solicitudes de actualización de NIT pendientes
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_nit_usuario_pendiente ON solicitud_actualizacion_nit (id_usuario) WHERE estado = 'pendiente';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_solicitud_nit_nuevo_pendiente ON solicitud_actualizacion_nit (nit_nuevo) WHERE estado = 'pendiente';
+
 CREATE INDEX IF NOT EXISTS idx_cuenta_empresa_solicitud ON cuenta_empresa(id_solicitud_origen);
 CREATE INDEX IF NOT EXISTS idx_parametro_sistema_usuario ON parametro_sistema(id_usuario_actualizo);
 CREATE INDEX IF NOT EXISTS idx_identidad_proveedor ON usuario_identidad_externa(proveedor, id_proveedor);
@@ -1367,10 +1412,13 @@ CREATE INDEX IF NOT EXISTS idx_identidad_usuario ON usuario_identidad_externa(id
 CREATE INDEX IF NOT EXISTS idx_codigo_correo_tipo ON codigo_verificacion(correo, tipo);
 CREATE INDEX IF NOT EXISTS idx_codigo_expiracion ON codigo_verificacion(expiracion);
 
+-- C-6: Control de intentos de acceso y bloqueo
+CREATE INDEX IF NOT EXISTS idx_control_intento_bloqueo ON control_intento_acceso (bloqueado_hasta);
+
 -- Índices en Analítica de Búsqueda (M02 - HU-BUS-06): filtro por periodo y agrupación por término
 CREATE INDEX IF NOT EXISTS idx_bsr_fecha ON busqueda_sin_resultado(fecha);
 CREATE INDEX IF NOT EXISTS idx_bsr_termino ON busqueda_sin_resultado(termino);
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (49 TABLAS - v3.9)
+-- FIN DEL SCRIPT DDL (53 TABLAS - v4.2)
 -- ==============================================================================

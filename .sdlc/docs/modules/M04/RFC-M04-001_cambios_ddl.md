@@ -1,6 +1,6 @@
 # 💡 RFC-M04-001 — Cambios Propuestos al Modelo de Datos de M04
 
-> **Estado:** 🟢 **PARCIALMENTE APROBADO Y APLICADO (2026-10-21): C-1 y C-3 (opción A).** 🟡 **C-2 y C-4…C-9 siguen pendientes de decisión.** El DDL de `bd/` está bloqueado sin RFC (`ADR-006`, `ADR-007`): este RFC y la aprobación del Director Humano son el rastro que exige esa regla.
+> **Estado:** 🟢 **TOTALMENTE APROBADO Y APLICADO (2026-10-21): C-1 a C-9.** Aprobado en bloque por el Director Humano. El DDL de `bd/` queda actualizado a versión 4.2 (BD v3.0, 53 tablas). Este RFC y la aprobación del Director Humano son el rastro que exige `ADR-006` y `ADR-007`.
 > **Origen:** petición expresa del Director Humano (2026-10-21) de proponer los cambios de DDL que resuelven las
 > decisiones 4 (almacenamiento del RUT) y 5 (almacenamiento del NIT), más los cambios que se derivan de ellas.
 > **Naturaleza del documento:** este RFC **no es entregable de Gate 1**. La regla de oro #1 del Product Manager le
@@ -238,24 +238,19 @@ INSERT INTO asignacion_permiso (id_rol, id_permiso) VALUES (1, 21) ON CONFLICT (
 Marca una opción por cambio. Si apruebas "en bloque", los que figuran como *recomendados* quedan aprobados y C-3 en su
 opción A.
 
-| Cambio | Resuelve | Mi recomendación | Aprobar | Rechazar | Ajustar |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| **C-1** `cuenta_empresa` | **Decisión 5** (NIT) | ✅ Aprobar | ☑ **Aprobado y aplicado (2026-10-21)** | ☐ | ☐ |
-| **C-2** Unicidad de pendientes | `RN-CUE-14/19` | ✅ Aprobar | ☐ | ☐ | ☐ |
-| **C-3** Almacenamiento del RUT | **Decisión 4** | ✅ **Opción A** (en BD tras un puerto) | ☑ **Opción A, aprobada y aplicada (2026-10-21)** | ☐ | ☐ |
-| **C-4** Direcciones | `RN-CUE-21` | ✅ Aprobar | ☐ | ☐ | ☐ |
-| **C-5** Códigos derivados | `RN-CUE-03` | ✅ Aprobar | ☐ | ☐ | ☐ |
-| **C-6** `control_intento_acceso` | `RN-CUE-07` | ✅ Aprobar | ☐ | ☐ | ☐ |
-| **C-7** Correo sin mayúsculas | `RN-CUE-01` | ✅ Aprobar | ☐ | ☐ | ☐ |
-| **C-8** Marca de cambio de clave | `F-17` | ✅ Aprobar la columna; el cambio en M17 se pide aparte | ☐ | ☐ | ☐ |
-| **C-9** Permiso `empresas.validar` | `DP-09` | ✅ Aprobar | ☐ | ☐ | ☐ |
-
-**Pregunta de decisión para el Director Humano:** ¿apruebas los cambios C-1 a C-9 tal como se recomiendan, o quieres
-decidir alguno por separado? En particular, **C-3** es una decisión de arquitectura con alternativas reales y merece
-tu criterio explícito.
+| Cambio | Resuelve | Mi recomendación | Estado |
+| :--- | :--- | :---: | :---: |
+| **C-1** `cuenta_empresa` | **Decisión 5** (NIT) | ✅ Aprobar | ☑ **Aprobado y aplicado (2026-10-21)** |
+| **C-2** Unicidad de pendientes | `RN-CUE-14/19` | ✅ Aprobar | ☑ **Aprobado y aplicado (2026-10-21)** |
+| **C-3** Almacenamiento del RUT | **Decisión 4** | ✅ **Opción A** (en BD tras un puerto) | ☑ **Opción A, aprobada y aplicada (2026-10-21)** |
+| **C-4** Direcciones | `RN-CUE-21` | ✅ Aprobar | ☑ **Aprobado y aplicado (2026-10-21)** |
+| **C-5** Códigos derivados | `RN-CUE-03` | ✅ Aprobar | ☑ **Aprobado y aplicado (2026-10-21)** |
+| **C-6** `control_intento_acceso` | `RN-CUE-07` | ✅ Aprobar | ☑ **Aprobado y aplicado (2026-10-21)** |
+| **C-7** Correo sin mayúsculas | `RN-CUE-01` | ✅ Aprobar | ☑ **Aprobado y aplicado (2026-10-21)** |
+| **C-8** Marca de cambio de clave | `F-17` | ✅ Aprobar la columna | ☑ **Aprobado y aplicado (2026-10-21)** |
+| **C-9** Permiso `empresas.validar` | `DP-09` | ✅ Aprobar | ☑ **Aprobado y aplicado (2026-10-21)** |
 
 ### Estado de aplicación (2026-10-21)
-- **Aplicados** en `bd/sql/schema_pintuclic.sql` (v4.0) y `seed_pintuclic.sql`: **C-1** y **C-3 opción A**, con la variación señalada en C-3. Documentados como versión **2.8** en `bd/docs/`. Validados contra PostgreSQL 18.6 en instalación limpia y en actualización de una base 3.9.
-- **Interpretación registrada:** la instrucción del Director fue *"crear la tabla cuenta_empresa con sus columnas, opción A"*. Se entendió como C-1 y C-3 opción A (sus decisiones 5 y 4). Si la intención fue solo C-1, C-3 se revierte retirando `documento_soporte` y `id_documento`.
-- **No aplicados, pendientes de decisión:** C-2, C-4, C-5, C-6, C-7, C-8 y C-9.
-- **No tocado:** `backend/prisma/schema.prisma` (archivo compartido, Directiva #3): lo formaliza el Arquitecto en Gate 2.
+- **Totalmente aplicados** en `bd/sql/schema_pintuclic.sql` (v4.2, 53 tablas) y `seed_pintuclic.sql`: C-1 a C-9 en bloque por decisión del Director Humano.
+- **Documentados** como versión **3.0** / esquema 4.2 en `bd/docs/`.
+- **Sincronización:** el modelo Prisma en `backend/prisma/schema.prisma` y los contratos Zod de M04 en `.sdlc/docs/contracts/m04-cuentas.contract.ts` se formalizan en Fase 2 (Gate 2).

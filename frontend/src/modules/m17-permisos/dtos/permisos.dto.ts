@@ -24,6 +24,7 @@ export const CODIGOS_PERMISO = [
   'configuracion.ver',
   'configuracion.editar',
   'estadisticas.consultar',
+  'empresas.validar',
   'productos.crear',
   'productos.eliminar',
   'ordenes.ver',

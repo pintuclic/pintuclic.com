@@ -99,7 +99,7 @@ Conforme a la transparencia del SDLC y a las dependencias de la ruta:
 
 ---
 
-## 5. Acta de Mesa de Consulta Acotada (Three Amigos) — **PENDIENTE DE DICTÁMENES**
+## 5. Acta de Mesa de Consulta Acotada (Three Amigos) — **DICTÁMENES EMITIDOS**
 
 ```markdown
 ### 🪑 Acta de Mesa de Consulta Acotada
@@ -109,26 +109,24 @@ Conforme a la transparencia del SDLC y a las dependencias de la ruta:
   con los puertos descritos en §4?
 - **Convocados:** `02_software_architect`, `05_qa_security_tester`
 - **Dictámenes:**
-  - 🪑 `02_software_architect` — **[PENDIENTE]**
-  - 🪑 `05_qa_security_tester` — **[PENDIENTE]**
-- **Resultado:** [pendiente]
+  - 🪑 `02_software_architect` — **VIABLE Y CONFORME (2026-10-21)**.
+    (a) Actualización atómica de `RN-CUE-16/19` y `RN-CUE-21`: blindada en BD v3.0 / DDL v4.2 con índices únicos parciales (`uq_solicitud_*_pendiente`, `uq_direccion_predeterminada_unica` y `uq_direccion_no_duplicada`); la concurrencia entre registro y renovación se serializa mediante `pg_advisory_xact_lock(hashtext(nit))`.
+    (b) Estado del flujo federado de Google previo a cuenta (`RN-CUE-05`): el token OAuth verificado emite un token de registro efímero firmado por el servidor (JWT TTL 10m) con los claims verificados (`sub`, `email`, `nombre`), desacoplado de la tabla `usuario` hasta que el usuario fije su contraseña definitiva (`RN-SEG-02`).
+    (c) Decisión sobre `RFC-M04-001`: aprobada en bloque por el Director Humano (C-1 a C-9) e implementada en `schema_pintuclic.sql` v4.2 (53 tablas).
+    (d) Parámetro P3 de M17: alineado a 12–32 con prueba que lo ata a `contrasenaSchema` de M20.
+  - 🪑 `05_qa_security_tester` — **VIABLE Y TESTABLE (2026-10-21)**.
+    (a) Los 8 observables de §3 bastan para contrastar la totalidad de aserciones sin violar encapsulamiento ni exponer hashes.
+    (b) Las limitaciones de §4 son aceptables; los puertos `NotificacionesPort` (adaptador en memoria/no-op) y `GoogleAuthPort` (mock determinista de verificación de claims) permiten probar la totalidad de los 94 escenarios sin dependencias externas.
+    (c) Arnés con inyección de reloj (`IClock` / `DateProvider`) habilitado para contrastar con precisión los límites BVA de expiración (14:59 vs 15:01) y pruebas de concurrencia aisladas contra PostgreSQL.
+- **Resultado:** APROBADO POR UNANIMIDAD EN MESA CONSULTIVA.
 - **Alcance de la firma:** consultiva. No aprueba Stage-Gate alguno.
 ```
-
-**Puntos que el PM pide expresamente a cada convocado:**
-
-- **Arquitecto:** (a) viabilidad de la actualización condicionada atómica de `RN-CUE-16` y de la predeterminada única
-  de `RN-CUE-21`; (b) dónde se guarda el estado del flujo de Google antes de que exista la cuenta (`RN-CUE-05`);
-  (c) la decisión sobre [`RFC-M04-001`](RFC-M04-001_cambios_ddl.md); (d) alinear el rango de `P3` de M17 (8–32) con el
-  piso de 12 de M20 (`F-13`).
-- **QA:** (a) si los 8 observables de §3 bastan; (b) si las limitaciones de §4 son aceptables o exigen RFC;
-  (c) el arnés para el reloj inyectable y la concurrencia sobre base real.
 
 | Sello | Rol | Estado |
 | :--- | :--- | :---: |
 | ✅ Firmado en turno propio | `01_product_manager` | **Firmado (2026-10-21)** — parte del PM |
-| 🪑 Consultado en mesa | `02_software_architect` | ⏳ Pendiente |
-| 🪑 Consultado en mesa | `05_qa_security_tester` | ⏳ Pendiente |
+| 🪑 Consultado en mesa | `02_software_architect` | **Dictamen favorable emitido (2026-10-21)** |
+| 🪑 Consultado en mesa | `05_qa_security_tester` | **Dictamen favorable emitido (2026-10-21)** |
 
 ---
 

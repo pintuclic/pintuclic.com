@@ -183,3 +183,50 @@ Instalación limpia y actualización de bases en v4.0 y v3.9, esquema y seed dos
 - Código de M17 que sustituya `AlmacenConfiguracionMemoria` (RFC-M17-001 §5) y el modelo Prisma.
 - Conectar `auth.complejidad_minima_contrasena` con la validación real de contraseñas (M20/M04).
 - `docs/00_SISTEMA` (plantilla de QA y plantilla de módulo) y `.sdlc/.../MODULE_TEMPLATE` aún citan Kysely: son documentos de otro dominio y no se tocaron.
+
+---
+
+## 2026-10-21 — M04 · Formalización completa de Arquitectura, Contratos Zod y DDL (Fase 2)
+
+**Rol:** Software Architect Lead · **Fase:** FASE_2_ARQUITECTURA · **Módulo:** M04 (Cuentas, Autenticación y Perfil)
+
+### Contexto de entrada
+El Director Humano autorizó el salto de ola de M04 sobre M18 y la Ola 2, firmó Gate 1 y aprobó en bloque los 9 cambios propuestos en `RFC-M04-001` (C-1 a C-9). Se procede con la ejecución íntegra y exhaustiva de la Fase 2 de Arquitectura.
+
+### Subroles convocados y actividades
+1. **01 · System & Modular Topologist:**
+   - Formalización de 4 ADRs fundacionales:
+     - `ADR-009`: Puerto hexagonal `NotificacionesPort` con adaptador offline en memoria/no-op para desacoplar M04 de M18 sin bloquear pruebas ATDD.
+     - `ADR-010`: Mapeo de `cuenta_empresa` 1:1 con `usuario`, almacenamiento seguro de RUT en `documento_soporte` (BYTEA max 5 MB, SHA-256) detrás de `AlmacenDocumentosPort` con prohibición expresa de seleccionar `contenido` en listados.
+     - `ADR-011`: Flujo unificado de autenticación con M20 (BCrypt costo 12, sliding sessions en tabla `sesion`, cambio obligatorio de contraseña en primer acceso con `cambio_contrasena_pendiente`, y token de registro efímero JWT para Google Identity).
+     - `ADR-012`: Control anti-fuerza bruta en tabla `control_intento_acceso` y técnica anti-enumeración (dummy compare BCrypt para correos inexistentes y respuestas idénticas).
+   - Mapa de rutas canónicas REST `/api/cuentas/*` y `/api/admin/empresas/*` documentado en `.sdlc/docs/modules/M04/04_ARQUITECTURA_Y_CODIGO.md`.
+2. **02 · Relational Data & DDL Modeler:**
+   - DDL actualizado a **v4.2 / BD v3.0 (53 tablas)** en `bd/sql/schema_pintuclic.sql` y `bd/sql/seed_pintuclic.sql`:
+     - Tabla 53 `control_intento_acceso` con índice `idx_control_intento_acceso_bloqueo`.
+     - Tabla `cuenta_empresa` y tabla `documento_soporte`.
+     - Renombrado `codigo` a `codigo_hash VARCHAR(255)` con seed hasheado BCrypt costo 12 de `'123456'`.
+     - Índices únicos parciales para solicitudes pendientes (`solicitud_empresa`, `solicitud_actualizacion_nit`).
+     - Restricciones únicas en `direccion_cliente` (`uq_direccion_predeterminada_unica` y `uq_direccion_no_duplicada`).
+     - Normalización de correo `uq_usuario_correo_lower` en `usuario`.
+     - Columna `cambio_contrasena_pendiente BOOLEAN NOT NULL DEFAULT false` en `usuario`.
+     - Permiso 21 `'empresas.validar'` sembrado y asignado al Administrador.
+   - Sincronización del modelo en `backend/prisma/schema.prisma` y generación limpia de tipos con `npx prisma generate`.
+   - Documentación relacional actualizada a v3.0 en `bd/docs/CHANGELOG_DATABASE.md`, `WALKTHROUGH_DATABASE.md` y `DOCUMENTACION_BASE_DATOS.md`.
+3. **03 · API Contracts & Protocol Designer:**
+   - Redacción formal de `.sdlc/docs/contracts/m04-cuentas.contract.ts` cubriendo las 10 HUs (`HU-CUE-01` a `HU-CUE-10`), envelopes de respuesta estandarizados, tipado estricto Zod 4 y tipos inferidos.
+   - DTOs espejo implementados en `backend/src/modules/m04-cuentas/dtos/m04-cuentas.dto.ts` y `frontend/src/modules/m04-cuentas/dtos/m04-cuentas.dto.ts`.
+   - Interfaces puras (cero runtime) y puertos hexagonales en `backend/src/modules/m04-cuentas/interfaces/` y `frontend/src/modules/m04-cuentas/interfaces/`.
+4. **04 · ATDD Three Amigos Consultation:**
+   - Formalización de los dictámenes consultivos del Software Architect y QA Security Tester en `.sdlc/docs/modules/M04/01_ATDD_SPEC.md` §5. Aprobado por unanimidad.
+
+### Verificación Determinista
+- `npm run test:contracts`: 16/16 validaciones exitosas, 0 advertencias, 0 fallos (veredicto: APROBADO).
+- `npm run check:no-any`: PASS sobre 154 archivos auditados (0 usos de ANY).
+- `npx tsc --noEmit` en `backend/` y `frontend/`: 0 errores de compilación.
+- `npm run lint` en `backend/` y `frontend/`: 0 warnings, 0 errores.
+- `npm run lint:a11y` en `frontend/`: 0 violaciones.
+- Vitest suites: 71/71 tests backend PASS, 57/57 tests frontend PASS (128/128 total en el repositorio).
+
+### Alto mecánico (Rule #10 y STAGE_GATES.md §3)
+Turno de Arquitectura detenido. `current_state.json` actualizado a `FASE_2_ARQUITECTURA` / `GATE_2_ARQUITECTURA` en estado `ESPERANDO_APROBACION_HUMANA`. No se genera código de controladores ni servicios hasta la firma explícita del Director Humano.

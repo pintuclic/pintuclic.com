@@ -171,4 +171,25 @@ entrega coordinada. No la cubría — son dos capas, dos artefactos.
 - `npm run test:contracts`: ✅ 12/12 validaciones exitosas.
 - `npm run verify:state`: ✅ Estado SDLC validado.
 
+---
+
+## 2026-10-21 — M04 · Inicio de Fase 3A (Construcción Backend API REST)
+
+**Rol:** Backend Lead Engineer · **Sello:** ✅ Firmado en turno propio · **Fase:** FASE_3A_BACKEND
+
+### Contexto de Entrada
+Gate 2 de M04 firmado por el Director Humano ('confirmo'). Aprobada formalmente la arquitectura, ADRs 009..012, contrato Zod rector `m04-cuentas.contract.ts`, DTOs, puertos hexagonales y DDL v4.2 / BD v3.0 (53 tablas). Salto de ola autorizado para M04 sobre M18 y Ola 2 (desacoplado de M18 mediante `NotificacionesPort`).
+
+### Plan de Construcción TDD (10 HUs)
+- **HU-CUE-01:** Registro particular B2C con validación OTP (códigos hasheados con BCrypt, TTL 15m, máx 3 reintentos).
+- **HU-CUE-02:** Registro y autenticación federada con Google Identity (`GoogleAuthPort` + token de registro efímero JWT + fijación obligatoria de contraseña).
+- **HU-CUE-03:** Registro directo empresa B2B con subida segura de RUT en `documento_soporte` (máx 5MB, SHA-256) y validación de unicidad de solicitudes pendientes.
+- **HU-CUE-04:** Inicio y cierre de sesión con cookies HTTP-only `SameSite=Strict`, control anti-fuerza bruta en `control_intento_acceso` y cambio obligatorio de clave en primer acceso (`cambio_contrasena_pendiente`).
+- **HU-CUE-05:** Recuperación de contraseña con respuesta indistinguible anti-enumeración, token de restablecimiento con TTL 30m y límite de intentos.
+- **HU-CUE-06:** Perfil de usuario y solicitud de ascenso a empresa B2B (con RUT adjunto).
+- **HU-CUE-07:** Libreta de direcciones (máx 10, regla de una única predeterminada y no duplicación de nomenclatura).
+- **HU-CUE-08:** Unicidad estricta de cuentas y política anti-colisión de correos en minúsculas.
+- **HU-CUE-09:** Administración y validación corporativa de solicitudes B2B (permiso `empresas.validar`, aprobación atómica con creación en `cuenta_empresa` y renovación de NIT con historial inmutable).
+- **HU-CUE-10:** Desactivación de cuenta propia (revocación de sesiones activas y opacidad ante intentos posteriores).
+
 

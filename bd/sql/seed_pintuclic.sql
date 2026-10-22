@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 4.1 (alineado con schema_pintuclic.sql v4.1: parametro_sistema - M17)
+-- VERSIÓN: 4.2 (alineado con schema_pintuclic.sql v4.2 - RFC-M04-001)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -32,7 +32,7 @@ INSERT INTO rol (id_rol, nombre, id_sub_rol_empresa, estado) VALUES
     (3, 'empresa_vip',   1,    'activo')
 ON CONFLICT (id_rol) DO NOTHING;
 
--- 1.4 Permisos Atómicos (Catálogo Maestro Oficial M17 / M20)
+-- 1.4 Permisos Atómicos (Catálogo Maestro Oficial M17 / M20 / M04)
 INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     -- Permisos heredados / pruebas M20
     (1,  'seguridad.configurar_sesion',    'Ajustar tiempos y políticas de vigencia de sesión', 'activo'),
@@ -56,7 +56,9 @@ INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     (18, 'configuracion.ver',              'Consultar parámetros operativos del sistema',       'activo'),
     (19, 'configuracion.editar',           'Actualizar parámetros y reglas del sistema',        'activo'),
     -- Analítica de Búsqueda (M02 HU-BUS-06)
-    (20, 'estadisticas.consultar',         'Consultar estadísticas de búsqueda sin resultado',  'activo')
+    (20, 'estadisticas.consultar',         'Consultar estadísticas de búsqueda sin resultado',  'activo'),
+    -- Validación de Cuentas Empresa (M04 HU-CUE-09, RFC-M04-001 C-9)
+    (21, 'empresas.validar',               'Aprobar o rechazar solicitudes de cuenta empresa, ascenso y renovación de NIT', 'activo')
 ON CONFLICT (id_permiso) DO NOTHING;
 
 -- 1.5 Asignación de Permisos a Roles
@@ -65,6 +67,7 @@ INSERT INTO asignacion_permiso (id_rol, id_permiso) VALUES
     (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
     (1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
     (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
+    (1, 21),
     (3, 4), (3, 10)
 ON CONFLICT (id_rol, id_permiso) DO NOTHING;
 
@@ -449,9 +452,10 @@ INSERT INTO usuario_identidad_externa (id_identidad, id_usuario, proveedor, id_p
     (1, 2, 'google', 'google-oauth2|102938475610293847561', 'cliente@pintuclic.co', now() - interval '5 days')
 ON CONFLICT (id_identidad) DO NOTHING;
 
--- 9.5 Códigos de Verificación OTP Efímeros (HU-CUE-01, 05, 06)
-INSERT INTO codigo_verificacion (id_codigo, correo, codigo, tipo, expiracion, intentos, max_intentos, datos_temporales) VALUES
-    ('c0000000-0000-0000-0000-000000000001', 'baja@pintuclic.co', '123456', 'registro', now() + interval '15 minutes', 0, 3, '{"id_usuario": 3}'::jsonb)
+-- 9.5 Códigos de Verificación OTP Efímeros (HU-CUE-01, 05, 06, RFC-M04-001 C-5)
+-- Hash BCrypt costo 12 derivado de '123456'
+INSERT INTO codigo_verificacion (id_codigo, correo, codigo_hash, tipo, expiracion, intentos, max_intentos, datos_temporales) VALUES
+    ('c0000000-0000-0000-0000-000000000001', 'baja@pintuclic.co', '$2b$12$UEjh98K3w36fJBWLtCWHKuAzhWy24tbz7kmqHcGuIdVkSSTtPsCmO', 'registro', now() + interval '15 minutes', 0, 3, '{"id_usuario": 3}'::jsonb)
 ON CONFLICT (id_codigo) DO NOTHING;
 
 -- ==============================================================================
