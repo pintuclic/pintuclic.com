@@ -11,15 +11,18 @@ RUN corepack enable && corepack prepare pnpm@12.4.1 --activate
 RUN apk add --no-cache python3 make g++
 
 COPY package.json package-lock.json ./
+COPY pnpm-workspace.yaml* ./
 
-RUN printf 'allowBuilds:\n  bcrypt: true\n  esbuild: true\n' > pnpm-workspace.yaml \
+RUN printf 'allowBuilds:\n  bcrypt: true\n  esbuild: true\n  "@prisma/client": true\n  "@prisma/engines": true\n  prisma: true\n' > pnpm-workspace.yaml \
     && pnpm import \
     && pnpm install --frozen-lockfile
 
 COPY tsconfig.json ./
+COPY prisma ./prisma
 COPY src ./src
 
-RUN pnpm exec tsc --declaration false --declarationMap false \
+RUN pnpm exec prisma generate \
+    && pnpm exec tsc --declaration false --declarationMap false \
     && pnpm install --prod --frozen-lockfile
 
 # ------------------------------------------------------------------------------
@@ -35,6 +38,7 @@ ENV PORT=3000
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
 
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
