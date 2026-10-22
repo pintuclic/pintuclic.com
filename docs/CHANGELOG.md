@@ -18,7 +18,8 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 - **Core Kit (autorizado):** nuevos `PasswordInput`, `OtpInput`, `FileInput`, `Alert`, `Stepper`, `SegmentedTabs`, `SectionNav` y `TextButton`; `Input` gana `endAdornment` y `Header` lee la sesión.
 - **Verificación:** `next build` ✅ (17 rutas), `tsc`, ESLint y `lint:a11y` sin errores, 0 `any`, `audit:core-kit` 0 violaciones, `audit:a11y` aprobado, `audit:zod` ✅, Vitest **136/136** (+33). Navegador real a 1920 y 390 px recorriendo todos los flujos. Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.6.0_M04_cuentas_autenticacion_perfil_frontend.md`.
 - **Ajustes autorizados al aprobar:** (1) el backend conserva 100 kb de cuerpo JSON en toda la API y acepta hasta 7 MB **solo** en `POST /cuentas/empresas/renovacion-nit` (RUT de 5 MB en base64); el exceso responde 413 con código propio en vez de un 500 (`core/middlewares/cuerpoJson.middleware.ts`, backend 199/199, +6). (2) Entrada "Empresas" en la barra lateral y el breadcrumb del `AdminLayout` de M17.
-- **🛑 Pendiente:** el *rewrite* de `next.config.ts` pierde el prefijo `/api` frente a las rutas `/api/v1` del backend; se resolverá al integrar la configuración de DevOps.
+- **Integración de `main` (DevOps):** sin conflictos. `lucide-react` 1.x retiró los íconos de marca y rompía el `Footer` del Core; se reemplazaron por `IconosMarca.tsx` (Simple Icons, CC0). Verificado con `lucide-react` 1.60.0 y `dotenv` 18.0.8.
+- **🛑 Pendiente para DevOps:** la URL de la API no conserva el prefijo `/api/v1` del backend (`NEXT_PUBLIC_API_URL=/api` en el build de Docker, `http://localhost:3000` en `frontend/.env.example`, *rewrite* de `next.config.ts`), y `frontend/package-lock.json` sigue fijando `lucide-react` 0.525. Detalle en el walkthrough §12.
 
 ---
 

@@ -174,3 +174,17 @@ El Director aprobó la revisión visual ("apruebo tu frontend") y, antes del com
 **Verificación:** backend `tsc` 0 · ESLint 0/0 · 0 `any` (104 archivos) · Vitest **199/199** (+6: 100 kb aceptado y 200 kb → 413; base64 de 5 MB exactos aceptado en la ruta del RUT, también con barra final; > 7 MB → 413; JSON mal formado sigue al manejador global). Frontend `next build` ✅ · `tsc` · ESLint · `lint:a11y` · `audit:core-kit` · `audit:a11y` en verde · Vitest 136/136.
 
 **Nota:** la ruta multipart del controlador (`req.file`) no tiene `multer` instalado; el RUT llega siempre en base64, por eso el ajuste se hizo en el parser JSON.
+
+## 12. Integración de `main` (DevOps)
+Se integró `origin/main` (Docker Compose, SMTP con Brevo/Mailpit, Google OAuth, Dockerfiles con pnpm y actualizaciones de dependabot) sin conflictos de archivos.
+
+**Rotura detectada y corregida:** dependabot sube `lucide-react` de 0.525 a `^1.58` (el `pnpm-lock.yaml` que usa el Dockerfile resuelve **1.60.0**). La v1 elimina los íconos de marca y el `Footer` del Core importaba `Facebook`, `Instagram` y `Youtube`: el build de Docker habría fallado. Se revisaron los 73 íconos distintos que usaba el frontend contra el paquete 1.60.0; solo faltaban esos tres. Se reemplazaron por `core/components/layout/IconosMarca.tsx` (trazos de Simple Icons 16.35.0, CC0-1.0, copiados sin modificar). `dotenv` 17 → 18 es compatible: `dotenv/config` sigue publicándose en CommonJS.
+
+**Verificación con las versiones de producción instaladas** (`lucide-react` 1.60.0 y `dotenv` 18.0.8, con `--no-save`): `next build` ✅ · frontend `tsc`, ESLint y `lint:a11y` limpios · Vitest 136/136 · backend `tsc` y ESLint limpios · Vitest 199/199 · `audit:core-kit` y `audit:a11y` aprobados · footer revisado en el navegador.
+
+### Pendiente para DevOps (no se tocó)
+1. **URL de la API.** El cliente usa `NEXT_PUBLIC_API_URL ?? '/api/v1'` como base y el backend monta sus rutas en `/api/v1`, pero la configuración de `main` no conserva ese prefijo:
+   * `docker-compose.yml` compila el frontend con `NEXT_PUBLIC_API_URL=/api`: las peticiones salen a `/api/cuentas/…` (sin `/v1`) y el *rewrite* de `next.config.ts` (`/api/:path*` → `${NEXT_PUBLIC_API_URL}/:path*`, resuelto en el build) apunta a sí mismo.
+   * `frontend/.env.example` propone `NEXT_PUBLIC_API_URL=http://localhost:3000`: las peticiones irían a `http://localhost:3000/cuentas/…`, también sin `/api/v1`.
+   * Propuesta: dejar la base del cliente en `/api/v1` (mismo origen, la cookie `HttpOnly` viaja sin CORS) y que el *rewrite* use una variable solo de servidor, p. ej. `/api/:path*` → `${BACKEND_URL ?? 'http://backend:3000'}/api/:path*`. Requiere tocar `next.config.ts`, `docker-compose.yml` y `.env.example`.
+2. **Lockfiles del frontend:** `package.json` pide `lucide-react ^1.58`, pero `package-lock.json` sigue fijando 0.525 (solo se actualizó `pnpm-lock.yaml`). `npm ci` fallaría por desincronía; conviene elegir un único gestor (el Dockerfile usa pnpm) y retirar o regenerar el otro lockfile.
