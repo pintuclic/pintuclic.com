@@ -259,3 +259,38 @@ El Director pidió la landing antes del frontend de M04: fuente visual `VISTAS.p
 - Imágenes de logo, productos y categorías son marcadores extraídos del mockup; el Director las sustituirá.
 - **Detenido en Gate 3B**: revisión visual del Director Humano. No se declara la compuerta aprobada.
 - **Walkthrough:** `docs/walkthroughs/FP-01/walkthrough_v0.5.0_FP01_landing_frontend.md`.
+
+---
+
+## 2026-10-22 — M04 · v0.6.0 · Frontend de Cuentas, Autenticación y Perfil
+
+**Rol:** Frontend Lead Engineer · **Módulo:** M04 (Fase 3B)
+
+### Contexto
+El Director aprobó la landing (FP-01) y pidió el login con `VISTAS.pdf` págs. 3–6 como fuente visual. Esas páginas son el **modal de registro**; se propusieron 7 decisiones (registro según mockup, login/recuperación/primer acceso derivados, empresa sin OTP, azul `action`, stepper del mockup, una sola contraseña, Términos solo en cliente, Google deshabilitado) y el Director respondió: "si, hazlo. y el frontend que falta, derivalo por funciones y diseño del proyecto, ya que parece que no tengo mas mockups."
+
+### Subroles convocados
+- **01 · Design System:** 8 componentes nuevos en el Core (`PasswordInput`, `OtpInput`, `FileInput`, `Alert`, `Stepper`, `SegmentedTabs`, `SectionNav`, `TextButton`); `Input.endAdornment` y `Header` con sesión.
+- **02 · Data & State:** servicios sobre la API real v0.4.2, mapa de errores propio del módulo, `SesionBootstrap` sobre `useAuthStore` (sin tokens en el cliente).
+- **03 · Views & UX:** modal interceptado + páginas completas de acceso, `/perfil` con 5 secciones y `/admin/empresas`.
+- **05 · Component TDD:** 33 pruebas nuevas (utilidades, RUT, render en servidor de formularios y del Core nuevo).
+
+### Verificación
+- `next build` ✅ · `tsc` ✅ · ESLint ✅ · `lint:a11y` ✅ · 0 `any` · `audit:core-kit` 0 violaciones (la primera pasada detectó 6 `<button>` crudos; se crearon `TextButton` y `SectionNav`) · `audit:a11y` ✅ · `audit:zod` ✅ · Vitest 136/136.
+- Navegador real con **API simulada en la página** (no hay backend ni base de datos en el entorno): todos los flujos de las HU recorridos a 1920 y 390 px. Corregidos en la revisión: placeholder engañoso del login, título descentrado, stepper desequilibrado, paso final "en curso", campos de solo lectura con aspecto editable, desborde de 772 px en móvil y sección activa fuera de vista.
+
+### Elevado al equipo (fuera del módulo, no se tocó — Directiva #3)
+1. `frontend/next.config.ts`: el *rewrite* `/api/:path*` → `http://backend:3000/:path*` descarta `/api`, pero el backend escucha en `/api/v1`.
+2. `backend/src/index.ts`: límite JSON de 100 kb frente a RUT de hasta 5 MB (ya elevado en v0.4.1).
+3. `m17-permisos/components/AdminLayout.tsx`: entrada "Empresas" en la barra lateral y su breadcrumb.
+
+### Pendiente / conocido
+- Integración contra el backend real (Gate 4). `HU-CUE-02` aplazada. Sin geocodificación inversa para `CA-CUE-07-04` (solo coordenadas).
+- **Detenido en Gate 3B**: revisión visual del Director Humano. No se declara la compuerta aprobada.
+- **Walkthrough:** `docs/walkthroughs/M04/walkthrough_v0.6.0_M04_cuentas_autenticacion_perfil_frontend.md`.
+
+### Cierre (mismo día) — Gate 3B aprobado
+- El Director aprobó la revisión visual ("apruebo tu frontend") y autorizó, antes del commit, dos cambios fuera del módulo: el límite JSON del backend y la barra lateral del admin de M17.
+- **Límite JSON:** nuevo `backend/src/core/middlewares/cuerpoJson.middleware.ts`: 100 kb en toda la API y 7 MB solo en `POST /cuentas/empresas/renovacion-nit`; el exceso responde 413 con código propio en lugar del 500 genérico. Backend: `tsc` 0, ESLint 0/0, 0 `any`, Vitest 199/199 (+6).
+- **M17:** entrada "Empresas" en la barra lateral y título en el breadcrumb; verificada en navegador.
+- **Siguiente:** integrar `main` (DevOps: Docker, SMTP, Google OAuth) y probar contra el backend real, incluida la geolocalización de `CA-CUE-07-04`. Sigue pendiente alinear el *rewrite* `/api` de `next.config.ts` con la configuración de DevOps.

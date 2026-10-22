@@ -1,11 +1,44 @@
 {
-  "fecha": "2026-10-22T05:11:33.897Z",
-  "archivos_auditados": 28,
+  "fecha": "2026-10-22T19:40:43.873Z",
+  "archivos_auditados": 92,
   "resumen": {
-    "pass": 1,
-    "warn": 0,
+    "pass": 0,
+    "warn": 4,
     "fail": 0,
     "estado_accesibilidad": "CONFORME_WCAG_2.1_AA"
   },
-  "hallazgos": []
+  "hallazgos": [
+    {
+      "file": "frontend\\src\\core\\components\\forms\\FileInput.tsx",
+      "line": 11,
+      "rule": "WCAG-3.3.2-Labels-or-Instructions",
+      "severity": "WARN",
+      "message": "Input potencialmente huérfano sin id asociado a <label> ni aria-label.",
+      "snippet": "/** Tipos aceptados, como en `<input accept>` (p. ej. \".pdf,.jpg,.png\"). */"
+    },
+    {
+      "file": "frontend\\src\\core\\components\\forms\\FileInput.tsx",
+      "line": 27,
+      "rule": "WCAG-3.3.2-Labels-or-Instructions",
+      "severity": "WARN",
+      "message": "Input potencialmente huérfano sin id asociado a <label> ni aria-label.",
+      "snippet": "* input, borde neutral, foco `action`). El `<input type=\"file\">` nativo queda"
+    },
+    {
+      "file": "frontend\\src\\core\\components\\forms\\OtpInput.tsx",
+      "line": 82,
+      "rule": "WCAG-3.3.2-Labels-or-Instructions",
+      "severity": "WARN",
+      "message": "Input potencialmente huérfano sin id asociado a <label> ni aria-label.",
+      "snippet": "<input"
+    },
+    {
+      "file": "frontend\\src\\core\\tests\\componentes-landing.test.tsx",
+      "line": 98,
+      "rule": "WCAG-3.3.2-Labels-or-Instructions",
+      "severity": "WARN",
+      "message": "Input potencialmente huérfano sin id asociado a <label> ni aria-label.",
+      "snippet": "expect(html).toMatch(/<input[^>]*name=\"q\"/);"
+    }
+  ]
 }

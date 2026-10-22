@@ -6,6 +6,22 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [v0.6.0] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔐 **Frontend de M04 — Cuentas, Autenticación y Perfil.** Registro de persona natural con OTP y de empresa según `VISTAS.pdf` págs. 3–6; login, recuperación, restablecimiento y primer acceso derivados del mismo modal; "Mi cuenta" (`/perfil`: datos, contraseña, correo con OTP, direcciones, ascenso a empresa, renovación de NIT con RUT, cierre de sesión y desactivación) y panel `/admin/empresas` (dictamen de registros, ascensos y renovaciones con descarga del RUT). Cubre `HU-CUE-01` y `03` a `10`; `HU-CUE-02` (Google) aplazada con el botón deshabilitado.
+- **✅ Estado:** **Gate 3B aprobado** por el Director Humano ("apruebo tu frontend"). Verificado con una API simulada en el navegador: **aún no se ha probado contra el backend real**; la integración (incluida la geolocalización de `CA-CUE-07-04`) se hará al enlazarlo.
+
+### Módulo M04 — Frontend
+- **Acceso en modal:** rutas interceptadas `@modal/(.)login` y `(.)registro` sobre cualquier página pública, con su versión de página completa para enlace directo y para la redirección del middleware (`?destino=`, validado contra redirecciones abiertas y bucles).
+- **Sesión (ADR-005):** `SesionBootstrap` hidrata `useAuthStore` con `GET /cuentas/perfil`; el header muestra el nombre y lleva a `/perfil`. Ningún token en el cliente.
+- **RUT:** validación previa de tipo y tamaño (5 MB exactos sí, 5 MB + 1 byte no) y huella SHA-256 calculada en el navegador, idéntica a la del backend.
+- **Core Kit (autorizado):** nuevos `PasswordInput`, `OtpInput`, `FileInput`, `Alert`, `Stepper`, `SegmentedTabs`, `SectionNav` y `TextButton`; `Input` gana `endAdornment` y `Header` lee la sesión.
+- **Verificación:** `next build` ✅ (17 rutas), `tsc`, ESLint y `lint:a11y` sin errores, 0 `any`, `audit:core-kit` 0 violaciones, `audit:a11y` aprobado, `audit:zod` ✅, Vitest **136/136** (+33). Navegador real a 1920 y 390 px recorriendo todos los flujos. Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.6.0_M04_cuentas_autenticacion_perfil_frontend.md`.
+- **Ajustes autorizados al aprobar:** (1) el backend conserva 100 kb de cuerpo JSON en toda la API y acepta hasta 7 MB **solo** en `POST /cuentas/empresas/renovacion-nit` (RUT de 5 MB en base64); el exceso responde 413 con código propio en vez de un 500 (`core/middlewares/cuerpoJson.middleware.ts`, backend 199/199, +6). (2) Entrada "Empresas" en la barra lateral y el breadcrumb del `AdminLayout` de M17.
+- **🛑 Pendiente:** el *rewrite* de `next.config.ts` pierde el prefijo `/api` frente a las rutas `/api/v1` del backend; se resolverá al integrar la configuración de DevOps.
+
+---
+
 ## [v0.5.0] - 2026-10-22
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🏠 **Landing page pública (frente propio FP-01).** Página de inicio `/` según la página 1 de `VISTAS.pdf` y la UI Spec §4.1: topbar, header con mega-menú de categorías, hero, franja de confianza, buscador con accesos a Calculadora y Asesoría de color, productos destacados, categorías y footer institucional. Responsive *mobile-first*.

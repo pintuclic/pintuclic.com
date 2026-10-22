@@ -1,19 +1,47 @@
 {
   "proyecto": "Pintu Clic",
   "dominio": "pintuclic.com",
-  "version_actual": "v0.4.1",
+  "version_actual": "v0.6.0",
   "fecha_actualizacion": "2026-10-22",
   "fase_activa": "FASE_3B_FRONTEND",
-  "gate_activo": "GATE_3A_APROBADO",
+  "gate_activo": "GATE_3B_APROBADO",
   "estado": "FASE_3B_EN_CURSO",
   "rol_en_turno": "04_frontend_engineer",
   "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 (Cuentas, Autenticación y Perfil): Fase 3A (Backend) remediada en v0.4.1 y certificada al 100% por QA tras re-auditoría forense y code review. Defecto BUG-M04-01 resuelto con guarda requirePermission('empresas.validar'), respuesta opaca 404, atomicidad transaccional y 188/188 tests Vitest pasando (+72 nuevos). Se LEVANTA formalmente el Veto Stop-the-Line. El Frontend Lead Engineer (04_frontend_engineer) queda habilitado para construir las vistas de las 10 HUs de M04 consumiendo la API asegurada.",
+  "nota_de_contexto": "M04 frontend v0.6.0 APROBADO en Gate 3B por el Director Humano (\"apruebo tu frontend\"). Antes del commit autorizó corregir el límite JSON del backend para el RUT y añadir la entrada Empresas a la barra lateral del AdminLayout de M17 (M17 no conocía la ruta). Después se integran los cambios de DevOps de main (Docker, SMTP, Google OAuth). La geolocalización (CA-CUE-07-04) se probará al enlazar el backend real.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
+  "frentes_propios": [
+    {
+      "id": "FP-01",
+      "nombre": "Landing page pública (Home)",
+      "estado": "GATE_3B_APROBADO",
+      "aprobacion": "Director Humano, 2026-10-22: \"te quedo increible, gracias\" (revisión visual de v0.5.0). Datos e imágenes siguen siendo temporales.",
+      "version": "v0.5.0",
+      "walkthrough": "docs/walkthroughs/FP-01/walkthrough_v0.5.0_FP01_landing_frontend.md",
+      "responsable": "04_frontend_engineer",
+      "autorizado_por": "Director Humano",
+      "fecha_autorizacion": "2026-10-22",
+      "fuente_visual": "docs/assets/mockups/VISTAS.pdf (solo la página 1) + ESPECIFICACION_TECNICA_UI_UX.md §3.1 y §4.1",
+      "tipografia": "Poppins + Inter (Pintu_Clic_UI_Oficial.md §2.2)",
+      "ubicacion": [
+        "frontend/src/app/(public)/",
+        "frontend/src/core/components/ (se autoriza ampliar el Core Kit: layout, navegación y formularios)"
+      ],
+      "datos": "ESTATICOS_TEMPORALES: los módulos M01 (catálogo), M05 (carrito) y M04 (cuenta) los harán reactivos",
+      "gate": "GATE_3B_FRONTEND_UI_APPROVAL: revisión visual del Director Humano antes de cualquier avance"
+    }
+  ],
   "total_modulos": 21,
   "modulos_con_spec": 8,
   "modulos_pendientes_gate_1": 13,
   "bloqueos": [
+    {
+      "tipo": "FRENTE_PROPIO_AUTORIZADO",
+      "descripcion": "FP-01 · Landing page pública. La landing no pertenece a ninguno de los 21 módulos de RUTA_DEL_PROYECTO.md. El Director Humano la registra como frente propio (2026-10-22): vive en frontend/src/app/(public)/ y en el Core Kit, sin crear carpeta en src/modules/. Autoriza ampliar frontend/src/core/ (Directiva #3) y usar datos estáticos temporales (productos, categorías, carrito y sesión) hasta que M01, M05 y M04 los alimenten.",
+      "responsable": "Director Humano",
+      "estado": "AUTORIZADO",
+      "impacto": "El contenido estático es provisional y debe sustituirse por datos reales de M01/M05/M04; el avance se detiene en Gate 3B para revisión visual. No altera la fase de M04."
+    },
     {
       "tipo": "VETO_STOP_THE_LINE",
       "descripcion": "M04 v0.4.0 backend rechazado por QA tras auditoría forense. Defecto S1 Blocker BUG-M04-01: Broken Access Control y escalada vertical de privilegios en /api/v1/admin/empresas/* (falta validación de actor.tipoSesion === 'admin' o permisos administrativos; clientes ordinarios pueden listar solicitudes corporativas con datos sensibles y dictaminar aprobaciones/rechazos).",
@@ -89,6 +117,14 @@
       "responsable": "Equipo de M17 / Director Humano",
       "estado": "RESUELTA",
       "impacto": "Resuelto en v0.3.3. Modelo ParametroSistema creado en schema.prisma, PrismaConfiguracionRepository implementado con cache de 30s e invalidacion reactiva, idAdmin propagado para auditar id_usuario_actualizo, y eliminados los arrays de datos hardcodeados en memoria (Directiva #10)."
+    },
+    {
+      "tipo": "SOLICITUD_DE_CAMBIO_EXTERNO",
+      "descripcion": "El frontend de M04 v0.6.0 necesita tres cambios fuera de su módulo (Directiva #3: no se tocaron): (1) frontend/next.config.ts: el rewrite /api/:path* -> http://backend:3000/:path* descarta el prefijo /api, pero el backend monta sus rutas en /api/v1, así que el proxy respondería 404; (2) backend/src/index.ts: express.json({ limit: \"100kb\" }) impide enviar el RUT de hasta 5 MB de HU-CUE-10 (ya elevado en v0.4.1); (3) m17-permisos/components/AdminLayout.tsx: entrada \"Empresas\" (/admin/empresas) en la barra lateral y su título en el breadcrumb.",
+      "responsable": "Director Humano (aprobación) · DevOps (1) · Backend M04 (2) · equipo M17 (3)",
+      "estado": "PARCIALMENTE_AUTORIZADO",
+      "impacto": "Sin (1) ninguna vista llega al backend a través de Next; sin (2) la renovación de NIT falla con archivos reales; sin (3) el panel de empresas solo es accesible por URL.",
+      "resolucion": "Director Humano, 2026-10-22: \"te doy permiso de corregir el limite JSON y la barra lateral del admin (recordemos que el M17 no tenia ni idea de este modulo, asi que no hizo esa ruta)\". Se autorizan (2) y (3). El punto (1) (rewrite de next.config.ts) queda para la integración con la configuración de DevOps de main. Aplicados el 2026-10-22: (2) core/middlewares/cuerpoJson.middleware.ts (100 kb general, 7 MB solo en renovacion-nit, 413 con código propio; backend 199/199) y (3) entrada Empresas y breadcrumb en AdminLayout de M17. Queda abierto (1)."
     }
   ],
   "modulos_registrados": [
@@ -139,12 +175,12 @@
       "scope": "m04-cuentas",
       "spec": true,
       "backend": "implementado",
-      "frontend": "estructura",
+      "frontend": "implementado",
       "contratos_zod": true,
       "depende_de": [
         "M18"
       ],
-      "estado_sdlc": "Fase 3A (Backend) certificada en v0.4.1 tras remediación de BUG-M04-01 y levantamiento de Veto Stop-the-Line (188/188 tests backend, 0 ANY en 102 archivos, tsc/eslint limpios). Fase 3B (Frontend) en curso por 04_frontend_engineer: vistas de HU-CUE-01 a HU-CUE-10."
+      "estado_sdlc": "Fase 3A (Backend) certificada en v0.4.1 (+ v0.4.2 motivo opcional). Fase 3B (Frontend) v0.6.0 APROBADA por el Director Humano (Gate 3B). Cierre en curso: ajustes autorizados (límite JSON del RUT y entrada Empresas en el AdminLayout de M17), commit e integración de main (DevOps). Siguiente: integración real contra el backend y Gate 4 (QA)."
     },
     {
       "id": "M05",
@@ -604,6 +640,48 @@
       "fecha": "2026-10-22",
       "autor": "05_qa_security_tester",
       "motivo": "Levantamiento formal del Veto Stop-the-Line para M04 tras re-auditoría forense y code review de la versión remediada v0.4.1. Defecto BUG-M04-01 resuelto al 100%, 188/188 tests backend en verde, 0 ANY en 102 archivos, tsc y eslint limpios. Se aprueba Gate 3A y se reanuda la Fase 3B asignada a 04_frontend_engineer."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-22",
+      "autor": "Director Humano",
+      "motivo": "Instrucción expresa: (1) ratifica el cambio de una línea en backend/src/app.routes.ts (inyección de autorizacionService en M04); (2) el motivo de rechazo pasa a ser opcional en el contrato (se conserva obligatorio, mínimo 10 caracteres, solo al rechazar un REGISTRO de empresa, RN-CUE-17) y autoriza el ajuste puntual de backend/contrato/DTO aun estando en Fase 3B: v0.4.2; (3) la verificación del correo del registro de empresa se valida con el administrador que acepta la empresa; (4) la auditoría de decisiones sigue aplazada (HU-SEG-04)."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-22",
+      "autor": "Director Humano",
+      "motivo": "Registra FP-01 (landing page pública) como frente propio, fuera de los 21 módulos: ubicación en src/app/(public)/ y Core Kit, autorización para ampliar el core y datos estáticos temporales. No modifica la fase de M04. Al terminar se detiene en Gate 3B."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "GATE_3B_FRONTEND_UI_APPROVAL",
+      "fecha": "2026-10-22",
+      "autor": "04_frontend_engineer",
+      "motivo": "FP-01 v0.5.0 entregada: landing pública con Core Kit ampliado (13 componentes nuevos), next build OK, tsc/eslint/lint:a11y limpios, 0 any, Vitest 103/103 y verificación en navegador real (1366 y 500 px). v0.4.2 (motivo de rechazo opcional) entregada en el mismo turno. Se DETIENE a la espera de la revisión visual del Director Humano (STAGE_GATES §Gate 3B). El frontend de M04 no se ha iniciado."
+    },
+    {
+      "de": "GATE_3B_FRONTEND_UI_APPROVAL",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-22",
+      "autor": "Director Humano",
+      "motivo": "Aprueba la revisión visual de FP-01 v0.5.0 (\"te quedo increible, gracias\") y ordena iniciar el frontend de M04 por el inicio de sesión, con VISTAS.pdf páginas 3 a 6 como fuente visual."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "GATE_3B_FRONTEND_UI_APPROVAL",
+      "fecha": "2026-10-22",
+      "autor": "04_frontend_engineer",
+      "motivo": "M04 frontend v0.6.0 entregado: acceso en modal con rutas interceptadas, registro natural (OTP) y empresa, login, recuperación, restablecimiento, primer acceso, perfil completo y panel /admin/empresas. Core Kit +8 componentes. next build OK, tsc/ESLint/lint:a11y limpios, 0 any, audit:core-kit 0 violaciones, audit:a11y y audit:zod aprobados, Vitest 136/136; flujos recorridos en navegador real (1920 y 390 px) con API simulada. Se DETIENE a la espera de la revisión visual del Director Humano (STAGE_GATES §Gate 3B)."
+    },
+    {
+      "de": "GATE_3B_FRONTEND_UI_APPROVAL",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-22",
+      "autor": "Director Humano",
+      "motivo": "Aprueba la revisión visual del frontend de M04 v0.6.0 (\"apruebo tu frontend\"). Antes del commit autoriza corregir el límite JSON del backend (RUT de HU-CUE-10) y la barra lateral del AdminLayout de M17 (entrada Empresas). Ordena integrar los cambios de DevOps de main. La geolocalización se probará con el backend real."
     }
   ]
 }
