@@ -18,9 +18,6 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-pintuclic}:${POSTGRES_PASSWORD:-pintuclic}@db:5432/${POSTGRES_DB:-pintuclic_dev}?schema=public
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_pintuclic_32_caracteres_min}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
     ports: !override
       - "${BACKEND_PORT:-3000}:3000"
     healthcheck:
@@ -32,10 +29,6 @@ services:
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
     ports: !override
       - "${FRONTEND_PORT:-3001}:3001"
     depends_on: !override
