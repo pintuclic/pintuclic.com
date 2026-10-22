@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Bell,
+  Building2,
   ChevronDown,
   ChevronRight,
   Flame,
@@ -98,6 +99,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       exact: false,
     },
     {
+      // M04 · HU-CUE-09 / HU-CUE-10: registros, ascensos y renovaciones de NIT.
+      label: 'Empresas',
+      href: '/admin/empresas',
+      icon: <Building2 className="w-5 h-5 shrink-0" />,
+      exact: false,
+    },
+    {
       label: 'Configuración',
       href: '/admin/configuracion',
       icon: <Settings className="w-5 h-5 shrink-0" />,
@@ -124,6 +132,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     if (pathname === '/admin') return 'Dashboard';
     if (pathname.startsWith('/admin/empleados')) return 'Colaboradores y Permisos';
     if (pathname.startsWith('/admin/clientes')) return 'Gestión de Clientes';
+    if (pathname.startsWith('/admin/empresas')) return 'Validación de Empresas';
     if (pathname.startsWith('/admin/configuracion')) return 'Configuración del Sistema';
     if (pathname.startsWith('/admin/gobernanza')) return 'Gobernanza Administradora';
     return 'Administración';
