@@ -18,6 +18,9 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-pintuclic}:${POSTGRES_PASSWORD:-pintuclic}@db:5432/${POSTGRES_DB:-pintuclic_dev}?schema=public
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_pintuclic_32_caracteres_min}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
     ports: !override
       - "${BACKEND_PORT:-3000}:3000"
     healthcheck:
@@ -36,6 +39,16 @@ services:
     healthcheck:
       disable: true
     deploy: !reset null
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: pintuclic-mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_WEB_PORT:-8025}:8025"
+    networks:
+      - backend_net
 
 networks:
   backend_net:
