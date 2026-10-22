@@ -3,14 +3,15 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+RUN printf 'allowBuilds:\n  esbuild: true\n  unrs-resolver: true\n' > pnpm-workspace.yaml \
+    && pnpm install --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm build
+RUN pnpm exec next build
 
 FROM base AS runner
 WORKDIR /app
