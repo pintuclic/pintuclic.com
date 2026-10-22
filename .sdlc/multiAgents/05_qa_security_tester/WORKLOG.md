@@ -259,3 +259,37 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 - **Veredicto Gate 4A (Infraestructura Core Kit):** 🟢 **APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA**.
 - **Reporte Oficial:** `.sdlc/docs/qa/M20/v0.3.2/QA_REPORT.md`.
 - **Acción:** Deuda técnica de accesibilidad del Core Kit cerrada. Componentes listos para habilitar M04 y M01.
+
+---
+
+### [2026-10-21 23:35] — 🔴 AUDITORÍA FORENSE DE BACKEND Y VETO STOP-THE-LINE — M04 (v0.4.0)
+
+> **Insumo:** `docs/walkthroughs/M04/walkthrough_v0.4.0_M04_cuentas_autenticacion_backend.md`  
+> **Especificación:** `.sdlc/docs/modules/M04/` (01_SPEC_FUNCIONAL.md, 02_HISTORIAS_USUARIO.md, 01_ATDD_SPEC.md)  
+> **Auditor:** QA Lead & Security Compliance Director (`05_qa_security_tester`)  
+> **Naturaleza:** Auditoría de Calidad y Seguridad de Entrega Backend M04 (Gate 3A / 4A).
+
+#### 1. Resultados de Ejecución Real y Batería Automatizada
+- **Vitest Backend:** **116/116 tests PASS** (18 suites, 45 pruebas unitarias/integración de M04).
+- **Vitest Frontend:** **57/57 tests PASS** (9 suites, regresión cero en apps y módulos).
+- **Compilación TypeScript (`npx tsc --noEmit`):** **0 errores** en Backend.
+- **Linter Backend (`npm run lint`):** **0 errores, 0 warnings**.
+- **Auditoría AST Cero ANY (`npm run check:no-any`):** **99 archivos auditados en `backend/src`, 0 usos de ANY (PASS)**.
+- **Validación de Contratos Zod (`node .sdlc/tooling/validate-contracts.mjs`):** **16/16 checks PASS**.
+- **Auditorías de Gobernanza:**
+  - `node .sdlc/tooling/audit-core-kit.mjs`: **0 violaciones** (13 archivos conformes).
+  - `node .sdlc/tooling/audit-zod-chains.mjs`: **0 anti-patrones** (corregido delimitador de coma en tooling, 14 archivos conformes).
+  - `node .sdlc/tooling/audit-a11y.mjs`: **0 violaciones WCAG 2.1 AA** (28 archivos conformes).
+
+#### 2. Detección de Defecto Crítico de Seguridad (Veto Stop-the-Line)
+- **Defecto Detectado:** `BUG-M04-01` (**Severidad S1 — Blocker**).
+- **Descripción:** Falla crítica de control de acceso funcional (Broken Function-Level Access Control / Escalada Vertical de Privilegios) en endpoints administrativos `/api/v1/admin/empresas/*` (`/solicitudes`, `/solicitudes/:idSolicitud`, `/solicitudes/:idSolicitud/dictamen`, `/renovaciones/:idSolicitud/dictamen`).
+- **Causa Raíz:** En `backend/src/modules/m04-cuentas/m04.routes.ts:137-142` se montan las rutas solo con `authMiddleware`. En `backend/src/modules/m04-cuentas/controllers/empresas.controller.ts:190` únicamente se valida la presencia de `req.actor`, sin verificar si `actor.tipoSesion === 'admin'` o si el actor cuenta con permisos administrativos (`empresas.validar`).
+- **Impacto:** Cualquier comprador registrado como cliente ordinario (`tipoSesion: 'cliente'`) con su cookie de sesión `pc_sid` puede listar solicitudes de empresas con datos fiscales y de representación legal sensibles, así como aprobar o rechazar empresas y renovaciones de NIT. En el dictamen, el `idUsuario` del cliente atacante se graba en base de datos como `idAdminRevisor`.
+- **Infracción de Políticas:** Violación flagrante de `HU-ADM-03` (Control de acceso en servidor mandatorio), `HU-SEG-03` (Anti-BFLA), BDD Escenario 14 de `02_HISTORIAS_USUARIO.md`, y discrepancia con lo declarado en Walkthrough v0.4.0 §4.2.
+
+#### 3. Dictamen y Parada Obligatoria
+- **Veredicto Gate 3A / 4A:** 🔴 **RECHAZADO — VETO STOP-THE-LINE ACTIVADO**.
+- **Reporte Oficial:** `.sdlc/docs/qa/M04/v0.4.0/QA_REPORT.md`.
+- **Acción SDLC:** En virtud del Mandato #2 (Prohibición estricta de autocorrección por QA), se prohíbe a QA modificar el código de producción. Se transfiere el rol a `03_backend_engineer` para remediación prioritaria de `BUG-M04-01`, blindaje de rutas con HTTP 404 opaco ante clientes ordinarios y adición de tests de seguridad en `m04.routes.test.ts`.
+

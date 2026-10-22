@@ -4,16 +4,23 @@
   "version_actual": "v0.4.0",
   "fecha_actualizacion": "2026-10-21",
   "fase_activa": "FASE_3A_BACKEND",
-  "gate_activo": "GATE_2_FIRMADO",
-  "estado": "FASE_3A_COMPLETADA",
+  "gate_activo": "GATE_3A_RECHAZADO",
+  "estado": "BLOQUEADO_POR_VETO_QA",
   "rol_en_turno": "03_backend_engineer",
   "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 (Cuentas, Autenticación y Perfil): Fase 3A (Backend Lead Engineer) completada al 100%. Implementadas las 10 HUs (HU-CUE-01 a HU-CUE-10), endpoints REST bajo /cuentas y /admin/empresas, servicios hexagonales, repositorios Prisma y 45 pruebas Vitest (116/116 backend PASS). Walkthrough v0.4.0 generado. Listo para revisión y transición a Fase 3B (Frontend).",
+  "nota_de_contexto": "M04 (Cuentas, Autenticación y Perfil): Auditoría forense de QA completada para el backend v0.4.0. Se activó VETO STOP-THE-LINE por defecto S1 Blocker BUG-M04-01 (Broken Access Control en /admin/empresas/*: ausencia de validación de rol administrativo o permisos). El rol en turno regresa a 03_backend_engineer para remediación obligatoria con blindaje perimetral HTTP 404 opaco y pruebas de seguridad en m04.routes.test.ts.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
   "modulos_pendientes_gate_1": 13,
   "bloqueos": [
+    {
+      "tipo": "VETO_STOP_THE_LINE",
+      "descripcion": "M04 v0.4.0 backend rechazado por QA tras auditoría forense. Defecto S1 Blocker BUG-M04-01: Broken Access Control y escalada vertical de privilegios en /api/v1/admin/empresas/* (falta validación de actor.tipoSesion === 'admin' o permisos administrativos; clientes ordinarios pueden listar solicitudes corporativas con datos sensibles y dictaminar aprobaciones/rechazos).",
+      "responsable": "03_backend_engineer",
+      "estado": "ACTIVO",
+      "impacto": "Construcción y certificación detenidas hasta la remediación por el Backend Lead Engineer con blindaje HTTP 404 opaco y pruebas de seguridad en m04.routes.test.ts."
+    },
     {
       "tipo": "INCONSISTENCIA_RUTA",
       "descripcion": "El grafo de RUTA_DEL_PROYECTO.md tiene 4 inconsistencias registradas en su seccion 7: ciclo M18 -> M04 -> M07 -> M08 -> M18; M05 y M08 en Ola 4 dependen de M06, M07 y M21 de Ola 5; M16 sin conexiones; classDef declarados sin aplicar.",
@@ -135,7 +142,7 @@
       "depende_de": [
         "M18"
       ],
-      "estado_sdlc": "Fase 3A (Backend) completada al 100% (116/116 tests backend pasando, 0 ANY en 99 archivos, tsc/eslint limpios). Walkthrough v0.4.0 generado. Listo para revisión y paso a Fase 3B (Frontend)."
+      "estado_sdlc": "Fase 3A (Backend) rechazada por QA en v0.4.0 con Veto Stop-the-Line (BUG-M04-01: Broken Access Control en /admin/empresas). Asignado a 03_backend_engineer para remediación prioritaria."
     },
     {
       "id": "M05",
@@ -567,6 +574,20 @@
       "fecha": "2026-10-21",
       "autor": "03_backend_engineer",
       "motivo": "Fase 3A de M04 completada al 100%. Entrega de endpoints REST bajo /cuentas y /admin/empresas, servicios hexagonales, repositorios Prisma, cookie segura pc_sid y 45 pruebas Vitest cubriendo HU-CUE-01 a HU-CUE-10. 116/116 tests backend pasando, 0 ANY en 99 archivos, tsc y eslint limpios. Walkthrough v0.4.0 generado."
+    },
+    {
+      "de": "FASE_3A_BACKEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-21",
+      "autor": "Director Humano",
+      "motivo": "Instrucción expresa del Director Humano de pasar a Fase 3B con el rol 04_frontend_engineer para M04, tomando como insumos .sdlc/docs/modules/M04/, el walkthrough del backend v0.4.0, AGENTS.md y la ficha ATDD. El backend queda congelado; cualquier cambio de API se tramita por mesa técnica o RFC."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "FASE_3A_BACKEND",
+      "fecha": "2026-10-21",
+      "autor": "05_qa_security_tester",
+      "motivo": "VETO STOP-THE-LINE activado por QA en auditoría forense del backend M04 v0.4.0. Detección de defecto S1 Blocker BUG-M04-01 (Broken Function-Level Access Control en /api/v1/admin/empresas/*). Se regresa a Fase 3A asignado a 03_backend_engineer para remediación perimetral y pruebas de seguridad."
     }
   ]
 }
