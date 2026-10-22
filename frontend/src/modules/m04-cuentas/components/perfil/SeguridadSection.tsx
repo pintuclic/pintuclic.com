@@ -155,7 +155,9 @@ function CambioCorreo({
       onCorreoCambiado(nuevo);
       setSolicitud(null);
       reset();
-      setExito(`Listo: tu correo ahora es ${nuevo}. Avisamos del cambio a tu correo anterior.`);
+      // CA-CUE-06-02 pide avisar al correo anterior, pero el backend aún no emite ese
+      // evento (pendiente con M18): no se promete aquí.
+      setExito(`Listo: tu correo ahora es ${nuevo}.`);
     } catch (error) {
       setErrorCodigo(aErrorCuentas(error).mensaje);
     } finally {
