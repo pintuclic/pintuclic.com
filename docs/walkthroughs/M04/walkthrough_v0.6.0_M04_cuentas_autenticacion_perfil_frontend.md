@@ -127,8 +127,7 @@ Correcciones hechas durante la revisión: placeholder `••••••••`
 
 ## 7. Limitaciones y pendientes (declarados, sin sobre-afirmar)
 1. **Integración real pendiente:** nada se probó contra el backend ni PostgreSQL; la API simulada no sustituye la prueba de integración del Gate 4.
-2. **Fuera del módulo:** el límite JSON y la barra lateral de M17 se resolvieron con la aprobación del Director (ver §11). Sigue pendiente:
-   * `frontend/next.config.ts`: el *rewrite* `/api/:path*` → `http://backend:3000/:path*` **pierde el prefijo `/api`**, pero el backend monta sus rutas en `/api/v1`. Tal como está, las peticiones del navegador a `/api/v1/…` llegarían a `/v1/…` (404). Hay que alinear destino o prefijo con la configuración de DevOps.
+2. **Fuera del módulo:** el límite JSON y la barra lateral de M17 se resolvieron con la aprobación del Director (ver §11); el *rewrite* de `next.config.ts`, que perdía el prefijo `/api`, se corrigió al integrar `main` (ver §12).
 3. `HU-CUE-02` (Google) aplazada; por lo mismo no se muestra la advertencia de DP-12 al pedir el ascenso (el perfil no expone si hay Google vinculado).
 4. `CA-CUE-07-04`: la ubicación agrega **coordenadas**, pero no autocompleta dirección y barrio porque no hay proveedor de geocodificación inversa; el usuario los escribe. Las coordenadas solo se envían si guarda la dirección.
 5. Consentimiento de Términos solo en el cliente (decisión 6).
@@ -182,9 +181,24 @@ Se integró `origin/main` (Docker Compose, SMTP con Brevo/Mailpit, Google OAuth,
 
 **Verificación con las versiones de producción instaladas** (`lucide-react` 1.60.0 y `dotenv` 18.0.8, con `--no-save`): `next build` ✅ · frontend `tsc`, ESLint y `lint:a11y` limpios · Vitest 136/136 · backend `tsc` y ESLint limpios · Vitest 199/199 · `audit:core-kit` y `audit:a11y` aprobados · footer revisado en el navegador.
 
-### Pendiente para DevOps (no se tocó)
-1. **URL de la API.** El cliente usa `NEXT_PUBLIC_API_URL ?? '/api/v1'` como base y el backend monta sus rutas en `/api/v1`, pero la configuración de `main` no conserva ese prefijo:
-   * `docker-compose.yml` compila el frontend con `NEXT_PUBLIC_API_URL=/api`: las peticiones salen a `/api/cuentas/…` (sin `/v1`) y el *rewrite* de `next.config.ts` (`/api/:path*` → `${NEXT_PUBLIC_API_URL}/:path*`, resuelto en el build) apunta a sí mismo.
-   * `frontend/.env.example` propone `NEXT_PUBLIC_API_URL=http://localhost:3000`: las peticiones irían a `http://localhost:3000/cuentas/…`, también sin `/api/v1`.
-   * Propuesta: dejar la base del cliente en `/api/v1` (mismo origen, la cookie `HttpOnly` viaja sin CORS) y que el *rewrite* use una variable solo de servidor, p. ej. `/api/:path*` → `${BACKEND_URL ?? 'http://backend:3000'}/api/:path*`. Requiere tocar `next.config.ts`, `docker-compose.yml` y `.env.example`.
-2. **Lockfiles del frontend:** `package.json` pide `lucide-react ^1.58`, pero `package-lock.json` sigue fijando 0.525 (solo se actualizó `pnpm-lock.yaml`). `npm ci` fallaría por desincronía; conviene elegir un único gestor (el Dockerfile usa pnpm) y retirar o regenerar el otro lockfile.
+### URL de la API (corregida con autorización del Director: "hazlo tu, te doy permiso")
+**Problema.** El cliente llama a `NEXT_PUBLIC_API_URL ?? '/api/v1'` y el backend monta sus rutas en `/api/v1`, pero:
+* El *rewrite* de `next.config.ts` (`/api/:path*` → `http://backend:3000/:path*`) **descartaba `/api`**: `/api/v1/x` llegaba al backend como `/v1/x` (404).
+* El `frontend/Dockerfile` no declaraba `ARG`, así que los `args` de `docker-compose.yml` (`NEXT_PUBLIC_API_URL=/api`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`) nunca llegaban al build; la variable de ejecución tampoco tenía efecto, porque Next fija los rewrites y las `NEXT_PUBLIC_*` al compilar. *(Corrige lo dicho antes en esta sección: el cliente de Docker ya usaba `/api/v1` por omisión; lo roto era el destino del proxy.)*
+* `frontend/.env.example` proponía `NEXT_PUBLIC_API_URL=http://localhost:3000`, que en desarrollo local enviaba las peticiones a `http://localhost:3000/cuentas/…`, sin `/api/v1` y fuera del mismo origen.
+
+**Solución.** El navegador llama siempre a `/api/v1` en el mismo origen (la cookie `HttpOnly` + `SameSite=Strict` viaja sin CORS) y Next lo reenvía al backend conservando el prefijo, con una variable **solo de servidor**:
+
+| Archivo | Cambio |
+| :--- | :--- |
+| `frontend/next.config.ts` | `/api/:path*` → `${BACKEND_URL}/api/:path*`; `BACKEND_URL` por omisión `http://localhost:3000` (desarrollo local) |
+| `frontend/Dockerfile` | `ARG`/`ENV` `BACKEND_URL` (por omisión `http://backend:3000`) y `NEXT_PUBLIC_GOOGLE_CLIENT_ID` en la etapa de build |
+| `docker-compose.yml` | `args: BACKEND_URL` en lugar de `NEXT_PUBLIC_API_URL`; se quitan las variables de ejecución sin efecto |
+| `docker-compose.override.example.yml` · `.env.example` · `frontend/.env.example` | `BACKEND_URL` en lugar de `NEXT_PUBLIC_API_URL`, con la explicación |
+
+`apiClient` (M20) no cambia: su base por omisión `/api/v1` es la correcta.
+
+**Verificación real del proxy:** se compiló con `BACKEND_URL=http://127.0.0.1:3999` contra un backend de eco y se arrancó Next **sin** la variable. El manifiesto de rutas fija `http://127.0.0.1:3999/api/:path*`; el backend recibió `GET /api/v1/cuentas/perfil` con la cookie del navegador, `POST /api/v1/cuentas/login` con su cuerpo y un cuerpo de **6 990 557 bytes** (RUT de 5 MB en base64) íntegro en `/api/v1/cuentas/empresas/renovacion-nit`; el `Set-Cookie` (`HttpOnly; Secure; SameSite=Strict`) volvió al navegador. Los YAML de compose se validaron con un analizador (Docker no está instalado en este entorno, así que la imagen no se construyó).
+
+### Pendiente para DevOps
+1. **Lockfiles del frontend:** `package.json` pide `lucide-react ^1.58`, pero `package-lock.json` sigue fijando 0.525 (solo se actualizó `pnpm-lock.yaml`). `npm ci` fallaría por desincronía; conviene elegir un único gestor (el Dockerfile usa pnpm) y retirar o regenerar el otro lockfile.

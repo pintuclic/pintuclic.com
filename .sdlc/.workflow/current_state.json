@@ -8,7 +8,7 @@
   "estado": "FASE_3B_EN_CURSO",
   "rol_en_turno": "04_frontend_engineer",
   "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 frontend v0.6.0 APROBADO en Gate 3B y commiteado (6 commits) con los ajustes autorizados (límite JSON por ruta y entrada Empresas en el AdminLayout de M17). Integrado origin/main de DevOps: lucide-react 1.x retiró los íconos de marca y se corrigió el Footer (IconosMarca.tsx); dotenv 18 compatible; todo verificado con las versiones de producción. Pendiente para enlazar el backend real: alinear la URL de la API (NEXT_PUBLIC_API_URL=/api en docker-compose y el rewrite de next.config.ts pierden /api/v1) y la desincronía de package-lock.json en el frontend. Siguiente: integración real y Gate 4 (QA); la geolocalización (CA-CUE-07-04) se prueba con el backend real.",
+  "nota_de_contexto": "M04 frontend v0.6.0 APROBADO en Gate 3B, commiteado e integrado con main de DevOps. Corregidos: límite JSON por ruta, entrada Empresas en el AdminLayout de M17, íconos de marca retirados en lucide-react 1.x y la URL de la API (el navegador llama a /api/v1 en el mismo origen y Next reenvía al backend con BACKEND_URL conservando el prefijo). Pendiente para DevOps: package-lock.json del frontend desincronizado. Siguiente: levantar el backend real (docker compose), integración de punta a punta (incluida la geolocalización de CA-CUE-07-04) y Gate 4 (QA).",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "frentes_propios": [
     {
@@ -122,9 +122,9 @@
       "tipo": "SOLICITUD_DE_CAMBIO_EXTERNO",
       "descripcion": "El frontend de M04 v0.6.0 necesita tres cambios fuera de su módulo (Directiva #3: no se tocaron): (1) frontend/next.config.ts: el rewrite /api/:path* -> http://backend:3000/:path* descarta el prefijo /api, pero el backend monta sus rutas en /api/v1, así que el proxy respondería 404; (2) backend/src/index.ts: express.json({ limit: \"100kb\" }) impide enviar el RUT de hasta 5 MB de HU-CUE-10 (ya elevado en v0.4.1); (3) m17-permisos/components/AdminLayout.tsx: entrada \"Empresas\" (/admin/empresas) en la barra lateral y su título en el breadcrumb. Actualización tras integrar main (2026-10-22): DevOps compila el frontend con NEXT_PUBLIC_API_URL=/api y frontend/.env.example propone http://localhost:3000; en ambos casos las peticiones pierden el prefijo /api/v1 del backend. Además package-lock.json del frontend fija lucide-react 0.525 frente a ^1.58 en package.json.",
       "responsable": "Director Humano (aprobación) · DevOps (1) · Backend M04 (2) · equipo M17 (3)",
-      "estado": "PARCIALMENTE_AUTORIZADO",
+      "estado": "RESUELTA",
       "impacto": "Sin (1) ninguna vista llega al backend a través de Next; sin (2) la renovación de NIT falla con archivos reales; sin (3) el panel de empresas solo es accesible por URL.",
-      "resolucion": "Director Humano, 2026-10-22: \"te doy permiso de corregir el limite JSON y la barra lateral del admin (recordemos que el M17 no tenia ni idea de este modulo, asi que no hizo esa ruta)\". Se autorizan (2) y (3). El punto (1) (rewrite de next.config.ts) queda para la integración con la configuración de DevOps de main. Aplicados el 2026-10-22: (2) core/middlewares/cuerpoJson.middleware.ts (100 kb general, 7 MB solo en renovacion-nit, 413 con código propio; backend 199/199) y (3) entrada Empresas y breadcrumb en AdminLayout de M17. Queda abierto (1)."
+      "resolucion": "Director Humano, 2026-10-22: \"te doy permiso de corregir el limite JSON y la barra lateral del admin (recordemos que el M17 no tenia ni idea de este modulo, asi que no hizo esa ruta)\". Se autorizan (2) y (3). El punto (1) (rewrite de next.config.ts) queda para la integración con la configuración de DevOps de main. Aplicados el 2026-10-22: (2) core/middlewares/cuerpoJson.middleware.ts (100 kb general, 7 MB solo en renovacion-nit, 413 con código propio; backend 199/199) y (3) entrada Empresas y breadcrumb en AdminLayout de M17. Queda abierto (1). (1) resuelto el 2026-10-22 con autorización del Director (\"hazlo tu, te doy permiso\"): BACKEND_URL solo de servidor en next.config.ts conservando /api/v1, ARG en frontend/Dockerfile, docker-compose (build args), override y .env.example. Verificado con backend de eco (ruta, cookie, cuerpo de ~7 MB y Set-Cookie). Sigue abierto para DevOps: frontend/package-lock.json desincronizado (lucide-react 0.525 vs ^1.58)."
     }
   ],
   "modulos_registrados": [
@@ -689,6 +689,13 @@
       "fecha": "2026-10-22",
       "autor": "04_frontend_engineer",
       "motivo": "Entrega v0.6.0 commiteada (fix v0.4.2, chore landing FP-01, feat M04 frontend, fix límite JSON, fix barra lateral M17, docs) e integrado origin/main de DevOps. Corregida la rotura de lucide-react 1.x en el Footer; verificado con las versiones de producción. Elevada a DevOps la alineación de la URL de la API (/api/v1)."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-22",
+      "autor": "Director Humano",
+      "motivo": "Autoriza al frontend engineer a corregir la configuración de la URL de la API (\"hazlo tu, te doy permiso\") y a hacer commit y push. Resuelto: proxy /api con BACKEND_URL conservando /api/v1, ARG en el Dockerfile del frontend, docker-compose, override y .env.example."
     }
   ]
 }
