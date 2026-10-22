@@ -1,14 +1,14 @@
 {
   "proyecto": "Pintu Clic",
   "dominio": "pintuclic.com",
-  "version_actual": "v0.6.0",
+  "version_actual": "v0.6.1",
   "fecha_actualizacion": "2026-10-22",
   "fase_activa": "FASE_3B_FRONTEND",
   "gate_activo": "GATE_3B_APROBADO",
   "estado": "FASE_3B_EN_CURSO",
   "rol_en_turno": "04_frontend_engineer",
   "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 frontend v0.6.0 APROBADO en Gate 3B, commiteado e integrado con main de DevOps. Corregidos: límite JSON por ruta, entrada Empresas en el AdminLayout de M17, íconos de marca retirados en lucide-react 1.x y la URL de la API (el navegador llama a /api/v1 en el mismo origen y Next reenvía al backend con BACKEND_URL conservando el prefijo). Pendiente para DevOps: package-lock.json del frontend desincronizado. Siguiente: levantar el backend real (docker compose), integración de punta a punta (incluida la geolocalización de CA-CUE-07-04) y Gate 4 (QA).",
+  "nota_de_contexto": "M04 v0.6.1: frontend aprobado y validado de punta a punta contra el backend real y PostgreSQL local (pintuclic_dev). Corregidos el perfil fuera de contrato y la evasión de unicidad del NIT. Listo para Gate 4 (QA). Para levantar el entorno local: base pintuclic_dev + backend/.env (no versionado); los OTP solo se leen con el arnés de validación porque M18 no existe.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "frentes_propios": [
     {
@@ -180,7 +180,7 @@
       "depende_de": [
         "M18"
       ],
-      "estado_sdlc": "Fase 3A (Backend) certificada en v0.4.1 (+ v0.4.2 motivo opcional). Fase 3B (Frontend) v0.6.0 APROBADA por el Director Humano (Gate 3B). Cierre en curso: ajustes autorizados (límite JSON del RUT y entrada Empresas en el AdminLayout de M17), commit e integración de main (DevOps). Siguiente: integración real contra el backend y Gate 4 (QA)."
+      "estado_sdlc": "Fase 3A certificada (v0.4.1). Fase 3B aprobada (v0.6.0). v0.6.1: validación real de punta a punta contra PostgreSQL (pintuclic_dev) y correcciones autorizadas (perfil conforme al contrato, NIT normalizado). Siguiente: Gate 4 (QA). Pendientes: aviso al correo anterior (CA-CUE-06-02, M18), equivalencia de NIT sin guion (PO), HU-CUE-02 aplazada."
     },
     {
       "id": "M05",
@@ -696,6 +696,20 @@
       "fecha": "2026-10-22",
       "autor": "Director Humano",
       "motivo": "Autoriza al frontend engineer a corregir la configuración de la URL de la API (\"hazlo tu, te doy permiso\") y a hacer commit y push. Resuelto: proxy /api con BACKEND_URL conservando /api/v1, ARG en el Dockerfile del frontend, docker-compose, override y .env.example."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-22",
+      "autor": "Director Humano",
+      "motivo": "Tras la validación real contra PostgreSQL (pintuclic_dev) autoriza (\"te autorizo\") corregir tres hallazgos: (1) GET/PUT /cuentas/perfil no cumplen perfilUsuarioResponseSchema (backend M04); (2) la unicidad del NIT se evade con otro formato (backend M04, RN-CUE-14); (3) texto falso sobre aviso al correo anterior (frontend M04)."
+    },
+    {
+      "de": "FASE_3B_FRONTEND",
+      "a": "FASE_3B_FRONTEND",
+      "fecha": "2026-10-22",
+      "autor": "04_frontend_engineer",
+      "motivo": "v0.6.1: validación real de M04 contra PostgreSQL y correcciones autorizadas (perfil conforme a perfilUsuarioResponseSchema, nitSchema normalizado, texto de cambio de correo). Backend 205/205, frontend 136/136. Queda listo para Gate 4 (QA)."
     }
   ]
 }

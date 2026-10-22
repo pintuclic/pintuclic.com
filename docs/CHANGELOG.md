@@ -6,6 +6,18 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [v0.6.1] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔎 **Validación real de M04 contra PostgreSQL y correcciones.** Todas las HU de M04 (salvo `HU-CUE-02`, aplazada) recorridas en el navegador contra el backend real y la base `pintuclic_dev` (esquema v4.2 + seed): registro con OTP, primer acceso, recuperación con token de un solo uso, cambio de contraseña que cierra todas las sesiones, cambio de correo, direcciones con ubicación del dispositivo, ascenso y dictamen, renovación de NIT con un RUT real de 2 MB y descarga idéntica byte a byte, desactivación y 404 opaco sin permiso.
+- **Correcciones (autorizadas por el Director):**
+  - **Backend · perfil fuera de contrato:** `GET` y `PUT /cuentas/perfil` respondían `tipoUsuario`/`cuentaEmpresa` sin `cambioContrasenaPendiente`; ahora cumplen `perfilUsuarioResponseSchema` (una cuenta empresa se mostraba como personal).
+  - **Backend · unicidad del NIT (RN-CUE-14):** `900.555.666-1` evadía el duplicado de `900555666-1`. `nitSchema` normaliza (sin espacios ni puntos) en backend, contrato rector y frontend.
+  - **Frontend:** se retiró la promesa de aviso al correo anterior, que el backend no emite (CA-CUE-06-02 queda pendiente con M18).
+- **Verificación:** backend 205/205 (+6), frontend 136/136, `tsc`/ESLint/`check:no-any` limpios, contratos validados. Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.6.1_M04_validacion_real_y_correcciones_backend.md`.
+- **Pendiente:** el Product Owner debe fijar si un NIT sin guion equivale al mismo con guion; el correo real (OTP, enlaces y avisos) depende de M18.
+
+---
+
 ## [v0.6.0] - 2026-10-22
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🔐 **Frontend de M04 — Cuentas, Autenticación y Perfil.** Registro de persona natural con OTP y de empresa según `VISTAS.pdf` págs. 3–6; login, recuperación, restablecimiento y primer acceso derivados del mismo modal; "Mi cuenta" (`/perfil`: datos, contraseña, correo con OTP, direcciones, ascenso a empresa, renovación de NIT con RUT, cierre de sesión y desactivación) y panel `/admin/empresas` (dictamen de registros, ascensos y renovaciones con descarga del RUT). Cubre `HU-CUE-01` y `03` a `10`; `HU-CUE-02` (Google) aplazada con el botón deshabilitado.

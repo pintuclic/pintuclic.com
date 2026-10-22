@@ -257,3 +257,16 @@ Por instrucción del Director Humano ("dejar el backend completamente sano") se 
 - **Decisiones registradas en la misma instrucción:** ratificado `app.routes.ts`; verificación del correo del registro de empresa a cargo del administrador; auditoría aplazada.
 - **Walkthrough:** `docs/walkthroughs/M04/walkthrough_v0.4.2_M04_motivo_rechazo_opcional_backend.md`.
 - **Sigue elevado:** límite JSON de 100 kb en `index.ts` frente al RUT de 5 MB; catálogo de códigos de error divergente; notificaciones de renovación de NIT.
+
+---
+
+## 2026-10-22 — M04 · v0.6.1 · Correcciones halladas en la validación real
+
+**Rol:** asumido por el agente frontend con autorización expresa del Director Humano ("te autorizo").
+
+- Validación de punta a punta contra PostgreSQL 18 (`pintuclic_dev`, esquema v4.2 + seed) con el código real del backend.
+- **Perfil fuera de contrato:** `PerfilService.obtenerPerfil` y `actualizarDatos` devuelven ahora `PerfilUsuarioResponse` (`tipo`, `cambioContrasenaPendiente`, `empresa`); la prueba valida contra `perfilUsuarioResponseSchema.strict()`.
+- **Unicidad del NIT:** `nitSchema` normaliza con `normalizarNit` (sin espacios ni puntos) en DTO y contrato rector; nueva prueba `nit.dto.test.ts`.
+- Verificación: `tsc` 0, ESLint 0/0, 0 `any`, Vitest 205/205 (+6).
+- Pendiente: CA-CUE-06-02 (aviso al correo anterior) no tiene evento en el puerto de notificaciones; el PO debe fijar si un NIT sin guion equivale al mismo con guion.
+- Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.6.1_M04_validacion_real_y_correcciones_backend.md`.

@@ -298,3 +298,9 @@ El Director aprobó la landing (FP-01) y pidió el login con `VISTAS.pdf` págs.
 - **Integración de `main`:** sin conflictos. `lucide-react` 1.x retiró `Facebook`, `Instagram` y `Youtube` y rompía el Footer del Core: se reemplazaron por `IconosMarca.tsx` (Simple Icons, CC0). Verificado con `lucide-react` 1.60.0 y `dotenv` 18.0.8 instalados.
 - **Elevado a DevOps:** la configuración de `main` no conserva el prefijo `/api/v1` (`NEXT_PUBLIC_API_URL=/api` en el build, `http://localhost:3000` en `.env.example`) y `package-lock.json` del frontend quedó desincronizado. Detalle en el walkthrough §12.
 - **URL de la API (autorizado: "hazlo tu, te doy permiso"):** el *rewrite* descartaba `/api` y el Dockerfile del frontend no declaraba `ARG`, así que los `args` de compose nunca llegaban al build. Ahora el navegador llama a `/api/v1` en el mismo origen y Next reenvía con `BACKEND_URL` (solo servidor, fijado al compilar) conservando el prefijo. Verificado con un backend de eco: ruta, cookie, cuerpo de ~7 MB y `Set-Cookie`. Sigue para DevOps: `package-lock.json` desincronizado.
+
+## 2026-10-22 — M04 · v0.6.1 · Validación real contra el backend
+
+- Base local `pintuclic_dev` (PostgreSQL 18) + backend real con un arnés que imprime los OTP; frontend en producción con `BACKEND_URL`. Todas las HU de M04 recorridas en Chrome sin API simulada.
+- Hallazgos: perfil fuera de contrato y NIT sin normalizar (backend, corregidos con autorización) y texto falso sobre el aviso al correo anterior (frontend, retirado). `nitSchema` del frontend normaliza igual que el contrato.
+- Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.6.1_M04_validacion_real_y_correcciones_backend.md`.
