@@ -1,15 +1,18 @@
 import Link from 'next/link';
-import { Facebook, Instagram, Mail, MapPin, Phone, Youtube, type LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { Mail, MapPin, Phone, type LucideIcon } from 'lucide-react';
+import { IconoFacebook, IconoInstagram, IconoYoutube, type IconoMarcaProps } from './IconosMarca';
 import { Container } from './Container';
 import { Logo, type LogoProps } from './Logo';
 
 export type FooterSocialIcon = 'facebook' | 'instagram' | 'youtube';
 export type FooterContactIcon = 'ubicacion' | 'telefono' | 'correo';
 
-const ICONOS_SOCIALES: Record<FooterSocialIcon, LucideIcon> = {
-  facebook: Facebook,
-  instagram: Instagram,
-  youtube: Youtube,
+// lucide-react 1.x ya no trae logotipos de marca (ver IconosMarca.tsx).
+const ICONOS_SOCIALES: Record<FooterSocialIcon, ComponentType<IconoMarcaProps>> = {
+  facebook: IconoFacebook,
+  instagram: IconoInstagram,
+  youtube: IconoYoutube,
 };
 
 const ICONOS_CONTACTO: Record<FooterContactIcon, LucideIcon> = {
