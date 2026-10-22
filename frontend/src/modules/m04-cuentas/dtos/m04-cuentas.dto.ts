@@ -278,24 +278,24 @@ export type PerfilUsuarioView = z.infer<typeof perfilUsuarioViewSchema>;
  * 11. SCHEMAS: HU-CUE-09 DICTAMEN DE SOLICITUDES
  * ─────────────────────────────────────────────────────────────────────────── */
 
-export const dictamenSolicitudEmpresaFormSchema = z
-  .object({
-    decision: z.enum(['aprobar', 'rechazar']),
-    motivoRechazo: z.string().trim().max(500).optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.decision === 'rechazar') {
-        return typeof data.motivoRechazo === 'string' && data.motivoRechazo.length >= 10;
-      }
-      return true;
-    },
-    {
-      message: 'En caso de rechazo, debe justificar con al menos 10 caracteres',
-      path: ['motivoRechazo'],
-    }
-  );
+/** Dictamen con motivo OPCIONAL: ascensos y renovaciones de NIT (RN-CUE-17). */
+export const dictamenSolicitudEmpresaFormSchema = z.object({
+  decision: z.enum(['aprobar', 'rechazar']),
+  motivoRechazo: z.string().trim().max(500).optional(),
+});
 export type DictamenSolicitudEmpresaFormData = z.infer<typeof dictamenSolicitudEmpresaFormSchema>;
+
+/** RN-CUE-17: al rechazar un REGISTRO de empresa el motivo es obligatorio (mínimo 10 caracteres). */
+export const dictamenRegistroEmpresaFormSchema = dictamenSolicitudEmpresaFormSchema.refine(
+  (data) =>
+    data.decision !== 'rechazar' ||
+    (typeof data.motivoRechazo === 'string' && data.motivoRechazo.length >= 10),
+  {
+    message: 'Para rechazar un registro de empresa debe justificar con al menos 10 caracteres',
+    path: ['motivoRechazo'],
+  }
+);
+export type DictamenRegistroEmpresaFormData = z.infer<typeof dictamenRegistroEmpresaFormSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 12. SCHEMAS: HU-CUE-10 RENOVACIÓN DE NIT

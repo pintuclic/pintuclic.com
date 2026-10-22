@@ -355,6 +355,51 @@ describe('HU-CUE-09 · Dictamen', () => {
     expect(repoSolicitudes.decidirSolicitud).not.toHaveBeenCalled();
   });
 
+  it('el contrato acepta rechazar sin motivo; el servicio lo exige solo en registros (RN-CUE-17)', async () => {
+    // Registro: sin motivo -> 400 MOTIVO_RECHAZO_REQUERIDO (no llega a decidir).
+    repoSolicitudes.buscarPorId.mockResolvedValue({ ...solicitud, tipoSolicitud: 'registro' });
+    const registro = await pedir({ ...rutaDictamen, cuerpo: { decision: 'rechazar' } });
+    expect(registro.estado).toBe(400);
+    expect(registro.cuerpo).toMatchObject({ error: { code: 'MOTIVO_RECHAZO_REQUERIDO' } });
+    expect(repoSolicitudes.decidirSolicitud).not.toHaveBeenCalled();
+
+    // Ascenso: sin motivo -> 200 (opcional).
+    repoSolicitudes.buscarPorId.mockResolvedValue({ ...solicitud, tipoSolicitud: 'ascenso_particular' });
+    repoSolicitudes.decidirSolicitud.mockResolvedValue({
+      resultado: 'decidida',
+      solicitud: { ...solicitud, estado: 'rechazada' },
+    });
+    const ascenso = await pedir({ ...rutaDictamen, cuerpo: { decision: 'rechazar' } });
+    expect(ascenso.estado).toBe(200);
+  });
+
+  it('rechazar una renovación de NIT sin motivo responde 200 (CA-CUE-09-06)', async () => {
+    repoSolicitudes.buscarRenovacionPorId.mockResolvedValue({
+      idSolicitud: ID_RENOVACION,
+      idUsuario: 7,
+      estado: 'pendiente',
+      nitAnterior: '900111222-3',
+      nitNuevo: '900999888-7',
+    });
+    repoSolicitudes.decidirRenovacionNit.mockResolvedValue({
+      resultado: 'decidida',
+      solicitud: { idSolicitud: ID_RENOVACION, estado: 'rechazada' },
+    });
+
+    const { estado } = await pedir({
+      nombre: 'rechazo de renovación sin motivo',
+      metodo: 'POST',
+      ruta: `/admin/empresas/renovaciones/${ID_RENOVACION}/dictamen`,
+      cuerpo: { decision: 'rechazar' },
+    });
+
+    expect(estado).toBe(200);
+    expect(repoSolicitudes.decidirRenovacionNit).toHaveBeenCalledWith(
+      ID_RENOVACION,
+      expect.objectContaining({ estado: 'rechazada', motivoRechazo: null })
+    );
+  });
+
   it('un conflicto de NIT al aprobar responde 409 NIT_YA_REGISTRADO', async () => {
     repoSolicitudes.buscarPorId.mockResolvedValue(solicitud);
     repoSolicitudes.decidirSolicitud.mockResolvedValue({ resultado: 'nit_ocupado' });

@@ -339,6 +339,31 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       );
     });
 
+    it('un motivo de menos de 10 caracteres tampoco basta para rechazar un REGISTRO', async () => {
+      vi.mocked(solicitudesRepo.buscarPorId).mockResolvedValueOnce(
+        solicitudPendiente({ tipoSolicitud: 'registro' })
+      );
+
+      await expect(
+        service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'rechazar', motivoRechazo: 'corto' })
+      ).rejects.toMatchObject({ codigo: 'MOTIVO_RECHAZO_REQUERIDO', statusCode: 400 });
+
+      expect(solicitudesRepo.decidirSolicitud).not.toHaveBeenCalled();
+    });
+
+    it('un motivo vacío o de solo espacios en un ASCENSO se guarda como "sin motivo", no como cadena vacía', async () => {
+      vi.mocked(solicitudesRepo.buscarPorId).mockResolvedValueOnce(
+        solicitudPendiente({ tipoSolicitud: 'ascenso_particular' })
+      );
+
+      await service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'rechazar', motivoRechazo: '   ' });
+
+      expect(solicitudesRepo.decidirSolicitud).toHaveBeenCalledWith(
+        'solicitud-uuid-1',
+        expect.objectContaining({ estado: 'rechazada', motivoRechazo: null })
+      );
+    });
+
     it('una solicitud ya decidida responde 409 SOLICITUD_YA_DECIDIDA sin tocar nada (CA-CUE-09-04)', async () => {
       vi.mocked(solicitudesRepo.buscarPorId).mockResolvedValueOnce(
         solicitudPendiente({ estado: 'aprobada' })
@@ -419,6 +444,18 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       expect(solicitudesRepo.decidirRenovacionNit).toHaveBeenCalledWith(
         'renovacion-uuid-1',
         expect.objectContaining({ estado: 'aprobada', idAdminRevisor: 1 })
+      );
+    });
+
+    it('rechazar una renovación sin motivo es válido y deja el NIT vigente (CA-CUE-09-06)', async () => {
+      vi.mocked(solicitudesRepo.buscarRenovacionPorId).mockResolvedValueOnce(renovacionPendiente());
+
+      const res = await service.dictaminarRenovacionNit('renovacion-uuid-1', 1, { decision: 'rechazar' });
+
+      expect(res.mensaje).toContain('rechazada exitosamente');
+      expect(solicitudesRepo.decidirRenovacionNit).toHaveBeenCalledWith(
+        'renovacion-uuid-1',
+        expect.objectContaining({ estado: 'rechazada', motivoRechazo: null })
       );
     });
 

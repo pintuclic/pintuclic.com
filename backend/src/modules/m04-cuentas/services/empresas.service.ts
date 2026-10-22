@@ -14,6 +14,9 @@ import type {
   SolicitarRenovacionNitRequest,
 } from '../dtos/m04-cuentas.dto';
 
+/** RN-CUE-17: longitud mínima del motivo al rechazar un registro de empresa. */
+const MOTIVO_MINIMO_REGISTRO = 10;
+
 export class EmpresasError extends Error {
   constructor(
     message: string,
@@ -284,12 +287,17 @@ export class EmpresasService {
 
     const estado = dictamen.decision === 'aprobar' ? 'aprobada' : 'rechazada';
 
-    // RN-CUE-17: el motivo es obligatorio solo al rechazar un REGISTRO de empresa;
-    // en ascensos es opcional.
-    const motivoVacio = !dictamen.motivoRechazo || dictamen.motivoRechazo.trim().length === 0;
-    if (estado === 'rechazada' && solicitud.tipoSolicitud === 'registro' && motivoVacio) {
+    // RN-CUE-17: el motivo es obligatorio (mínimo 10 caracteres) solo al rechazar un
+    // REGISTRO de empresa; en ascensos es opcional. La regla vive aquí y no en el DTO
+    // porque depende del tipo de solicitud, que solo conoce el servidor.
+    const motivo = this.normalizarMotivo(dictamen.motivoRechazo);
+    if (
+      estado === 'rechazada' &&
+      solicitud.tipoSolicitud === 'registro' &&
+      (motivo === null || motivo.length < MOTIVO_MINIMO_REGISTRO)
+    ) {
       throw new EmpresasError(
-        'El motivo de rechazo es obligatorio para dictámenes negativos.',
+        `El motivo de rechazo es obligatorio (mínimo ${MOTIVO_MINIMO_REGISTRO} caracteres) al rechazar un registro de empresa.`,
         'MOTIVO_RECHAZO_REQUERIDO',
         400,
       );
@@ -298,7 +306,7 @@ export class EmpresasService {
     const decision = await this.solicitudesRepo.decidirSolicitud(idSolicitud, {
       estado,
       idAdminRevisor: idAdmin,
-      motivoRechazo: dictamen.motivoRechazo ?? null,
+      motivoRechazo: motivo,
       fechaRevision: new Date(),
     });
 
@@ -315,7 +323,7 @@ export class EmpresasService {
       await this.notificaciones.notificarDictamenEmpresa(
         solicitud.correoEmpresarial,
         'rechazada',
-        dictamen.motivoRechazo,
+        motivo ?? undefined,
       );
     }
 
@@ -403,7 +411,7 @@ export class EmpresasService {
     const decision = await this.solicitudesRepo.decidirRenovacionNit(idSolicitud, {
       estado,
       idAdminRevisor: idAdmin,
-      motivoRechazo: dictamen.motivoRechazo ?? null,
+      motivoRechazo: this.normalizarMotivo(dictamen.motivoRechazo), // opcional (RN-CUE-17)
       fechaRevision: new Date(),
     });
 
@@ -418,6 +426,12 @@ export class EmpresasService {
       solicitud: decision.solicitud,
       mensaje: `Renovación de NIT ${estado === 'aprobada' ? 'aprobada' : 'rechazada'} exitosamente.`,
     };
+  }
+
+  /** Un motivo vacío o solo de espacios equivale a "sin motivo". */
+  private normalizarMotivo(motivo: string | undefined): string | null {
+    const limpio = motivo?.trim();
+    return limpio === undefined || limpio.length === 0 ? null : limpio;
   }
 
   /** CA-CUE-09-04: una solicitud decidida no se vuelve a decidir (409). */

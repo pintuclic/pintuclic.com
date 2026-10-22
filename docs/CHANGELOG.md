@@ -6,6 +6,15 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [v0.4.2] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** ✏️ **Motivo de rechazo opcional en el dictamen (M04).** Por decisión del Director Humano el contrato acepta rechazar sin motivo; se conserva obligatorio (mínimo 10 caracteres) solo al rechazar un **registro** de empresa (`RN-CUE-17`), regla que pasa del DTO al servicio porque depende del tipo de solicitud.
+- **Alcance:** contrato rector `m04-cuentas.contract.ts`, DTO del backend, `EmpresasService` (un motivo vacío se guarda como "sin motivo") y DTO del frontend (`dictamenSolicitudEmpresaFormSchema` opcional + `dictamenRegistroEmpresaFormSchema` obligatorio). Ajuste autorizado expresamente durante la Fase 3B.
+- **Verificación:** backend 20/20 suites · **193/193** (+5); frontend +8 pruebas de DTO; contratos 16/16; `tsc`, ESLint y `check:no-any` limpios. Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.4.2_M04_motivo_rechazo_opcional_backend.md`.
+- **Decisiones registradas:** ratificado el cambio de `app.routes.ts` (v0.4.1); la verificación del correo del registro de empresa la valida el administrador al aceptarla; auditoría de decisiones aplazada (`HU-SEG-04`).
+
+---
+
 ## [v0.4.1] - 2026-10-21
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🛡️ **Remediación de `BUG-M04-01` (S1 Blocker) — control de acceso en `/admin/empresas/*`.** Las rutas administrativas de empresas ahora exigen sesión válida y el permiso atómico `empresas.validar`, evaluado en servidor en cada petición; sin él responden el 404 opaco de M20.

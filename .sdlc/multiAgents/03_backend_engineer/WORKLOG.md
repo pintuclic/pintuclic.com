@@ -244,3 +244,16 @@ Por instrucción del Director Humano ("dejar el backend completamente sano") se 
 - **Elevado sin resolver (requiere archivo compartido, contrato firmado o decisión de producto):** límite JSON de 100 kb en `index.ts` frente a RUT de 5 MB (bloquea la renovación de punta a punta); catálogo de códigos de error divergente; motivo opcional en ascensos/renovaciones frente al DTO firmado; verificación de correo del registro de empresa; notificaciones de renovación de NIT; auditoría de decisiones (`HU-SEG-04`); fallo de notificación posterior al commit; carga de RUT huérfana en registro/ascenso. Detalle en el walkthrough §8.
 - La exclusión mutua real entre conexiones concurrentes solo se demuestra contra PostgreSQL: prueba de integración para el Gate 4.
 - **Entrega al Agente 05 (QA)** para re-auditoría de `BUG-M04-01` y del saneamiento.
+
+---
+
+## 2026-10-22 — M04 · v0.4.2 · Motivo de rechazo opcional en el dictamen
+
+**Rol:** Backend Lead Engineer (ajuste puntual autorizado por el Director Humano durante la Fase 3B)
+
+- **Decisión del Director:** el motivo de rechazo queda opcional. Se conserva obligatorio (≥ 10 caracteres) solo al rechazar un **registro** de empresa (`RN-CUE-17`).
+- **Cambios:** el `.refine` de ≥ 10 caracteres sale del contrato rector y del DTO; la regla del registro pasa a `EmpresasService.dictaminarSolicitud` (depende del tipo de solicitud, que solo conoce el servidor). Un motivo vacío o de espacios se guarda como `null` en solicitudes y renovaciones. DTO del frontend dividido en `dictamenSolicitudEmpresaFormSchema` (opcional) y `dictamenRegistroEmpresaFormSchema` (obligatorio).
+- **Verificación:** 20/20 suites, 193/193 (+5); `tsc`, ESLint, `check:no-any` limpios; contratos 16/16.
+- **Decisiones registradas en la misma instrucción:** ratificado `app.routes.ts`; verificación del correo del registro de empresa a cargo del administrador; auditoría aplazada.
+- **Walkthrough:** `docs/walkthroughs/M04/walkthrough_v0.4.2_M04_motivo_rechazo_opcional_backend.md`.
+- **Sigue elevado:** límite JSON de 100 kb en `index.ts` frente al RUT de 5 MB; catálogo de códigos de error divergente; notificaciones de renovación de NIT.

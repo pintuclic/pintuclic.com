@@ -376,23 +376,18 @@ export const solicitudEmpresaItemSchema = z.object({
 });
 export type SolicitudEmpresaItem = z.infer<typeof solicitudEmpresaItemSchema>;
 
-export const dictamenSolicitudEmpresaRequestSchema = z
-  .object({
-    decision: z.enum(['aprobar', 'rechazar']),
-    motivoRechazo: z.string().trim().max(500).optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.decision === 'rechazar') {
-        return typeof data.motivoRechazo === 'string' && data.motivoRechazo.length >= 10;
-      }
-      return true;
-    },
-    {
-      message: 'En caso de rechazo, el motivo debe contener al menos 10 caracteres',
-      path: ['motivoRechazo'],
-    }
-  );
+/**
+ * Dictamen administrativo (aprobar o rechazar).
+ *
+ * El motivo es OPCIONAL en el contrato (decisión del Director Humano, 2026-10-22).
+ * La excepción es el rechazo de un REGISTRO de empresa, donde RN-CUE-17 lo exige:
+ * esa regla depende del tipo de solicitud, que solo conoce el servidor, y se aplica
+ * en `EmpresasService.dictaminarSolicitud` (MOTIVO_RECHAZO_REQUERIDO).
+ */
+export const dictamenSolicitudEmpresaRequestSchema = z.object({
+  decision: z.enum(['aprobar', 'rechazar']),
+  motivoRechazo: z.string().trim().max(500).optional(),
+});
 export type DictamenSolicitudEmpresaRequest = z.infer<typeof dictamenSolicitudEmpresaRequestSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
