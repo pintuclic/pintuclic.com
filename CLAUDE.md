@@ -7,7 +7,8 @@ Las reglas del proyecto están en [AGENTS.md](./AGENTS.md) y rigen aquí por com
 1. Lee `.sdlc/.workflow/current_state.json`. Ahí está dónde vamos: `fase_activa`, `gate_activo`, `estado`, `rol_en_turno`, `modulo_en_curso`, `bloqueos` y `nota_de_contexto`.
 2. Respeta la fase: en `FASE_1_PRD` y `FASE_2_ARQUITECTURA` no se escribe código de negocio (ver AGENTS.md). Si `estado` es `ESPERANDO_APROBACION_HUMANA`, detente y pide la firma.
 3. Si necesitas más detalle del módulo en curso, mira `.sdlc/docs/modules/M[XX]/` y el `WORKLOG.md` del rol en turno en `.sdlc/multiAgents/`.
-4. No pidas al usuario que te explique el proyecto ni qué archivos leer: la respuesta está en los pasos anteriores. Pregunta solo lo que esos archivos no resuelvan.
+4. Para saber qué se ha hecho, empieza por `docs/CHANGELOG.md` (una entrada por versión con las HU cubiertas y la ruta del walkthrough). Abre un walkthrough de `docs/walkthroughs/M[XX]/` solo si la tarea toca ese módulo, y ahí fíjate en "Resumen de dependencias externas" e "Inventario de archivos".
+5. No pidas al usuario que te explique el proyecto ni qué archivos leer: la respuesta está en los pasos anteriores. Pregunta solo lo que esos archivos no resuelvan.
 
 ## Trabajo en paralelo
 
