@@ -13,17 +13,21 @@ export type BadgeVariant =
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
   icon?: React.ReactNode;
+  /** Forma de píldora (esquinas totalmente redondeadas), p. ej. "OFERTAS" en la navegación. */
+  pill?: boolean;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
   children,
   variant = 'neutral',
   icon,
+  pill = false,
   className = '',
   ...props
 }) => {
-  const baseStyles =
-    'inline-flex items-center gap-1 font-title font-semibold text-xs px-2 py-0.5 rounded-[4px] uppercase tracking-wide select-none';
+  const baseStyles = `inline-flex items-center gap-1 font-title font-semibold text-xs py-0.5 uppercase tracking-wide select-none ${
+    pill ? 'rounded-full px-3' : 'rounded-[4px] px-2'
+  }`;
 
   const variantStyles: Record<BadgeVariant, string> = {
     sponsored: 'bg-highlight text-neutral-black shadow-xs',

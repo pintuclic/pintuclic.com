@@ -6,6 +6,19 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [v0.5.0] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🏠 **Landing page pública (frente propio FP-01).** Página de inicio `/` según la página 1 de `VISTAS.pdf` y la UI Spec §4.1: topbar, header con mega-menú de categorías, hero, franja de confianza, buscador con accesos a Calculadora y Asesoría de color, productos destacados, categorías y footer institucional. Responsive *mobile-first*.
+- **⚠️ Estado:** detenido en **Gate 3B** a la espera de la revisión visual del Director Humano. **Datos estáticos temporales** (productos, categorías, carrito y sesión) hasta que M01, M05 y M04 los alimenten; imágenes de producto, categoría y logo son marcadores extraídos del mockup.
+
+### Core Kit (ampliación autorizada)
+- **Nuevos:** `ButtonLink`, `IconButton`, `Select`, `SearchBar`, `Container`, `Logo`, `Topbar`, `Header`, `CategoriesMegaMenu`, `Footer`, `Carousel`, `ScrollRow`, `CategoryCard`, `formatCOP` y `button-styles.ts` (fuente única de estilos de botón, con la variante `outline-light`).
+- **Extendidos sin romper su API:** `Button` (estilos extraídos), `Input` (`appearance="bare"`), `Badge` (`pill`), `ProductCard` (`href`, precio con sufijo COP, fondos blancos fundidos, objetivos táctiles de 44 px en móvil). `app/layout.tsx`: Poppins 500 y favicon declarado.
+- **Verificación:** `next build` ✅ (`/` estática, 122 kB); `tsc`, ESLint y `lint:a11y` sin errores; 0 `any`; auditorías `a11y` y `core-kit` aprobadas; Vitest **103/103** (+38). Verificado en navegador real a 1366 y 500 px: sin desborde, objetivos táctiles ≥ 44 px, mega-menú accesible con retorno de foco.
+- **Conocido:** 14 errores 404 en consola por el *prefetch* de Next.js hacia rutas aún no construidas (`/productos`, `/login`, `/carrito`…). Walkthrough: `docs/walkthroughs/FP-01/walkthrough_v0.5.0_FP01_landing_frontend.md`.
+
+---
+
 ## [v0.4.2] - 2026-10-22
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** ✏️ **Motivo de rechazo opcional en el dictamen (M04).** Por decisión del Director Humano el contrato acepta rechazar sin motivo; se conserva obligatorio (mínimo 10 caracteres) solo al rechazar un **registro** de empresa (`RN-CUE-17`), regla que pasa del DTO al servicio porque depende del tipo de solicitud.

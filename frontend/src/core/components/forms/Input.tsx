@@ -8,6 +8,11 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   error?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  /**
+   * `field` (por defecto): campo completo con borde. `bare`: sin borde ni fondo,
+   * para componerlo dentro de otro contenedor (p. ej. el buscador del header).
+   */
+  appearance?: 'field' | 'bare';
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -20,6 +25,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       leftIcon,
       rightIcon,
       disabled,
+      appearance = 'field',
       className = '',
       ...props
     },
@@ -28,6 +34,26 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
     const helperId = inputId && helperText ? `${inputId}-helper` : undefined;
     const errorId = inputId && error ? `${inputId}-error` : undefined;
+
+    const estiloCampo = `
+      w-full min-h-[44px] px-3.5 py-2.5 text-sm font-sans text-neutral-dark bg-neutral-white
+      border rounded-input transition-all duration-200 placeholder:text-neutral-medium
+      focus:outline-none focus:ring-2 focus:border-action focus:ring-action/20
+      disabled:bg-neutral-light/70 disabled:text-neutral-medium disabled:cursor-not-allowed
+      ${leftIcon ? 'pl-10' : ''}
+      ${rightIcon ? 'pr-10' : ''}
+      ${
+        error
+          ? 'border-danger focus:border-danger focus:ring-danger/20 text-danger'
+          : 'border-neutral-light hover:border-neutral-medium/60'
+      }
+    `;
+
+    const estiloSinBorde = `
+      w-full min-h-[44px] px-3.5 py-2.5 text-sm font-sans text-neutral-dark bg-transparent
+      placeholder:text-neutral-medium focus:outline-none
+      disabled:text-neutral-medium disabled:cursor-not-allowed
+    `;
 
     return (
       <div className="w-full flex flex-col">
@@ -54,20 +80,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             disabled={disabled}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? errorId : helperId}
-            className={`
-              w-full min-h-[44px] px-3.5 py-2.5 text-sm font-sans text-neutral-dark bg-neutral-white
-              border rounded-input transition-all duration-200 placeholder:text-neutral-medium
-              focus:outline-none focus:ring-2 focus:border-action focus:ring-action/20
-              disabled:bg-neutral-light/70 disabled:text-neutral-medium disabled:cursor-not-allowed
-              ${leftIcon ? 'pl-10' : ''}
-              ${rightIcon ? 'pr-10' : ''}
-              ${
-                error
-                  ? 'border-danger focus:border-danger focus:ring-danger/20 text-danger'
-                  : 'border-neutral-light hover:border-neutral-medium/60'
-              }
-              ${className}
-            `}
+            className={`${appearance === 'bare' ? estiloSinBorde : estiloCampo} ${className}`}
             {...props}
           />
 

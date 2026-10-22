@@ -235,3 +235,27 @@ Los archivos corregidos viven en `frontend/src/core/`, entregable de infraestruc
    archivo. El script `lint:a11y` continua siendo el instrumento.
 3. **No se declara ninguna compuerta aprobada.** El entregable de este rol termina en el walkthrough
    y el commit; Gate 4 es potestad del QA Lead.
+
+---
+
+## 2026-10-22 — FP-01 · v0.5.0 · Landing page pública
+
+**Rol:** Frontend Lead Engineer · **Frente propio** registrado por el Director Humano (fuera de los 21 módulos)
+
+### Contexto
+El Director pidió la landing antes del frontend de M04: fuente visual `VISTAS.pdf` (solo página 1), tipografía global Poppins + Inter, datos estáticos temporales y autorización para ampliar el Core Kit.
+
+### Subroles convocados
+- **01 · Design System:** 13 componentes nuevos en `core/components` (layout, navegación, formularios, `CategoryCard`) y `button-styles.ts` como fuente única de estilos; extensiones compatibles de `Button`, `Input`, `Badge` y `ProductCard`.
+- **03 · Views & UX:** `app/(public)/` con layout (skip link, topbar, header, footer) y 5 secciones; contenido aislado en `_data/*.content.ts` y marcado como temporal.
+- **05 · Component TDD:** sin `jsdom`, render en servidor con `react-dom/server` (38 pruebas nuevas) e integridad del contenido (existencia de cada imagen, enlaces válidos).
+
+### Verificación
+- `next build` ✅ · `tsc` ✅ · ESLint ✅ · `lint:a11y` ✅ · 0 `any` · auditorías `a11y` y `core-kit` aprobadas · Vitest 103/103.
+- Navegador real (servidor de producción): 1366 px y 500 px, sin desborde, objetivos táctiles ≥ 44 px, mega-menú con foco retenido y retorno de foco. Corregidos en la revisión: título del hero en 3 líneas, fondos blancos de las fotos, sufijo COP, solape de la insignia del carrito, legibilidad del hero en móvil, objetivos táctiles < 44 px y 404 del favicon.
+
+### Pendiente / conocido
+- 14 errores 404 de *prefetch* hacia rutas aún no construidas; desaparecen con M01/M04/M05.
+- Imágenes de logo, productos y categorías son marcadores extraídos del mockup; el Director las sustituirá.
+- **Detenido en Gate 3B**: revisión visual del Director Humano. No se declara la compuerta aprobada.
+- **Walkthrough:** `docs/walkthroughs/FP-01/walkthrough_v0.5.0_FP01_landing_frontend.md`.
