@@ -24,7 +24,7 @@ frontend/src/
 │
 ├── core/                          # Infraestructura global compartida (NO contiene lógica de negocio)
 │   ├── api/
-│   │   └── apiClient.ts           # Instancia Axios: baseURL NEXT_PUBLIC_API_URL, interceptor JWT Bearer
+│   │   └── apiClient.ts           # Instancia Axios con withCredentials: la sesión viaja en cookie (ADR-005)
 │   ├── auth/
 │   │   └── useAuth.ts             # Hook de autenticación global (lee authStore)
 │   ├── components/                # Design System base reutilizable
@@ -41,7 +41,7 @@ frontend/src/
 │   ├── hooks/                     # Hooks React reutilizables globales
 │   │   └── usePermission.ts       # Verifica permisos del usuario autenticado (M17)
 │   ├── store/                     # Zustand stores globales
-│   │   └── authStore.ts           # Estado de sesión: user, accessToken, setAuth, clearAuth
+│   │   └── authStore.ts           # Estado de sesión: solo el usuario. El token NO vive en JS (ADR-005)
 │   ├── theme/
 │   │   ├── colors.ts              # ⚠️ FUENTE ÚNICA de tokens de color (importada por tailwind.config.ts)
 │   │   └── GUIA_COLORES.md        # Matriz oficial de tokens y reglas de uso
@@ -60,7 +60,7 @@ frontend/src/
 │   ├── m04-cuentas/               # Auth B2C/B2B, perfil, direcciones
 │   ├── m01-catalogo/              # Storefront público + administración del catálogo
 │   ├── m02-busqueda/              # Búsqueda, filtros, facetas y ordenamiento
-│   ├── m05-carrito-compras/       # Drawer de carrito, líneas, resumen
+│   ├── m05-carrito/               # Drawer de carrito, líneas, resumen
 │   └── m08-ordenes/               # Mis pedidos (cliente) + gestión de órdenes (admin)
 │
 │   Cada módulo tiene la estructura interna:
@@ -96,7 +96,7 @@ frontend/src/
 ```
 Usuario → Server Component (fetch directo) o Client Component
   → hook del módulo (useXxx)
-  → service (apiClient con Bearer token)
+  → service (apiClient con cookie HttpOnly)
   → backend API
   → Zustand store actualiza
   → React re-renderiza
@@ -109,4 +109,4 @@ Usuario → Server Component (fetch directo) o Client Component
 3. `m17-permisos` (panel admin empleados)
 4. `m04-cuentas` (auth B2C/B2B, perfil)
 5. `m01-catalogo` (storefront + admin)
-6. `m02-busqueda` → `m05-carrito-compras` → `m08-ordenes`
+6. `m02-busqueda` → `m05-carrito` → `m08-ordenes`

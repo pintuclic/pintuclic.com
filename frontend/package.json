@@ -5,9 +5,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "check:no-any": "node ../.sdlc/tooling/check-no-any-frontend.mjs src",
+    "build": "npm run check:no-any && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "next lint --max-warnings=0",
+    "lint:a11y": "eslint src/app src/core src/modules --max-warnings=0 --rule \"{\\\"jsx-a11y/alt-text\\\":\\\"error\\\",\\\"jsx-a11y/anchor-is-valid\\\":\\\"error\\\",\\\"jsx-a11y/aria-props\\\":\\\"error\\\",\\\"jsx-a11y/aria-role\\\":\\\"error\\\",\\\"jsx-a11y/click-events-have-key-events\\\":\\\"error\\\",\\\"jsx-a11y/label-has-associated-control\\\":\\\"error\\\",\\\"jsx-a11y/no-static-element-interactions\\\":\\\"error\\\",\\\"jsx-a11y/role-has-required-aria-props\\\":\\\"error\\\"}\"",
     "lint:fix": "eslint src --fix",
     "check:types": "tsc --noEmit",
     "test": "vitest run"
@@ -24,18 +26,19 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.37.0",
+    "@tailwindcss/postcss": "^4.1.11",
     "@types/node": "^26.3.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.5",
-    "eslint": "^10.9.1",
+    "@vitejs/plugin-react": "^4.5.2",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.37.0",
     "eslint-config-next": "^15.4.2",
+    "tailwindcss": "^4.1.11",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.69.0",
-    "vitest": "^3.2.4",
-    "@vitejs/plugin-react": "^6.1.2",
-    "tailwindcss": "^4.1.11",
-    "@tailwindcss/postcss": "^4.1.11",
-    "autoprefixer": "^10.4.21"
+    "vitest": "^3.2.4"
   }
 }

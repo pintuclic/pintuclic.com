@@ -5,12 +5,13 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "check:no-any": "tsx ../.sdlc/tooling/check-no-any-backend.ts src",
+    "build": "npm run check:no-any && tsc",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx src/core/db/seed.ts",
+    "db:seed": "psql \"$DATABASE_URL\" -f ../bd/sql/seed_pintuclic.sql",
     "db:reset": "prisma migrate reset --force && npm run db:seed",
     "db:studio": "prisma studio",
     "lint": "eslint src",
@@ -25,6 +26,7 @@
   "dependencies": {
     "@prisma/client": "^6.0.0",
     "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^18.0.8",
     "express": "^5.2.1",
@@ -36,6 +38,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",

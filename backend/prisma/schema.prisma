@@ -1,6 +1,10 @@
-// ⚠️  FUENTE ÚNICA de la estructura de base de datos.
+// ⚠️  FUENTE ÚNICA de la estructura de base de datos para Prisma.
+//
+// ADR-004 — Este schema MAPEA el DDL existente en `bd/sql/schema_pintuclic.sql`
+// mediante @@map / @map, en lugar de describir un modelo paralelo. `bd/` está
+// bloqueado y es la base real; Prisma debe hablar de las mismas tablas.
+//
 // Ejecutar `npx prisma generate` cada vez que se modifique este archivo.
-// Los tipos TypeScript son generados automáticamente — NO definirlos manualmente en los módulos.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,265 +16,224 @@ datasource db {
 }
 
 // =============================================================================
-// ENUMS
+// ENUMS — espejo exacto de los tipos definidos en bd/sql/schema_pintuclic.sql
 // =============================================================================
 
+/// Ciclo de vida de una sesión de usuario (M20 · HU-SEG-02)
+enum EstadoSesion {
+  activa
+  cerrada
+  expirada
+  revocada
+
+  @@map("enum_estado_sesion")
+}
+
+/// Determina la ventana de inactividad aplicable (RF-SEG-02-02)
+enum TipoSesion {
+  admin
+  cliente
+
+  @@map("enum_tipo_sesion")
+}
+
+/// Causa por la que una sesión dejó de estar activa (RF-SEG-02-06)
+enum MotivoCierreSesion {
+  cierre_manual
+  inactividad
+  cambio_contrasena
+  cuenta_desactivada
+  permisos_retirados
+
+  @@map("enum_motivo_cierre_sesion")
+}
+
+/// Estado de las solicitudes de supresión de datos (Habeas Data · HU-SEG-05)
+enum EstadoSolicitudSupresion {
+  pendiente
+  en_proceso
+  aprobada
+  rechazada
+
+  @@map("enum_estado_solicitud_supresion")
+}
+
+/// Estado de la cuenta de usuario. Pertenece al dominio de M04; M20 solo lo lee.
+enum EstadoUsuario {
+  activo
+  inactivo
+  bloqueado
+  pendiente
+
+  @@map("enum_estado_usuario")
+}
+
+/// Estado general de entidades de configuración y catálogos (M17)
+enum EstadoGeneral {
+  activo
+  inactivo
+
+  @@map("enum_estado_general")
+}
+
+/// Tipo de cuenta de usuario (M04 / M17)
 enum TipoUsuario {
-  B2C
-  B2B
-  EMPLEADO
-  ADMIN
+  normal
+  empresa
 
-  @@map("tipo_usuario")
-}
-
-enum EstadoOrden {
-  PENDIENTE
-  CONFIRMADA
-  EN_PREPARACION
-  DESPACHADA
-  ENTREGADA
-  CANCELADA
-  DEVOLUCION
-
-  @@map("estado_orden")
-}
-
-enum TipoDocumento {
-  CC
-  NIT
-  CE
-  PASAPORTE
-
-  @@map("tipo_documento")
+  @@map("enum_tipo_usuario")
 }
 
 // =============================================================================
-// MÓDULO M20 — SEGURIDAD Y AUDITORÍA
-// =============================================================================
-
-model LogAuditoria {
-  id            Int      @id @default(autoincrement())
-  usuario_id    Int?
-  accion        String
-  entidad       String
-  entidad_id    String?
-  detalle       String?
-  ip_origen     String?
-  user_agent    String?
-  creado_en     DateTime @default(now())
-
-  @@map("log_auditoria")
-}
-
-model SesionToken {
-  id           Int      @id @default(autoincrement())
-  usuario_id   Int
-  token_hash   String   @unique
-  revocado     Boolean  @default(false)
-  expira_en    DateTime
-  creado_en    DateTime @default(now())
-
-  @@map("sesion_token")
-}
-
-// =============================================================================
-// MÓDULO M17 — PERMISOS Y ROLES
-// =============================================================================
-
-model Permiso {
-  id          Int      @id @default(autoincrement())
-  codigo      String   @unique
-  descripcion String?
-  modulo      String
-  creado_en   DateTime @default(now())
-
-  usuario_permisos UsuarioPermiso[]
-
-  @@map("permiso")
-}
-
-model UsuarioPermiso {
-  id           Int      @id @default(autoincrement())
-  usuario_id   Int
-  permiso_id   Int
-  otorgado_por Int?
-  creado_en    DateTime @default(now())
-
-  permiso   Permiso @relation(fields: [permiso_id], references: [id])
-
-  @@unique([usuario_id, permiso_id])
-  @@map("usuario_permiso")
-}
-
-// =============================================================================
-// MÓDULO M04 — CUENTAS
+// MÓDULO M04 — USUARIO (declaración mínima)
+//
+// ⚠️ La tabla `usuario` pertenece a M04. M20 y M17 la necesitan para resolver
+// sus relaciones y para leer `estado`, `tipo`, `contrasena` y vínculos a roles.
 // =============================================================================
 
 model Usuario {
-  id               Int           @id @default(autoincrement())
-  correo           String        @unique
-  password_hash    String?
-  nombre_completo  String
-  tipo_documento   TipoDocumento?
-  numero_documento String?
-  telefono         String?
-  tipo             TipoUsuario   @default(B2C)
-  activo           Boolean       @default(true)
-  verificado       Boolean       @default(false)
-  google_id        String?       @unique
-  creado_en        DateTime      @default(now())
-  actualizado_en   DateTime      @updatedAt
+  idUsuario  Int           @id @default(autoincrement()) @map("id_usuario")
+  nombre     String        @db.VarChar(150)
+  telefono   String?       @db.VarChar(20)
+  correo     String        @unique @db.VarChar(150)
+  /// Hash BCrypt (coste ≥ 12). RN-SEG-02: toda cuenta tiene contraseña, incluidas las de Google.
+  contrasena String        @db.VarChar(255)
+  idRol      Int?          @map("id_rol")
+  estado     EstadoUsuario @default(activo)
+  tipo       TipoUsuario   @default(normal)
 
-  empresa         EmpresaB2B?
-  direcciones     DireccionEnvio[]
+  sesiones             Sesion[]
+  consentimientos      ConsentimientoUsuario[]
+  solicitudesSupresion SolicitudSupresion[]
+
+  rolDirecto           Rol?         @relation("UsuarioRolDirecto", fields: [idRol], references: [idRol])
+  usuarioRol           UsuarioRol?
 
   @@map("usuario")
 }
 
-model EmpresaB2B {
-  id            Int      @id @default(autoincrement())
-  usuario_id    Int      @unique
-  razon_social  String
-  nit           String   @unique
-  activo        Boolean  @default(false)
-  creado_en     DateTime @default(now())
-
-  usuario Usuario @relation(fields: [usuario_id], references: [id])
-
-  @@map("empresa_b2b")
-}
-
-model DireccionEnvio {
-  id           Int      @id @default(autoincrement())
-  usuario_id   Int
-  nombre       String
-  direccion    String
-  ciudad       String
-  departamento String
-  codigo_postal String?
-  predeterminada Boolean @default(false)
-  creado_en    DateTime @default(now())
-
-  usuario Usuario @relation(fields: [usuario_id], references: [id])
-
-  @@map("direccion_envio")
-}
-
 // =============================================================================
-// MÓDULO M01 — CATÁLOGO
+// MÓDULO M17 — ADMINISTRACIÓN, EMPLEADOS Y PERMISOS
 // =============================================================================
 
-model Categoria {
-  id          Int         @id @default(autoincrement())
-  nombre      String
-  slug        String      @unique
+/// Rol o perfil de asignación relacional (ADR-006)
+model Rol {
+  idRol            Int           @id @default(autoincrement()) @map("id_rol")
+  nombre           String        @unique @db.VarChar(100)
+  idSubRolEmpresa  Int?          @map("id_sub_rol_empresa")
+  estado           EstadoGeneral @default(activo)
+
+  asignaciones     AsignacionPermiso[]
+  usuariosConRol   UsuarioRol[]
+  usuariosDirectos Usuario[]     @relation("UsuarioRolDirecto")
+
+  @@map("rol")
+}
+
+/// Catálogo maestro de permisos atómicos del sistema
+model Permiso {
+  idPermiso   Int           @id @default(autoincrement()) @map("id_permiso")
+  nombre      String        @unique @db.VarChar(100)
   descripcion String?
-  imagen_url  String?
-  activa      Boolean     @default(true)
-  padre_id    Int?
+  estado      EstadoGeneral @default(activo)
 
-  padre       Categoria?  @relation("CategoriaPadre", fields: [padre_id], references: [id])
-  hijos       Categoria[] @relation("CategoriaPadre")
-  productos   Producto[]
+  asignaciones AsignacionPermiso[]
 
-  @@map("categoria")
+  @@map("permisos")
 }
 
-model Producto {
-  id            Int       @id @default(autoincrement())
-  sku           String    @unique
-  nombre        String
-  slug          String    @unique
-  descripcion   String?
-  categoria_id  Int
-  activo        Boolean   @default(true)
-  creado_en     DateTime  @default(now())
-  actualizado_en DateTime @updatedAt
+/// Asignación N:M de permisos a perfiles individuales
+model AsignacionPermiso {
+  idAsignacionPermiso Int @id @default(autoincrement()) @map("id_asignacion_permiso")
+  idRol               Int @map("id_rol")
+  idPermiso           Int @map("id_permiso")
 
-  categoria   Categoria    @relation(fields: [categoria_id], references: [id])
-  variantes   VarianteProducto[]
+  rol     Rol     @relation(fields: [idRol], references: [idRol], onDelete: Cascade)
+  permiso Permiso @relation(fields: [idPermiso], references: [idPermiso], onDelete: Cascade)
 
-  @@map("producto")
+  @@unique([idRol, idPermiso], map: "uq_rol_permiso")
+  @@index([idRol])
+  @@index([idPermiso])
+  @@map("asignacion_permiso")
 }
 
-model VarianteProducto {
-  id           Int      @id @default(autoincrement())
-  producto_id  Int
-  sku_variante String   @unique
-  color        String?
-  rendimiento  String?
-  acabado      String?
-  precio_b2c   Decimal  @db.Decimal(12, 2)
-  precio_b2b   Decimal? @db.Decimal(12, 2)
-  stock        Int      @default(0)
-  activa       Boolean  @default(true)
+/// Relación 1:1 Usuario - Rol con restricción UNIQUE(id_usuario)
+model UsuarioRol {
+  idUsuarioRol Int @id @default(autoincrement()) @map("id_usuario_rol")
+  idUsuario    Int @unique @map("id_usuario")
+  idRol        Int @map("id_rol")
 
-  producto     Producto    @relation(fields: [producto_id], references: [id])
-  items_carrito ItemCarrito[]
-  items_orden   ItemOrden[]
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  rol     Rol     @relation(fields: [idRol], references: [idRol], onDelete: Cascade)
 
-  @@map("variante_producto")
+  @@index([idUsuario])
+  @@index([idRol])
+  @@map("usuario_rol")
 }
 
 // =============================================================================
-// MÓDULO M05 — CARRITO DE COMPRAS
+// MÓDULO M20 — SEGURIDAD Y PROTECCIÓN DE DATOS
 // =============================================================================
 
-model Carrito {
-  id          Int      @id @default(autoincrement())
-  usuario_id  Int      @unique
-  creado_en   DateTime @default(now())
-  actualizado_en DateTime @updatedAt
+/// HU-SEG-02. La clave es UUID y no autoincremental a propósito: el identificador
+/// viaja en la cookie de sesión y un entero secuencial sería enumerable.
+model Sesion {
+  idSesion          String              @id @default(uuid()) @map("id_sesion") @db.Uuid
+  idUsuario         Int                 @map("id_usuario")
+  tipoSesion        TipoSesion          @map("tipo_sesion")
+  fechaInicio       DateTime            @default(now()) @map("fecha_inicio") @db.Timestamptz(6)
+  /// RF-SEG-02-03. Se renueva en cada operación del usuario (ventana deslizante).
+  fechaUltimoAcceso DateTime            @default(now()) @map("fecha_ultimo_acceso") @db.Timestamptz(6)
+  /// RF-SEG-02-02. Último acceso + ventana de inactividad del tipo de sesión.
+  fechaExpiracion   DateTime            @map("fecha_expiracion") @db.Timestamptz(6)
+  estado            EstadoSesion        @default(activa)
+  /// Nulo mientras la sesión sigue activa.
+  motivoCierre      MotivoCierreSesion? @map("motivo_cierre")
 
-  items ItemCarrito[]
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
 
-  @@map("carrito")
+  @@index([idUsuario, estado])
+  @@map("sesion")
 }
 
-model ItemCarrito {
-  id           Int     @id @default(autoincrement())
-  carrito_id   Int
-  variante_id  Int
-  cantidad     Int
-  precio_unitario Decimal @db.Decimal(12, 2)
+/// HU-SEG-05. Versiones legales de la política de tratamiento de datos.
+model AvisoPrivacidad {
+  idAvisoPrivacidad Int     @id @default(autoincrement()) @map("id_aviso_privacidad")
+  version           String  @unique @db.VarChar(50)
+  descripcion       String
+  /// Indica si es la versión activa que los usuarios deben consentir.
+  esVigente         Boolean @default(true) @map("es_vigente")
 
-  carrito  Carrito          @relation(fields: [carrito_id], references: [id])
-  variante VarianteProducto @relation(fields: [variante_id], references: [id])
+  consentimientos ConsentimientoUsuario[]
 
-  @@unique([carrito_id, variante_id])
-  @@map("item_carrito")
+  @@map("aviso_privacidad")
 }
 
-// =============================================================================
-// MÓDULO M08 — ÓRDENES
-// =============================================================================
+/// HU-SEG-05. Registro histórico auditable del consentimiento otorgado.
+model ConsentimientoUsuario {
+  idConsentimiento  Int      @id @default(autoincrement()) @map("id_consentimiento")
+  idUsuario         Int      @map("id_usuario")
+  idAvisoPrivacidad Int      @map("id_aviso_privacidad")
+  fecha             DateTime @default(now()) @db.Timestamptz(6)
 
-model Orden {
-  id              Int         @id @default(autoincrement())
-  numero          String      @unique
-  usuario_id      Int
-  estado          EstadoOrden @default(PENDIENTE)
-  total           Decimal     @db.Decimal(12, 2)
-  direccion_id    Int?
-  notas           String?
-  creado_en       DateTime    @default(now())
-  actualizado_en  DateTime    @updatedAt
+  usuario Usuario         @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  /// RESTRICT: un aviso consentido jamás se borra mientras exista su consentimiento.
+  aviso   AvisoPrivacidad @relation(fields: [idAvisoPrivacidad], references: [idAvisoPrivacidad], onDelete: Restrict)
 
-  items ItemOrden[]
-
-  @@map("orden")
+  @@unique([idUsuario, idAvisoPrivacidad], map: "uq_usuario_aviso")
+  @@map("consentimiento_usuario")
 }
 
-model ItemOrden {
-  id              Int     @id @default(autoincrement())
-  orden_id        Int
-  variante_id     Int
-  cantidad        Int
-  precio_unitario Decimal @db.Decimal(12, 2)
+/// HU-SEG-05. Ejercicio de derechos ARCO / supresión de datos (Habeas Data).
+model SolicitudSupresion {
+  idSolicitudSupresion Int                      @id @default(autoincrement()) @map("id_solicitud_supresion")
+  idUsuario            Int                      @map("id_usuario")
+  fechaSolicitud       DateTime                 @default(now()) @map("fecha_solicitud") @db.Timestamptz(6)
+  fechaResolucion      DateTime?                @map("fecha_resolucion") @db.Timestamptz(6)
+  estado               EstadoSolicitudSupresion @default(pendiente)
 
-  orden    Orden            @relation(fields: [orden_id], references: [id])
-  variante VarianteProducto @relation(fields: [variante_id], references: [id])
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
 
-  @@map("item_orden")
+  @@index([idUsuario, estado])
+  @@map("solicitud_supresion")
 }

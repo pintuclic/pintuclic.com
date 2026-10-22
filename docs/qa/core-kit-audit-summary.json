@@ -1,0 +1,10 @@
+{
+  "fecha": "2026-10-21T18:44:21.811Z",
+  "archivos_auditados": 13,
+  "resumen": {
+    "pass": 1,
+    "fail": 0,
+    "estado": "CONFORME_DIRECTIVA_13"
+  },
+  "hallazgos": []
+}
