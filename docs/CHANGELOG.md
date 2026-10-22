@@ -6,6 +6,24 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [v0.4.0] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔐 **Implementación Backend completa de Cuentas, Autenticación y Perfil (M04).** Endpoints REST canónicos bajo `/cuentas` y `/admin/empresas`, servicios hexagonales desacoplados, autenticación con OTP, federación Google Identity, señuelos anti-fuerza bruta, libreta de direcciones y flujo B2B corporativo con custodia de RUT.
+
+### Módulo M04 — Cuentas, Autenticación y Perfil (Backend)
+- **HU-CUE-01 (Registro B2C con OTP):** Código de verificación de 6 dígitos con hash BCrypt costo 12, expiración de 15 minutos y límite de 3 reintentos.
+- **HU-CUE-02 (Federación Google Identity):** Autenticación federada vía `GoogleAuthPort` con token de registro efímero JWT de 10 minutos para complementar datos en nuevos usuarios.
+- **HU-CUE-03 y HU-CUE-09 (Empresas B2B y Renovación de NIT):** Solicitudes corporativas con validación de NIT, custodia segura de archivo RUT (hasta 5MB, SHA-256) en `documento_soporte` y flujo de renovación de NIT.
+- **HU-CUE-04 (Login y Control de Fuerza Bruta):** Bloqueo temporal por 15m tras 5 intentos fallidos (ADR-012) y comparación con hash señuelo de tiempo constante ante correos inexistentes para prevenir ataques de temporización. Forzado de cambio de clave en primer acceso (ADR-011).
+- **HU-CUE-05 (Recuperación de Contraseña):** Enlace firmado seguro JWT de 30 minutos con respuesta indistinguible anti-enumeración y revocación masiva de sesiones en reset.
+- **HU-CUE-06 (Perfil y Credenciales):** Actualización de datos personales, cambio de contraseña con validación de clave actual y solicitud/confirmación de cambio de correo con OTP de 15m.
+- **HU-CUE-07 (Libreta de Direcciones):** Límite estricto de 10 direcciones por cliente (RN-CUE-07), auto-asignación de primera dirección como predeterminada y desmarcado atómico.
+- **HU-CUE-08 (Unicidad Universal):** Blindaje de unicidad en BD y repositorios contra colisiones de correo, NIT y solicitudes pendientes.
+- **HU-CUE-10 (Dictamen Administrativo y Desactivación):** Aprobación crea fila 1:1 en `cuenta_empresa` (ADR-010 / C-1); rechazo exige motivo >= 10 caracteres. Desactivación de cuenta con confirmación de clave y revocación de sesiones.
+- **Verificación:** 18/18 suites Vitest backend PASS (116/116 tests), 0 errores TypeScript (`npx tsc --noEmit`), 0 advertencias ESLint, y 0 usos de `any` en 99 archivos backend auditados. Walkthrough generado en `docs/walkthroughs/M04/walkthrough_v0.4.0_M04_cuentas_autenticacion_backend.md`.
+
+---
+
 ## [v0.3.3] - 2026-10-21
 - **Autor:** DanExl24 (@DanExl24)
 - **Commit:** `3b10811` — `feat(m17-permisos): persistir parametros en base de datos con repositorio prisma HU-ADM-05`

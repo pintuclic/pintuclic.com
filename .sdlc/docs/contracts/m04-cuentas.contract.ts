@@ -433,6 +433,21 @@ export const solicitudActualizacionNitItemSchema = z.object({
 });
 export type SolicitudActualizacionNitItem = z.infer<typeof solicitudActualizacionNitItemSchema>;
 
+export const listarSolicitudesEmpresaQuerySchema = z.object({
+  estado: estadoSolicitudEmpresaSchema.optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+});
+export type ListarSolicitudesEmpresaQuery = z.infer<typeof listarSolicitudesEmpresaQuerySchema>;
+
+export const dictamenRenovacionNitRequestSchema = dictamenSolicitudEmpresaRequestSchema;
+export type DictamenRenovacionNitRequest = z.infer<typeof dictamenRenovacionNitRequestSchema>;
+
+export const desactivarCuentaRequestSchema = z.object({
+  contrasena: z.string().min(1, 'La contraseña es requerida para confirmar la desactivación'),
+});
+export type DesactivarCuentaRequest = z.infer<typeof desactivarCuentaRequestSchema>;
+
 /* ───────────────────────────────────────────────────────────────────────────
  * 13. ENVELOPE GENÉRICO DE RESPUESTA EXITOSA
  * ─────────────────────────────────────────────────────────────────────────── */
@@ -449,3 +464,4 @@ export const baseSuccessResponseSchema = z.object({
   message: z.string().optional(),
 });
 export type BaseSuccessResponse = z.infer<typeof baseSuccessResponseSchema>;
+

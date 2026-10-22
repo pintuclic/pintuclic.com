@@ -192,4 +192,19 @@ Gate 2 de M04 firmado por el Director Humano ('confirmo'). Aprobada formalmente 
 - **HU-CUE-09:** Administración y validación corporativa de solicitudes B2B (permiso `empresas.validar`, aprobación atómica con creación en `cuenta_empresa` y renovación de NIT con historial inmutable).
 - **HU-CUE-10:** Desactivación de cuenta propia (revocación de sesiones activas y opacidad ante intentos posteriores).
 
+### Entrega de Fase 3A Completada (100% Funcional)
+- **Subroles convocados:**
+  - **03 · Data Layer Optimizer:** Repositorios Prisma tipados con cero SQL crudo (`PrismaCuentasRepository`, `PrismaCodigosVerificacionRepository`, `PrismaControlIntentosRepository`, `PrismaDocumentosRepository`, `PrismaSolicitudesEmpresaRepository`, `PrismaDireccionesRepository`).
+  - **02 · Domain Business Rules:** Implementación de servicios de dominio desacoplados (`AuthCuentasService`, `RecuperacionPasswordService`, `PerfilService`, `DireccionesService`, `EmpresasService`).
+  - **01 · API Gateway & Security:** Controladores REST tipados con DTOs Zod canónicos, cookie `pc_sid` HttpOnly/SameSite=Strict, y enrutador modular `m04.routes.ts` montado en `backend/src/app.routes.ts`.
+  - **04 · Developer TDD Tester:** 6 suites de pruebas Vitest para M04 con 45 pruebas exhaustivas cubriendo el 100% de los escenarios BDD de HU-CUE-01 a HU-CUE-10.
 
+### Verificación Determinista de Calidad (Zero Warnings / Zero Errors)
+- `npx tsc --noEmit`: ✅ 0 errores.
+- `npm run lint`: ✅ 0 errores, 0 advertencias.
+- `npm run check:no-any`: ✅ 99 archivos auditados, 0 usos de ANY.
+- `npm test` (backend Vitest): ✅ 18/18 suites PASS, 116/116 tests PASS (45 nuevos de M04 + 71 regresión M20/M17).
+- `npm test` (frontend Vitest): ✅ 9/9 suites PASS, 57/57 tests PASS (cero regresiones).
+- `npm run test:contracts`: ✅ 16/16 validaciones exitosas.
+- **Walkthrough oficial:** `docs/walkthroughs/M04/walkthrough_v0.4.0_M04_cuentas_autenticacion_backend.md`.
+- **Estado de la entrega:** Fase 3A finalizada al 100%. Módulo preparado para revisión técnica / inicio de Fase 3B (Frontend).

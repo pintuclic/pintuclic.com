@@ -1,14 +1,14 @@
 {
   "proyecto": "Pintu Clic",
   "dominio": "pintuclic.com",
-  "version_actual": "v0.3.3",
+  "version_actual": "v0.4.0",
   "fecha_actualizacion": "2026-10-21",
   "fase_activa": "FASE_3A_BACKEND",
   "gate_activo": "GATE_2_FIRMADO",
-  "estado": "FASE_3A_EN_CURSO",
+  "estado": "FASE_3A_COMPLETADA",
   "rol_en_turno": "03_backend_engineer",
   "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 (Cuentas, Autenticación y Perfil): GATE 2 FIRMADO por el Director Humano ('confirmo'). Aprobada formalmente la arquitectura, ADRs 009..012, modelo Prisma 6, DDL v4.2 / BD v3.0 (53 tablas) y contrato Zod rector m04-cuentas.contract.ts. Se inicia formalmente la Fase 3A (Construcción Backend Lead Engineer) para implementar las 10 HUs con TDD, repositorios Prisma, servicios desacoplados y endpoints REST canónicos.",
+  "nota_de_contexto": "M04 (Cuentas, Autenticación y Perfil): Fase 3A (Backend Lead Engineer) completada al 100%. Implementadas las 10 HUs (HU-CUE-01 a HU-CUE-10), endpoints REST bajo /cuentas y /admin/empresas, servicios hexagonales, repositorios Prisma y 45 pruebas Vitest (116/116 backend PASS). Walkthrough v0.4.0 generado. Listo para revisión y transición a Fase 3B (Frontend).",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "total_modulos": 21,
   "modulos_con_spec": 8,
@@ -129,13 +129,13 @@
       "ola": 3,
       "scope": "m04-cuentas",
       "spec": true,
-      "backend": "estructura",
+      "backend": "implementado",
       "frontend": "estructura",
       "contratos_zod": true,
       "depende_de": [
         "M18"
       ],
-      "estado_sdlc": "Gate 2 firmado (2026-10-21). Fase 3A (Backend) en curso para implementar HU-CUE-01 a HU-CUE-10."
+      "estado_sdlc": "Fase 3A (Backend) completada al 100% (116/116 tests backend pasando, 0 ANY en 99 archivos, tsc/eslint limpios). Walkthrough v0.4.0 generado. Listo para revisión y paso a Fase 3B (Frontend)."
     },
     {
       "id": "M05",
@@ -560,6 +560,13 @@
       "fecha": "2026-10-21",
       "autor": "Director Humano",
       "motivo": "Firma formal de Gate 2 para M04 por el Director Humano ('confirmo'). Aprobación de especificación técnica, ADRs 009 a 012, contrato Zod rector m04-cuentas.contract.ts, DTOs y puertos en backend/frontend, modelo Prisma 6 y DDL v4.2 / BD v3.0 (53 tablas). Se autoriza el inicio de la Fase 3A (Construcción Backend Lead Engineer)."
+    },
+    {
+      "de": "FASE_3A_BACKEND",
+      "a": "FASE_3A_BACKEND",
+      "fecha": "2026-10-21",
+      "autor": "03_backend_engineer",
+      "motivo": "Fase 3A de M04 completada al 100%. Entrega de endpoints REST bajo /cuentas y /admin/empresas, servicios hexagonales, repositorios Prisma, cookie segura pc_sid y 45 pruebas Vitest cubriendo HU-CUE-01 a HU-CUE-10. 116/116 tests backend pasando, 0 ANY en 99 archivos, tsc y eslint limpios. Walkthrough v0.4.0 generado."
     }
   ]
 }

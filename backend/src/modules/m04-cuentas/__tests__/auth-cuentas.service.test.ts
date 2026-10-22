@@ -1,0 +1,494 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { CodigoVerificacion, Sesion, Usuario, UsuarioIdentidadExterna } from '@prisma/client';
+import { derivarContrasena } from '../../../core/utils/crypto';
+import type { CuentasRepository } from '../repositories/cuentas.repository';
+import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
+import type { ControlIntentosRepository } from '../repositories/control-intentos.repository';
+import type { NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { GoogleAuthPort } from '../interfaces/google-auth.port';
+import { SimuladoDateProviderAdapter } from '../adapters/date-provider.adapter';
+import { AuthCuentasError, AuthCuentasService } from '../services/auth-cuentas.service';
+import type { SesionService } from '../../m20-seguridad/services/sesion.service';
+
+describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
+  let dateProvider: SimuladoDateProviderAdapter;
+  let cuentasRepo: CuentasRepository;
+  let codigosRepo: CodigosVerificacionRepository;
+  let controlIntentosRepo: ControlIntentosRepository;
+  let notificaciones: NotificacionesPort;
+  let googleAuth: GoogleAuthPort;
+  let sesionService: SesionService;
+  let authService: AuthCuentasService;
+
+  const fechaBase = new Date('2026-10-21T12:00:00Z');
+
+  beforeEach(() => {
+    dateProvider = new SimuladoDateProviderAdapter(fechaBase);
+
+    cuentasRepo = {
+      buscarPorCorreo: vi.fn().mockResolvedValue(null),
+      buscarPorId: vi.fn().mockResolvedValue(null),
+      buscarConEmpresaPorId: vi.fn().mockResolvedValue(null),
+      crearUsuarioCliente: vi.fn().mockImplementation((datos) =>
+        Promise.resolve({
+          idUsuario: 10,
+          nombre: datos.nombre,
+          correo: datos.correo,
+          contrasena: datos.contrasenaHash,
+          telefono: datos.telefono ?? null,
+          tipo: datos.tipo ?? 'normal',
+          estado: datos.estado ?? 'activo',
+          idRol: null,
+          cambioContrasenaPendiente: false,
+          fechaCreacion: fechaBase,
+          fechaActualizacion: fechaBase,
+        } as Usuario)
+      ),
+      actualizarDatosPerfil: vi.fn(),
+      actualizarContrasena: vi.fn().mockImplementation((idUsuario, hash, cambioPendiente) =>
+        Promise.resolve({
+          idUsuario,
+          nombre: 'Usuario Test',
+          correo: 'test@pintuclic.com',
+          contrasena: hash,
+          telefono: '3001234567',
+          tipo: 'normal',
+          estado: 'activo',
+          idRol: null,
+          cambioContrasenaPendiente: Boolean(cambioPendiente),
+          fechaCreacion: fechaBase,
+          fechaActualizacion: fechaBase,
+        } as Usuario)
+      ),
+      actualizarCorreo: vi.fn(),
+      actualizarEstado: vi.fn().mockImplementation((idUsuario, estado) =>
+        Promise.resolve({
+          idUsuario,
+          nombre: 'Usuario Pendiente',
+          correo: 'test@pintuclic.com',
+          contrasena: 'hash',
+          telefono: '3001234567',
+          tipo: 'normal',
+          estado,
+          idRol: null,
+          cambioContrasenaPendiente: false,
+          fechaCreacion: fechaBase,
+          fechaActualizacion: fechaBase,
+        } as Usuario)
+      ),
+      desactivarCuenta: vi.fn(),
+      buscarIdentidadExterna: vi.fn().mockResolvedValue(null),
+      vincularIdentidadExterna: vi.fn().mockResolvedValue({
+        idIdentidad: 1,
+        idUsuario: 10,
+        proveedor: 'google',
+        idProveedor: 'sub-google-123',
+        correoProveedor: 'google@gmail.com',
+        fechaVinculacion: fechaBase,
+      } as UsuarioIdentidadExterna),
+      buscarCuentaEmpresaPorNit: vi.fn().mockResolvedValue(null),
+      buscarCuentaEmpresaPorIdUsuario: vi.fn().mockResolvedValue(null),
+      crearCuentaEmpresa: vi.fn(),
+      actualizarNitEmpresa: vi.fn(),
+    };
+
+    codigosRepo = {
+      guardarCodigo: vi.fn().mockImplementation((datos) =>
+        Promise.resolve({
+          idCodigo: 'codigo-uuid-123',
+          correo: datos.correo,
+          codigoHash: datos.codigoHash,
+          tipo: datos.tipo,
+          intentos: 0,
+          maxIntentos: datos.maxIntentos ?? 3,
+          expiracion: datos.expiracion,
+          datosTemporales: datos.datosTemporales ?? null,
+          fechaCreacion: fechaBase,
+        } as CodigoVerificacion)
+      ),
+      buscarPorId: vi.fn().mockResolvedValue(null),
+      buscarUltimoActivoPorCorreo: vi.fn().mockResolvedValue(null),
+      incrementarIntentos: vi.fn().mockImplementation((_id) =>
+        Promise.resolve({
+          idCodigo: 'codigo-uuid-123',
+          correo: 'test@pintuclic.com',
+          codigoHash: 'hash',
+          tipo: 'registro',
+          intentos: 1,
+          maxIntentos: 3,
+          expiracion: new Date(fechaBase.getTime() + 15 * 60 * 1000),
+          datosTemporales: null,
+          fechaCreacion: fechaBase,
+        } as CodigoVerificacion)
+      ),
+      eliminar: vi.fn().mockResolvedValue(undefined),
+    };
+
+    controlIntentosRepo = {
+      obtener: vi.fn().mockResolvedValue(null),
+      registrarFallo: vi.fn().mockImplementation((correo, max, minutos, ahora) =>
+        Promise.resolve({
+          idIntento: 'intento-uuid',
+          correo,
+          intentosFallidos: 1,
+          bloqueadoHasta: null,
+          ultimoFallo: ahora,
+        })
+      ),
+      limpiar: vi.fn().mockResolvedValue(undefined),
+    };
+
+    notificaciones = {
+      enviarCodigoRegistro: vi.fn().mockResolvedValue(undefined),
+      enviarCodigoCambioCorreo: vi.fn().mockResolvedValue(undefined),
+      enviarEnlaceRecuperacion: vi.fn().mockResolvedValue(undefined),
+      notificarDictamenEmpresa: vi.fn().mockResolvedValue(undefined),
+    };
+
+    googleAuth = {
+      verificarIdToken: vi.fn().mockResolvedValue({
+        sub: 'google-sub-456',
+        email: 'nuevo-google@pintuclic.com',
+        nombre: 'Google Usuario',
+      }),
+    };
+
+    sesionService = {
+      crear: vi.fn().mockResolvedValue({
+        idSesion: 'sesion-activa-uuid',
+        idUsuario: 10,
+        tipoSesion: 'cliente',
+        estado: 'activa',
+        fechaCreacion: fechaBase,
+        ultimoAcceso: fechaBase,
+        fechaExpiracion: new Date(fechaBase.getTime() + 3600 * 1000),
+      } as unknown as Sesion),
+      cerrarManualmente: vi.fn(),
+      invalidarTodas: vi.fn().mockResolvedValue(1),
+    } as unknown as SesionService;
+
+    authService = new AuthCuentasService(
+      cuentasRepo,
+      codigosRepo,
+      controlIntentosRepo,
+      notificaciones,
+      googleAuth,
+      dateProvider,
+      sesionService,
+    );
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────────
+   * HU-CUE-01: REGISTRO B2C Y VALIDACIÓN OTP
+   * ─────────────────────────────────────────────────────────────────────────── */
+  describe('HU-CUE-01: Registro B2C con OTP', () => {
+    it('debe registrar solicitud y enviar código OTP de 6 dígitos', async () => {
+      const res = await authService.solicitarRegistroB2C({
+        nombre: 'Juan Perez',
+        correo: 'juan@pintuclic.com',
+        telefono: '3001234567',
+        contrasena: 'PasswordRobusto123!',
+      });
+
+      expect(res.idVerificacion).toBe('codigo-uuid-123');
+      expect(res.correo).toBe('juan@pintuclic.com');
+      expect(res.tiempoExpiracionSegundos).toBe(900); // 15 minutos
+
+      expect(notificaciones.enviarCodigoRegistro).toHaveBeenCalledWith(
+        'juan@pintuclic.com',
+        expect.stringMatching(/^\d{6}$/),
+        15,
+      );
+    });
+
+    it('rechaza si el correo ya está registrado y activo (HU-CUE-08)', async () => {
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 1,
+        correo: 'activo@pintuclic.com',
+        estado: 'activo',
+      } as Usuario);
+
+      await expect(
+        authService.solicitarRegistroB2C({
+          nombre: 'Juan',
+          correo: 'activo@pintuclic.com',
+          telefono: '3001234567',
+          contrasena: 'PasswordRobusto123!',
+        })
+      ).rejects.toThrow(AuthCuentasError);
+    });
+
+    it('verifica código OTP exitosamente, crea usuario y sesión', async () => {
+      const contrasenaHash = await derivarContrasena('Secret123456!');
+      const codigoHash = await derivarContrasena('123456');
+
+      vi.mocked(codigosRepo.buscarPorId).mockResolvedValueOnce({
+        idCodigo: 'codigo-uuid-123',
+        correo: 'juan@pintuclic.com',
+        codigoHash,
+        tipo: 'registro',
+        intentos: 0,
+        maxIntentos: 3,
+        expiracion: new Date(fechaBase.getTime() + 15 * 60 * 1000),
+        datosTemporales: {
+          nombre: 'Juan Perez',
+          telefono: '3001234567',
+          contrasenaHash,
+        },
+        fechaCreacion: fechaBase,
+      } as CodigoVerificacion);
+
+      const res = await authService.verificarCodigoRegistro('codigo-uuid-123', '123456');
+
+      expect(res.usuario.correo).toBe('juan@pintuclic.com');
+      expect(res.sesion.idSesion).toBe('sesion-activa-uuid');
+      expect(codigosRepo.eliminar).toHaveBeenCalledWith('codigo-uuid-123');
+    });
+
+    it('rechaza código OTP expirado (RN-CUE-01: BVA > 15m)', async () => {
+      const codigoHash = await derivarContrasena('123456');
+      vi.mocked(codigosRepo.buscarPorId).mockResolvedValueOnce({
+        idCodigo: 'codigo-uuid-123',
+        correo: 'juan@pintuclic.com',
+        codigoHash,
+        tipo: 'registro',
+        intentos: 0,
+        maxIntentos: 3,
+        expiracion: new Date(fechaBase.getTime() - 1000), // Expirado hace 1s
+        datosTemporales: {},
+        fechaCreacion: fechaBase,
+      } as CodigoVerificacion);
+
+      await expect(
+        authService.verificarCodigoRegistro('codigo-uuid-123', '123456')
+      ).rejects.toThrow(AuthCuentasError);
+
+      expect(codigosRepo.eliminar).toHaveBeenCalledWith('codigo-uuid-123');
+    });
+
+    it('rechaza código OTP incorrecto e incrementa intentos', async () => {
+      const codigoHash = await derivarContrasena('999999');
+      vi.mocked(codigosRepo.buscarPorId).mockResolvedValueOnce({
+        idCodigo: 'codigo-uuid-123',
+        correo: 'juan@pintuclic.com',
+        codigoHash,
+        tipo: 'registro',
+        intentos: 0,
+        maxIntentos: 3,
+        expiracion: new Date(fechaBase.getTime() + 15 * 60 * 1000),
+        datosTemporales: {},
+        fechaCreacion: fechaBase,
+      } as CodigoVerificacion);
+
+      await expect(
+        authService.verificarCodigoRegistro('codigo-uuid-123', '123456')
+      ).rejects.toThrow(AuthCuentasError);
+
+      expect(codigosRepo.incrementarIntentos).toHaveBeenCalledWith('codigo-uuid-123');
+    });
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────────
+   * HU-CUE-02: FEDERACIÓN GOOGLE IDENTITY
+   * ─────────────────────────────────────────────────────────────────────────── */
+  describe('HU-CUE-02: Federación con Google', () => {
+    it('inicia sesión directamente si el usuario ya tiene la identidad vinculada', async () => {
+      vi.mocked(cuentasRepo.buscarIdentidadExterna).mockResolvedValueOnce({
+        idIdentidad: 1,
+        idUsuario: 20,
+        proveedor: 'google',
+        idProveedor: 'google-sub-456',
+        correoProveedor: 'nuevo-google@pintuclic.com',
+        fechaVinculacion: fechaBase,
+      } as UsuarioIdentidadExterna);
+
+      vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce({
+        idUsuario: 20,
+        correo: 'nuevo-google@pintuclic.com',
+        nombre: 'Google Usuario',
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: null,
+      } as Usuario);
+
+      const res = await authService.autenticarGoogle({ idToken: 'valid-google-id-token' });
+
+      expect(res.cuentaNueva).toBe(false);
+      if (!res.cuentaNueva) {
+        expect(res.usuario.idUsuario).toBe(20);
+        expect(res.sesion.idSesion).toBe('sesion-activa-uuid');
+      }
+    });
+
+    it('emite token efímero de registro si es una cuenta nueva para obligar a fijar contraseña (RN-SEG-02)', async () => {
+      const res = await authService.autenticarGoogle({ idToken: 'valid-google-id-token' });
+
+      expect(res.cuentaNueva).toBe(true);
+      if (res.cuentaNueva) {
+        expect(res.tokenRegistroTemporal).toBeDefined();
+        expect(res.email).toBe('nuevo-google@pintuclic.com');
+      }
+    });
+
+    it('completa registro federado fijando contraseña y teléfono', async () => {
+      // 1. Obtener token temporal
+      const authRes = await authService.autenticarGoogle({ idToken: 'valid-google-id-token' });
+      expect(authRes.cuentaNueva).toBe(true);
+      if (!authRes.cuentaNueva) return;
+
+      // 2. Completar registro
+      const res = await authService.completarRegistroGoogle({
+        tokenRegistroTemporal: authRes.tokenRegistroTemporal,
+        telefono: '3109876543',
+        contrasena: 'MiPasswordFederado123!',
+      });
+
+      expect(res.usuario.correo).toBe('nuevo-google@pintuclic.com');
+      expect(cuentasRepo.crearUsuarioCliente).toHaveBeenCalled();
+      expect(cuentasRepo.vincularIdentidadExterna).toHaveBeenCalledWith({
+        idUsuario: 10,
+        proveedor: 'google',
+        idProveedor: 'google-sub-456',
+        correoProveedor: 'nuevo-google@pintuclic.com',
+      });
+      expect(res.sesion.idSesion).toBe('sesion-activa-uuid');
+    });
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────────
+   * HU-CUE-04: LOGIN Y BLOQUEO POR INTENTOS
+   * ─────────────────────────────────────────────────────────────────────────── */
+  describe('HU-CUE-04: Inicio de sesión y control de fuerza bruta', () => {
+    it('inicia sesión con credenciales válidas y limpia control de intentos', async () => {
+      const passHash = await derivarContrasena('ClaveCorrecta123!');
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 5,
+        correo: 'login@pintuclic.com',
+        contrasena: passHash,
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: null,
+        cambioContrasenaPendiente: false,
+      } as Usuario);
+
+      const res = await authService.login({
+        correo: 'login@pintuclic.com',
+        contrasena: 'ClaveCorrecta123!',
+      });
+
+      expect(res.requiereCambioContrasena).toBe(false);
+      if (!res.requiereCambioContrasena) {
+        expect(res.usuario.idUsuario).toBe(5);
+        expect(res.sesion.idSesion).toBe('sesion-activa-uuid');
+        expect(controlIntentosRepo.limpiar).toHaveBeenCalledWith('login@pintuclic.com');
+      }
+    });
+
+    it('ejecuta señuelo de tiempo constante ante usuario inexistente (ADR-012)', async () => {
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce(null);
+
+      await expect(
+        authService.login({
+          correo: 'noexiste@pintuclic.com',
+          contrasena: 'CualquierClave123!',
+        })
+      ).rejects.toThrow(AuthCuentasError);
+
+      expect(controlIntentosRepo.registrarFallo).toHaveBeenCalled();
+    });
+
+    it('bloquea tras 5 intentos fallidos durante 15 minutos (ADR-012)', async () => {
+      const passHash = await derivarContrasena('ClaveCorrecta123!');
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValue({
+        idUsuario: 5,
+        correo: 'ataque@pintuclic.com',
+        contrasena: passHash,
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: null,
+        cambioContrasenaPendiente: false,
+      } as Usuario);
+
+      vi.mocked(controlIntentosRepo.registrarFallo).mockResolvedValueOnce({
+        correo: 'ataque@pintuclic.com',
+        intentosFallidos: 5,
+        bloqueadoHasta: new Date(fechaBase.getTime() + 15 * 60 * 1000),
+        fechaUltimoIntento: fechaBase,
+      });
+
+      await expect(
+        authService.login({
+          correo: 'ataque@pintuclic.com',
+          contrasena: 'ClaveEquivocada1!',
+        })
+      ).rejects.toThrow(AuthCuentasError);
+    });
+
+    it('solicita cambio obligatorio de contraseña en primer acceso (ADR-011)', async () => {
+      const passHash = await derivarContrasena('ClaveInicial123!');
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 8,
+        correo: 'primero@pintuclic.com',
+        contrasena: passHash,
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: null,
+        cambioContrasenaPendiente: true, // Forzado
+      } as Usuario);
+
+      const res = await authService.login({
+        correo: 'primero@pintuclic.com',
+        contrasena: 'ClaveInicial123!',
+      });
+
+      expect(res.requiereCambioContrasena).toBe(true);
+      if (res.requiereCambioContrasena) {
+        expect(res.idUsuario).toBe(8);
+        expect(res.tokenCambio).toBeDefined();
+      }
+    });
+
+    it('permite cambiar contraseña en primer acceso consumiendo token válido', async () => {
+      const passHash = await derivarContrasena('ClaveInicial123!');
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 8,
+        correo: 'primero@pintuclic.com',
+        contrasena: passHash,
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: null,
+        cambioContrasenaPendiente: true,
+      } as Usuario);
+
+      const loginRes = await authService.login({
+        correo: 'primero@pintuclic.com',
+        contrasena: 'ClaveInicial123!',
+      });
+
+      if (!loginRes.requiereCambioContrasena) return;
+
+      vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce({
+        idUsuario: 8,
+        correo: 'primero@pintuclic.com',
+        contrasena: passHash,
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: null,
+        cambioContrasenaPendiente: true,
+      } as Usuario);
+
+      const cambioRes = await authService.cambiarContrasenaPrimerAcceso(
+        loginRes.tokenCambio,
+        'NuevaPasswordDefinitiva123!',
+      );
+
+      expect(cambioRes.usuario.idUsuario).toBe(8);
+      expect(cuentasRepo.actualizarContrasena).toHaveBeenCalledWith(
+        8,
+        expect.any(String),
+        false, // cambioContrasenaPendiente = false
+      );
+      expect(cambioRes.sesion.idSesion).toBe('sesion-activa-uuid');
+    });
+  });
+});
