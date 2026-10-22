@@ -6,6 +6,7 @@ import type { CodigosVerificacionRepository } from '../repositories/codigos-veri
 import type { NotificacionesPort } from '../interfaces/notificaciones.port';
 import { SimuladoDateProviderAdapter } from '../adapters/date-provider.adapter';
 import { PerfilError, PerfilService } from '../services/perfil.service';
+import { perfilUsuarioResponseSchema } from '../dtos/m04-cuentas.dto';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 
 describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
@@ -96,14 +97,16 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
   });
 
   describe('HU-CUE-06: Gestión de Perfil', () => {
-    it('obtiene perfil con detalle de cuenta empresa cuando aplica', async () => {
-      vi.mocked(cuentasRepo.buscarConEmpresaPorId).mockResolvedValueOnce({
+    const usuarioEmpresa = (nombre = 'Ferretería Central') =>
+      ({
         idUsuario: 15,
-        nombre: 'Ferretería Central',
+        nombre,
         correo: 'admin@ferreteriacentral.com',
         telefono: '3112223344',
         tipo: 'empresa',
         estado: 'activo',
+        cambioContrasenaPendiente: false,
+        contrasena: '$2b$12$hash-que-no-debe-salir',
         cuentaEmpresa: {
           nit: '900123456-7',
           nombreEmpresa: 'Ferretería Central S.A.S.',
@@ -112,19 +115,28 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
           telefono: '3112223344',
           fechaAprobacion: fechaBase,
         } as CuentaEmpresa,
-      } as Usuario & { cuentaEmpresa: CuentaEmpresa | null });
+      }) as Usuario & { cuentaEmpresa: CuentaEmpresa | null };
+
+    it('obtiene el perfil con la forma exacta del contrato (perfilUsuarioResponseSchema)', async () => {
+      vi.mocked(cuentasRepo.buscarConEmpresaPorId).mockResolvedValueOnce(usuarioEmpresa());
 
       const res = await service.obtenerPerfil(15);
 
-      expect(res.nombre).toBe('Ferretería Central');
-      expect(res.tipoUsuario).toBe('empresa');
-      expect(res.cuentaEmpresa?.nit).toBe('900123456-7');
+      // Validar contra el esquema del contrato detecta cualquier desajuste de nombres
+      // (antes se respondía tipoUsuario/cuentaEmpresa y el frontend no reconocía la empresa).
+      expect(perfilUsuarioResponseSchema.strict().safeParse(res).success).toBe(true);
+      expect(res.tipo).toBe('empresa');
+      expect(res.cambioContrasenaPendiente).toBe(false);
+      expect(res.empresa?.nit).toBe('900123456-7');
+      expect(res.empresa?.fechaAprobacion).toBe(fechaBase.toISOString());
+      expect(JSON.stringify(res)).not.toContain('$2b$');
     });
 
-    it('actualiza datos personales básicos', async () => {
+    it('actualiza datos personales y devuelve el perfil completo del contrato', async () => {
       vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce({
         idUsuario: 15,
       } as Usuario);
+      vi.mocked(cuentasRepo.buscarConEmpresaPorId).mockResolvedValueOnce(usuarioEmpresa('Nuevo Nombre'));
 
       const res = await service.actualizarDatos(15, {
         nombre: 'Nuevo Nombre',
@@ -132,6 +144,7 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
       });
 
       expect(res.nombre).toBe('Nuevo Nombre');
+      expect(perfilUsuarioResponseSchema.strict().safeParse(res).success).toBe(true);
       expect(cuentasRepo.actualizarDatosPerfil).toHaveBeenCalledWith(15, {
         nombre: 'Nuevo Nombre',
         telefono: '3209998877',

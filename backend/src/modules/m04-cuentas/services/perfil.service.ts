@@ -9,6 +9,7 @@ import type {
   CambiarContrasenaPerfilRequest,
   ConfirmarCambioCorreoRequest,
   DesactivarCuentaRequest,
+  PerfilUsuarioResponse,
   SolicitarCambioCorreoRequest,
 } from '../dtos/m04-cuentas.dto';
 
@@ -35,29 +36,33 @@ export class PerfilService {
   ) {}
 
   /**
-   * HU-CUE-06: Obtener perfil del usuario autenticado
+   * HU-CUE-06: Obtener perfil del usuario autenticado. La forma pública la fija
+   * `perfilUsuarioResponseSchema` del contrato rector, sin contraseña ni derivados
+   * (RN-CUE-25).
    */
-  async obtenerPerfil(idUsuario: number) {
+  async obtenerPerfil(idUsuario: number): Promise<PerfilUsuarioResponse> {
     const usuario = await this.cuentasRepo.buscarConEmpresaPorId(idUsuario);
     if (!usuario) {
       throw new PerfilError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
     }
 
+    const empresa = usuario.cuentaEmpresa;
     return {
       idUsuario: usuario.idUsuario,
       nombre: usuario.nombre,
       correo: usuario.correo,
       telefono: usuario.telefono,
-      tipoUsuario: usuario.tipo,
+      tipo: usuario.tipo,
       estado: usuario.estado,
-      cuentaEmpresa: usuario.cuentaEmpresa
+      cambioContrasenaPendiente: usuario.cambioContrasenaPendiente,
+      empresa: empresa
         ? {
-            nit: usuario.cuentaEmpresa.nit,
-            nombreEmpresa: usuario.cuentaEmpresa.nombreEmpresa,
-            nombreRepresentante: usuario.cuentaEmpresa.nombreRepresentante,
-            correoEmpresarial: usuario.cuentaEmpresa.correoEmpresarial,
-            telefono: usuario.cuentaEmpresa.telefono,
-            fechaAprobacion: usuario.cuentaEmpresa.fechaAprobacion,
+            nit: empresa.nit,
+            nombreEmpresa: empresa.nombreEmpresa,
+            nombreRepresentante: empresa.nombreRepresentante,
+            correoEmpresarial: empresa.correoEmpresarial,
+            telefono: empresa.telefono,
+            fechaAprobacion: empresa.fechaAprobacion.toISOString(),
           }
         : null,
     };
@@ -72,17 +77,13 @@ export class PerfilService {
       throw new PerfilError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
     }
 
-    const actualizado = await this.cuentasRepo.actualizarDatosPerfil(idUsuario, {
+    await this.cuentasRepo.actualizarDatosPerfil(idUsuario, {
       nombre: input.nombre,
       telefono: input.telefono,
     });
 
-    return {
-      idUsuario: actualizado.idUsuario,
-      nombre: actualizado.nombre,
-      telefono: actualizado.telefono,
-      correo: actualizado.correo,
-    };
+    // Misma forma que GET /perfil: el contrato define una sola respuesta de perfil.
+    return this.obtenerPerfil(idUsuario);
   }
 
   /**
