@@ -5,10 +5,10 @@
   "fecha_actualizacion": "2026-10-22",
   "fase_activa": "FASE_4_TESTING_QA",
   "gate_activo": "GATE_4A_APROBADO",
-  "estado": "GATE_4A_APROBADO",
-  "rol_en_turno": "05_qa_security_tester",
+  "estado": "EN_REVISION_FINAL",
+  "rol_en_turno": "00_orchestrator",
   "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 v0.6.1: Gate 4A aprobado y certificado formalmente por QA Lead & Security Compliance Director. 341/341 tests combinados PASS (205 backend en 22 suites, 136 frontend en 14 suites), 259 archivos sin ANY, compilación estricta limpia, ESLint en cero, Next.js build exitoso (17/17 páginas), auditoría de Core Kit y Zod en 0 violaciones, audit-a11y con 0 violaciones y 4 advertencias falsos positivos documentadas, fidelidad visual contrastada contra VISTAS.pdf renderizado (págs. 1, 3, 4, 5 y 6) e interacción dinámica verificada en navegador real (Chrome DevTools MCP) y por el Director Humano. Reporte oficial: .sdlc/docs/qa/M04/v0.6.1/QA_REPORT.md. M04 listo para Gate 5 (Release SemVer).",
+  "nota_de_contexto": "M04 v0.6.1 EN REVISIÓN FINAL por el Director Humano. QA certificó el Gate 4A (341/341 pruebas, 0 any, tsc y ESLint limpios, build 17/17, fidelidad visual contra VISTAS.pdf); reporte en .sdlc/docs/qa/M04/v0.6.1/QA_REPORT.md. El reporte no incluye E2E automatizado (Playwright/axe) ni stress (k6): el Director indicó a QA no repetirlos porque otro agente ya los ejecutó, aunque sin registrar evidencia. El Director revisa manualmente que el módulo cumpla. Ningún agente avanza a Gate 5 (Release) sin su firma explícita.",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "frentes_propios": [
     {
@@ -180,7 +180,7 @@
       "depende_de": [
         "M18"
       ],
-      "estado_sdlc": "Fase 3A certificada (v0.4.1). Fase 3B aprobada (v0.6.0). v0.6.1: validación real de punta a punta contra PostgreSQL (pintuclic_dev) y correcciones autorizadas (perfil conforme al contrato, NIT normalizado). Siguiente: Gate 4 (QA). Pendientes: aviso al correo anterior (CA-CUE-06-02, M18), equivalencia de NIT sin guion (PO), HU-CUE-02 aplazada."
+      "estado_sdlc": "Fase 3A certificada (v0.4.1). Fase 3B aprobada (v0.6.0). v0.6.1: validación real de punta a punta contra PostgreSQL (pintuclic_dev) y correcciones autorizadas (perfil conforme al contrato, NIT normalizado). Gate 4A certificado por QA (8502177). EN REVISIÓN FINAL por el Director Humano; Gate 5 bloqueado hasta su firma. Pendientes: aviso al correo anterior (CA-CUE-06-02, M18), equivalencia de NIT sin guion (PO), HU-CUE-02 aplazada, evidencia de E2E y k6 sin registrar."
     },
     {
       "id": "M05",
@@ -717,6 +717,13 @@
       "fecha": "2026-10-22",
       "autor": "05_qa_security_tester",
       "motivo": "M04 v0.6.1 auditado y certificado en Gate 4A (Paso A + Paso B): restaurada la entrada histórica de 04_frontend_engineer, verificadas 341/341 pruebas automatizadas PASS (205 backend en 22 suites + 136 frontend en 14 suites), 259 archivos sin ANY, tsc y ESLint limpios, build 17/17 páginas, 4 advertencias falsos positivos de audit-a11y documentadas, páginas 1, 3, 4, 5 y 6 de VISTAS.pdf renderizadas y contrastadas contra capturas en vivo, e interacción dinámica verificada en navegador real (trampa de foco, tabs por teclado y casillas OTP). Reporte en .sdlc/docs/qa/M04/v0.6.1/QA_REPORT.md."
+    },
+    {
+      "de": "GATE_4A_APROBADO",
+      "a": "EN_REVISION_FINAL",
+      "fecha": "2026-10-22",
+      "autor": "Director Humano",
+      "motivo": "El Director deja M04 v0.6.1 en revisión final manual antes de Gate 5. Declara que pidió a QA no repetir E2E ni k6 porque otro agente ya los ejecutó, sin registrar evidencia. Transición registrada por el agente a petición del Director."
     }
   ]
 }
