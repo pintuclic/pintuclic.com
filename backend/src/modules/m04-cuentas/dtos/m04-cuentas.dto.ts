@@ -4,7 +4,7 @@ import { z } from 'zod';
  * ============================================================================
  * DTOs Y ESQUEMAS DE VALIDACIÓN — M04. Cuentas, Autenticación y Perfil
  * ============================================================================
- * Espejo fiel de `.sdlc/docs/contracts/m04-cuentas.contract.ts` para ejecución
+ * Espejo fiel de `contracts/m04-cuentas.contract.ts` para ejecución
  * backend bajo Zod 4. Cero tipos `any`.
  * ============================================================================
  */

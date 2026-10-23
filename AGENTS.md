@@ -1,197 +1,63 @@
-# Protocolo y Guía de Desarrollo para Agentes de IA - PINTU CLIC
+# AGENTS.md — Pintu Clic
 
-> ## 🛑 ALTO OBLIGATORIO (CIRCUIT BREAKER - PASO 0 INVIOLABLE)
->
-> **ESTÁ TERMINANTEMENTE PROHIBIDO ESCRIBIR O MODIFICAR CÓDIGO SIN ANTES EJECUTAR ESTE PROTOCOLO.**
-> Existe un **guardarraíl mecánico activo en `.agents/hooks.json`** que bloqueará físicamente cualquier intento indebido de edición.
->
-> **Antes de realizar cualquier acción o invocar herramientas de edición (`write_to_file`, `replace_file_content`):**
-> 1. **Lee obligatoriamente [`.sdlc/.workflow/current_state.json`](.sdlc/.workflow/current_state.json)** para conocer `modulo_en_curso`, `fase_activa`, `gate_activo`, `estado` y `rol_en_turno`.
-> 2. ⛔ **PROHIBICIÓN EN FASE 1 (PRD):** Si `fase_activa === "FASE_1_PRD"`, NO se escribe código en `backend/src/` ni `frontend/src/`, ni se modifica el schema de BD. Solo se producen especificaciones y HUs en `.sdlc/docs/modules/M[XX]/`.
-> 3. ⛔ **PROHIBICIÓN EN FASE 2 (ARQUITECTURA):** Si `fase_activa === "FASE_2_ARQUITECTURA"`, solo se crean DTOs/interfaces Zod y DDL. PROHIBIDO implementar servicios, controladores o componentes.
-> 4. ⛔ **AISLAMIENTO DE MÓDULO (Directiva #1):** Solo puedes editar archivos de tu módulo asignado `src/modules/m[xx]-[nombre]`. Prohibido tocar otros módulos.
-> 5. ⛔ **ESPERA HUMANA:** Si `estado === "ESPERANDO_APROBACION_HUMANA"`, detén la ejecución y solicita la firma del Director Humano.
->
-> 🗺️ **Ruta canónica obligatoria:** [`.sdlc/AGENTS.md`](.sdlc/AGENTS.md) y [`docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md`](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md).
-> **Stack confirmado:** Backend: `Express 5` + `Prisma 6` + `Zod 4` + `Vitest 3` + `JWT` + `bcrypt` (sal 12). Frontend: `Next.js 15` + `React 19` + `Tailwind CSS 4` + `Zustand 5` + `React Hook Form`.
+Plataforma e-commerce de pinturas (pintuclic.com). Equipo pequeño: 4 desarrolladores y 1 DevOps.
+Flujo ágil: **sin gates, firmas ni roles de agente**. La calidad la dan el CI y la revisión cruzada de cada PR.
 
----
+**Stack:** Backend Express 5 + Prisma 6 + Zod 4 + Vitest 3 + JWT + bcrypt (costo 12). Frontend Next.js 15 + React 19 + Tailwind 4 + Zustand 5 + React Hook Form.
 
-Bienvenido. Este repositorio contiene la especificación funcional, técnica, diagramas y políticas de negocio de la plataforma **Pintu Clic**.
+## Cómo se trabaja
 
-Como agente de IA responsable de implementar código, pruebas o arquitectura para este sistema, **debes seguir estrictamente el siguiente flujo de trabajo**.
+Un módulo = una rama `feature/m[xx]-nombre` + un contrato + un PR a `main`.
+El orden de módulos sigue [`RUTA_DEL_PROYECTO.md`](docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) como guía:
+si falta un predecesor, avisa al usuario y propone una alternativa; decide el Tech Lead.
 
-> ⛔ **DIRECTIVAS CRÍTICAS DE ALCANCE Y CONCURRENCIA (PRODUCT OWNER):**
-> 1. **Aislamiento Estricto de Módulo:** Está terminantemente PROHIBIDO modificar o eliminar archivos, rutas o controladores existentes que pertenezcan a otros módulos o que estén siendo desarrollados por otros equipos. Tu código debe vivir exclusivamente dentro del módulo asignado.
-> 2. **Lectura Obligatoria de Estructura de Carpetas (`backend/infraestructura.md` y `frontend/infraestructura.md`) y Nomenclatura por Código de Módulo:** Antes de crear o editar cualquier archivo de código, el agente DEBE leer la documentación de infraestructura del backend y frontend en la raíz del proyecto para ubicar los archivos respetando con precisión la estructura global definida para toda la organización. Las carpetas dentro de `src/modules/` en backend y frontend deben nombrarse obligatoriamente con el estándar `m[xx]-[nombre-modulo]` en minúsculas y kebab-case (ej: `m20-seguridad`, `m17-permisos`, `m18-notificaciones`, `m04-cuentas`).
-> 3. **Protocolo de Parada e Informe de Inconsistencias:** Si para completar una HU consideras necesario modificar un archivo compartido o externo a tu módulo, **DEBES DETENER LA EJECUCIÓN INMEDIATAMENTE**, no realizar ningún cambio y presentar un reporte detallado al equipo humano explicando la inconsistencia o necesidad técnica. Solo podrás continuar tras recibir aprobación explícita.
-> 4. **Objetivo 100% Funcional:** No reconstruyas la arquitectura global del backend ni del frontend. Concéntrate en cumplir al 100% los Criterios de Aceptación (CA) y Requisitos Funcionales (RF) de cada Historia de Usuario usando el stack tecnológico aprobado.
-> 5. **Los Diagramas son Contratos de Flujo Obligatorios:** Los diagramas han sido diseñados y consensuados por todo el equipo de ingeniería. No son meras ilustraciones: **definen la máquina de estados, ramificaciones condicionales, secuencias de llamadas y manejo de errores exactos** que tu código debe respetar.
-> 5.1. **🗺️ LA RUTA DEL PROYECTO ES UN CONTRATO DE ORDEN DE CONSTRUCCIÓN:** Todo agente DEBE leer íntegramente [`docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md`](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) y **comprender la ruta a la totalidad** — los 21 módulos, las 6 olas y el grafo completo de dependencias — antes de escribir código. No basta con leer la ficha de tu módulo: debes saber qué módulos lo preceden, cuáles dependen de él y en qué ola se ubica. En ese grafo, una flecha `A --> B` significa que **`B` depende de `A`**: está PROHIBIDO implementar un módulo cuyas dependencias no estén terminadas y certificadas en [`PROJECT_STATUS.md`](.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md). Queda igualmente PROHIBIDO crear módulos no listados en esa ruta, renombrarlos, fusionarlos o saltarse olas. Si detectas un bloqueo de dependencias o una inconsistencia en la ruta, aplica la Directiva #3 (detener y reportar).
-> 6. **Walkthrough en CADA Implementación:** Tras CUALQUIER cambio o implementación de código, es MANDATORIO generar el Walkthrough de Implementación correspondiente en `docs/walkthroughs/M[XX]/` según la [guía de walkthroughs](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_VERSIONADO_Y_WALKTHROUGHS.md).
-> 7. **Convención de Commits y Push Controlado:** Los commits deben crearse usando el formato `tipo(scope): descripcion` en minúsculas y modo imperativo, **sin prefijo de versión** (la versión va únicamente en el título de la PR). La **fuente única de verdad** sobre tipos permitidos, scopes y el árbol de decisión es [docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md), **de lectura obligatoria antes de cualquier commit**.
->    - **🔴 REGLA CRÍTICA — `feat` EXIGE UNA HU:** El tipo `feat` se reserva **exclusivamente** para funcionalidad real de negocio que satisface una Historia de Usuario con código verificable end-to-end. **Si no puedes citar un código `HU-XXX-NN` concreto que la entrega satisface, el commit NO ES `feat`.** Estructura de carpetas, scaffolding, arquitectura, configuración, dependencias, contratos Zod sin implementar y schema Prisma son **`chore`** o **`docs`**, nunca `feat`.
->    - **Tipos permitidos (12, sin excepciones):** `feat`, `fix`, `security`, `perf`, `refactor`, `test`, `docs`, `style`, `chore`, `ci`, `build`, `revert`. Quedan prohibidos `update`, `add`, `change`, `improve`, `WIP` y `misc`.
->    - Verificar que TypeScript compile limpio y hacer push únicamente a la rama asignada.
-> 8. **Paleta de Colores Obligatoria de Diseño (Design System Pintuclic):** Queda TERMINANTEMENTE PROHIBIDO para cualquier desarrollador o Agente de IA utilizar colores arbitrarios (ej. `bg-[#002855]`, `text-purple-600`, colores hexadecimales inline o clases estándar de Tailwind no aprobadas). Todo componente visual DEBE construirse exclusivamente con los tokens de color oficiales definidos en `frontend/src/core/theme/colors.ts` y documentados en `frontend/src/core/theme/GUIA_COLORES.md` (`corporate`, `action`, `subaction`, `conversion`, `highlight`, `neutral-*`).
-> 9. **Exclusividad del Sistema de Reviews (Solo Líderes Técnicos):** Queda TERMINANTEMENTE PROHIBIDO para desarrolladores o Agentes de IA que actúen como implementadores crear, editar o alterar archivos dentro de `docs/reviews/`. La auditoría técnica, evaluación de código y emisión de dictámenes es potestad y responsabilidad EXCLUSIVA del Líder Técnico (Tech Lead). Si no estás desempeñando explícitamente el rol de Líder Técnico, **NO HAGAS REVIEWS**; tu entregable como implementador finaliza estrictamente en el Walkthrough (`docs/walkthroughs/`) y el commit/push correspondiente.
-> 10. **Origen Único de Datos y Prohibición de Auto-Siembra en Código (Seed Centralizado):** Queda TERMINANTEMENTE PROHIBIDO para cualquier desarrollador o Agente de IA hardcodear arrays de datos iniciales en TypeScript o crear funciones en Express/TypeScript que inserten datos, catálogos o mocks en la base de datos al arrancar el servidor (ej: funciones tipo `sembrarPermisos()`, `initData()`, auto-inserts al importar routers, etc.). Todo dato inicial, catálogo maestro o mock para pruebas DEBE residir exclusivamente en `bd/sql/seed_pintuclic.sql` y gestionarse mediante `npm run db:seed` de acuerdo con [`bd/docs/GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./bd/docs/GUIA_MOCKS_Y_DATOS_PRUEBA.md). Los repositorios y servicios deben limitarse estrictamente a consultar y operar sobre PostgreSQL sin auto-inyectar datos en runtime. Las carpetas `interfaces/` deben contener exclusivamente tipos (`interface`, `type`), con cero runtime y cero datos.
-> 11. **Ejecución Obligatoria de ESLint y TypeScript en Backend (`Zero Warnings / Zero Errors`):** Todo agente de IA o desarrollador que cree, modifique o refactorice código en `backend/` DEBE ejecutar obligatoriamente `npm run lint` (ESLint) y `npx tsc --noEmit` en la raíz del backend antes de dar por finalizada la tarea o realizar cualquier commit. El código debe pasar con **0 errores y 0 advertencias** (incluyendo prohibición absoluta de `any` y variables sin uso).
-> 12. **Arquitectura de DTOs en Frontend y Prohibición de Validaciones Inline:** Queda TERMINANTEMENTE PROHIBIDO para cualquier desarrollador o Agente de IA declarar esquemas Zod o DTOs inline dentro de componentes o páginas React/Next.js (`.tsx`). Todo esquema de validación debe residir en archivos dedicados dentro de carpetas `dtos/`: los DTOs globales (seguridad, contraseñas M20, campos universales) en `frontend/src/core/dtos/`, y los DTOs de formularios o casos de uso específicos en `frontend/src/modules/m[xx]-[nombre]/dtos/`. Los formularios deben usar `react-hook-form` con `zodResolver`. Las carpetas `interfaces/` se reservan exclusivamente para tipos TypeScript estáticos sin código ejecutable (cero runtime).
-> 13. **Fuentes Visuales de Verdad y Prohibición de Componentes Huérfanos:** Queda TERMINANTEMENTE PROHIBIDO para cualquier desarrollador o Agente de IA maquetar componentes visuales ad-hoc, inventar variantes de interfaz o usar estilos que contradigan las fuentes visuales de verdad oficiales ubicadas en `docs/assets/mockups/`:
->    - **Documento Rector Supremo de UI/UX:** [`docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md`](./docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md) (transcripción canónica en Markdown) y [`docs/assets/mockups/Pintu_Clic_UI_Oficial.docx.pdf`](./docs/assets/mockups/Pintu_Clic_UI_Oficial.docx.pdf) (UI Spec v1.0). Define de forma estricta e innegociable tokens cromáticos, tipografía (Poppins + Inter), iconografía lineal de un solo trazo, radios de borde (inputs 4–6px, botones 5–7px, tarjetas 6–10px, modales 12–16px), sombras (`0 2px 8px rgba(0,0,0,0.08)` / hover `0 8px 16px rgba(0,0,0,0.12)` con `translateY(-4px)`), las 5 variantes oficiales de botón, modales con franja arcoíris corporativa y la composición de vistas.
->    - **Especificación del Panel de Administración:** [`docs/assets/mockups/pintu_clic_admin_m01_m02_.pdf`](./docs/assets/mockups/pintu_clic_admin_m01_m02_.pdf) (Contrato visual exclusivo de administración para M01 y M02).
->    - **Catálogo de Referencia Visual Global:** [`docs/assets/mockups/VISTAS.pdf`](./docs/assets/mockups/VISTAS.pdf) (Guía complementaria para maquetación de vistas públicas y del ecosistema).
->    - **Uso Obligatorio del Core Kit:** Toda vista o módulo en `frontend/` DEBE construirse obligatoriamente utilizando los componentes base canónicos de `frontend/src/core/components/` (`Button`, `Input`, `Checkbox`, `Modal`, `ProductCard`, `Badge`, `Skeleton`). Prohibido maquetar botones, modales, campos o tarjetas desde cero.
+## Antes de escribir código
 
----
+1. Lee el contrato `contracts/m[xx]-nombre.contract.ts`. **El contrato es la especificación.**
+   Si no existe, escríbelo primero con el usuario: qué hace, qué NO hace, 5–10 reglas, endpoints y esquemas Zod.
+2. Si existe, lee la spec en `docs/02_MODULOS_FUNCIONALES/` o `docs/01_TRANSVERSALES/` y los diagramas en
+   `docs/assets/diagrams/M[XX]/`. Los diagramas siguen siendo contrato de flujo (estados, ramas, errores).
+3. Lee [`backend/ARQUITECTURA.md`](backend/ARQUITECTURA.md) y [`frontend/ARQUITECTURA.md`](frontend/ARQUITECTURA.md).
+4. Si algo depende del cliente y no está claro, anótalo como pregunta en el contrato y sigue con el resto.
 
-## 🧭 Flujo de Trabajo Obligatorio para Implementar Cualquier Tarea / HU
+## Reglas de código
 
-```mermaid
-graph TD
-    A[Requerimiento / HU Solicitada] --> R[0. Leer RUTA_DEL_PROYECTO.md completa:<br/>21 modulos, 6 olas, grafo de dependencias]
-    R --> R2{Las dependencias del modulo<br/>estan certificadas?}
-    R2 -- No --> RSTOP[🛑 PARAR Y REPORTAR<br/>Dependencias sin cerrar]
-    R2 -- Si --> B[1. Consultar docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md]
-    B --> C[2. Leer Especificación en docs/02_MODULOS_FUNCIONALES]
-    C --> D[3. Inspección OBLIGATORIA de Diagramas en docs/assets/diagrams/]
-    D --> E[4. Leer Políticas Transversales en docs/01_TRANSVERSALES]
-    E --> F[5. Leer backend/infraestructura.md y frontend/infraestructura.md]
-    F --> G{¿Requiere tocar archivos de otros equipos?}
-    G -- Sí --> H[🛑 PARAR Y REPORTAR AL EQUIPO]
-    G -- No --> I[6. Diseñar e Implementar Código en el Módulo Asignado]
-    I --> J[7. Validar Criterios de Aceptación y Diagrama]
-    J --> K[8. Checklist de Políticas Globales docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/CHECKLIST_CIERRE_MODULOS.md]
-    K --> L[9. Generar Walkthrough Oficial]
-    L --> M[10. Commit Semántico y Push a la Rama Asignada]
-```
+- **Aislamiento:** el código de un módulo vive solo en `src/modules/m[xx]-nombre/` (backend y frontend), en minúsculas y kebab-case.
+- **Archivos compartidos** (`prisma/schema.prisma`, `bd/sql/*`, seed, permisos, `app.routes.ts`, `core/`):
+  van en un **PR pequeño aparte** y se avisa al equipo, para evitar conflictos. No los edites dentro del PR del módulo.
+  Si necesitas cambiar código de OTRO módulo, detente y pregunta al usuario.
+- **TypeScript estricto, cero `any`.**
+- **Backend:** Prisma tipado (cero SQL concatenado), Zod en `body`, `query` y `params`, repositorios con el singleton de `core/db/client.ts`.
+- **Frontend:** componentes de `frontend/src/core/components/` (Core Kit); colores solo de `frontend/src/core/theme/colors.ts`
+  (ver [`GUIA_COLORES.md`](frontend/src/core/theme/GUIA_COLORES.md)); esquemas Zod en `dtos/`, nunca inline en `.tsx`;
+  formularios con React Hook Form + `zodResolver`. Respeta [`ESPECIFICACION_TECNICA_UI_UX.md`](docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md) y los mockups de `docs/assets/mockups/`.
+- **Datos iniciales:** solo en `bd/sql/seed_pintuclic.sql` (`npm run db:seed`, ver [`GUIA_MOCKS_Y_DATOS_PRUEBA.md`](bd/docs/GUIA_MOCKS_Y_DATOS_PRUEBA.md)). Prohibido sembrar desde código.
+- **Interfaces:** `interfaces/` solo tipos, cero runtime.
 
-### Paso 0: Ubicación en la Ruta del Proyecto (OBLIGATORIO Y PREVIO A TODO)
-- Lee **íntegramente** [docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md). No leas solo la fila de tu módulo: **comprende la ruta a la totalidad**.
-- Identifica con precisión: (a) en qué **ola** se ubica tu módulo, (b) de qué módulos **depende**, (c) qué módulos **habilita** tu trabajo, y (d) si está en el **camino crítico**.
-- Verifica en [`.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md`](.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md) que **todas** las dependencias del grafo estén terminadas y certificadas.
-- 🛑 **Si alguna dependencia no está cerrada, DETÉN LA EJECUCIÓN y repórtalo.** No implementes un módulo cuyos predecesores no existen: producirías código contra interfaces inventadas.
-- 🛑 **Si el módulo no tiene especificación funcional** (13 de los 21 están marcados ❌ en la ruta), detente: la spec es un entregable del Gate 1 del Product Manager, no del implementador.
+## Seguridad
 
-### Paso 1: Localización y Mapeo de Dependencias
-- Identifica el código de la Historia de Usuario (ejemplo: `HU-CUE-01`, `HU-ADM-02`, etc.).
-- Abre [docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md](./docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md) para determinar qué módulos transversales (`M20 Seguridad`, `M17 Permisos`, `M18 Notificaciones`) y qué **diagramas** aplican a esa historia.
+- Autorización siempre en el servidor, también en los `GET`. Permisos atómicos por empleado, resueltos en cada petición.
+- 403 genérico, sin revelar si el recurso existe ni el nombre del permiso.
+- Nunca devolver contraseñas, hashes, trazas ni SQL. Payloads mínimos.
+- Contraseñas con bcrypt costo 12. Sesión en cookie `HttpOnly`.
+- Detalle: [`CHECKLIST_CIERRE_MODULOS.md`](docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/CHECKLIST_CIERRE_MODULOS.md) y `docs/01_TRANSVERSALES/POLITICAS/`.
 
-### Paso 2: Lectura de la Especificación Funcional
-- Abre el archivo correspondiente en `docs/02_MODULOS_FUNCIONALES/` (por ejemplo, [docs/02_MODULOS_FUNCIONALES/M04_CUENTAS_AUTH_PERFIL.md](./docs/02_MODULOS_FUNCIONALES/M04_CUENTAS_AUTH_PERFIL.md)).
-- Lee los **Requisitos Funcionales (RF)**, **Requisitos No Funcionales (RNF)** y los **Criterios de Aceptación (CA)**.
+## Antes de cada commit y PR
 
-### Paso 3: Inspección OBLIGATORIA de Diagramas (Contrato de Flujo del Equipo)
-Antes de escribir una sola línea de código, **debes abrir y analizar visualmente el diagrama asociado** en `docs/assets/diagrams/M[XX]/`:
-- **Árboles de Decisión y Bifurcaciones:** Revisa qué condiciones de validación (`if / else`) están diagramadas. Cada rama del diagrama debe tener su correspondiente lógica en el código.
-- **Transición de Estados:** Si el diagrama define estados (ej: `Pendiente -> Aprobado -> Rechazado`), el código debe implementar exactamente esos nombres y transiciones.
-- **Rutas de Error y Cancelación:** Presta especial atención a los caminos alternativos (qué pasa si el código de verificación expiró, qué pasa si el NIT ya existe, etc.).
-- **Secuencia de Llamadas:** Respeta el orden de ejecución (ej: primero validar con Zod -> luego verificar existencia en BD -> luego generar hash BCrypt -> luego emitir evento SMTP).
+En `backend/` y `frontend/`: `npm run lint -- --max-warnings=0`, `npm run check:types`, `npm run check:no-any`, `npm test`.
+En la raíz: `npm run test:contracts`. Es lo mismo que corre el CI.
 
-### Paso 4: Cumplimiento de Políticas Transversales (¡Crítico!)
-- **M20 - Seguridad y Auditoría ([docs/01_TRANSVERSALES/M20_SEGURIDAD_Y_AUDITORIA.md](./docs/01_TRANSVERSALES/M20_SEGURIDAD_Y_AUDITORIA.md)):**
-  - **Credenciales (`HU-SEG-01`):** Nunca guardar ni comparar contraseñas en texto claro. Usar funciones de hash seguras con salt (BCrypt con costo 12).
-  - **Sesiones y Tokens (`HU-SEG-02`):** Validar tiempos de expiración y manejo de tokens/cookies seguras (`HttpOnly`, `SameSite`, `Secure`).
-  - **Autorización en Servidor (`HU-SEG-03`):** NUNCA confiar únicamente en la validación del frontend. Cada endpoint debe validar identidad y autorización en backend.
-  - **Auditoría (`HU-SEG-04`):** Registrar eventos críticos (cambios de permisos, accesos administrativos, aprobaciones de empresas) con timestamp, actor y acción.
-  - **Datos Sensibles (`HU-SEG-06`):** No retornar contraseñas, hashes ni datos sensibles en las respuestas JSON.
-- **M17 - Permisos y Administración ([docs/01_TRANSVERSALES/M17_PERMISOS_Y_ROLES.md](./docs/01_TRANSVERSALES/M17_PERMISOS_Y_ROLES.md)):**
-  - El sistema utiliza **permisos individuales por empleado** (sin roles predefinidos fijos). Comprobar el permiso específico en tiempo real ante cada operación (`HU-ADM-03`).
-- **M18 - Notificaciones ([docs/01_TRANSVERSALES/M18_NOTIFICACIONES.md](./docs/01_TRANSVERSALES/M18_NOTIFICACIONES.md)):**
-  - Para flujos que involucren códigos de verificación o confirmaciones, consumir la capa de eventos/notificaciones desacoplada por SMTP.
+## Commits y PR
 
-### Paso 5: Lectura Obligatoria de Estructura de Carpetas (`backend/` y `frontend/`) y Nomenclatura por Código
-Antes de crear o modificar cualquier archivo de código:
-- **Backend:** Lee el archivo [`backend/ARQUITECTURA.md`](./backend/ARQUITECTURA.md) para entender la estructura modular, capas (controllers / services / repositories / dtos / interfaces / __tests__) y convenciones del backend. Stack: Express 5 + Prisma 6 + Zod 4 + Vitest 3.
-- **Frontend:** Lee el archivo [`frontend/ARQUITECTURA.md`](./frontend/ARQUITECTURA.md) para entender la estructura del proyecto Next.js 15. Los DTOs transversales compartidos van en `src/core/dtos/`. Prohibido declarar esquemas Zod inline en componentes `.tsx`. Usar `react-hook-form` + `zodResolver` para formularios.
-- **Paleta de Colores de Diseño:** En componentes frontend, usar estrictamente los tokens de color del Design System Pintuclic (`corporate`, `action`, `subaction`, `conversion`, `highlight`, `neutral-*`) declarados en `frontend/src/core/theme/colors.ts`. Prohibido inventar colores arbitrarios o clases `bg-[#...]`.
-- **Nomenclatura Obligatoria de Carpetas de Módulo:** Toda carpeta creada dentro de `src/modules/` (tanto en `backend/` como en `frontend/`) DEBE seguir estrictamente la convención de código de módulo en minúsculas y nombre en kebab-case: `m[xx]-[nombre-modulo]` (ejemplos: `m20-seguridad`, `m17-permisos`, `m18-notificaciones`, `m04-cuentas`, `m02-productos`, `m07-carrito`, `m08-ordenes`).
-- **Límites de Módulo:** Asegúrate de que todos los archivos nuevos se ubiquen dentro de la carpeta asignada a tu módulo, sin tocar archivos de otros equipos ni carpetas ajenas.
+- Commit: `tipo(scope): descripcion`, minúsculas e imperativo. Scope = carpeta del módulo (`m13-inventario`).
+  Tipos y scopes: [`GUIA_GIT_COMMITS_Y_PUSH.md`](docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md).
+  `feat` solo si entrega funcionalidad real (cita la HU); estructura, contratos sin implementar y configuración son `chore` o `docs`.
+- Nunca `push --force` a `main`. Todo entra por PR.
+- PR: título `tipo(scope): descripcion` (sin versión); descripción de máximo 10 líneas (qué hace, qué tocó fuera del módulo, cómo se probó).
+- Un compañero revisa; CI en verde y 1 aprobación para fusionar. El tag de versión lo crea `release.yml`.
+- Backend, frontend y QA no editan `.github/workflows/`, `docker-compose.yml`, `Dockerfile*` ni `.env.example`: es dominio del DevOps.
 
-### Paso 6: Stack Backend Obligatorio y Reglas de Arquitectura
-Todo código del backend generado para cualquier módulo DEBE ceñirse estrictamente al stack definido en [docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_BACKEND.md](./docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_BACKEND.md):
-- **Lenguaje:** TypeScript estricto (`strict: true`, sin tipos `any`).
-- **Framework HTTP:** Express.js estructurado en controladores y servicios dentro del módulo asignado.
-- **Acceso y Tipado de Base de Datos:** **Prisma 6** con tipado fuerte. El schema canónico vive en `backend/prisma/schema.prisma` y es la única fuente de la verdad del modelo de datos. Todo repositorio debe usar `PrismaClient` y los tipos generados por Prisma (`Prisma.XxxGetPayload`, `Prisma.XxxCreateInput`, etc.) para retornos y parámetros. Prohibido terminantemente el uso de `any` o queries SQL en texto plano sin tipar. Toda consulta compleja usa `prisma.$queryRaw` con `Prisma.sql` (tagged template, nunca concatenación). Ver schema en `backend/prisma/schema.prisma` y DDL de referencia en `bd/sql/schema_pintuclic.sql`.
-- **Validación de Entradas (DTOs):** **Zod** para validar `req.body`, `req.query`, `req.params`.
-- **Autenticación y Sesiones:** **JWT** con tiempos de vida cortos y rotación segura.
-- **Hashing de Contraseñas:** **BCrypt** con costo de sal mínimo de 12 (`HU-SEG-01`).
-- **Comunicaciones:** **SMTP** estructurado en el módulo `M18` para notificaciones y códigos transaccionales.
-- **Seguridad HTTP:** **CORS** restrictivo y cabeceras seguras.
-- **Origen Centralizado de Datos y Prohibición de Auto-Siembra:** Todo dato inicial, mock o catálogo maestro del sistema reside exclusivamente en `bd/sql/seed_pintuclic.sql` y se gestiona mediante `npm run db:seed` ([`bd/docs/GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./bd/docs/GUIA_MOCKS_Y_DATOS_PRUEBA.md)). Prohibido terminantemente hardcodear arrays de catálogo o crear funciones de auto-siembra en Express (`sembrarPermisos`, etc.). Las carpetas `interfaces/` deben contener única y exclusivamente contratos de compilación (`interface`, `type`), con cero runtime y cero datos.
+## Ya no existen
 
-### Paso 7: Validación de Criterios de Aceptación y Casos Borde
-- Valida que cada HU cumpla tanto sus Criterios de Aceptación escritos (Gherkin) como los caminos de error trazados en el diagrama.
-
-### Paso 8: Validación de Políticas Globales de Cierre (Definition of Done)
-Antes de declarar el módulo finalizado, **DEBES comprobar el cumplimiento de las 3 políticas de integridad** definidas en [docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/CHECKLIST_CIERRE_MODULOS.md](./docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/CHECKLIST_CIERRE_MODULOS.md):
-1. **Unicidad de Cuentas (`HU-CUE-08`):** [docs/01_TRANSVERSALES/POLITICAS/politica_HU-CUE-08_unicidad_cuentas.md](./docs/01_TRANSVERSALES/POLITICAS/politica_HU-CUE-08_unicidad_cuentas.md).
-2. **Control de Acceso en Servidor (`HU-ADM-03`):** [docs/01_TRANSVERSALES/POLITICAS/politica_HU-ADM-03_control_acceso_servidor.md](./docs/01_TRANSVERSALES/POLITICAS/politica_HU-ADM-03_control_acceso_servidor.md).
-3. **No Exposición de Datos Sensibles (`HU-SEG-06`):** [docs/01_TRANSVERSALES/POLITICAS/politica_HU-SEG-06_no_exposicion_datos_sensibles.md](./docs/01_TRANSVERSALES/POLITICAS/politica_HU-SEG-06_no_exposicion_datos_sensibles.md).
-
-### Paso 9: Walkthrough de Implementación
-Al completar la implementación, **DEBES SI O SI**:
-1. **Generar el Walkthrough de Implementación:** Crear el documento formal usando la estructura de [docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/PLANTILLA_WALKTHROUGH_IMPLEMENTACION.md](./docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/PLANTILLA_WALKTHROUGH_IMPLEMENTACION.md), guardándolo en `docs/walkthroughs/M[XX]/` con el **sufijo obligatorio de capa al final del nombre**: `walkthrough_v[X.Y.Z.W]_[MXX]_[descripcion]_[backend|frontend].md`, detallando:
-   - Módulo de origen y HUs completadas.
-   - Reglas de negocio y políticas transversales validadas.
-   - Criterios de Aceptación verificados.
-   - **Resumen conceptual de dependencias externas** (qué necesita este código de otros módulos para operar al 100% en producción y a quién habilita).
-   - Lista de archivos creados/modificados dentro del módulo asignado.
-2. **Autoría real:** el campo **Autor / Responsable** del walkthrough debe registrar a la persona real de la entrega con su `@usuario`; si un agente de IA asistió, se documenta como apoyo, nunca como autor.
-
-### Paso 10: Actualización de Versión, Commits y Push al Repositorio
-
-> 🔗 **Antes de hacer commit**, actualiza también:
-> - `.sdlc/multiAgents/[tu_agente]/WORKLOG.md` con el resumen de lo realizado
-> - `.sdlc/.workflow/current_state.json` si cambiaste de fase o completaste un Gate
-> - `.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md` si el módulo avanzó de estado
->
-> **Formato canónico del commit:** `tipo(scope): descripcion` — **sin prefijo de versión**.
-> La versión va únicamente en el título de la PR (`tipo(scope) [X.Y.Z.W]: mensaje`).
-> **Fuente única de verdad:** [`docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md`](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md)
-> (el protocolo del SDLC está subordinado a esta guía).
-
-Siguiendo el esquema de [CONTRIBUTING.md](CONTRIBUTING.md) y la [Guía de Commits y Push](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md):
-1. **Versión Obligatoria:** dejar `.github/version.txt` con la versión de la entrega y agregar en [docs/CHANGELOG.md](./docs/CHANGELOG.md) su entrada con fecha y la línea `- **Autor:** Nombre (@usuario)` (la persona real que realiza la entrega, nunca la IA).
-   > 🚧 **La automatización en CI está EN DESARROLLO.** Los workflows `pr-title-lint.yml` y
-   > `version.yml`, y el `CONTRIBUTING.md` de la raíz, **aún no existen**. Su ausencia es conocida y
-   > está asignada al DevOps designado: **no la reportes como hallazgo**. Sigue el formato de versión
-   > que ya usa `docs/CHANGELOG.md`. Detalle y estado en
-   > [GUIA_VERSIONADO_Y_WALKTHROUGHS.md](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_VERSIONADO_Y_WALKTHROUGHS.md).
-2. **Verificación Previa Obligatoria:** Comprobar que TypeScript compila sin errores (`npx tsc --noEmit`), que ESLint no arroja errores ni advertencias (`npm run lint`), que las pruebas unitarias pasan al 100% y que solo se modificaron archivos del módulo asignado.
-3. **Formato del Commit:** Crear commits atómicos utilizando el estándar Conventional Commits (`tipo(modulo): descripcion`, ej: `feat(M04): implementar registro con verificacion HU-CUE-01` o `fix(M04): corregir expiracion de tokens`).
-4. **Push Seguro:** Ejecutar `git push origin <rama_asignada>` únicamente sobre la rama de trabajo correspondiente. Nunca hacer push forzado (`--force`) sobre ramas compartidas.
-
----
-
-## 📂 Índice del Repositorio y Documentación
-
-- [docs/CHANGELOG.md](./docs/CHANGELOG.md): Registro central de versiones del proyecto.
-- 🗺️ **[docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md](./docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md): LA RUTA DEL PROYECTO — grafo de dependencias de los 21 módulos en 6 olas de construcción. Lectura íntegra obligatoria antes de codificar.**
-- [docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_GENERAL.md](./docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_GENERAL.md): Resumen de dominios, actores, módulos y dependencias globales.
-- [docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_BACKEND.md](./docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_BACKEND.md): Stack oficial, directivas de aislamiento y protocolo de parada.
-- [docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md](./docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md): Mapeo directo entre Historias de Usuario, Transversales y Diagramas.
-- [docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md): Convención de Conventional Commits y protocolo de push.
-- [docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_VERSIONADO_Y_WALKTHROUGHS.md](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_VERSIONADO_Y_WALKTHROUGHS.md): Protocolo de Walkthroughs de implementación.
-- [docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/ESTANDAR_Y_GUIA_INCORPORACION.md](./docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/ESTANDAR_Y_GUIA_INCORPORACION.md): Normativa para incorporar o refactorizar módulos futuros.
-- [docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/CHECKLIST_CIERRE_MODULOS.md](./docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/CHECKLIST_CIERRE_MODULOS.md): Validación obligatoria de políticas globales antes de cerrar un módulo.
-- [docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/PLANTILLA_WALKTHROUGH_IMPLEMENTACION.md](./docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/PLANTILLA_WALKTHROUGH_IMPLEMENTACION.md): Plantilla oficial de entrega post-implementación (.md y .docx).
-- [docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/PLANTILLA_REPORTE_QA_MODULO.md](./docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/PLANTILLA_REPORTE_QA_MODULO.md): Plantilla estándar de informe de pruebas de calidad QA (.md y .docx).
-- [docs/01_TRANSVERSALES/M20_SEGURIDAD_Y_AUDITORIA.md](./docs/01_TRANSVERSALES/M20_SEGURIDAD_Y_AUDITORIA.md): Especificación detallada de seguridad, sesiones y datos sensibles.
-- [docs/01_TRANSVERSALES/M17_PERMISOS_Y_ROLES.md](./docs/01_TRANSVERSALES/M17_PERMISOS_Y_ROLES.md): Modelo de permisos granulares por empleado.
-- [docs/01_TRANSVERSALES/M18_NOTIFICACIONES.md](./docs/01_TRANSVERSALES/M18_NOTIFICACIONES.md): Servicios de correo y notificaciones transaccionales.
-- [docs/01_TRANSVERSALES/POLITICAS/](./docs/01_TRANSVERSALES/POLITICAS/): Políticas transversales de unicidad, control de servidor y datos sensibles.
-- [docs/02_MODULOS_FUNCIONALES/M04_CUENTAS_AUTH_PERFIL.md](./docs/02_MODULOS_FUNCIONALES/M04_CUENTAS_AUTH_PERFIL.md): Cuentas particulares y empresas, login, registro, perfiles y direcciones.
-- [bd/docs/GUIA_MOCKS_Y_DATOS_PRUEBA.md](./bd/docs/GUIA_MOCKS_Y_DATOS_PRUEBA.md): Protocolo de mocks y datos de prueba centralizados (31 tablas) para testing local y desarrollo de módulos.
-- `docs/assets/diagrams/`: Diagramas de arquitectura, flujo funcional y secuencia por módulo.
-- `docs/assets/mockups/`: Fuentes de verdad visuales oficiales (`Pintu_Clic_UI_Oficial.docx.pdf`, `pintu_clic_admin_m01_m02_.pdf`, `VISTAS.pdf`).
-
-
-### Version
-- 🚧 **El esquema de versiones está en revisión.** `GUIA_VERSIONADO_Y_WALKTHROUGHS.md` describe cuatro segmentos, pero `docs/CHANGELOG.md` y los tags del repositorio usan tres. **Hasta que su responsable lo unifique, sigue el formato de `docs/CHANGELOG.md`** y no reabras la discusión en cada entrega.
-- En CADA entrega, el agente de IA DEBE declarar la versión en el título de la PR (`tipo(scope) [X.Y.Z.W]: mensaje`), dejar `.github/version.txt` con ese mismo número y agregar en [docs/CHANGELOG.md](./docs/CHANGELOG.md) la entrada `## [vX.Y.Z.W] - AAAA-MM-DD` con la línea `- **Autor:** Nombre (@usuario)`.
-- El **autor registrado es la persona real** que realiza/publica la entrega (el humano responsable), con su `@usuario` de GitHub. Queda **prohibido** registrarse como `Agente de IA` o mencionar a la IA en el CHANGELOG.
-- 🚧 Los workflows `PR Title Lint` y `version.yml` **están pendientes de construcción**: hoy no validan ni publican nada. Su ausencia **no se reporta**.
-- Está prohibido crear tags o Releases a mano.
-- La versión del proyecto vive únicamente en `.github/version.txt`; no se duplica en otros archivos de código.
+Gates, firmas del "Director Humano", `current_state.json`, PRD/ATDD/QA por módulo, walkthroughs obligatorios, `docs/reviews/`, bitácoras por rol.
+Los documentos históricos que los mencionan (`docs/walkthroughs/`, `docs/CHANGELOG.md`, `bd/docs/`) se conservan solo como historia.

@@ -53,67 +53,26 @@ graph TD
 
 ---
 
-## 5. Capa de Calidad y Testing (QA) — Arsenal Oficial
+## 5. Calidad y Testing
 
-> **Responsable:** QA Lead & Security Compliance Director (`05_qa_security_tester`)  
-> **Guía completa de uso y criterio de proporcionalidad:** [`.sdlc/multiAgents/05_qa_security_tester/QA_TOOLING_GUIDE.md`](../../../.sdlc/multiAgents/05_qa_security_tester/QA_TOOLING_GUIDE.md)  
-> **Regla rector:** Ningún módulo pasa el Stage-Gate 4 sin haber superado los 4 Pilares del Arsenal.
+La calidad se verifica en el CI (`.github/workflows/01_ci_quality_gates.yml`) y en la revisión cruzada de cada PR. No hay compuertas de firma.
 
-### 5.1. Stack de Testing por Capa
+### 5.1. Stack de Testing
 
-| Herramienta | Capa | Cuadrante Ágil | Ubicación de Tests | Propósito |
-| :--- | :--- | :---: | :--- | :--- |
-| **Vitest** | Backend + Frontend | Q1 / Q2 | `backend/tests/modules/` · `frontend/src/modules/[mXX]/tests/` | Tests unitarios e integración: lógica de dominio, servicios, contratos Zod, repositorios Prisma |
-| **Bruno CLI** | Backend (API) | Q1 / Q2 | `tests/bruno/[XX_modulo]/` | Testing declarativo de endpoints REST: assertions HTTP, DTOs, status codes (`.bru` files, 100% versionables en Git) |
-| **Playwright** | Frontend (E2E) | Q2 / Q3 | `frontend/tests/e2e/` | Simulación de usuario real en Chromium headless: flujos de navegación, formularios, sesión, modales |
-| **@axe-core/playwright** | Frontend (A11y) | Q2 / Q3 | Integrado en suites Playwright | Auditoría WCAG 2.1 AA: aria-labels, jerarquía de encabezados, contraste, roles ARIA |
-| **k6** | Backend (Performance) | Q4 | `tests/load/k6_*.js` | Pruebas de carga y estrés concurrente: SLA p95/p99, pool de conexiones Prisma/PostgreSQL |
-| **OWASP ZAP** | Backend (Seguridad DAST) | Q4 | Reporte DAST externo | Análisis dinámico: SQLi, XSS, IDOR, cabeceras de seguridad HTTP |
+| Herramienta | Capa | Ubicación de Tests | Propósito |
+| :--- | :--- | :--- | :--- |
+| **Vitest** | Backend + Frontend | `backend/src/modules/m[xx]-*/__tests__/` · `frontend/src/modules/m[xx]-*/tests/` | Unitarios e integración: lógica de dominio, servicios, contratos Zod, repositorios Prisma |
+| **k6** | Backend (carga) | `tests/load/` | Carga y estrés concurrente (opcional, módulos de alta carga) |
 
-### 5.2. Scripts AST de Verificación de Tipos (Integrados en CI)
+### 5.2. Verificaciones del CI (scripts en `tooling/`)
 
-Estos scripts residen en `.sdlc/tooling/` y se ejecutan como parte del Gate 4 y del pipeline CI:
-
-| Script | Propósito | Cuándo se ejecuta |
+| Script | Propósito | Comando |
 | :--- | :--- | :--- |
-| `check-no-any-backend.ts` | Verifica AST: cero uso de `any` en todo `backend/src/` | Obligatorio en cada entrega de Backend (Gate 3A y Gate 4) |
-| `check-no-any-frontend.mjs` | Verifica AST: cero uso de `any` en todo `frontend/src/` | Obligatorio en cada entrega de Frontend (Gate 3B y Gate 4) |
-| `validate-contracts.mjs` | Valida que los contratos Zod en `docs/contracts/` compilen sin errores | Gate 2 y Gate 3A |
-| `audit-a11y.mjs` | Auditoría de accesibilidad automatizada (complementa Playwright + axe-core) | Gate 3B y Gate 4 |
-| `audit-security-runtime.mjs` | Auditoría de seguridad en runtime sobre los endpoints expuestos | Gate 4 |
-| `run-load-test.mjs` | Orquestador de ejecución de scripts k6 | Gate 4 (módulos de alta carga) |
+| `check-no-any-backend.ts` / `check-no-any-frontend.mjs` | Cero uso de `any` (AST) en backend, frontend y contratos | `npm run check:no-any` |
+| `validate-contracts.mjs` | Valida los contratos Zod de `contracts/` | `npm run test:contracts` |
+| `audit-a11y.mjs` | Auditoría estática de accesibilidad (WCAG 2.1 AA) | `npm run audit:a11y` |
+| `audit-core-kit.mjs`, `audit-zod-chains.mjs` | Uso del Core Kit y cadenas Zod | `npm run audit:core-kit`, `npm run audit:zod` |
+| `audit-security-runtime.mjs` | Auditoría de seguridad en runtime (manual) | `npm run audit:dast` |
+| `run-load-test.mjs` | Orquestador de k6 (manual) | `npm run test:load` |
 
-### 5.3. Los 4 Pilares del Arsenal QA (Mandato Inviolable en Gate 4)
-
-```mermaid
-graph LR
-    subgraph P1 ["Pilar 1 — Lógica (Q1/Q2)"]
-        V["Vitest\nUnit + Integración"]
-        B["Bruno CLI\nAPI REST Contracts"]
-    end
-    subgraph P2 ["Pilar 2 — UI/E2E (Q2/Q3)"]
-        PW["Playwright\nE2E Chromium"]
-        AX["@axe-core\nWCAG 2.1 AA"]
-    end
-    subgraph P3 ["Pilar 3 — Carga/Seg (Q4)"]
-        K6["k6\nSLA Concurrencia"]
-        ZAP["OWASP ZAP\nDAST Security"]
-    end
-    subgraph P4 ["Pilar 4 — UX (Q3)"]
-        EX["Test Charters\nExploratorio UX"]
-    end
-
-    P1 --> Gate4["🧪 Gate 4\nCertificación QA"]
-    P2 --> Gate4
-    P3 --> Gate4
-    P4 --> Gate4
-
-    style Gate4 fill:#1e3a8a,stroke:#3b82f6,color:#ffffff
-```
-
-### 5.4. Reglas de Alcance QA (Qué puede y NO puede hacer el QA Lead)
-
-- ✅ **Puede:** auditar código, emitir reportes, ejercer poder de veto (Stop-the-Line), ejecutar el arsenal de herramientas.
-- ❌ **No puede:** corregir código de Backend ni Frontend — devuelve el ticket con RCA al desarrollador correspondiente.
-- ❌ **No puede:** tocar archivos de `.github/workflows/`, Docker ni infraestructura — dominio exclusivo del DevOps designado.
-- ❌ **No puede:** aprobar su propio Stage-Gate — la firma del Gate 4 requiere al Director Humano.
+Además, en cada capa: `npm run lint -- --max-warnings=0`, `npm run check:types` y `npm test`. Los reportes de los scripts se generan en `docs/qa/` y no se versionan.

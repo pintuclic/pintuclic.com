@@ -30,8 +30,8 @@ El diagrama de la Sección 3 es un **contrato de ingeniería**, no una ilustraci
 | ¿Qué hace funcionalmente un módulo (RF, RNF, CA)? | `docs/02_MODULOS_FUNCIONALES/` y `docs/01_TRANSVERSALES/` |
 | ¿Cómo se implementa técnicamente? | `docs/00_SISTEMA/01_ARQUITECTURA/ARQUITECTURA_BACKEND.md` |
 | ¿Qué HU toca qué política transversal y qué diagrama? | `docs/00_SISTEMA/01_ARQUITECTURA/MATRIZ_TRAZABILIDAD.md` |
-| ¿Cuál es el Stage-Gate activo y quién tiene el turno? | `.sdlc/.workflow/current_state.json` |
-| ¿Cuál es el estado de avance real por módulo? | `.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md` |
+| ¿Cuál es la especificación de la API de un módulo? | `contracts/m[xx]-*.contract.ts` |
+| ¿Cuál es el estado de avance por módulo? | El tablero de tareas del equipo y los PR fusionados en `main` |
 
 **Stack confirmado para todos los módulos** (no negociable sin RFC aprobado):
 Backend `Express 5` + `Prisma 6` + `Zod 4` + `Vitest 3` · Frontend `Next.js 15` + `React 19` + `Tailwind CSS 4` + `Zustand 5` + `React Hook Form` + `Axios`.
@@ -238,11 +238,12 @@ El diagrama declara cinco `classDef` (`adm`, `cat`, `cli`, `ven`, `ope`) que nun
 
 ---
 
-## 8. Reglas Obligatorias para Agentes
+## 8. Cómo usar esta ruta
 
-1. **Verificar dependencias antes de empezar.** Antes de implementar `MXX`, confirmar en [`PROJECT_STATUS.md`](../../../.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md) que todos sus predecesores en el grafo están certificados. Si alguno no lo está, **detenerse y reportar**.
-2. **No saltarse olas.** Una ola posterior no se inicia sin cierre de la anterior ni autorización explícita del Product Owner.
-3. **Respetar el inventario y la nomenclatura.** Los 21 módulos, sus nombres y sus scopes son los de la Sección 4. Prohibido crear módulos no listados, renombrarlos o fusionarlos.
-4. **Usar el scope exacto** de la Sección 4 para carpetas y commits (`m[xx]-[nombre]`, minúsculas y kebab-case).
-5. **Declarar el impacto en el Walkthrough.** La sección de dependencias externas debe citar explícitamente qué módulos de esta ruta habilita el trabajo entregado y qué necesita de otros para operar al 100%.
-6. **Un módulo sin spec no se implementa.** Los 13 módulos marcados ❌ en la Sección 4 requieren primero su especificación funcional (Gate 1, Product Manager) antes de cualquier código.
+La ruta es una **guía de orden**, no un bloqueo: la decide el Tech Lead.
+
+1. **Revisar dependencias antes de empezar.** Si un predecesor del grafo aún no está en `main`, avisa al Tech Lead y propón una alternativa (por ejemplo, un contrato o un adaptador temporal).
+2. **Respetar el inventario y la nomenclatura.** Los 21 módulos, sus nombres y sus scopes son los de la Sección 4. No se crean, renombran ni fusionan módulos sin acuerdo del equipo.
+3. **Usar el scope exacto** de la Sección 4 para carpetas y commits (`m[xx]-[nombre]`, minúsculas y kebab-case).
+4. **Un módulo sin spec funcional** (❌ en la Sección 4) se define primero en su contrato `contracts/m[xx]-*.contract.ts`: qué hace, qué no hace, reglas clave, endpoints y esquemas.
+5. **Describir el impacto en el PR:** qué módulos habilita el trabajo entregado y qué necesita de otros.

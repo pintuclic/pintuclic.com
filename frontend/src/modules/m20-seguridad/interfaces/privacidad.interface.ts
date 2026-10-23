@@ -1,6 +1,6 @@
 /**
  * Contratos de datos de HU-SEG-05, en paridad con
- * `.sdlc/docs/contracts/m20-seguridad.contract.ts`.
+ * `contracts/m20-seguridad.contract.ts`.
  *
  * ⚠️ Cero runtime: esta carpeta solo contiene tipos (Directiva #12).
  */
