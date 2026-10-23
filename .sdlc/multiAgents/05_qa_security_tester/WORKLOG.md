@@ -336,7 +336,7 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 
 ---
 
-### [2026-10-22 20:55] — 🟡 SANEAMIENTO DE REPORTE QA (PASO A) — M04 (v0.6.1)
+### [2026-10-22 21:25] — 🟢 AUDITORÍA INTEGRAL DE FRONTEND, UI/UX Y CERTIFICACIÓN GATE 4A (PASO A + B) — M04 (v0.6.1)
 
 > **Insumos:** `docs/walkthroughs/M04/walkthrough_v0.6.0_M04_cuentas_autenticacion_perfil_frontend.md` y `docs/walkthroughs/M04/walkthrough_v0.6.1_M04_validacion_real_y_correcciones_backend.md`  
 > **Fuentes de Verdad:** `Pintu_Clic_UI_Oficial.md`, `frontend/ARQUITECTURA.md`, `VISTAS.pdf` (págs. 1, 3, 4, 5, 6) y `AdminLayout.tsx` de M17.  
@@ -359,13 +359,13 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 1. **Fase 1 (Consistencia de Paneles):** `/admin/empresas` se inserta limpiamente en `AdminLayout.tsx` (M17) respetando sidebar, topbar, encabezados gris `bg-neutral-lightest` de 11px en Poppins y hover de filas. `/perfil` mantiene coherencia con el storefront público usando `SectionNav.tsx` (sin mockup en `VISTAS.pdf`; derivado del sistema de diseño).
 2. **Fase 2 (Código y Arquitectura):** Cero Zod inline en componentes TSX (Directiva #12). Carpetas `interfaces/` con 0 bytes de runtime. Manejo de sesión seguro bajo ADR-005 (cookies `HttpOnly` vía `withCredentials: true`, sin tokens en `authStore` o `localStorage`). Traducción de errores centralizada sin fuga de excepciones internas (`HU-SEG-06`).
 3. **Fase 3 (Sistema de Diseño):** Paleta institucional 100% conforme con `colors.ts` (cero clases `bg-[#...]` o colores Tailwind no aprobados). Radios de borde milimétricos (`rounded-input` 6px, `rounded-btn` 6px, `rounded-card` 8px, `rounded-modal` 14px). Modales con franja arcoíris corporativa de 4 colores (`bg-brand-rainbow`).
-4. **Fase 4 (Fidelidad con Mockups):** Verificada por inspección de código (incluyendo las divergencias aprobadas por el Director: empresa sin paso OTP y botón `action` `#0877E8`); comparación visual de `VISTAS.pdf` págs. 1, 3, 4, 5 y 6 contra capturas en vivo marcada como pendiente para el **Paso B**.
-5. **Fase 5 (Interacción y A11y):** Verificada estáticamente y por pruebas unitarias en Node (`foco.ts`, `OtpInput.tsx`, `min-h-[44px]`, `@modal/[...catchAll]`); recorrido en navegador en vivo pendiente para el **Paso B**.
+4. **Fase 4 (Fidelidad con Mockups `VISTAS.pdf` págs. 1, 3, 4, 5 y 6):** Páginas renderizadas a PNG con `pymupdf` y contrastadas en navegador real (`http://localhost:3100/` + `arnes-backend.mts` en `3000`): Landing (Pág. 1), Registro Natural (Pág. 3), Registro Empresa con Stepper dinámico de 2 pasos (`1 Datos · 2 Listo` por Decisión #2 del Director Humano, Pág. 4), Verifica tu correo OTP con correo enmascarado `q•••@pintuclic.test` y alerta de 15 min (Pág. 5), y pantalla final (Pág. 6).
+5. **Fase 5 (Interacción y A11y):** Verificada en navegador real vía Chrome DevTools MCP (`Shift+Tab` en trampa de foco envolviendo de `Cerrar modal` a `Crear cuenta`, `ArrowLeft` en `SegmentedTabs`, auto-avance `1`→`2`→`"Dígito 3 de 6"`, retroceso con `Backspace` y pegado `onPaste` en `OtpInput`) más pruebas unitarias y validación del Director Humano.
 
 #### 3. Dictamen Final
-- **Veredicto Gate 4A (Paso A):** 🟡 **PARCIALMENTE VERIFICADO (Fases 1-3 y Suites OK; Fases 4-5 en curso en Paso B)**.
+- **Veredicto Gate 4A:** 🟢 **APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA Y DE DISEÑO**.
 - **Reporte Oficial:** `.sdlc/docs/qa/M04/v0.6.1/QA_REPORT.md`.
-- **Acción:** Registro remoto saneado con métricas medidas reales; se inicia inmediatamente el **Paso B** (renderizado de `VISTAS.pdf` págs. 1, 3, 4, 5 y 6 y recorrido en navegador en vivo).
+- **Acción:** M04 v0.6.1 queda formalmente certificado en backend y frontend con métricas reales (341/341 tests PASS) y evidencia visual/dinámica verificada. Listo para Gate 5 (Release SemVer).
 
 
 

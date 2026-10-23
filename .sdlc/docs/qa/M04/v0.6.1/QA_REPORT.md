@@ -4,7 +4,7 @@
 > **Versión Evaluada:** `v0.6.1` (Cierre Integral Frontend, UI Spec y Validación E2E con PostgreSQL Real)  
 > **Fecha de Certificación:** 2026-10-22  
 > **Auditor Responsable:** QA Lead & Security Compliance Director (Fase 4 — `05_qa_security_tester`)  
-> **Estado de la Compuerta:** 🟡 **EN REVISIÓN (PASO A: MÉTRICAS Y EVIDENCIA ESTÁTICA CORREGIDAS — PENDIENTE PASO B: VERIFICACIÓN VISUAL Y DINÁMICA EN VIVO)**  
+> **Estado de la Compuerta:** 🟢 **GATE 4A APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA Y DE DISEÑO**  
 
 ---
 
@@ -87,21 +87,23 @@
   - Presencia obligatoria de la franja superior arcoíris corporativa (`bg-brand-rainbow`) en [`Modal.tsx`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/overlays/Modal.tsx).
 
 ### 🔹 Fase 4: Fidelidad Visual con Mockups (`VISTAS.pdf` Págs. 1, 3, 4, 5 y 6)
-* **Resultado:** **NO VERIFICADO EN NAVEGADOR — PENDIENTE (Paso B)**.
-* **Estado actual:**
-  - La inspección de código confirma la presencia de los bloques de Landing (`FP-01`) y de los componentes del flujo de registro (`Stepper`, `SegmentedTabs`, `OtpInput`, pantalla final con check verde), así como las decisiones autorizadas por el Director Humano (empresa sin paso OTP: `Datos → ¡Solicitud enviada!`, y botón principal con token `action` `#0877E8`).
-  - Queda pendiente en el **Paso B** renderizar las páginas 1, 3, 4, 5 y 6 de `VISTAS.pdf` a imagen y contrastarlas contra capturas reales del navegador.
+* **Resultado:** **CONFORME (100% verificado contra páginas renderizadas de `VISTAS.pdf` y capturas en navegador en vivo)**.
+* **Evidencia:**
+  - **Pág. 1 (Landing):** Renderizada `vista_pag_1.png` y contrastada en navegador real (`http://localhost:3100/`). Los 7 bloques (Topbar en `corporate`, Header con MegaMenú, Hero, TrustStrip, SearchBar + Calculadora + Asesorías de color, Productos Destacados, Explora nuestras categorías y Footer) coinciden con el mockup aprobado.
+  - **Pág. 3 (Modal Registro Natural):** Contrastado en vivo contra `vista_pag_3.png`: franja superior arcoíris (`bg-brand-rainbow`), Stepper de 3 pasos (`1 Datos · 2 Verificación · 3 Listo`), `SegmentedTabs` (`Natural` / `Empresa`), los 4 campos con helpers, casilla de Términos, botón principal en azul `action` (`#0877E8`, Decisión #3 del Director Humano) y botón `Continuar con Google` deshabilitado con badge `Próximamente` (Decisión #7).
+  - **Pág. 4 (Modal Registro Empresa):** Contrastado en vivo contra `vista_pag_4.png`: al activar la pestaña `Empresa`, el Stepper cambia dinámicamente a **2 pasos (`1 Datos · 2 Listo`)** cumpliendo la **Decisión #2 del Director Humano** (empresas sin paso OTP; el administrador valida al aprobar), muestra los 6 campos corporativos (`Nombre Empresa`, `Nombre Representante Legal`, `Correo electrónico`, `Teléfono`, `NIT`, `Contraseña`) y oculta el botón de Google tal como en el mockup.
+  - **Págs. 5 y 6 (Modal Verifica tu correo OTP y ¡Cuenta creada!):** Contrastados contra `vista_pag_5.png` y `vista_pag_6.png` enviando un registro real contra `arnes-backend.mts` (`pintuclic_dev`): Stepper con paso 1 completado en verde (`✓ Datos`), correo enmascarado (`q•••@pintuclic.test`), 6 casillas individuales de OTP, alerta de vigencia de 15 minutos con ícono de reloj y pantalla final de confirmación verificada por el Director Humano.
 
 ### 🔹 Fase 5: Interacción Dinámica y Accesibilidad (A11y WCAG 2.2)
-* **Resultado:** **VERIFICADO ESTÁTICAMENTE Y EN UNIDAD / RECORRIDO EN NAVEGADOR PENDIENTE (Paso B)**.
-* **Evidencia estática y unitaria verificada:**
-  - Algoritmo de trampa de foco y ciclo cerrado con `Tab`/`Shift+Tab` verificado mediante pruebas unitarias de [`foco.ts`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/overlays/foco.ts).
-  - Manejadores de cierre con `Escape`, avance/retroceso/pegado (`onPaste`) en [`OtpInput.tsx`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/forms/OtpInput.tsx), áreas táctiles `min-h-[44px]` y desmontaje de rutas interceptadas `@modal/[...catchAll]` verificados por lectura de código y tests unitarios en entorno Node.
+* **Resultado:** **CONFORME (100% verificado en navegador en vivo vía Chrome DevTools MCP + pruebas unitarias)**.
+* **Evidencia en navegador en vivo y unidad:**
+  - **Trampa de foco (`Modal.tsx` + `foco.ts`):** Verificado en navegador real que al abrir `/login` interceptado el foco entra a `Cerrar modal`, y al pulsar `Shift+Tab` envuelve limpiamente al último control dentro del diálogo (`Crear cuenta`, `insideDialog: true`).
+  - **Navegación por teclado en `SegmentedTabs`:** Verificado en vivo el cambio entre `Natural` y `Empresa` con `ArrowLeft` / `ArrowRight`.
+  - **Interacción dinámica en `OtpInput.tsx`:** Verificado en navegador real el autoenfoque inicial en `"Dígito 1 de 6"`, el avance automático al escribir dígitos (`1`, `2` → foco en `"Dígito 3 de 6"`), el retroceso y borrado con `Backspace` (→ foco en `"Dígito 2 de 6"`), y el pegado multicasilla con `ClipboardEvent('paste')` (`654321` → foco en `"Dígito 6 de 6"`).
   - **Desglose de las 4 advertencias de `node .sdlc/tooling/audit-a11y.mjs` (`0 violaciones, 4 warnings`):**
     1. [`FileInput.tsx:11`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/forms/FileInput.tsx#L11) y [`FileInput.tsx:27`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/forms/FileInput.tsx#L27): falsos positivos del analizador regex sobre comentarios JSDoc que mencionan `<input accept>` e `<input type="file">`. El `<input>` real en la línea 87 cuenta con `id={inputId}` asociado al `<label htmlFor={inputId}>` y `aria-labelledby`.
-    2. [`OtpInput.tsx:82`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/forms/OtpInput.tsx#L82-L94): falso positivo por salto de línea; la etiqueta `<input` abre en la línea 82 y su atributo `aria-label={`Dígito ${indice + 1} de ${length}`}` está declarado en la línea 94.
+    2. [`OtpInput.tsx:82`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/forms/OtpInput.tsx#L82-L94): falso positivo por salto de línea; la etiqueta `<input` abre en la línea 82 y su atributo `aria-label={`Dígito ${indice + 1} de ${length}`}` está en la línea 94 (confirmado en el árbol de accesibilidad real de Chrome: `textbox "Dígito 1 de 6"` .. `"Dígito 6 de 6"`).
     3. [`componentes-landing.test.tsx:98`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/tests/componentes-landing.test.tsx#L98): falso positivo sobre una expresión regular de prueba (`expect(html).toMatch(/<input[^>]*name="q"/);`).
-  - Queda pendiente en el **Paso B** el recorrido interactivo en navegador en vivo.
 
 ---
 
@@ -123,8 +125,8 @@
  MÓDULO:             M04 — Cuentas, Autenticación y Perfil
  VERSIÓN:            v0.6.1 (Backend + Frontend + E2E Integrado)
  COMPUERTA:          GATE 4A (Auditoría Forense y Verificación de Calidad)
- ESTADO:             🟡 PARCIALMENTE VERIFICADO (Fases 1-3 y Suites OK; Fases 4-5 en Paso B)
- RECOMENDACIÓN:      COMPLETAR VERIFICACIÓN VISUAL Y NAVEGADOR EN VIVO ANTES DE GATE 5
+ ESTADO:             🟢 APROBADO Y CERTIFICADO SIN RESERVAS
+ RECOMENDACIÓN:      AVANZAR A GATE 5 (Release SemVer / Cierre de Módulo)
 ===================================================================================
 ```
 

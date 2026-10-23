@@ -4,11 +4,11 @@
   "version_actual": "v0.6.1",
   "fecha_actualizacion": "2026-10-22",
   "fase_activa": "FASE_4_TESTING_QA",
-  "gate_activo": "GATE_4A_EN_REVISION",
-  "estado": "FASE_4_EN_CURSO",
+  "gate_activo": "GATE_4A_APROBADO",
+  "estado": "GATE_4A_APROBADO",
   "rol_en_turno": "05_qa_security_tester",
   "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 v0.6.1 en Fase 4 (QA): verificadas las baterías automatizadas y estáticas con cifras reales (341/341 tests PASS: 205 backend en 22 suites + 136 frontend en 14 suites, 259 archivos sin ANY, tsc/ESLint limpios, build 17/17 páginas, audit:core-kit y audit:zod en 0 violaciones, audit:a11y con 0 violaciones y 4 advertencias falsos positivos documentadas). Pendiente completar Paso B: comparación visual real contra VISTAS.pdf (págs. 1, 3, 4, 5 y 6) y recorrido dinámico en navegador.",
+  "nota_de_contexto": "M04 v0.6.1: Gate 4A aprobado y certificado formalmente por QA Lead & Security Compliance Director. 341/341 tests combinados PASS (205 backend en 22 suites, 136 frontend en 14 suites), 259 archivos sin ANY, compilación estricta limpia, ESLint en cero, Next.js build exitoso (17/17 páginas), auditoría de Core Kit y Zod en 0 violaciones, audit-a11y con 0 violaciones y 4 advertencias falsos positivos documentadas, fidelidad visual contrastada contra VISTAS.pdf renderizado (págs. 1, 3, 4, 5 y 6) e interacción dinámica verificada en navegador real (Chrome DevTools MCP) y por el Director Humano. Reporte oficial: .sdlc/docs/qa/M04/v0.6.1/QA_REPORT.md. M04 listo para Gate 5 (Release SemVer).",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "frentes_propios": [
     {
@@ -713,10 +713,10 @@
     },
     {
       "de": "FASE_3B_FRONTEND",
-      "a": "FASE_4_TESTING_QA",
+      "a": "GATE_4A_APROBADO",
       "fecha": "2026-10-22",
       "autor": "05_qa_security_tester",
-      "motivo": "Paso A de auditoría QA sobre M04 v0.6.1: restaurada la entrada histórica de 04_frontend_engineer y corregidas las métricas reales verificadas en QA_REPORT.md (341/341 tests PASS: 205 backend + 136 frontend; 259 archivos sin ANY; 4 advertencias falsos positivos de audit-a11y documentadas). Fases 4 (VISTAS.pdf) y 5 (navegador en vivo) quedan marcadas como pendientes mientras se ejecuta el Paso B."
+      "motivo": "M04 v0.6.1 auditado y certificado en Gate 4A (Paso A + Paso B): restaurada la entrada histórica de 04_frontend_engineer, verificadas 341/341 pruebas automatizadas PASS (205 backend en 22 suites + 136 frontend en 14 suites), 259 archivos sin ANY, tsc y ESLint limpios, build 17/17 páginas, 4 advertencias falsos positivos de audit-a11y documentadas, páginas 1, 3, 4, 5 y 6 de VISTAS.pdf renderizadas y contrastadas contra capturas en vivo, e interacción dinámica verificada en navegador real (trampa de foco, tabs por teclado y casillas OTP). Reporte en .sdlc/docs/qa/M04/v0.6.1/QA_REPORT.md."
     }
   ]
 }
