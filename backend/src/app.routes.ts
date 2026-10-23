@@ -10,7 +10,17 @@ export function construirAppRoutes(): Router {
   const m20 = construirModuloM20();
   const auth = construirAuthMiddleware(m20.sesionService);
   const m17 = construirModuloM17(m20.sesionService, m20.auditoria);
-  const m04 = construirModuloM04(m20.sesionService, m17.autorizacionService);
+  const m04 = construirModuloM04(m20.sesionService, m17.autorizacionService, {
+    // HU-ADM-07: M04 lee los parámetros de autenticación que el admin edita en M17
+    // (caché corta de 30 s en el repositorio de configuración).
+    parametros: {
+      obtenerNumero: async (clave) => {
+        const { parametros } = await m17.configService.obtenerCatalogo();
+        const valor = parametros.find((p) => p.clave === clave)?.valor;
+        return typeof valor === 'number' ? valor : null;
+      },
+    },
+  });
 
   // M20: El aviso de privacidad es público; el resto exige sesión vigente.
   router.use('/seguridad/privacidad/aviso-vigente', m20.router);
