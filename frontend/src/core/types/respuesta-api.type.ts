@@ -1,6 +1,6 @@
 /**
  * Envelope canónico de la API.
- * Espejo de .sdlc/docs/contracts/m20-seguridad.contract.ts y de
+ * Espejo de contracts/m20-seguridad.contract.ts y de
  * PINTUCLIC_CONTEXT.md §6.5. Es una unión discriminada: `success` distingue
  * las dos formas y TypeScript obliga a comprobarlo antes de leer `data`.
  */

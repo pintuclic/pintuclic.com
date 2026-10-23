@@ -7,7 +7,7 @@ Fuente única de verdad: `docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS
 ## 1. Convención de Formato (Conventional Commits)
 - Formato del mensaje: `tipo(scope): descripcion`
 - Todo en minúsculas y modo imperativo.
-- **Sin prefijo de versión en el commit** (la versión solo va en el título de la PR: `tipo(scope) [X.Y.Z.W]: mensaje`).
+- **Sin prefijo de versión** ni en el commit ni en el título de la PR (el tag lo calcula `release.yml`).
 
 ---
 
@@ -24,10 +24,7 @@ Fuente única de verdad: `docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS
 
 ---
 
-## 4. Artefactos Previos al Commit
-1. **Walkthrough Obligatorio:** Crear walkthrough en `docs/walkthroughs/M[XX]/walkthrough_v[X.Y.Z.W]_[MXX]_[descripcion]_[backend|frontend].md`.
-2. **Autoría Real:** El autor registrado en CHANGELOG y walkthrough DEBE ser la persona real (`@usuario`), nunca el agente IA.
-3. **Actualización de Estado:**
-   - `.sdlc/multiAgents/[tu_rol]/WORKLOG.md`
-   - `.sdlc/.workflow/current_state.json` (si avanzó la fase/gate)
-   - `.sdlc/multiAgents/00_orchestrator/PROJECT_STATUS.md` (si el módulo avanzó de estado)
+## 4. Antes del Commit y del PR
+1. Correr los checks de calidad: `npm run lint -- --max-warnings=0`, `npm run check:types`, `npm run check:no-any` y `npm test` (en `backend/` y `frontend/`), más `npm run test:contracts` en la raíz.
+2. Actualizar el contrato en `contracts/` si cambió la API.
+3. El PR lleva una descripción de máximo 10 líneas: qué hace, qué tocó fuera del módulo y cómo se probó.

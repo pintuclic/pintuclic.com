@@ -35,3 +35,6 @@ Thumbs.db
 .vscode/
 .idea/
 memory/
+
+# Reportes generados por tooling/ (no se versionan)
+docs/qa/

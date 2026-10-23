@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "check:no-any": "node ../.sdlc/tooling/check-no-any-frontend.mjs src",
+    "check:no-any": "node ../tooling/check-no-any-frontend.mjs src",
     "build": "npm run check:no-any && next build",
     "start": "next start",
     "lint": "next lint --max-warnings=0",

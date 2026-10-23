@@ -4,7 +4,7 @@ import { z } from 'zod';
  * ============================================================================
  * DTOs Y ESQUEMAS DE VALIDACIÓN FRONTEND — M04. Cuentas, Autenticación y Perfil
  * ============================================================================
- * Espejo fiel de `.sdlc/docs/contracts/m04-cuentas.contract.ts` para ejecución
+ * Espejo fiel de `contracts/m04-cuentas.contract.ts` para ejecución
  * en componentes React / Next.js bajo react-hook-form y zodResolver.
  * Directiva #12: Prohibido declarar esquemas Zod inline en componentes .tsx.
  * ============================================================================

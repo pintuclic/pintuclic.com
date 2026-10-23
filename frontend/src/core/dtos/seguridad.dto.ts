@@ -8,7 +8,7 @@ import { z } from 'zod';
  * #12 prohíbe declarar esquemas Zod dentro de componentes `.tsx`.
  *
  * ⚠️ Deben permanecer en paridad con
- * `.sdlc/docs/contracts/m20-seguridad.contract.ts`. Si el contrato cambia, esto
+ * `contracts/m20-seguridad.contract.ts`. Si el contrato cambia, esto
  * cambia con él: es el mismo requisito expresado del lado del navegador.
  */
 

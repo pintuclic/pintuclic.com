@@ -7,28 +7,23 @@ Aplica estrictamente tanto a **desarrolladores humanos** como a **Agentes de Int
 > ## ⚖️ FUENTE ÚNICA DE VERDAD DE NOMENCLATURA
 >
 > **Este archivo es la autoridad final sobre tipos de commit y scopes para todo el proyecto.**
-> Ningún otro documento, incluida la metodología SDLC en `.sdlc/`, puede definir tipos de commit
-> distintos a los catalogados aquí. Si existe discrepancia, **esta guía prevalece**.
->
-> Documentos subordinados que deben alinearse a esta guía:
-> - [`.sdlc/multiAgents/protocols/GIT_COMMIT_CONVENTION.md`](../../../.sdlc/multiAgents/protocols/GIT_COMMIT_CONVENTION.md)
-> - [`CONTRIBUTING.md`](../../../CONTRIBUTING.md) (versionado y títulos de PR)
-> - [`AGENTS.md`](../../../AGENTS.md) (Directiva #7)
+> Ningún otro documento puede definir tipos de commit distintos a los catalogados aquí.
+> Si existe discrepancia, **esta guía prevalece**. Documentos alineados:
+> [`AGENTS.md`](../../../AGENTS.md) y `.agents/rules/03_git_commits.md`.
 
 ---
 
-## 1. Dos Formatos Distintos: Commit vs Título de PR
+## 1. Formato de Commit y de Título de PR
 
-Es crítico no confundirlos. **El commit NO lleva versión; el título de la PR SÍ.**
+Ambos usan el mismo formato y **ninguno lleva versión**: el tag de versión lo calcula
+`.github/workflows/release.yml` a partir de los mensajes de commit al llegar a `main`.
 
-| Artefacto | Formato Obligatorio | Lleva versión | Ejemplo |
-| :--- | :--- | :---: | :--- |
-| **Commit individual** | `tipo(scope): descripcion` | ❌ NO | `feat(m04-cuentas): implementar registro con verificacion HU-CUE-01` |
-| **Título de la PR** | `tipo(scope) [X.Y.Z.W]: mensaje` | ✅ SÍ | `feat(m04-cuentas) [0.4.8.0]: registro de cuentas con verificacion` |
+| Artefacto | Formato Obligatorio | Ejemplo |
+| :--- | :--- | :--- |
+| **Commit individual** | `tipo(scope): descripcion` | `feat(m04-cuentas): implementar registro con verificacion HU-CUE-01` |
+| **Título de la PR** | `tipo(scope): descripcion` | `feat(m04-cuentas): registro de cuentas con verificacion` |
 
-> ⛔ **PROHIBIDO** colocar el prefijo `[vX.Y.Z]` al inicio de un mensaje de commit.
-> La versión del proyecto vive **exclusivamente** en `.github/version.txt` y se declara en el
-> **título de la PR** con cuatro segmentos (`X.Y.Z.W`), según [CONTRIBUTING.md](../../../CONTRIBUTING.md).
+> ⛔ **PROHIBIDO** colocar un prefijo de versión (`[vX.Y.Z]`) en el commit o en el título de la PR.
 
 Estructura completa de un commit:
 
@@ -69,7 +64,6 @@ Reglas de forma:
 | Crear el schema Prisma sin lógica de negocio | `feat` | **`chore(bd)`** |
 | Crear carpetas vacías de un módulo (`controllers/`, `services/`) | `feat` | **`chore(estructura)`** |
 | Agregar contratos Zod sin implementar endpoints | `feat` | **`docs(contratos)`** |
-| Integrar el submódulo SDLC o metodología | `feat` | **`chore(sdlc)`** |
 | Configurar workflows de GitHub Actions | `feat` | **`ci(workflows)`** |
 | Agregar tests a código ya existente | `feat` | **`test(mXX-nombre)`** |
 
@@ -191,14 +185,13 @@ Formato: `m[xx]-[nombre-modulo]` en minúsculas y kebab-case, idéntico al nombr
 | :--- | :--- |
 | `estructura` | Creación de estructura de carpetas, scaffolding, organización de proyecto |
 | `arquitectura` | Documentos de arquitectura general, backend, frontend, matriz de trazabilidad |
-| `contratos` | Contratos Zod API-First en `.sdlc/docs/contracts/` |
+| `contratos` | Contratos Zod API-First en `contracts/` |
 | `bd` | Schema Prisma, DDL, seeds, migraciones, documentación de base de datos |
 | `core` | Código compartido: `apiClient`, middlewares globales, theme, DTOs transversales |
 | `ui` | Design System, componentes base, tokens de color |
 | `qa` | Reportes de QA, suites de prueba transversales, tooling de calidad |
 | `devops` | Docker, entornos, `.env.example`, infraestructura (⚠️ solo DevOps designado) |
 | `workflows` | GitHub Actions, pipelines de CI/CD (⚠️ solo DevOps designado) |
-| `sdlc` | Metodología SDLC, submódulo `.sdlc/`, protocolos multiagente |
 | `gobernanza` | `AGENTS.md`, `CONTRIBUTING.md`, guías y estándares del sistema |
 | `deps` | Dependencias de npm, lockfiles |
 | `config` | ESLint, tsconfig, Prettier, configuración de herramientas |
@@ -274,12 +267,11 @@ Antes de ejecutar `git commit`, el desarrollador o Agente de IA DEBE verificar:
 2. [ ] **Regla de `feat`:** si usé `feat`, puedo citar un código `HU-XXX-NN` satisfecho end-to-end.
 3. [ ] **Scope presente y válido:** está en el catálogo de la Sección 5.
 4. [ ] **Forma correcta:** minúsculas, imperativo, sin punto final, sin prefijo `[vX.Y.Z]`.
-5. [ ] **Sin versión en el commit:** la versión va únicamente en el título de la PR.
+5. [ ] **Sin versión:** ni en el commit ni en el título de la PR.
 6. [ ] **Aislamiento de módulo:** `git status` confirma que solo toqué archivos de mi módulo asignado.
 7. [ ] **Compilación limpia:** `npx tsc --noEmit` y `npm run lint` con 0 errores y 0 advertencias.
 8. [ ] **Cero `any`:** `npm run check:no-any` en la capa correspondiente.
-9. [ ] **Walkthrough generado** (si hubo implementación de código).
-10. [ ] **Bitácoras SDLC actualizadas:** `WORKLOG.md`, `current_state.json`, `PROJECT_STATUS.md`.
+9. [ ] **Contrato actualizado** (`contracts/`) si cambió la API.
 
 ---
 
@@ -290,16 +282,15 @@ graph TD
     A[Codigo Finalizado] --> B[1. tsc --noEmit + npm run lint sin errores]
     B --> C[2. npm run check:no-any sin violaciones]
     C --> D[3. git status: solo archivos del modulo asignado]
-    D --> E[4. Generar Walkthrough si hubo codigo]
-    E --> F[5. Recorrer arbol de decision de tipo de commit]
-    F --> G[6. Commit con formato tipo-scope-descripcion]
-    G --> H[7. git push origin rama-asignada]
+    D --> E[4. Recorrer arbol de decision de tipo de commit]
+    E --> F[5. Commit con formato tipo-scope-descripcion]
+    F --> G[6. git push origin rama-asignada y abrir PR]
 ```
 
 1. **Compilación Limpia:** No deben existir errores de TypeScript ni de ESLint (0 errores, 0 advertencias).
 2. **Auditoría de Tipos:** `npm run check:no-any` sin violaciones en backend y frontend.
 3. **Aislamiento de Módulo:** Verificar mediante `git status` y `git diff` que **únicamente se modificaron archivos del módulo asignado**.
-4. **Documentación Sincronizada:** Confirmar que el Walkthrough refleja exactamente los cambios realizados.
+4. **Contrato Sincronizado:** Confirmar que `contracts/` refleja la API implementada.
 5. **Push a la Rama Correcta:** Realizar push únicamente a la rama asignada (`feature/m[xx]-[nombre]`).
 6. **Prohibición Estricta:** **PROHIBIDO** `git push --force` sobre ramas compartidas o principales (`main`, `develop`).
 7. **Prohibición de Dominio DevOps:** Backend, Frontend y QA tienen **prohibido** commitear cambios en `.github/workflows/`, `docker-compose.yml`, `Dockerfile*` o `.env.example`. Ese dominio pertenece exclusivamente al DevOps designado del repositorio.

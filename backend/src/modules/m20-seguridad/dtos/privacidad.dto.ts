@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * DTOs de HU-SEG-05. Espejo de docs/contracts/m20-seguridad.contract.ts.
+ * DTOs de HU-SEG-05. Espejo de contracts/m20-seguridad.contract.ts.
  * Regla de Oro #2: ningún request toca un servicio sin pasar por Zod.
  */
 

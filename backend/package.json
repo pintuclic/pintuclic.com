@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "check:no-any": "tsx ../.sdlc/tooling/check-no-any-backend.ts src",
+    "check:no-any": "tsx ../tooling/check-no-any-backend.ts src",
     "build": "npm run check:no-any && tsc",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",

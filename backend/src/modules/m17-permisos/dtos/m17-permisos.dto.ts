@@ -4,7 +4,7 @@ import { z } from 'zod';
  * ============================================================================
  * DTOs Y ESQUEMAS DE VALIDACIÓN — M17. Administración, Empleados y Permisos
  * ============================================================================
- * Espejo fiel de `.sdlc/docs/contracts/m17-permisos.contract.ts` para ejecución
+ * Espejo fiel de `contracts/m17-permisos.contract.ts` para ejecución
  * backend bajo Zod 4. Cero tipos `any`.
  */
 

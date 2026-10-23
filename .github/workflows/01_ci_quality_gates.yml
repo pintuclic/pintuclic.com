@@ -1,4 +1,4 @@
-name: 🚦 Stage-Gate 4 — Quality & AST Security Gates
+name: 🚦 CI — Calidad y seguridad
 
 on:
   push:
@@ -34,7 +34,7 @@ jobs:
           fi
 
   ast-quality-audit:
-    name: 🛡️ Audit Zero ANY & Governance
+    name: 🛡️ Zero ANY, contratos y accesibilidad
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout repository
@@ -47,9 +47,6 @@ jobs:
 
       - name: 📦 Install governance tooling
         run: npm install --no-audit --no-fund
-
-      - name: 📋 Verify Stage-Gate machine state integrity
-        run: npm run verify:state
 
       - name: 🔍 AST Zero ANY audit (backend + frontend + contratos)
         run: npm run check:no-any
