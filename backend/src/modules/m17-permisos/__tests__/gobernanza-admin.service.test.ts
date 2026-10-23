@@ -3,15 +3,20 @@ import type { SesionService } from '../../m20-seguridad/services/sesion.service'
 import type { EmpleadosRepositoryPort, EntidadEmpleado } from '../interfaces/empleados.interface';
 import type {
   GobernanzaAdminRepositoryPort,
+  GobernanzaNotificacionesPort,
   SolicitudCambioCorreoAdmin,
 } from '../interfaces/gobernanza.interface';
 import { EmpleadoError } from '../services/empleados.service';
-import { GobernanzaAdminService } from '../services/gobernanza-admin.service';
+import {
+  GobernanzaAdminService,
+  SmtpGobernanzaNotificacionesAdapter,
+} from '../services/gobernanza-admin.service';
 
 function crearMockGobernanza(): {
   gobernanzaRepo: GobernanzaAdminRepositoryPort;
   empleadosRepo: EmpleadosRepositoryPort;
   sesionService: SesionService;
+  notificaciones: GobernanzaNotificacionesPort;
 } {
   const storeTokens = new Map<string, SolicitudCambioCorreoAdmin>();
 
@@ -77,13 +82,22 @@ function crearMockGobernanza(): {
     invalidarTodas: vi.fn().mockResolvedValue(3),
   } as unknown as SesionService;
 
-  return { gobernanzaRepo, empleadosRepo, sesionService };
+  const notificaciones: GobernanzaNotificacionesPort = {
+    enviarSolicitudSustitucionCorreoAdmin: vi.fn().mockResolvedValue(undefined),
+  };
+
+  return { gobernanzaRepo, empleadosRepo, sesionService, notificaciones };
 }
 
 describe('HU-ADM-06 · Gobernanza y Sustitución de la Cuenta Administradora', () => {
-  it('RN-ADM-18: Administrador solicita sustitución de correo hacia una dirección no registrada', async () => {
-    const { gobernanzaRepo, empleadosRepo, sesionService } = crearMockGobernanza();
-    const servicio = new GobernanzaAdminService(gobernanzaRepo, empleadosRepo, sesionService);
+  it('RN-ADM-18: Administrador solicita sustitución de correo hacia una dirección no registrada y emite notificación SMTP', async () => {
+    const { gobernanzaRepo, empleadosRepo, sesionService, notificaciones } = crearMockGobernanza();
+    const servicio = new GobernanzaAdminService(
+      gobernanzaRepo,
+      empleadosRepo,
+      sesionService,
+      notificaciones,
+    );
 
     const resultado = await servicio.solicitarSustitucionCorreo(
       { nuevoCorreo: 'nuevo.admin@pintuclic.com' },
@@ -91,8 +105,46 @@ describe('HU-ADM-06 · Gobernanza y Sustitución de la Cuenta Administradora', (
     );
 
     expect(resultado.mensaje).toContain('nuevo.admin@pintuclic.com');
-    expect(resultado.tokenPreview).toBeDefined();
+    expect(resultado.correoAnterior).toBe('admin@pintuclic.com');
+    expect(resultado.nuevoCorreo).toBe('nuevo.admin@pintuclic.com');
+    expect(resultado.expiracionMinutos).toBe(1440);
+    expect(resultado.tokenPreview).toHaveLength(64);
     expect(gobernanzaRepo.guardarSolicitudCambioCorreo).toHaveBeenCalledOnce();
+    expect(notificaciones.enviarSolicitudSustitucionCorreoAdmin).toHaveBeenCalledWith({
+      correoActual: 'admin@pintuclic.com',
+      nuevoCorreo: 'nuevo.admin@pintuclic.com',
+      tokenConfirmacion: resultado.tokenPreview,
+      minutosVigencia: 1440,
+    });
+  });
+
+  it('RN-ADM-18: SmtpGobernanzaNotificacionesAdapter envía el token al nuevo correo y alerta preventiva al correo actual', async () => {
+    const sendMailMock = vi.fn().mockResolvedValue({ messageId: '<gov-1@gmail.com>' });
+    const adapter = new SmtpGobernanzaNotificacionesAdapter(
+      {
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        user: 'notificaciones@gmail.com',
+        pass: 'clave',
+        from: 'Pintu Clic <notificaciones@pintuclic.com>',
+        frontendBaseUrl: 'https://pintuclic-dev.adsoproject.dev',
+      },
+      { sendMail: sendMailMock },
+    );
+
+    await adapter.enviarSolicitudSustitucionCorreoAdmin({
+      correoActual: 'admin.actual@gmail.com',
+      nuevoCorreo: 'admin.nuevo@gmail.com',
+      tokenConfirmacion: 'a'.repeat(64),
+      minutosVigencia: 1440,
+    });
+
+    expect(sendMailMock).toHaveBeenCalledTimes(2);
+    expect(sendMailMock.mock.calls[0]?.[0]?.to).toBe('admin.nuevo@gmail.com');
+    expect(sendMailMock.mock.calls[0]?.[0]?.text).toContain('a'.repeat(64));
+    expect(sendMailMock.mock.calls[1]?.[0]?.to).toBe('admin.actual@gmail.com');
+    expect(sendMailMock.mock.calls[1]?.[0]?.text).toContain('admin.nuevo@gmail.com');
   });
 
   it('RN-ADM-18: Rechaza solicitud si la nueva dirección ya pertenece a otro usuario', async () => {
@@ -127,6 +179,8 @@ describe('HU-ADM-06 · Gobernanza y Sustitución de la Cuenta Administradora', (
     });
 
     expect(confirmacion.mensaje).toContain('actualizado con éxito');
+    expect(confirmacion.correoActualizado).toBe('nuevo.admin@pintuclic.com');
+    expect(confirmacion.sesionesPreviasInvalidadas).toBe(true);
     expect(gobernanzaRepo.actualizarCorreoAdmin).toHaveBeenCalledWith(1, 'nuevo.admin@pintuclic.com');
     expect(sesionService.invalidarTodas).toHaveBeenCalledWith(1, 'cambio_contrasena');
   });

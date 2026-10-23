@@ -6,6 +6,15 @@ export interface SolicitudCambioCorreoAdmin {
   fechaExpiracion: Date;
 }
 
+export interface GobernanzaNotificacionesPort {
+  enviarSolicitudSustitucionCorreoAdmin(params: {
+    correoActual: string;
+    nuevoCorreo: string;
+    tokenConfirmacion: string;
+    minutosVigencia: number;
+  }): Promise<void>;
+}
+
 export interface GobernanzaAdminRepositoryPort {
   obtenerAdmin(): Promise<{ idUsuario: number; correo: string; nombre: string } | null>;
   guardarSolicitudCambioCorreo(solicitud: SolicitudCambioCorreoAdmin): Promise<void>;
