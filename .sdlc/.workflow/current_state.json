@@ -3,12 +3,12 @@
   "dominio": "pintuclic.com",
   "version_actual": "v0.6.1",
   "fecha_actualizacion": "2026-10-22",
-  "fase_activa": "FASE_4_TESTING_QA",
-  "gate_activo": "GATE_4A_APROBADO",
-  "estado": "EN_REVISION_FINAL",
+  "fase_activa": "FASE_0_GOBERNANZA",
+  "gate_activo": "GATE_0_SELECCION_DE_MODULO",
+  "estado": "ESPERANDO_DECISION_HUMANA",
   "rol_en_turno": "00_orchestrator",
-  "modulo_en_curso": "M04",
-  "nota_de_contexto": "M04 v0.6.1 EN REVISIÓN FINAL por el Director Humano. QA certificó el Gate 4A (341/341 pruebas, 0 any, tsc y ESLint limpios, build 17/17, fidelidad visual contra VISTAS.pdf); reporte en .sdlc/docs/qa/M04/v0.6.1/QA_REPORT.md. El reporte no incluye E2E automatizado (Playwright/axe) ni stress (k6): el Director indicó a QA no repetirlos porque otro agente ya los ejecutó, aunque sin registrar evidencia. El Director revisa manualmente que el módulo cumpla. Ningún agente avanza a Gate 5 (Release) sin su firma explícita.",
+  "modulo_en_curso": null,
+  "nota_de_contexto": "M04 v0.6.1 cerrado: el Director Humano firmó el Gate 5 el 2026-10-22 tras su revisión final manual. Integrado en main vía PR #10 y publicado como release v0.6.1. E2E y k6 fueron ejecutados por otro agente sin evidencia registrada en el QA_REPORT, según declaró el Director. Esperando que el Director seleccione el siguiente módulo (pendientes de ruta: M18 Notificaciones o la Ola 2).",
   "ruta_del_proyecto": "../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md",
   "frentes_propios": [
     {
@@ -180,7 +180,7 @@
       "depende_de": [
         "M18"
       ],
-      "estado_sdlc": "Fase 3A certificada (v0.4.1). Fase 3B aprobada (v0.6.0). v0.6.1: validación real de punta a punta contra PostgreSQL (pintuclic_dev) y correcciones autorizadas (perfil conforme al contrato, NIT normalizado). Gate 4A certificado por QA (8502177). EN REVISIÓN FINAL por el Director Humano; Gate 5 bloqueado hasta su firma. Pendientes: aviso al correo anterior (CA-CUE-06-02, M18), equivalencia de NIT sin guion (PO), HU-CUE-02 aplazada, evidencia de E2E y k6 sin registrar."
+      "estado_sdlc": "CERRADO en v0.6.1. Fase 3A certificada (v0.4.1). Fase 3B aprobada (v0.6.0). Gate 4A certificado por QA (8502177). Gate 5 firmado por el Director Humano (2026-10-22) tras revisión final manual; integrado en main vía PR #10. Pendientes: aviso al correo anterior (CA-CUE-06-02, M18), equivalencia de NIT sin guion (PO), HU-CUE-02 aplazada, evidencia de E2E y k6 sin registrar."
     },
     {
       "id": "M05",
@@ -724,6 +724,20 @@
       "fecha": "2026-10-22",
       "autor": "Director Humano",
       "motivo": "El Director deja M04 v0.6.1 en revisión final manual antes de Gate 5. Declara que pidió a QA no repetir E2E ni k6 porque otro agente ya los ejecutó, sin registrar evidencia. Transición registrada por el agente a petición del Director."
+    },
+    {
+      "de": "EN_REVISION_FINAL",
+      "a": "GATE_5_APROBADO",
+      "fecha": "2026-10-22",
+      "autor": "Director Humano",
+      "motivo": "El Director firma el Gate 5 de M04 v0.6.1 tras su revisión final manual. Elige publicar la release con el tag v0.6.1 del proyecto y no con el que calcularía la acción automática."
+    },
+    {
+      "de": "GATE_5_APROBADO",
+      "a": "GATE_0_SELECCION_DE_MODULO",
+      "fecha": "2026-10-22",
+      "autor": "00_orchestrator",
+      "motivo": "M04 v0.6.1 integrado en main vía PR #10 y publicado como release v0.6.1. El ciclo vuelve a la selección del siguiente módulo."
     }
   ]
 }
