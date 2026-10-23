@@ -113,6 +113,8 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
           contrasena: datos.contrasenaHash,
           estado: 'activo',
           tipo: 'normal',
+          // CA-ADM-01-03: la credencial temporal obliga a fijar una propia en el primer acceso.
+          cambioContrasenaPendiente: true,
         },
       });
 

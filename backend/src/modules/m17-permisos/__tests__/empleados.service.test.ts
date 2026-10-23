@@ -89,6 +89,8 @@ function crearMockRepos(): {
     buscarSolicitudPorToken: vi.fn().mockResolvedValue(null),
     eliminarSolicitud: vi.fn().mockResolvedValue(undefined),
     actualizarCorreoAdmin: vi.fn().mockResolvedValue(undefined),
+    obtenerHashContrasena: vi.fn().mockResolvedValue(null),
+    actualizarContrasena: vi.fn().mockResolvedValue(undefined),
   };
 
   const sesionService = {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { derivarContrasena } from '../../../core/utils/crypto';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import type { EmpleadosRepositoryPort, EntidadEmpleado } from '../interfaces/empleados.interface';
 import type {
@@ -38,6 +39,8 @@ function crearMockGobernanza(): {
       return Promise.resolve();
     }),
     actualizarCorreoAdmin: vi.fn().mockResolvedValue(undefined),
+    obtenerHashContrasena: vi.fn().mockImplementation(() => derivarContrasena('Temporal#2026!')),
+    actualizarContrasena: vi.fn().mockResolvedValue(undefined),
   };
 
   const empleadosRepo: EmpleadosRepositoryPort = {
@@ -183,6 +186,29 @@ describe('HU-ADM-06 · Gobernanza y Sustitución de la Cuenta Administradora', (
     expect(confirmacion.sesionesPreviasInvalidadas).toBe(true);
     expect(gobernanzaRepo.actualizarCorreoAdmin).toHaveBeenCalledWith(1, 'nuevo.admin@pintuclic.com');
     expect(sesionService.invalidarTodas).toHaveBeenCalledWith(1, 'cambio_contrasena');
+  });
+
+  it('CA-ADM-01-03: el primer acceso fija la clave por el repositorio y revoca las sesiones', async () => {
+    const { gobernanzaRepo, empleadosRepo, sesionService } = crearMockGobernanza();
+    const servicio = new GobernanzaAdminService(gobernanzaRepo, empleadosRepo, sesionService);
+
+    await servicio.primerAcceso(1, {
+      credencialTemporal: 'Temporal#2026!',
+      nuevaContrasena: 'MiClaveDefinitiva2026!',
+    });
+
+    expect(gobernanzaRepo.actualizarContrasena).toHaveBeenCalledWith(1, expect.stringMatching(/^\$2[aby]\$12\$/));
+    expect(sesionService.invalidarTodas).toHaveBeenCalledWith(1, 'cambio_contrasena');
+  });
+
+  it('CA-ADM-01-03: el primer acceso con credencial temporal errónea no cambia nada', async () => {
+    const { gobernanzaRepo, empleadosRepo, sesionService } = crearMockGobernanza();
+    const servicio = new GobernanzaAdminService(gobernanzaRepo, empleadosRepo, sesionService);
+
+    await expect(
+      servicio.primerAcceso(1, { credencialTemporal: 'Erronea#2026!', nuevaContrasena: 'MiClaveDefinitiva2026!' }),
+    ).rejects.toThrow(EmpleadoError);
+    expect(gobernanzaRepo.actualizarContrasena).not.toHaveBeenCalled();
   });
 
   it('RN-ADM-18: Confirmación con token inexistente o inválido arroja error', async () => {

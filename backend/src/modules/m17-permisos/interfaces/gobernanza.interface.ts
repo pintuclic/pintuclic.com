@@ -21,4 +21,7 @@ export interface GobernanzaAdminRepositoryPort {
   buscarSolicitudPorToken(token: string): Promise<SolicitudCambioCorreoAdmin | null>;
   eliminarSolicitud(token: string): Promise<void>;
   actualizarCorreoAdmin(idUsuario: number, nuevoCorreo: string): Promise<void>;
+  obtenerHashContrasena(idUsuario: number): Promise<string | null>;
+  /** Fija la nueva contraseña y retira la marca de cambio obligatorio. */
+  actualizarContrasena(idUsuario: number, hash: string): Promise<void>;
 }

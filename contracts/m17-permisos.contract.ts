@@ -131,8 +131,12 @@ export type ErrorResponseEnvelope = z.infer<typeof errorResponseEnvelopeSchema>;
 
 /**
  * RN-ADM-12 / CA-ADM-03-03: OPACIDAD ABSOLUTA ANTE ACCESOS NO AUTORIZADOS.
- * Objeto canónico exacto que el middleware devuelve ante cualquier rechazo 403,
- * sin revelar si el recurso existía ni qué permiso faltaba.
+ *
+ * Norma del equipo (2026-10-23): la falta de permiso NO responde 403. El
+ * middleware de autorización devuelve el 404 opaco de M20
+ * (`RESPUESTA_RECURSO_NO_DISPONIBLE`, ADR-003), idéntico al de un recurso
+ * inexistente. Este objeto queda solo para reglas de negocio de la gobernanza
+ * del admin (p. ej. RN-ADM-18), nunca para la comprobación de permisos.
  */
 export const RESPUESTA_ACCESO_DENEGADO_OPACA: ErrorResponseEnvelope = {
   success: false,
@@ -163,6 +167,12 @@ export const crearEmpleadoOutputSchema = z.object({
   estado: estadoCuentaEmpleadoSchema,
   primerAccesoPendiente: z.boolean(),
   fechaCreacion: z.string().datetime(),
+  /**
+   * Se muestra una sola vez al administrador para que la entregue al empleado; no
+   * se envía por correo. Es de un solo uso: el empleado queda con cambio de
+   * contraseña obligatorio en su primer acceso (CA-ADM-01-03).
+   */
+  credencialTemporal: z.string().optional(),
 });
 export type CrearEmpleadoOutput = z.infer<typeof crearEmpleadoOutputSchema>;
 
