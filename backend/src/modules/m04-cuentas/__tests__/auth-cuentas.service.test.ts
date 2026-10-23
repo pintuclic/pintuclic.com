@@ -6,6 +6,7 @@ import type { CodigosVerificacionRepository } from '../repositories/codigos-veri
 import type { ControlIntentosRepository } from '../repositories/control-intentos.repository';
 import type { NotificacionesPort } from '../interfaces/notificaciones.port';
 import type { GoogleAuthPort } from '../interfaces/google-auth.port';
+import type { ParametrosCuentasPort } from '../interfaces/parametros-cuentas.port';
 import { SimuladoDateProviderAdapter } from '../adapters/date-provider.adapter';
 import { AuthCuentasError, AuthCuentasService } from '../services/auth-cuentas.service';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
@@ -182,6 +183,28 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
    * HU-CUE-01: REGISTRO B2C Y VALIDACIÓN OTP
    * ─────────────────────────────────────────────────────────────────────────── */
   describe('HU-CUE-01: Registro B2C con OTP', () => {
+    it('HU-ADM-07: la vigencia y los intentos del OTP salen de la configuración de M17', async () => {
+      const parametros: ParametrosCuentasPort = {
+        obtenerNumero: vi.fn().mockImplementation((clave: string) =>
+          Promise.resolve(clave === 'auth.vigencia_codigo_registro_minutos' ? 20 : clave === 'auth.intentos_codigo_registro' ? 4 : null),
+        ),
+      };
+      const servicio = new AuthCuentasService(
+        cuentasRepo, codigosRepo, controlIntentosRepo, notificaciones, googleAuth, dateProvider, sesionService, parametros,
+      );
+
+      const res = await servicio.solicitarRegistroB2C({
+        nombre: 'Config Prueba',
+        correo: 'config@pintuclic.com',
+        telefono: '3001234567',
+        contrasena: 'ClaveSegura2026!',
+      });
+
+      expect(res.tiempoExpiracionSegundos).toBe(20 * 60);
+      expect(codigosRepo.guardarCodigo).toHaveBeenCalledWith(expect.objectContaining({ maxIntentos: 4 }));
+      expect(notificaciones.enviarCodigoRegistro).toHaveBeenCalledWith('config@pintuclic.com', expect.stringMatching(/^\d{6}$/), 20);
+    });
+
     it('debe registrar solicitud y enviar código OTP de 6 dígitos', async () => {
       const res = await authService.solicitarRegistroB2C({
         nombre: 'Juan Perez',
@@ -503,6 +526,55 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
           contrasena: 'ClaveEquivocada1!',
         })
       ).rejects.toThrow(AuthCuentasError);
+    });
+
+    it('clave errónea de un correo existente responde sin detalles, igual que uno inexistente', async () => {
+      const passHash = await derivarContrasena('ClaveCorrecta123!');
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 5,
+        correo: 'login@pintuclic.com',
+        contrasena: passHash,
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: null,
+        cambioContrasenaPendiente: false,
+      } as Usuario);
+
+      const error = await authService
+        .login({ correo: 'login@pintuclic.com', contrasena: 'ClaveErronea123!' })
+        .catch((e: unknown) => e);
+      expect(error).toMatchObject({ codigo: 'CREDENCIALES_INVALIDAS', statusCode: 401 });
+      expect((error as AuthCuentasError).detalles).toBeUndefined();
+    });
+
+    it('HU-ADM-07: el bloqueo usa los intentos y la duración que el admin configuró en M17', async () => {
+      const parametros: ParametrosCuentasPort = {
+        obtenerNumero: vi.fn().mockImplementation((clave: string) =>
+          Promise.resolve(clave === 'auth.intentos_fallidos_bloqueo' ? 3 : clave === 'auth.duracion_bloqueo_minutos' ? 7 : null),
+        ),
+      };
+      const servicio = new AuthCuentasService(
+        cuentasRepo, codigosRepo, controlIntentosRepo, notificaciones, googleAuth, dateProvider, sesionService, parametros,
+      );
+
+      await expect(
+        servicio.login({ correo: 'noexiste@pintuclic.com', contrasena: 'Cualquiera123!' }),
+      ).rejects.toThrow(AuthCuentasError);
+      expect(controlIntentosRepo.registrarFallo).toHaveBeenCalledWith('noexiste@pintuclic.com', 3, 7, fechaBase);
+    });
+
+    it('HU-ADM-07: si la configuración falla se aplican los valores por defecto (5 intentos, 15 min)', async () => {
+      const parametros: ParametrosCuentasPort = {
+        obtenerNumero: vi.fn().mockRejectedValue(new Error('BD caída')),
+      };
+      const servicio = new AuthCuentasService(
+        cuentasRepo, codigosRepo, controlIntentosRepo, notificaciones, googleAuth, dateProvider, sesionService, parametros,
+      );
+
+      await expect(
+        servicio.login({ correo: 'noexiste@pintuclic.com', contrasena: 'Cualquiera123!' }),
+      ).rejects.toThrow(AuthCuentasError);
+      expect(controlIntentosRepo.registrarFallo).toHaveBeenCalledWith('noexiste@pintuclic.com', 5, 15, fechaBase);
     });
 
     it('solicita cambio obligatorio de contraseña en primer acceso (ADR-011)', async () => {

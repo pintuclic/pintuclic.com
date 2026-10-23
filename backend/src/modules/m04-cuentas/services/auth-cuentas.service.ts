@@ -3,6 +3,9 @@ import { Prisma, type Sesion, type Usuario } from '@prisma/client';
 import { derivarContrasena, verificarContrasena } from '../../../core/utils/crypto';
 import { esUsuarioAdministrativo, type CuentasRepository } from '../repositories/cuentas.repository';
 import { obtenerSecretoJwt } from './secreto-jwt';
+import { generarCodigoOtp } from './codigo-otp';
+import { leerParametroCuentas } from './parametros-cuentas';
+import type { ParametrosCuentasPort } from '../interfaces/parametros-cuentas.port';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
 import type { ControlIntentosRepository } from '../repositories/control-intentos.repository';
 import type { NotificacionesPort } from '../interfaces/notificaciones.port';
@@ -17,9 +20,6 @@ import type {
 } from '../dtos/m04-cuentas.dto';
 
 const DERIVACION_SENUELO = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.JustAPlaceholderHashForTimingXXXXXXXXXX';
-const MINUTOS_VIGENCIA_OTP_REGISTRO = 15;
-const MINUTOS_BLOQUEO_INTENTOS = 15;
-const MAX_INTENTOS_LOGIN = 5;
 
 export class AuthCuentasError extends Error {
   constructor(
@@ -49,10 +49,20 @@ export class AuthCuentasService {
     private readonly googleAuth: GoogleAuthPort,
     private readonly dateProvider: DateProviderPort,
     private readonly sesionService: SesionService,
+    /** HU-ADM-07: valores que el admin edita en M17; sin él se usan los del seed. */
+    private readonly parametros?: ParametrosCuentasPort,
   ) {}
 
   private obtenerJwtSecret(): string {
     return obtenerSecretoJwt();
+  }
+
+  private async parametrosOtpRegistro(): Promise<{ minutosVigencia: number; maxIntentos: number }> {
+    const [minutosVigencia, maxIntentos] = await Promise.all([
+      leerParametroCuentas(this.parametros, 'auth.vigencia_codigo_registro_minutos'),
+      leerParametroCuentas(this.parametros, 'auth.intentos_codigo_registro'),
+    ]);
+    return { minutosVigencia, maxIntentos };
   }
 
   /**
@@ -78,10 +88,11 @@ export class AuthCuentasService {
     }
 
     // Generar código numérico de 6 dígitos
-    const codigoNumerico = Math.floor(100000 + Math.random() * 900000).toString();
+    const { minutosVigencia, maxIntentos } = await this.parametrosOtpRegistro();
+    const codigoNumerico = generarCodigoOtp();
     const codigoHash = await derivarContrasena(codigoNumerico);
     const expiracion = new Date(
-      this.dateProvider.ahora().getTime() + MINUTOS_VIGENCIA_OTP_REGISTRO * 60 * 1000,
+      this.dateProvider.ahora().getTime() + minutosVigencia * 60 * 1000,
     );
 
     // Hash temporal de contraseña para registrarla una vez validado el OTP
@@ -92,7 +103,7 @@ export class AuthCuentasService {
       codigoHash,
       tipo: 'registro',
       expiracion,
-      maxIntentos: 3,
+      maxIntentos,
       datosTemporales: {
         nombre: input.nombre.trim(),
         telefono: input.telefono?.trim() ?? null,
@@ -104,13 +115,13 @@ export class AuthCuentasService {
     await this.notificaciones.enviarCodigoRegistro(
       correoNormalizado,
       codigoNumerico,
-      MINUTOS_VIGENCIA_OTP_REGISTRO,
+      minutosVigencia,
     );
 
     return {
       idVerificacion: guardado.idCodigo,
       correo: correoNormalizado,
-      tiempoExpiracionSegundos: MINUTOS_VIGENCIA_OTP_REGISTRO * 60,
+      tiempoExpiracionSegundos: minutosVigencia * 60,
     };
   }
 
@@ -222,10 +233,11 @@ export class AuthCuentasService {
       throw new AuthCuentasError('Solicitud de verificación no encontrada.', 'CODIGO_INVALIDO_O_EXPIRADO', 404);
     }
 
-    const nuevoCodigo = Math.floor(100000 + Math.random() * 900000).toString();
+    const { minutosVigencia, maxIntentos } = await this.parametrosOtpRegistro();
+    const nuevoCodigo = generarCodigoOtp();
     const codigoHash = await derivarContrasena(nuevoCodigo);
     const expiracion = new Date(
-      this.dateProvider.ahora().getTime() + MINUTOS_VIGENCIA_OTP_REGISTRO * 60 * 1000,
+      this.dateProvider.ahora().getTime() + minutosVigencia * 60 * 1000,
     );
 
     await this.codigosRepo.eliminar(idVerificacion);
@@ -235,20 +247,20 @@ export class AuthCuentasService {
       codigoHash,
       tipo: 'registro',
       expiracion,
-      maxIntentos: 3,
+      maxIntentos,
       datosTemporales: (registro.datosTemporales as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     });
 
     await this.notificaciones.enviarCodigoRegistro(
       registro.correo,
       nuevoCodigo,
-      MINUTOS_VIGENCIA_OTP_REGISTRO,
+      minutosVigencia,
     );
 
     return {
       idVerificacion: nuevoRegistro.idCodigo,
       correo: registro.correo,
-      tiempoExpiracionSegundos: MINUTOS_VIGENCIA_OTP_REGISTRO * 60,
+      tiempoExpiracionSegundos: minutosVigencia * 60,
     };
   }
 
@@ -261,6 +273,10 @@ export class AuthCuentasService {
   > {
     const correoNormalizado = input.correo.trim().toLowerCase();
     const ahora = this.dateProvider.ahora();
+    const [maxIntentosLogin, minutosBloqueo] = await Promise.all([
+      leerParametroCuentas(this.parametros, 'auth.intentos_fallidos_bloqueo'),
+      leerParametroCuentas(this.parametros, 'auth.duracion_bloqueo_minutos'),
+    ]);
 
     // 1. Verificar bloqueo anti-fuerza bruta (ADR-012)
     const control = await this.controlIntentosRepo.obtener(correoNormalizado);
@@ -284,8 +300,8 @@ export class AuthCuentasService {
       await verificarContrasena(input.contrasena, DERIVACION_SENUELO);
       await this.controlIntentosRepo.registrarFallo(
         correoNormalizado,
-        MAX_INTENTOS_LOGIN,
-        MINUTOS_BLOQUEO_INTENTOS,
+        maxIntentosLogin,
+        minutosBloqueo,
         ahora,
       );
       throw new AuthCuentasError('Credenciales incorrectas.', 'CREDENCIALES_INVALIDAS', 401);
@@ -297,27 +313,22 @@ export class AuthCuentasService {
     if (!coincide) {
       const fallo = await this.controlIntentosRepo.registrarFallo(
         correoNormalizado,
-        MAX_INTENTOS_LOGIN,
-        MINUTOS_BLOQUEO_INTENTOS,
+        maxIntentosLogin,
+        minutosBloqueo,
         ahora,
       );
 
       if (fallo.bloqueadoHasta && fallo.bloqueadoHasta.getTime() > ahora.getTime()) {
         throw new AuthCuentasError(
-          'Ha superado el número de intentos permitidos. Su cuenta ha sido bloqueada temporalmente por 15 minutos.',
+          `Ha superado el número de intentos permitidos. Su cuenta ha sido bloqueada temporalmente por ${minutosBloqueo} minutos.`,
           'CUENTA_BLOQUEADA',
           423,
-          { reintentarEnSegundos: MINUTOS_BLOQUEO_INTENTOS * 60 },
+          { reintentarEnSegundos: minutosBloqueo * 60 },
         );
       }
 
-      const restantes = Math.max(0, MAX_INTENTOS_LOGIN - fallo.intentosFallidos);
-      throw new AuthCuentasError(
-        'Credenciales incorrectas.',
-        'CREDENCIALES_INVALIDAS',
-        401,
-        { intentosRestantes: restantes },
-      );
+      // Sin "intentos restantes": la respuesta debe ser idéntica a la de un correo inexistente.
+      throw new AuthCuentasError('Credenciales incorrectas.', 'CREDENCIALES_INVALIDAS', 401);
     }
 
     // 5. Solo quien demostró conocer la clave sabe que la cuenta no está activa.

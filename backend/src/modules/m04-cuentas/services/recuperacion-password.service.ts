@@ -8,9 +8,10 @@ import type { DateProviderPort } from '../interfaces/date-provider.port';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import type { RestablecerPasswordRequest } from '../dtos/m04-cuentas.dto';
 import { obtenerSecretoJwt } from './secreto-jwt';
+import { leerParametroCuentas } from './parametros-cuentas';
+import type { ParametrosCuentasPort } from '../interfaces/parametros-cuentas.port';
 
 const DERIVACION_SENUELO = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.JustAPlaceholderHashForTimingXXXXXXXXXX';
-const MINUTOS_VIGENCIA_RECUPERACION = 30;
 
 export class RecuperacionPasswordError extends Error {
   constructor(
@@ -30,6 +31,8 @@ export class RecuperacionPasswordService {
     private readonly notificaciones: NotificacionesPort,
     private readonly dateProvider: DateProviderPort,
     private readonly sesionService: SesionService,
+    /** HU-ADM-07: vigencia del enlace editable por el admin en M17. */
+    private readonly parametros?: ParametrosCuentasPort,
   ) {}
 
   private obtenerJwtSecret(): string {
@@ -53,10 +56,14 @@ export class RecuperacionPasswordService {
     }
 
     // Generar token criptográfico seguro
+    const minutosVigencia = await leerParametroCuentas(
+      this.parametros,
+      'auth.vigencia_enlace_recuperacion_minutos',
+    );
     const tokenAleatorio = crypto.randomBytes(32).toString('hex');
     const tokenHash = await derivarContrasena(tokenAleatorio);
     const expiracion = new Date(
-      this.dateProvider.ahora().getTime() + MINUTOS_VIGENCIA_RECUPERACION * 60 * 1000,
+      this.dateProvider.ahora().getTime() + minutosVigencia * 60 * 1000,
     );
 
     const guardado = await this.codigosRepo.guardarCodigo({
@@ -81,18 +88,15 @@ export class RecuperacionPasswordService {
         tipo: 'recuperacion_password',
       },
       this.obtenerJwtSecret(),
-      { expiresIn: `${MINUTOS_VIGENCIA_RECUPERACION}m` },
+      { expiresIn: `${minutosVigencia}m` },
     );
 
-    try {
-      await this.notificaciones.enviarEnlaceRecuperacion(
-        correoNormalizado,
-        tokenJwt,
-        MINUTOS_VIGENCIA_RECUPERACION,
-      );
-    } catch {
-      // RF-SEG-06-06: preservar respuesta indistinguible ante fallos transitorios de transporte SMTP
-    }
+    // RF-SEG-06-06: el envío no se espera. Esperarlo haría que un correo registrado
+    // tarde lo que tarda el SMTP y delataría su existencia; un fallo de transporte
+    // tampoco cambia la respuesta.
+    this.notificaciones
+      .enviarEnlaceRecuperacion(correoNormalizado, tokenJwt, minutosVigencia)
+      .catch(() => undefined);
 
     return {
       mensaje:

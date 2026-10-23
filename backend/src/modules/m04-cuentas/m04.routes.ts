@@ -25,6 +25,7 @@ import { EmpresasController } from './controllers/empresas.controller';
 import type { DateProviderPort } from './interfaces/date-provider.port';
 import type { NotificacionesPort } from './interfaces/notificaciones.port';
 import type { GoogleAuthPort } from './interfaces/google-auth.port';
+import type { ParametrosCuentasPort } from './interfaces/parametros-cuentas.port';
 
 /**
  * RN-CUE-18 / HU-ADM-03: decidir sobre solicitudes de empresa exige este permiso
@@ -37,6 +38,8 @@ export interface ModuloM04Config {
   dateProvider?: DateProviderPort;
   notificaciones?: NotificacionesPort;
   googleAuth?: GoogleAuthPort;
+  /** HU-ADM-07: parámetros de autenticación de M17, inyectados desde app.routes.ts. */
+  parametros?: ParametrosCuentasPort;
 }
 
 export function construirModuloM04(
@@ -75,6 +78,7 @@ export function construirModuloM04(
     googleAuth,
     dateProvider,
     sesionService,
+    config?.parametros,
   );
 
   const recuperacionService = new RecuperacionPasswordService(
@@ -83,6 +87,7 @@ export function construirModuloM04(
     notificaciones,
     dateProvider,
     sesionService,
+    config?.parametros,
   );
 
   const perfilService = new PerfilService(

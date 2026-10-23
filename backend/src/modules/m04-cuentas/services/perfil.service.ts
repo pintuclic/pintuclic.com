@@ -4,6 +4,7 @@ import type { CodigosVerificacionRepository } from '../repositories/codigos-veri
 import type { NotificacionesPort } from '../interfaces/notificaciones.port';
 import type { DateProviderPort } from '../interfaces/date-provider.port';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
+import { generarCodigoOtp } from './codigo-otp';
 import type {
   ActualizarDatosPerfilRequest,
   CambiarContrasenaPerfilRequest,
@@ -147,7 +148,7 @@ export class PerfilService {
     }
 
     // Generar OTP de 6 dígitos
-    const codigoNumerico = Math.floor(100000 + Math.random() * 900000).toString();
+    const codigoNumerico = generarCodigoOtp();
     const codigoHash = await derivarContrasena(codigoNumerico);
     const expiracion = new Date(
       this.dateProvider.ahora().getTime() + MINUTOS_VIGENCIA_CAMBIO_CORREO * 60 * 1000,
