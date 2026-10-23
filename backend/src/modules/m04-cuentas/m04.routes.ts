@@ -10,7 +10,7 @@ import { PrismaDocumentosRepository } from './repositories/documentos.repository
 import { PrismaSolicitudesEmpresaRepository } from './repositories/solicitudes-empresa.repository';
 import { PrismaDireccionesRepository } from './repositories/direcciones.repository';
 import { SistemaDateProviderAdapter } from './adapters/date-provider.adapter';
-import { MemoriaNotificacionesAdapter } from './adapters/notificaciones.adapter';
+import { crearNotificacionesAdapterDesdeEntorno } from './adapters/notificaciones.adapter';
 import { MockGoogleAuthAdapter } from './adapters/google-auth.adapter';
 import { AuthCuentasService } from './services/auth-cuentas.service';
 import { RecuperacionPasswordService } from './services/recuperacion-password.service';
@@ -62,7 +62,7 @@ export function construirModuloM04(
 
   // Adaptadores (inyección configurable para pruebas desacopladas)
   const dateProvider = config?.dateProvider ?? new SistemaDateProviderAdapter();
-  const notificaciones = config?.notificaciones ?? new MemoriaNotificacionesAdapter();
+  const notificaciones = config?.notificaciones ?? crearNotificacionesAdapterDesdeEntorno();
   const googleAuth = config?.googleAuth ?? new MockGoogleAuthAdapter();
 
   // Servicios de dominio

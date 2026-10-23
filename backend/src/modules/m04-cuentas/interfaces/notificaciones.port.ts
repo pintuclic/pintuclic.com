@@ -8,7 +8,12 @@
  */
 
 export interface EventoNotificacion {
-  tipo: 'registro_otp' | 'recuperacion_password' | 'cambio_correo_otp' | 'dictamen_empresa';
+  tipo:
+    | 'registro_otp'
+    | 'recuperacion_password'
+    | 'cambio_correo_otp'
+    | 'cambio_correo_confirmado'
+    | 'dictamen_empresa';
   destinatario: string;
   timestamp: Date;
   metadatos: Record<string, string | number | boolean>;
@@ -23,4 +28,5 @@ export interface NotificacionesPort {
     resultado: 'aprobada' | 'rechazada',
     motivoRechazo?: string
   ): Promise<void>;
+  notificarCambioCorreoConfirmado?(correoAnterior: string, nuevoCorreo: string): Promise<void>;
 }

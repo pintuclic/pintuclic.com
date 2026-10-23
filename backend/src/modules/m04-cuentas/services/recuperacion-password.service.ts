@@ -83,11 +83,15 @@ export class RecuperacionPasswordService {
       { expiresIn: `${MINUTOS_VIGENCIA_RECUPERACION}m` },
     );
 
-    await this.notificaciones.enviarEnlaceRecuperacion(
-      correoNormalizado,
-      tokenJwt,
-      MINUTOS_VIGENCIA_RECUPERACION,
-    );
+    try {
+      await this.notificaciones.enviarEnlaceRecuperacion(
+        correoNormalizado,
+        tokenJwt,
+        MINUTOS_VIGENCIA_RECUPERACION,
+      );
+    } catch {
+      // RF-SEG-06-06: preservar respuesta indistinguible ante fallos transitorios de transporte SMTP
+    }
 
     return {
       mensaje:

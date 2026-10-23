@@ -160,6 +160,7 @@ export class PerfilService {
       maxIntentos: 3,
       datosTemporales: {
         idUsuario,
+        correoAnterior: usuario.correo,
         nuevoCorreo: nuevoCorreoNormalizado,
       },
     });
@@ -210,13 +211,21 @@ export class PerfilService {
       );
     }
 
-    const datos = registro.datosTemporales as { idUsuario?: number; nuevoCorreo?: string } | null;
+    const datos = registro.datosTemporales as {
+      idUsuario?: number;
+      correoAnterior?: string;
+      nuevoCorreo?: string;
+    } | null;
     if (datos?.idUsuario !== idUsuario || !datos?.nuevoCorreo) {
       throw new PerfilError('Inconsistencia en la verificación de usuario.', 'USUARIO_NO_COINCIDE', 403);
     }
 
     await this.cuentasRepo.actualizarCorreo(idUsuario, datos.nuevoCorreo);
     await this.codigosRepo.eliminar(registro.idCodigo);
+
+    if (datos.correoAnterior && this.notificaciones.notificarCambioCorreoConfirmado) {
+      await this.notificaciones.notificarCambioCorreoConfirmado(datos.correoAnterior, datos.nuevoCorreo);
+    }
 
     return {
       mensaje: 'Correo electrónico actualizado exitosamente.',
