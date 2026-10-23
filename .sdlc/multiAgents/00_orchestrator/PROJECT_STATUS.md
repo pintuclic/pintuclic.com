@@ -1,8 +1,8 @@
-> **Última Actualización:** 2026-10-21
-> **Fase Activa:** FASE 4 COMPLETADA — **M17 Y CORE KIT v0.3.2 CERTIFICADOS TRAS REMEDIACIÓN INTEGRAL**
-> **Última entrega:** `v0.3.2` — remediación de accesibilidad del Core Kit compartido de M20 (`Modal.tsx` y `ProductCard.tsx`; 57/57 Vitest frontend, 125/125 total). Certificado por QA en Gate 4A.
-> **Deuda abierta de M17:** ✅ **Cerrados y certificados por QA** en `v0.3.2` los 2 defectos de accesibilidad del Core Kit (foco y teclado), y la compuerta `lint:a11y` amplía su alcance a `src/core` para impedir su reaparición. Siguen abiertos los 2 hallazgos bloqueados por dependencias: identidad real de sesión → M04; KPIs agregados → contrato de M17. Detalle en el WORKLOG de `04_frontend_engineer` y reporte de QA.
-> **Agente en Turno:** `00_orchestrator` · **Módulo en curso: M17** (Administración y Permisos Certificado)
+> **Última Actualización:** 2026-10-22
+> **Fase Activa:** FASE 0 GOBERNANZA — **M04 cerrado con release `v0.6.1` (Gate 5 firmado por el Director Humano el 2026-10-22)**. Esperando la selección del siguiente módulo.
+> **Última entrega:** `v0.6.1` — M04 Cuentas, Autenticación y Perfil validado contra PostgreSQL real y certificado por QA (341/341 pruebas). Integrado en `main` vía PR #10.
+> **Deuda abierta de M17:** ✅ **Cerrados y certificados por QA** en `v0.3.2` y `v0.3.3`. Resuelta persistencia relacional con modelo Prisma y eliminación de arrays en memoria (Directiva #10).
+> **Agente en Turno:** `00_orchestrator` · **Módulo en curso: ninguno** (M04 cerrado en `v0.6.1`). **Salto de ola autorizado por el Director Humano (2026-10-21):** M04 se construye antes que M18 y antes de cerrar la Ola 2; M18 se incorpora después desacoplado mediante `NotificacionesPort`.
 > **Alcance del Sistema:** **21 módulos en 6 olas** — 8 con spec, 13 pendientes de Gate 1
 > **Ruta Maestra:** 🗺️ [`RUTA_DEL_PROYECTO.md`](../../../docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) (lectura íntegra obligatoria)
 > **Contexto Completo:** Ver [`PINTUCLIC_CONTEXT.md`](../../PINTUCLIC_CONTEXT.md)
@@ -24,6 +24,12 @@
 | **Frontend M17** | Frontend Engineer | Vistas Admin Mockup + Permisos + Clientes + Config | 🟢 COMPLETADO — 47 tests Vitest, build limpio | Gate 3B | ✅ **Firmado Gate 3B** |
 | **QA Forense M17** | QA Lead & Security | Cuadrantes Q1-Q4 + Zero ANY + Auditoría Determinista | 🟢 COMPLETADO | Gate 4A | ✅ **Certificado (v0.3.1)** |
 | **Release M17** | DevOps Engineer | Docker + Seeders + Release SemVer `v0.3.1` | 🟢 AUTORIZADO | Gate 5 | ✅ Listo para release |
+| **M04. PRD & Reglas** | Product Manager Lead | 10 HU INVEST, 94 BDD Gherkin, 26 RN-CUE, Diagramas Mermaid | 🟢 COMPLETADO — firmado con la reserva de la mesa ATDD subsanada | Gate 1 | ✅ **Firmado (2026-10-21)** |
+| **Arquitectura M04** | Software Architect | Contrato Zod (`m04-cuentas.contract.ts` 16/16 PASS) + 4 ADRs + DDL v4.2 / BD v3.0 (53 tablas) + Prisma + DTOs/puertos | 🟢 COMPLETADO | Gate 2 | ✅ **Firmado (2026-10-21)** |
+| **Backend M04** | Backend Engineer | API REST tipada + Lógica 10 HUs + Repositorios Prisma + Tests Vitest | 🟢 COMPLETADO — 205/205 Vitest en v0.6.1 | Gate 3A | ✅ **Certificado (v0.4.1)** |
+| **Frontend M04** | Frontend Engineer | Vistas de cuentas, perfil y administración de empresas | 🟢 COMPLETADO — 136/136 Vitest, build 17/17 | Gate 3B | ✅ **Firmado (v0.6.0)** |
+| **QA Forense M04** | QA Lead & Security | 341/341 pruebas + Zero ANY + fidelidad visual contra VISTAS.pdf | 🟢 COMPLETADO — E2E y k6 ejecutados por otro agente sin evidencia registrada (declarado por el Director) | Gate 4A | ✅ **Certificado (v0.6.1)** |
+| **Release M04** | Orquestador | Release SemVer `v0.6.1` + merge a `main` (PR #10) | 🟢 COMPLETADO | Gate 5 | ✅ **Firmado (2026-10-22)** |
 
 *Leyenda:* 🟢 Completado | 🟡 En Proceso / Parcial | 🔴 Bloqueado (Veto) | ⚪ No Iniciado
 
@@ -55,7 +61,7 @@
 | Módulo | Spec | Contratos Zod | Backend | Frontend | Tests Vitest | QA | Walkthrough |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **M18 — Notificaciones y Comunicaciones** | ✅ | ⚪ | 🟡 | ⚪ | ⚪ | ⚪ | ⚪ |
-| **M04 — Cuentas, Autenticación y Perfil** | ✅ | ⚪ | 🟡 | 🟡 | ⚪ | ⚪ | ⚪ |
+| **M04 — Cuentas, Autenticación y Perfil** | ✅ | ✅ | ✅ | ✅ | ✅ | 🟢 | ✅ |
 | **M02 — Búsqueda y Descubrimiento** | ✅ | ⚪ | 🟡 | 🟡 | ⚪ | ⚪ | ⚪ |
 
 ### Ola 4 — Intención y Operación

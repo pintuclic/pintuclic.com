@@ -101,3 +101,57 @@ Turno detenido. `current_state.json` actualizado a `FASE_1_PRD` / `GATE_1_PRD_AP
 - **Dictámenes:** Ambos **CONFORME**. El Arquitecto asume los 4 observables especiales en el contrato Zod y QA valida que los 47 escenarios cubren los pilares de prueba.
 - **Resultado:** Mesa cerrada conforme. DoR cumplida.
 
+---
+
+## 2026-10-21 — M04 · Entregables de Gate 1
+
+**Rol:** Product Manager Lead · **Módulo:** M04 Cuentas, Autenticación y Perfil
+**Fase:** FASE_1_PRD → esperando firma del Director Humano en Gate 1
+**Perfil de Compuerta Declarado:** **Perfil A (Vertical)**
+
+### Contexto de entrada
+El Director Humano autorizó construir M04 antes que M18 y antes de cerrar la Ola 2 (salto de ola registrado en
+`current_state.json → bloqueos[]` como `SALTO_DE_OLA_AUTORIZADO`), y dispuso que el arranque sea por el rol de
+Product Manager conforme a la metodología. M04 es Ola 3, depende de M18 (inexistente) y no tenía artefactos de Gate 1 ni
+contrato Zod. Se respondió además a sus decisiones: (1) ante conflicto entre diagrama y especificación **prevalece la
+especificación**; (2) la ampliación de `AuditoriaPort` la hace el Arquitecto en su turno; (3) se adoptan los valores por
+defecto del catálogo de parámetros de M17; (4) y (5) se le entrega una propuesta de DDL para que decida.
+
+### Subroles convocados
+- **03 · Functional Requirements, ATDD & BDD:** 26 reglas inmutables `RN-CUE`, 10 HU en INVEST con **94 escenarios BDD**
+  trazados a los **48 criterios de aceptación** de la fuente, matriz de testabilidad y casos frontera.
+- **02 · Legal & Domain Compliance:** custodia de datos personales (la ubicación del dispositivo exige consentimiento,
+  `RN-CUE-22`), no enumeración de cuentas (`RN-CUE-06`), custodia del RUT (`RN-CUE-20`) y trazabilidad de decisiones.
+- **01 · Discovery & Strategy:** matriz In/Out-of-Scope y resolución de preguntas abiertas como **19 decisiones de
+  producto propuestas** (`DP-01`…`DP-19`), que el Director firma con Gate 1.
+- **04 · Product Analytics & UAT:** 5 indicadores de éxito, con metas declaradas como propuestas a validar.
+
+### Entregables dejados en disco
+- `.sdlc/docs/modules/M04/01_SPEC_FUNCIONAL.md`: salto de ola, dependencias, actores, 26 RN, matriz de alcance, 19 DP, **17 hallazgos** sobre la fuente (6 diagramas que contradicen la spec y 11 defectos de spec/entorno), parámetros consumidos y DoR.
+- `.sdlc/docs/modules/M04/02_HISTORIAS_USUARIO.md`: 10 HU, 94 escenarios, evaluación INVEST (3 HU declaradas por rebanadas).
+- `.sdlc/docs/modules/M04/03_FLUJO_Y_ESTADOS.md`: transcripción a Mermaid de los 5 diagramas, 6 máquinas de estado y el catálogo de 9 eventos hacia M18.
+- `.sdlc/docs/modules/M04/01_ATDD_SPEC.md`: 8 observables críticos, alcance **no certificable** declarado, BVA y cobertura de los 48 CA.
+- `.sdlc/docs/modules/M04/RFC-M04-001_cambios_ddl.md`: 9 cambios propuestos al modelo de datos. **No es entregable de Gate 1**: la regla de oro #1 del PM prohíbe especificar SQL, así que se redactó a petición expresa del Director como insumo de Gate 2, y lo formaliza el Arquitecto.
+
+### Decisiones y hallazgos relevantes
+1. **Seguridad por diseño que cambia el modelo:** la restricción por intentos fallidos se lleva por correo (exista o no) para no filtrar qué cuentas existen; por eso no puede vivir en columnas de `usuario`.
+2. **El NIT vigente de una cuenta empresa no tiene dónde guardarse** (solo existe en `solicitud_empresa`) y el RUT presupone un almacenamiento de archivos inexistente: de ahí las decisiones 4 y 5 del Director.
+3. **Una cuenta jamás verificada no reserva el correo** (`DP-07`), para no dejar fuera de la plataforma a su dueño legítimo.
+4. **Corrección a mi propio reporte previo:** afirmé que las "15 preguntas abiertas" no estaban en el repositorio; sí están, en `M18_NOTIFICACIONES.md` §6, porque el análisis original cubría M04 y M18 y se partió en dos. Se incorporaron como origen de varias `DP`.
+5. **Defectos de otros módulos detectados, no tocados:** M17 guarda su catálogo de parámetros (decisión documentada en `ADR-007`: el DDL no tenía tabla de parámetros) y los tokens de cambio de correo del administrador en `Map` en memoria, de modo que no sobreviven a un reinicio; el catálogo de permisos no tiene un permiso para validar empresas; el mínimo de contraseña de M17 (8) contradice el de M20 (12); el cambio de clave forzoso de empleados no se persiste. Se elevan al Arquitecto y al Director (Directiva #3).
+
+### 🪑 Mesa de Consulta Acotada — ESTADO: PREPARADA, NO CONVOCADA
+- **Escenario:** C-1 · **Pregunta acotada escrita** en `01_ATDD_SPEC.md` §5 · **Convocados:** `02_software_architect`, `05_qa_security_tester`
+- **Dictámenes:** **PENDIENTES.** No se redactaron en nombre de otros roles: el protocolo exige que cada convocado responda desde su especialidad, y simularlo sería una firma sin respaldo.
+- **Consecuencia:** el ítem *"Ficha ATDD firmada por los Three Amigos"* de la DoR **no está cumplido**. El Director Humano decide si firma Gate 1 con esa reserva o exige antes la mesa.
+
+### Alto mecánico (Regla de Oro #10 y STAGE_GATES.md §3)
+Turno detenido. `current_state.json` pasa a `FASE_1_PRD` / `GATE_1_PRD_APPROVAL` en estado `ESPERANDO_APROBACION_HUMANA`. Se requiere
+la firma explícita del Director Humano para habilitar la Fase 2 (Software Architect Lead). No se escribió código ni se modificó ningún archivo fuera de
+`.sdlc/` en esta entrega.
+
+### ✅ Gate 1 FIRMADO — 2026-10-21
+- **Firma:** Director Humano, por instrucción expresa en la sesión ("firma el gate 1"), transcrita por el agente. Valida las decisiones de producto `DP-01`…`DP-19` y habilita la Fase 2.
+- **Reserva registrada:** la ficha ATDD seguía **sin los dictámenes del Arquitecto y del QA**; la instrucción de firma no abordó ese punto. Queda como bloqueo `RESERVA_DE_COMPUERTA` en `current_state.json` y debe resolverse antes de cerrar Gate 2.
+- **Corrección a mi reporte previo:** presenté el almacenamiento en memoria de los parámetros de M17 como un defecto. Es una decisión documentada (`ADR-007`); el efecto sobre M04 es real, pero no una falla no vista.
+- **Turno cedido** al Software Architect Lead.

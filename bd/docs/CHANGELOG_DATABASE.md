@@ -1,12 +1,54 @@
 # 📜 Registro de Cambios y Versiones de Base de Datos (CHANGELOG) - PINTUCLIC
 
-Este documento constituye el registro histórico y oficial del versionamiento del modelo de datos relacional de **Pintuclic** (PostgreSQL + Kysely).
+Este documento constituye el registro histórico y oficial del versionamiento del modelo de datos relacional de **Pintuclic** (PostgreSQL + Prisma).
 
 > **Motor:** PostgreSQL 13+ (compatible con PostgreSQL 18)  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Documentación General:** [`./DOCUMENTACION_BASE_DATOS.md`](./DOCUMENTACION_BASE_DATOS.md)  
 > **Walkthrough Detallado de Migraciones:** [`./WALKTHROUGH_DATABASE.md`](./WALKTHROUGH_DATABASE.md)  
+
+---
+
+## [v3.0] - 2026-10-21
+### Esquema 4.2 (53 Tablas) - M04 Cuentas: Unicidad, hash OTP, anti-fuerza bruta y cambio de clave
+- **Alcance General:** Aprobación en bloque del Director Humano sobre los cambios C-2 y C-4 a C-9 de `RFC-M04-001` (`.sdlc/docs/modules/M04/`) para sincronizar DDL y modelo Prisma de M04:
+  - **Nueva tabla `control_intento_acceso` (C-6, Tabla 53):** Contador y bloqueo temporal por correo normalizado (`RN-CUE-07`), permitiendo indistinguibilidad y anti-enumeración de cuentas (`RN-CUE-06`). Índice en `bloqueado_hasta`.
+  - **Unicidad de solicitudes pendientes (C-2, `RN-CUE-14`, `RN-CUE-19`):** Índices parciales `uq_solicitud_empresa_nit_pendiente`, `uq_solicitud_empresa_usuario_pendiente`, `uq_solicitud_nit_usuario_pendiente`, `uq_solicitud_nit_nuevo_pendiente`.
+  - **Direcciones: predeterminada única y sin duplicados (C-4, `RN-CUE-21`):** Índice único parcial `uq_direccion_predeterminada_unica` e índice único multi-columna `uq_direccion_no_duplicada` sobre `(id_usuario, lower(direccion), lower(barrio), lower(coalesce(apartamento_casa, '')))`.
+  - **Códigos OTP derivados (C-5, `RN-CUE-03`):** Columna `codigo` renombrada a `codigo_hash VARCHAR(255)` en `codigo_verificacion`. Seed actualizado con hash BCrypt costo 12.
+  - **Correo insensible a mayúsculas (C-7, `RN-CUE-01`):** Índice único funcional `uq_usuario_correo_lower` sobre `usuario (lower(correo))`.
+  - **Marca de cambio forzoso de clave (C-8, `CA-ADM-01-03`, `RN-CUE-04`):** Columna `cambio_contrasena_pendiente BOOLEAN NOT NULL DEFAULT false` en `usuario`.
+  - **Permiso `empresas.validar` (C-9, `DP-09`):** Permiso 21 añadido a `permisos` y asignado al rol 1 (administrador).
+  - 🔗 **Detalle y DDL:** [WALKTHROUGH_DATABASE.md#📦-versión-30-2026-10-21](./WALKTHROUGH_DATABASE.md#-versión-30-2026-10-21)
+
+---
+
+## [v2.9] - 2026-10-21
+### Esquema 4.1 (52 Tablas) - M17 Configuración general: tabla de parámetros
+- **Alcance General:** Aprobado por el Director Humano mediante `RFC-M17-001` (`.sdlc/docs/modules/M17/`), que cumple el punto 4 de `ADR-007`:
+  - **Nueva tabla `parametro_sistema`:** `clave` única con prefijo de área, `area` y `tipo_dato` (nuevos `enum_area_parametro` y `enum_tipo_dato_parametro`), `valor` y `valor_por_defecto` en `JSONB`, rango numérico opcional, fecha y último autor.
+  - **La base de datos impone el tipo y el rango (`RF-ADM-05-05/06`):** el valor nunca es nulo, del tipo equivocado ni está fuera de rango. Un parámetro nuevo es una fila nueva, sin DDL.
+  - **Seed:** las 10 filas del catálogo actual de M17, leídas del código y no transcritas. `ON CONFLICT DO NOTHING`: re-ejecutar el seed no pisa valores que un administrador ya modificó.
+  - **Disparador de `fecha_actualizacion`:** `fn_parametro_sistema_fecha()` y `trg_parametro_sistema_fecha`, los primeros del esquema. Solo mueven la fecha cuando cambia `valor`.
+  - **Rango de contraseña alineado:** `auth.complejidad_minima_contrasena` pasa de 8–32 a **12–32**, el piso de M20 (`RN-SEG-01`). El seed lo corrige también en bases ya sembradas.
+  - **Limpieza:** se elimina la definición duplicada de `presentacion` (sin cambio de esquema, verificado con `pg_dump`).
+  - **Migración idempotente:** probada sobre una instalación limpia y sobre bases en v4.0 y v3.9.
+  - **⚠️ Pendiente:** el código de M17 **todavía lee el catálogo de memoria**. Falta el modelo Prisma y el repositorio que sustituye a `AlmacenConfiguracionMemoria` (RFC-M17-001 §5).
+  - 🔗 **Detalle y DDL:** [WALKTHROUGH_DATABASE.md#📦-versión-29-2026-10-21](./WALKTHROUGH_DATABASE.md#-versión-29-2026-10-21)
+
+---
+
+## [v2.8] - 2026-10-21
+### Esquema 4.0 (51 Tablas) - M04 Cuentas: NIT vigente de la cuenta empresa y RUT adjunto almacenado
+- **Alcance General:** Dos decisiones del Director Humano sobre el RFC-M04-001 (`.sdlc/docs/modules/M04/`), tomadas durante el Gate 2 de **M04**:
+  - **NIT vigente (`RN-CUE-13`, `RN-CUE-19`, C-1):** nueva tabla `cuenta_empresa`, 1:1 con `usuario`, con el NIT vigente (`UNIQUE`) y los datos de la empresa aprobada. Hasta ahora el NIT solo existía en `solicitud_empresa`, de modo que renovarlo obligaba a mutar una solicitud histórica.
+  - **RUT adjunto (`RN-CUE-20`, C-3, opción A):** nueva tabla `documento_soporte` (`BYTEA`; PDF, JPG o PNG de hasta 5 MB; huella SHA-256; tamaño real verificado por `CHECK`). `solicitud_actualizacion_nit` añade `id_documento` (FK `RESTRICT`) y su columna `documento_adjunto_url` queda **deprecada** (pierde `NOT NULL`).
+  - **Restricción transitoria:** `ck_solicitud_nit_adjunto` exige que toda solicitud aporte el RUT por `id_documento` o por la URL antigua, hasta que esta última se retire.
+  - **Migración idempotente:** probada sobre una instalación limpia y sobre una base creada con el esquema 3.9. Las solicitudes anteriores conservan su URL.
+  - **Seed:** `cuenta_empresa` se rellena desde las solicitudes aprobadas y el RUT de ejemplo pasa a `documento_soporte`.
+  - **No incluido:** el resto de cambios del RFC (C-2 y C-4 a C-9) siguen pendientes de decisión.
+  - 🔗 **Detalle y DDL:** [WALKTHROUGH_DATABASE.md#📦-versión-28-2026-10-21](./WALKTHROUGH_DATABASE.md#-versión-28-2026-10-21)
 
 ---
 

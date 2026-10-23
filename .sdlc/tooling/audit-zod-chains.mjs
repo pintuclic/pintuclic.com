@@ -63,8 +63,8 @@ for (const filePath of filesToAudit) {
   const content = fs.readFileSync(filePath, 'utf8');
   const relPath = path.relative(rootDir, filePath);
 
-  // Buscar ocurrencias de .min(...)...trim() en una misma cadena de Zod (sin cruzar sentencias ';')
-  const minTrimRegex = /\.min\s*\([^)]*\)[^;]*?\.trim\s*\(\)/g;
+  // Buscar ocurrencias de .min(...)...trim() en una misma cadena de Zod (sin cruzar sentencias ';' ni campos de objeto ',')
+  const minTrimRegex = /\.min\s*\([^)]*\)[^;,]*?\.trim\s*\(\)/g;
   let match;
   while ((match = minTrimRegex.exec(content)) !== null) {
     failCount++;

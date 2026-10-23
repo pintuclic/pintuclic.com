@@ -84,30 +84,82 @@ enum TipoUsuario {
   @@map("enum_tipo_usuario")
 }
 
+/// Tipo de solicitud de cuenta corporativa (M04 · HU-CUE-03 / HU-CUE-06)
+enum TipoSolicitudEmpresa {
+  registro
+  ascenso_particular
+
+  @@map("enum_tipo_solicitud_empresa")
+}
+
+/// Estado del trámite de una solicitud de empresa o NIT (M04 · HU-CUE-03 / HU-CUE-09)
+enum EstadoSolicitudEmpresa {
+  pendiente
+  aprobada
+  rechazada
+
+  @@map("enum_estado_solicitud_empresa")
+}
+
+/// Propósito transaccional del código OTP efímero (M04 · HU-CUE-01, 05, 06)
+enum TipoCodigoOtp {
+  registro
+  recuperacion_password
+  cambio_correo
+
+  @@map("enum_tipo_codigo_otp")
+}
+
+/// Áreas de configuración general del sistema (M17 · RFC-M17-001)
+enum AreaParametro {
+  autenticacion
+  comunicaciones
+  comercial
+
+  @@map("enum_area_parametro")
+}
+
+/// Tipos de datos para parámetros de configuración (M17 · RFC-M17-001)
+enum TipoDatoParametro {
+  numero
+  texto
+  booleano
+
+  @@map("enum_tipo_dato_parametro")
+}
+
 // =============================================================================
-// MÓDULO M04 — USUARIO (declaración mínima)
-//
-// ⚠️ La tabla `usuario` pertenece a M04. M20 y M17 la necesitan para resolver
-// sus relaciones y para leer `estado`, `tipo`, `contrasena` y vínculos a roles.
+// MÓDULO M04 — USUARIO
 // =============================================================================
 
 model Usuario {
-  idUsuario  Int           @id @default(autoincrement()) @map("id_usuario")
-  nombre     String        @db.VarChar(150)
-  telefono   String?       @db.VarChar(20)
-  correo     String        @unique @db.VarChar(150)
+  idUsuario                 Int           @id @default(autoincrement()) @map("id_usuario")
+  nombre                    String        @db.VarChar(150)
+  telefono                  String?       @db.VarChar(20)
+  correo                    String        @unique @db.VarChar(150)
   /// Hash BCrypt (coste ≥ 12). RN-SEG-02: toda cuenta tiene contraseña, incluidas las de Google.
-  contrasena String        @db.VarChar(255)
-  idRol      Int?          @map("id_rol")
-  estado     EstadoUsuario @default(activo)
-  tipo       TipoUsuario   @default(normal)
+  contrasena                String        @db.VarChar(255)
+  idRol                     Int?          @map("id_rol")
+  estado                    EstadoUsuario @default(activo)
+  tipo                      TipoUsuario   @default(normal)
+  cambioContrasenaPendiente Boolean       @default(false) @map("cambio_contrasena_pendiente")
 
-  sesiones             Sesion[]
-  consentimientos      ConsentimientoUsuario[]
-  solicitudesSupresion SolicitudSupresion[]
+  sesiones               Sesion[]
+  consentimientos        ConsentimientoUsuario[]
+  solicitudesSupresion   SolicitudSupresion[]
+  parametrosActualizados ParametroSistema[]      @relation("ParametroUsuarioActualizo")
 
-  rolDirecto           Rol?         @relation("UsuarioRolDirecto", fields: [idRol], references: [idRol])
-  usuarioRol           UsuarioRol?
+  rolDirecto Rol?        @relation("UsuarioRolDirecto", fields: [idRol], references: [idRol])
+  usuarioRol UsuarioRol?
+
+  // M04 Relaciones
+  cuentaEmpresa               CuentaEmpresa?
+  direcciones                 DireccionCliente[]
+  solicitudesEmpresa          SolicitudEmpresa[]          @relation("SolicitudesEmpresaUsuario")
+  solicitudesEmpresaRevisadas SolicitudEmpresa[]          @relation("SolicitudesEmpresaRevisadas")
+  solicitudesNit              SolicitudActualizacionNit[] @relation("SolicitudesNitUsuario")
+  solicitudesNitRevisadas     SolicitudActualizacionNit[] @relation("SolicitudesNitRevisadas")
+  identidadesExternas         UsuarioIdentidadExterna[]
 
   @@map("usuario")
 }
@@ -169,6 +221,26 @@ model UsuarioRol {
   @@index([idUsuario])
   @@index([idRol])
   @@map("usuario_rol")
+}
+
+/// Parámetros de configuración general modificables en caliente por el administrador (M17 · HU-ADM-05, HU-ADM-07, RFC-M17-001)
+model ParametroSistema {
+  idParametro         Int                @id @default(autoincrement()) @map("id_parametro")
+  clave               String             @unique @db.VarChar(100)
+  area                AreaParametro
+  tipoDato            TipoDatoParametro  @map("tipo_dato")
+  descripcion         String
+  valor               Json
+  valorPorDefecto     Json               @map("valor_por_defecto")
+  rangoMinimo         Decimal?           @map("rango_minimo") @db.Decimal(14, 2)
+  rangoMaximo         Decimal?           @map("rango_maximo") @db.Decimal(14, 2)
+  fechaActualizacion  DateTime           @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo  Int?               @map("id_usuario_actualizo")
+
+  usuarioActualizo    Usuario?           @relation("ParametroUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onUpdate: Cascade, onDelete: SetNull)
+
+  @@index([idUsuarioActualizo], map: "idx_parametro_sistema_usuario")
+  @@map("parametro_sistema")
 }
 
 // =============================================================================
@@ -237,3 +309,159 @@ model SolicitudSupresion {
   @@index([idUsuario, estado])
   @@map("solicitud_supresion")
 }
+
+// =============================================================================
+// MÓDULO M04 — CUENTAS, AUTENTICACIÓN Y PERFIL
+// =============================================================================
+
+/// Datos y NIT vigente de cada cuenta empresa aprobada (HU-CUE-09, HU-CUE-10, RFC-M04-001 C-1)
+model CuentaEmpresa {
+  idUsuario           Int               @id @map("id_usuario")
+  nit                 String            @unique @db.VarChar(30)
+  nombreEmpresa       String            @map("nombre_empresa") @db.VarChar(150)
+  nombreRepresentante String            @map("nombre_representante") @db.VarChar(150)
+  correoEmpresarial   String            @map("correo_empresarial") @db.VarChar(150)
+  telefono            String            @db.VarChar(20)
+  idSolicitudOrigen   String?           @map("id_solicitud_origen") @db.Uuid
+  fechaAprobacion     DateTime          @default(now()) @map("fecha_aprobacion") @db.Timestamptz(6)
+  fechaActualizacion  DateTime          @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  usuario             Usuario           @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  solicitudOrigen     SolicitudEmpresa? @relation("CuentaEmpresaSolicitudOrigen", fields: [idSolicitudOrigen], references: [idSolicitud], onDelete: SetNull)
+
+  @@index([idSolicitudOrigen], map: "idx_cuenta_empresa_solicitud")
+  @@map("cuenta_empresa")
+}
+
+/// Custodia segura de documentos soporte adjuntos (RUT de renovación) en BYTEA (RFC-M04-001 C-3)
+model DocumentoSoporte {
+  idDocumento    String   @id @default(uuid()) @map("id_documento") @db.Uuid
+  nombreOriginal String   @map("nombre_original") @db.VarChar(255)
+  tipoMime       String   @map("tipo_mime") @db.VarChar(100)
+  tamanoBytes    Int      @map("tamano_bytes")
+  sha256         String   @db.Char(64)
+  contenido      Bytes
+  fechaCarga     DateTime @default(now()) @map("fecha_carga") @db.Timestamptz(6)
+
+  solicitudesActualizacionNit SolicitudActualizacionNit[]
+
+  @@map("documento_soporte")
+}
+
+/// Libreta de direcciones de entrega de los clientes (HU-CUE-07, RFC-M04-001 C-4)
+model DireccionCliente {
+  idDireccion        String   @id @default(uuid()) @map("id_direccion") @db.Uuid
+  idUsuario          Int      @map("id_usuario")
+  direccion          String   @db.VarChar(255)
+  barrio             String   @db.VarChar(100)
+  apartamentoCasa    String?  @map("apartamento_casa") @db.VarChar(100)
+  nombreApellido     String   @map("nombre_apellido") @db.VarChar(150)
+  telefono           String   @db.VarChar(20)
+  esPredeterminada   Boolean  @default(false) @map("es_predeterminada")
+  latitud            Decimal? @db.Decimal(10, 7)
+  longitud           Decimal? @db.Decimal(10, 7)
+  fechaCreacion      DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  usuario            Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@index([idUsuario], map: "idx_direccion_usuario")
+  @@index([idUsuario, esPredeterminada], map: "idx_direccion_predeterminada")
+  @@map("direccion_cliente")
+}
+
+/// Solicitudes de cuenta empresa inicial o ascenso particular (HU-CUE-03, HU-CUE-09, RFC-M04-001 C-2)
+model SolicitudEmpresa {
+  idSolicitud         String                 @id @default(uuid()) @map("id_solicitud") @db.Uuid
+  idUsuario           Int                    @map("id_usuario")
+  nombreEmpresa       String                 @map("nombre_empresa") @db.VarChar(150)
+  nombreRepresentante String                 @map("nombre_representante") @db.VarChar(150)
+  correoEmpresarial   String                 @map("correo_empresarial") @db.VarChar(150)
+  telefono            String                 @db.VarChar(20)
+  nit                 String                 @db.VarChar(30)
+  tipoSolicitud       TipoSolicitudEmpresa   @default(registro) @map("tipo_solicitud")
+  estado              EstadoSolicitudEmpresa @default(pendiente)
+  motivoRechazo       String?                @map("motivo_rechazo")
+  idAdminRevisor      Int?                   @map("id_admin_revisor")
+  fechaSolicitud      DateTime               @default(now()) @map("fecha_solicitud") @db.Timestamptz(6)
+  fechaRevision       DateTime?              @map("fecha_revision") @db.Timestamptz(6)
+
+  usuario             Usuario                @relation("SolicitudesEmpresaUsuario", fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  adminRevisor        Usuario?               @relation("SolicitudesEmpresaRevisadas", fields: [idAdminRevisor], references: [idUsuario], onDelete: SetNull)
+  cuentasOriginadas   CuentaEmpresa[]        @relation("CuentaEmpresaSolicitudOrigen")
+
+  @@index([nit], map: "idx_solicitud_empresa_nit")
+  @@index([idUsuario], map: "idx_solicitud_empresa_usuario")
+  @@index([estado], map: "idx_solicitud_empresa_estado")
+  @@map("solicitud_empresa")
+}
+
+/// Solicitudes formales de renovación o actualización de NIT (HU-CUE-10, RFC-M04-001 C-2 y C-3)
+model SolicitudActualizacionNit {
+  idSolicitud         String                 @id @default(uuid()) @map("id_solicitud") @db.Uuid
+  idUsuario           Int                    @map("id_usuario")
+  nitAnterior         String                 @map("nit_anterior") @db.VarChar(30)
+  nitNuevo            String                 @map("nit_nuevo") @db.VarChar(30)
+  documentoAdjuntoUrl String?                @map("documento_adjunto_url")
+  idDocumento         String?                @map("id_documento") @db.Uuid
+  estado              EstadoSolicitudEmpresa @default(pendiente)
+  motivoRechazo       String?                @map("motivo_rechazo")
+  idAdminRevisor      Int?                   @map("id_admin_revisor")
+  fechaSolicitud      DateTime               @default(now()) @map("fecha_solicitud") @db.Timestamptz(6)
+  fechaRevision       DateTime?              @map("fecha_revision") @db.Timestamptz(6)
+
+  usuario             Usuario                @relation("SolicitudesNitUsuario", fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+  adminRevisor        Usuario?               @relation("SolicitudesNitRevisadas", fields: [idAdminRevisor], references: [idUsuario], onDelete: SetNull)
+  documento           DocumentoSoporte?      @relation(fields: [idDocumento], references: [idDocumento], onDelete: Restrict)
+
+  @@index([idUsuario], map: "idx_solicitud_nit_usuario")
+  @@index([estado], map: "idx_solicitud_nit_estado")
+  @@index([idDocumento], map: "idx_solicitud_nit_documento")
+  @@map("solicitud_actualizacion_nit")
+}
+
+/// Identidades federadas OAuth vinculadas a la cuenta (HU-CUE-02)
+model UsuarioIdentidadExterna {
+  idIdentidad      Int      @id @default(autoincrement()) @map("id_identidad")
+  idUsuario        Int      @map("id_usuario")
+  proveedor        String   @db.VarChar(50)
+  idProveedor      String   @map("id_proveedor") @db.VarChar(255)
+  correoProveedor  String?  @map("correo_proveedor") @db.VarChar(150)
+  fechaVinculacion DateTime @default(now()) @map("fecha_vinculacion") @db.Timestamptz(6)
+
+  usuario          Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
+
+  @@unique([proveedor, idProveedor], map: "uq_identidad_proveedor")
+  @@unique([idUsuario, proveedor], map: "uq_usuario_proveedor")
+  @@index([idUsuario], map: "idx_identidad_usuario")
+  @@map("usuario_identidad_externa")
+}
+
+/// Códigos OTP efímeros transaccionales con hash seguro (HU-CUE-01, 05, 06, RFC-M04-001 C-5)
+model CodigoVerificacion {
+  idCodigo        String        @id @default(uuid()) @map("id_codigo") @db.Uuid
+  correo          String        @db.VarChar(150)
+  codigoHash      String        @map("codigo_hash") @db.VarChar(255)
+  tipo            TipoCodigoOtp
+  expiracion      DateTime      @db.Timestamptz(6)
+  intentos        Int           @default(0)
+  maxIntentos     Int           @default(3) @map("max_intentos")
+  datosTemporales Json?         @map("datos_temporales")
+  fechaCreacion   DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+
+  @@index([correo, tipo], map: "idx_codigo_correo_tipo")
+  @@index([expiracion], map: "idx_codigo_expiracion")
+  @@map("codigo_verificacion")
+}
+
+/// Control de intentos fallidos anti-fuerza bruta e indistinguibilidad por correo (HU-CUE-04, RFC-M04-001 C-6)
+model ControlIntentoAcceso {
+  correo             String    @id @db.VarChar(150)
+  intentosFallidos   Int       @default(0) @map("intentos_fallidos")
+  bloqueadoHasta     DateTime? @map("bloqueado_hasta") @db.Timestamptz(6)
+  fechaUltimoIntento DateTime  @default(now()) @map("fecha_ultimo_intento") @db.Timestamptz(6)
+
+  @@index([bloqueadoHasta], map: "idx_control_intento_bloqueo")
+  @@map("control_intento_acceso")
+}
+

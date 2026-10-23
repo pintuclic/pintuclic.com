@@ -28,6 +28,10 @@ Toda modificación a la base de datos de Pintuclic DEBE cumplir estrictamente co
    - Es mandatorio crear un índice `idx_[tabla]_[columna]` para **toda columna que sea Clave Foránea (FK)** o que sea utilizada como criterio de búsqueda recurrente (`correo`, `fecha`, etc.).
 6. **Orden Topológico Libre de Errores:**  
    - En el archivo SQL, ninguna tabla puede ser declarada antes de las tablas a las que hace referencia mediante `FOREIGN KEY`.
+7. **Funciones y Disparadores (solo cuando la base debe garantizar una invariante):**
+   - El esquema no los usa por defecto; se admiten únicamente para una regla que ningún `CHECK` o `UNIQUE` pueda expresar (p. ej. mantener una fecha de última modificación).
+   - Deben ser idempotentes: `CREATE OR REPLACE FUNCTION` y `DROP TRIGGER IF EXISTS` seguido de `CREATE TRIGGER`.
+   - Nomenclatura: `fn_[tabla]_[proposito]` para la función y `trg_[tabla]_[proposito]` para el disparador.
 
 ---
 
@@ -42,7 +46,7 @@ graph TD
     C --> D[3. Validar Sintaxis e Integridad de FKs]
     D --> E[4. Redactar Walkthrough en bd/docs/WALKTHROUGH_DATABASE.md]
     E --> F[5. Actualizar Changelog y Diagrama en bd/docs/DOCUMENTACION_BASE_DATOS.md]
-    F --> G[6. Sincronizar Tipos Kysely en backend/src/core/db/types.ts]
+    F --> G[6. Sincronizar modelos Prisma en backend/prisma/schema.prisma]
     G --> H[7. Validar Compilación TypeScript (tsc --noEmit)]
     H --> I[8. Commit Semántico y Push]
 ```
@@ -72,9 +76,10 @@ graph TD
 - Actualizar el diagrama Mermaid `erDiagram` para reflejar las nuevas relaciones.
 - Actualizar las tablas del Diccionario de Datos.
 
-### Paso 6: Sincronización con Backend Kysely (`backend/src/core/db/types.ts`)
-- Reflejar las nuevas tablas como interfaces `...Table` con `Generated<number>`, `ColumnType` y tipos literales de TypeScript para los `ENUMs`.
-- Actualizar la interfaz raíz `Database`.
+### Paso 6: Sincronización con Backend Prisma (`backend/prisma/schema.prisma`)
+- Reflejar las nuevas tablas como modelos Prisma, con `@map`/`@@map` al nombre real de la tabla y la columna, los `ENUM` como `enum` de Prisma y las claves foráneas como `@relation`.
+- Regenerar el cliente: `npm run db:generate`.
+- `schema.prisma` es un archivo **compartido** entre módulos: antes de editarlo aplica la Directiva #3 de `AGENTS.md`.
 
 ### Paso 7: Verificación de Compilación
 - Ejecutar en backend:
@@ -135,8 +140,8 @@ Breve descripción de 2 a 3 líneas del motivo del cambio y el objetivo funciona
 ---
 
 ### 💻 6. Impacto y Acciones Requeridas en Backend y Frontend
-#### Backend (Kysely / Express):
-- Interfaces que deben añadirse/modificarse en `src/core/db/types.ts`.
+#### Backend (Prisma / Express):
+- Modelos y enums que deben añadirse o modificarse en `backend/prisma/schema.prisma`.
 - Módulos afectados (`M02`, `M04`, `M07`, etc.).
 
 #### Frontend (Vistas / UI):
@@ -154,5 +159,5 @@ Antes de dar por concluida la tarea de base de datos, marca mentalmente este che
 - [ ] ¿Toda nueva FK tiene su índice `CREATE INDEX IF NOT EXISTS idx_...`?
 - [ ] ¿Se redactó la entrada correspondiente en `bd/docs/WALKTHROUGH_DATABASE.md` con la plantilla?
 - [ ] ¿Se actualizó el resumen en `bd/docs/DOCUMENTACION_BASE_DATOS.md`?
-- [ ] ¿Se actualizaron las interfaces en `backend/src/core/db/types.ts`?
+- [ ] ¿Se actualizó `backend/prisma/schema.prisma` y se regeneró el cliente (`npm run db:generate`)?
 - [ ] ¿TypeScript compila limpio con `tsc --noEmit`?

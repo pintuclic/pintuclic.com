@@ -1,0 +1,179 @@
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it } from 'vitest';
+import { getButtonClassName } from '../components/buttons/button-styles';
+import { CategoryCard } from '../components/data-display/CategoryCard';
+import { ProductCard } from '../components/data-display/ProductCard';
+import { SearchBar } from '../components/forms/SearchBar';
+import { Footer, type FooterProps } from '../components/layout/Footer';
+import { Header, type HeaderProps } from '../components/layout/Header';
+import { Carousel } from '../components/navigation/Carousel';
+import { formatCOP } from '../utils/moneda';
+
+/**
+ * Core Kit ampliado para la landing (FP-01). Sin jsdom en el proyecto, se
+ * verifica el HTML que produce el servidor: semántica, accesibilidad y contrato
+ * de cada componente.
+ */
+
+const LOGO = { src: '/images/landing/logo.png', alt: 'Pintu Clic, ir al inicio', width: 520, height: 303 };
+
+describe('getButtonClassName', () => {
+  it('conserva los tokens de las variantes existentes', () => {
+    expect(getButtonClassName({ variant: 'primary-action' })).toContain('bg-action');
+    expect(getButtonClassName({ variant: 'primary-conversion' })).toContain('hover:bg-conversion-hover');
+    expect(getButtonClassName({ variant: 'outline', fullWidth: true })).toContain('w-full');
+  });
+
+  it('outline-light usa un anillo de foco claro, visible sobre fondos oscuros', () => {
+    const clases = getButtonClassName({ variant: 'outline-light' });
+    expect(clases).toContain('border-neutral-white/80');
+    expect(clases).toContain('focus-visible:ring-neutral-white/80');
+    expect(clases).not.toContain('focus-visible:ring-action/50');
+  });
+});
+
+describe('formatCOP', () => {
+  it('formatea pesos colombianos sin decimales', () => {
+    expect(formatCOP(178900).replace(/\s/g, ' ')).toBe('$ 178.900');
+  });
+});
+
+describe('ProductCard con href', () => {
+  const html = renderToStaticMarkup(
+    <ProductCard
+      id="p1"
+      name="Brocha Premium 3&quot;"
+      price={12900}
+      originalPrice={15000}
+      isOffer
+      offerBadgeText="-15%"
+      imageUrl="/images/landing/producto-brocha.png"
+      href="/productos/brocha-premium-3"
+    />
+  );
+
+  it('el nombre y "Ver producto" son enlaces a la ficha, no botones', () => {
+    expect(html.match(/href="\/productos\/brocha-premium-3"/g)).toHaveLength(2);
+    expect(html).toContain('aria-label="Ver producto: Brocha Premium 3&quot;"');
+  });
+
+  it('muestra el precio con el sufijo COP y la insignia de oferta', () => {
+    expect(html).toContain('12.900 COP');
+    expect(html).toContain('-15%');
+  });
+
+  it('la imagen declara dimensiones y texto alternativo', () => {
+    expect(html).toMatch(/<img[^>]*alt="Brocha Premium 3&quot;"[^>]*width="400"[^>]*height="300"/);
+  });
+});
+
+describe('CategoryCard', () => {
+  const html = renderToStaticMarkup(
+    <CategoryCard title="Pinturas" href="/productos?categoria=pinturas" imageSrc="/images/landing/categoria-pinturas.png" />
+  );
+
+  it('toda la tarjeta es un único enlace con el nombre como texto real', () => {
+    expect(html.match(/<a /g)).toHaveLength(1);
+    expect(html).toContain('href="/productos?categoria=pinturas"');
+    expect(html).toContain('Pinturas');
+    expect(html).toContain('Ver productos');
+  });
+
+  it('el arte es decorativo (alt vacío)', () => {
+    expect(html).toMatch(/<img[^>]*alt=""/);
+  });
+});
+
+describe('SearchBar', () => {
+  const html = renderToStaticMarkup(
+    <SearchBar action="/productos" categories={[{ value: '', label: 'Todas' }, { value: 'pinturas', label: 'Pinturas' }]} />
+  );
+
+  it('es un formulario GET de búsqueda que funciona sin JavaScript', () => {
+    // El orden de los atributos lo decide React: se comprueba cada uno por separado.
+    const form = html.match(/<form[^>]*>/)?.[0] ?? '';
+    expect(form).toContain('action="/productos"');
+    expect(form).toContain('method="get"');
+    expect(form).toContain('role="search"');
+    expect(html).toMatch(/<input[^>]*name="q"/);
+    expect(html).toMatch(/<select[^>]*name="categoria"/);
+  });
+
+  it('todos los controles tienen nombre accesible', () => {
+    expect(html).toContain('aria-label="Buscar productos"');
+    expect(html).toContain('aria-label="Buscar"');
+    expect(html).toMatch(/<label[^>]*class="sr-only"[^>]*>Categoría<\/label>/);
+  });
+});
+
+describe('Carousel', () => {
+  it('con una sola diapositiva no muestra controles', () => {
+    const html = renderToStaticMarkup(<Carousel ariaLabel="Banners" slides={[<p key="a">Uno</p>]} />);
+    expect(html).toContain('aria-roledescription="carousel"');
+    expect(html).not.toContain('Diapositiva siguiente');
+  });
+
+  it('con varias, ofrece flechas y puntos, y deja inertes las ocultas', () => {
+    const html = renderToStaticMarkup(
+      <Carousel ariaLabel="Banners" slides={[<p key="a">Uno</p>, <p key="b">Dos</p>]} />
+    );
+    expect(html).toContain('aria-label="Diapositiva anterior"');
+    expect(html).toContain('aria-label="Diapositiva siguiente"');
+    expect(html).toContain('aria-label="Ir a la diapositiva 2"');
+    expect(html.match(/inert=""/g)).toHaveLength(1);
+  });
+});
+
+describe('Header', () => {
+  const props: HeaderProps = {
+    logo: LOGO,
+    navItems: [
+      { label: 'Inicio', href: '/' },
+      { label: 'Ofertas', href: '/ofertas', variant: 'pill' },
+    ],
+    megaMenu: { groups: [], assistant: { text: 'Ayuda', ctaLabel: 'Encontrar', href: '/asesoria' } },
+    account: { label: 'Mi cuenta', sublabel: 'Iniciar sesión', href: '/login' },
+    cart: { count: 3, total: 178900, href: '/carrito' },
+  };
+  const html = renderToStaticMarkup(<Header {...props} />).replace(/ /g, ' ');
+
+  it('el carrito anuncia cantidad y total a los lectores de pantalla', () => {
+    expect(html).toContain('aria-label="Carrito, 3 productos, total $ 178.900"');
+  });
+
+  it('expone navegación principal, cuenta y botón de categorías', () => {
+    expect(html).toContain('aria-label="Principal"');
+    expect(html).toContain('aria-label="Mi cuenta, Iniciar sesión"');
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain('Ofertas');
+  });
+});
+
+describe('Footer', () => {
+  const props: FooterProps = {
+    brandName: 'Pintu Clic',
+    logo: LOGO,
+    description: 'Descripción',
+    socials: [{ label: 'Facebook', href: 'https://www.facebook.com', icon: 'facebook' }],
+    columns: [{ title: 'Servicios', links: [{ label: 'Calculadora', href: '/calculadora' }] }],
+    contactTitle: 'Contacto',
+    contact: [{ icon: 'correo', label: 'contacto@pintuclic.com', href: 'mailto:contacto@pintuclic.com' }],
+    legalLinks: [{ label: 'Términos', href: '/terminos' }],
+  };
+  const html = renderToStaticMarkup(<Footer {...props} />);
+
+  it('calcula el año en lugar de fijarlo', () => {
+    expect(html).toContain(`© ${new Date().getFullYear()} Pintu Clic`);
+  });
+
+  it('las redes abren en pestaña nueva de forma segura y lo anuncian', () => {
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('(se abre en una pestaña nueva)');
+  });
+
+  it('cada columna de enlaces es un landmark de navegación', () => {
+    expect(html).toContain('aria-label="Servicios"');
+    expect(html).toContain('aria-label="Legal"');
+  });
+});

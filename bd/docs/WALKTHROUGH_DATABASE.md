@@ -1,10 +1,15 @@
 # 🚀 Walkthrough de Evolución y Migración de Base de Datos - PINTUCLIC
 
-Este documento registra la evolución histórica del modelo de base de datos de **Pintuclic**, detallando para cada versión las tablas creadas, tablas deprecadas, cambios de tipos de datos, nuevas restricciones (`CONSTRAINTS`), tipos `ENUM`, índices e impactos directos en Backend (Kysely/Express) y Frontend.
+Este documento registra la evolución histórica del modelo de base de datos de **Pintuclic**, detallando para cada versión las tablas creadas, tablas deprecadas, cambios de tipos de datos, nuevas restricciones (`CONSTRAINTS`), tipos `ENUM`, índices e impactos directos en Backend (Prisma/Express) y Frontend.
+
+> **Nota:** las entradas anteriores a la v2.8 mencionan Kysely porque describen el stack de su fecha. Desde que Kysely fue sustituido por Prisma 6 (`docs/CHANGELOG.md`), el backend se sincroniza con `backend/prisma/schema.prisma`.
 
 ---
 
 ## 📑 Índice de Versiones
+- [Versión 3.0 (M04: unicidad, hash OTP, anti-fuerza bruta y cambio de clave - 2026-10-21)](#-versión-30-2026-10-21)
+- [Versión 2.9 (M17: tabla de parámetros de configuración general - 2026-10-21)](#-versión-29-2026-10-21)
+- [Versión 2.8 (M04: NIT vigente de la cuenta empresa y RUT adjunto almacenado - 2026-10-21)](#-versión-28-2026-10-21)
 - [Versión 2.7 / v0.3.37.0 (M08: copia histórica de la orden, descuentos por línea y consecutivo - 2026-09-29)](#-versión-27--v03370-2026-09-29)
 - [Versión 2.6 / v0.3.34.0 (M08: estados, historial, notas internas y contactos de la orden - 2026-09-29)](#-versión-26--v03340-2026-09-29)
 - [Versión 2.5 / v3.29.0 (Sincronización de Modelo ER de Base de Datos - 2026-09-22)](#-versión-25--v3290-2026-09-22)
@@ -16,6 +21,229 @@ Este documento registra la evolución histórica del modelo de base de datos de 
 - [Versión 1.0 (Esquema Inicial Pre-Final) - Base de 21 Tablas](#-versión-10-2026-09-02)
 
 ---
+
+## 📦 Versión 3.0 (2026-10-21)
+
+### 🎯 Resumen Ejecutivo
+Aprobación en bloque del Director Humano sobre los cambios C-2 y C-4 a C-9 de `RFC-M04-001` (`.sdlc/docs/modules/M04/`) para sincronizar DDL y modelo Prisma de M04. Esta entrega complementa la v2.8 (C-1 y C-3) y eleva el esquema a **v4.2 (53 tablas)** con las defensas estructurales de cuentas:
+- **Total Tablas:** Pasa de 52 a 53 tablas (+1: `control_intento_acceso`).
+- **Foco de la versión:** Cuentas, Autenticación y Perfil (M04). Blindaje contra condiciones de carrera, anti-fuerza bruta e indistinguibilidad.
+
+---
+
+### 🛑 1. Tablas Deprecadas / Eliminadas
+Ninguna en esta versión.
+
+---
+
+### ✨ 2. Tablas Nuevas Creadas
+| Nueva Tabla | Clave Primaria (PK) | Claves Foráneas (FK) | Propósito Funcional |
+| :--- | :--- | :--- | :--- |
+| `control_intento_acceso` | `correo VARCHAR(150)` | Ninguna (desacoplada de usuario) | Control anti-fuerza bruta con contador de fallos y timestamp de restricción temporal. Indexada por correo normalizado para garantizar indistinguibilidad anti-enumeración (`RN-CUE-06`, `RN-CUE-07`). |
+
+---
+
+### 🔄 3. Tablas Modificadas y Nuevas Relaciones
+- **`usuario`:** Añade columna `cambio_contrasena_pendiente BOOLEAN NOT NULL DEFAULT false` (C-8, `CA-ADM-01-03`, `RN-CUE-04`).
+- **`codigo_verificacion`:** Columna `codigo` renombrada a `codigo_hash VARCHAR(255)` (C-5, `RN-CUE-03`).
+
+---
+
+### 🔒 4. Restricciones (CONSTRAINTS) y Tipos ENUM Agregados
+- **Nuevos Índices Únicos:**
+  - `uq_usuario_correo_lower`: `ON usuario (lower(correo))` (C-7, `RN-CUE-01`).
+  - `uq_direccion_predeterminada_unica`: `ON direccion_cliente (id_usuario) WHERE es_predeterminada` (C-4, `RN-CUE-21`).
+  - `uq_direccion_no_duplicada`: `ON direccion_cliente (id_usuario, lower(direccion), lower(barrio), lower(coalesce(apartamento_casa, '')))` (C-4).
+  - `uq_solicitud_empresa_nit_pendiente`: `ON solicitud_empresa (nit) WHERE estado = 'pendiente'` (C-2, `RN-CUE-14`).
+  - `uq_solicitud_empresa_usuario_pendiente`: `ON solicitud_empresa (id_usuario) WHERE estado = 'pendiente'` (C-2).
+  - `uq_solicitud_nit_usuario_pendiente`: `ON solicitud_actualizacion_nit (id_usuario) WHERE estado = 'pendiente'` (C-2).
+  - `uq_solicitud_nit_nuevo_pendiente`: `ON solicitud_actualizacion_nit (nit_nuevo) WHERE estado = 'pendiente'` (C-2, `RN-CUE-19`).
+- **Nuevos CHECK:**
+  - `ck_control_intentos_no_negativo`: `intentos_fallidos >= 0` en `control_intento_acceso`.
+- **Catálogo de Permisos (Seed):** Permiso 21 `empresas.validar` añadido al catálogo oficial y asignado a rol 1 (administrador).
+
+---
+
+### ⚡ 5. Nuevos Índices de Rendimiento
+- `CREATE INDEX IF NOT EXISTS idx_control_intento_bloqueo ON control_intento_acceso (bloqueado_hasta);`
+
+---
+
+### 💻 6. Impacto y Acciones Requeridas en Backend y Frontend
+#### Backend (Prisma / Express):
+- Sincronización del modelo Prisma en `backend/prisma/schema.prisma` mapeando `ControlIntentoAcceso`, `CuentaEmpresa`, `DocumentoSoporte`, `DireccionCliente`, `SolicitudEmpresa`, `SolicitudActualizacionNit`, `CodigoVerificacion`, `UsuarioIdentidadExterna`.
+- Contrato Zod `m04-cuentas.contract.ts` y DTOs en `m04-cuentas/dtos/`.
+- Permiso `empresas.validar` registrado en enum `CODIGOS_PERMISO`.
+
+#### Frontend (Vistas / UI):
+- Tipos TypeScript espejados en `frontend/src/modules/m04-cuentas/`.
+- Formularios consumiendo DTOs validados con Zod.
+
+---
+
+## 📦 Versión 2.9 (2026-10-21)
+
+### 🎯 Resumen Ejecutivo
+El catálogo de parámetros de **M17 Configuración general** (`HU-ADM-05`, `HU-ADM-07`) vivía en un `Map` en memoria por decisión de `ADR-007`, porque `bd/` no tenía tabla de parámetros: cada reinicio del servidor devolvía todo a sus valores por defecto. Esta versión crea la tabla, con la validación de tipo y rango **dentro de la base de datos**. Aprobado por el Director Humano mediante `RFC-M17-001`. La cabecera del script pasa a **esquema 4.1**.
+- **Total Tablas:** Pasa de 51 a 52 tablas.
+- **Foco de la versión:** Configuración general (M17). Cambio aditivo.
+- **⚠️ El código de M17 aún no la usa.** Hasta aplicar el plan del RFC (§5), el sistema sigue leyendo de memoria; el seed es idéntico al catálogo actual, de modo que nada cambia en el comportamiento.
+- **Revisión del mismo día, antes de cualquier commit:** se añadió un disparador para `fecha_actualizacion`, se alineó el rango de la complejidad de contraseña con el piso de M20 (12–32) y se eliminó una definición duplicada de `presentacion`. Se incorporan a esta versión en lugar de abrir otra porque aún no se ha publicado.
+
+---
+
+### 🛑 1. Tablas Deprecadas / Eliminadas
+Ninguna en esta versión.
+
+---
+
+### ✨ 2. Tablas Nuevas Creadas
+| Nueva Tabla | Clave Primaria (PK) | Claves Foráneas (FK) | Propósito Funcional |
+| :--- | :--- | :--- | :--- |
+| `parametro_sistema` | `id_parametro SERIAL` | `id_usuario_actualizo -> usuario` (SET NULL) | Parámetros modificables en caliente por el administrador: clave única con prefijo de área, valor vigente y por defecto (`JSONB`), rango numérico opcional, fecha y último autor. |
+
+---
+
+### 🔄 3. Tablas Modificadas y Nuevas Relaciones
+- Ninguna tabla existente cambia de estructura. **Limpieza:** se elimina la definición duplicada de `presentacion` (aparecía dos veces con texto idéntico, y `CREATE TABLE IF NOT EXISTS` la volvía inofensiva). Se comprobó con `pg_dump --schema-only` que el esquema resultante no cambia.
+- **Nueva relación:** `parametro_sistema.id_usuario_actualizo -> usuario.id_usuario` con `ON DELETE SET NULL`: borrar al administrador no destruye el valor del parámetro.
+
+---
+
+### 🔒 4. Restricciones (CONSTRAINTS) y Tipos ENUM Agregados
+- **Nuevos ENUMs:** `enum_area_parametro ('autenticacion', 'comunicaciones', 'comercial')` y `enum_tipo_dato_parametro ('numero', 'texto', 'booleano')`.
+- **Nuevos UNIQUE:** `UNIQUE (clave)`.
+- **Nuevos CHECK:**
+  - `ck_parametro_clave`: minúsculas con prefijo de área (`auth.x`).
+  - `ck_parametro_tipo_valor` y `ck_parametro_tipo_defecto`: el tipo JSON (`number`, `string`, `boolean`) coincide con `tipo_dato`; también rechazan el `null` de JSON.
+  - `ck_parametro_valor_en_rango` y `ck_parametro_defecto_en_rango`: un valor numérico queda dentro de `[rango_minimo, rango_maximo]`, ambos inclusivos.
+  - `ck_parametro_rango_orden` y `ck_parametro_rango_solo_numero`.
+- **Nota técnica:** las comprobaciones de rango usan `CASE WHEN` porque PostgreSQL no garantiza el orden de evaluación de `AND`/`OR`; sin él, convertir a número un valor de texto fallaría con un error de conversión en lugar de con una restricción.
+- **Migración para bases anteriores a v4.1:** solo `CREATE TABLE IF NOT EXISTS` y bloques `DO` que comprueban `pg_type` para los enums. Los `COMMENT ON` van después de crear la tabla.
+- **Función y disparador (los primeros del esquema):** `fn_parametro_sistema_fecha()` y `trg_parametro_sistema_fecha` (`BEFORE UPDATE`). Fijan `fecha_actualizacion = now()` **solo cuando cambia `valor`**; editar la descripción, el rango o reescribir el mismo valor no la mueve. Idempotentes (`CREATE OR REPLACE` y `DROP TRIGGER IF EXISTS`). La convención quedó registrada en la guía de BD.
+- **Alineación del rango de contraseña:** `auth.complejidad_minima_contrasena` pasa de 8–32 a **12–32**, el piso real de M20 (`RN-SEG-01`). Una corrección en el seed la aplica también a bases ya sembradas: sube el mínimo y lleva a 12 un valor que dejó de ser legal. Es idempotente y **no pisa** valores legítimos.
+
+---
+
+### ⚡ 5. Nuevos Índices de Rendimiento
+- `CREATE INDEX IF NOT EXISTS idx_parametro_sistema_usuario ON parametro_sistema(id_usuario_actualizo);`
+- `clave` queda cubierta por el índice de su `UNIQUE`.
+
+---
+
+### 💻 6. Impacto y Acciones Requeridas en Backend y Frontend
+#### Backend (Prisma / Express):
+- **Pendiente (equipo de M17, RFC-M17-001 §5):**
+  - modelo `ParametroSistema` en `backend/prisma/schema.prisma` (archivo **compartido**: Directiva #3; `valor` y `valorPorDefecto` como `Json`);
+  - repositorio Prisma que sustituya a `AlmacenConfiguracionMemoria`;
+  - `ConfiguracionPort.actualizar` debe recibir al administrador para llenar `id_usuario_actualizo`;
+  - retirar el array de datos del repositorio y añadir una caché corta, porque M20 lee estos valores en cada inicio de sesión.
+- **Límites declarados:** solo se guarda el último autor, el historial es de HU-SEG-04; `id_usuario_actualizo` debe fijarlo la aplicación, porque la base no conoce al usuario de la sesión; el seed no modifica filas ya existentes, de modo que cambiar un rango o una descripción en una base creada exige un `UPDATE` (salvo la alineación de contraseña, que ya lo incluye).
+- **Resuelto:** el rango de `auth.complejidad_minima_contrasena` ya es 12–32, igual que el piso de M20. El catálogo de M17 (`configuracion.repository.ts`) se corrigió con una prueba que lo **ata al mínimo real** de `contrasenaSchema` de M20 para que no vuelvan a divergir.
+- **Módulos afectados:** M17 (propietario). M04 consumirá `auth.*` por un puerto y no cambia.
+
+#### Frontend (Vistas / UI):
+- Sin impacto directo.
+
+#### Verificación (PostgreSQL 18.6 local sobre un clúster desechable, 2026-10-21):
+| Prueba | Resultado |
+| :--- | :--- |
+| Instalación limpia: esquema y seed, dos pasadas cada uno, `ON_ERROR_STOP=1` | ✅ Código 0; 52 tablas; 21 enums; 10 parámetros |
+| Actualización de bases en v4.0 y en v3.9 (cadena completa), dos pasadas cada una | ✅ Código 0; mismo estado final en las tres bases |
+| 15 valores inválidos (rango, tipo, `null`, clave, área, rango inverso, FK) | ✅ Los 15 rechazados por la restricción prevista |
+| Límites exactos (3 y 10 en rango 3–10), valor sin tope, restaurar el defecto, parámetros nuevos de texto y booleano sin tocar el DDL | ✅ Aceptados |
+| Borrar al administrador que modificó un valor | ✅ El valor se conserva; el autor pasa a `NULL` |
+| Esquema antes y después de la revisión, comparados con `pg_dump --schema-only` | ✅ La **única** diferencia es la función y el disparador nuevos; eliminar el duplicado de `presentacion` no altera el esquema |
+| Base ya sembrada con el rango viejo y un valor 10 puesto por un administrador, tras esquema y seed nuevos dos veces | ✅ Mínimo 12, valor llevado a 12, sin violar restricciones; segunda pasada sin cambios |
+| Re-ejecutar el seed sobre un valor legítimo modificado (20) | ✅ Se conserva |
+| Disparador: cambiar descripción, rango o reescribir el mismo valor / cambiar el valor / restaurar todos al defecto | ✅ Solo avanza la fecha cuando cambia el valor (2 de 10 filas al restaurar) |
+| Límites del rango 12–32 en la base | ✅ 11 y 33 rechazados; 12 y 32 aceptados |
+| Backend de M17: suite completa, `tsc --noEmit` y ESLint | ✅ 70/70 pruebas (eran 68), 0 errores, 0 advertencias. Con el defecto reintroducido, las 2 pruebas nuevas **fallan** (`expected 8 to be 12`) y las 5 anteriores no lo detectaban |
+
+---
+
+
+## 📦 Versión 2.8 (2026-10-21)
+
+### 🎯 Resumen Ejecutivo
+Cierra dos huecos del modelo de **M04 Cuentas** detectados al especificar el módulo (`.sdlc/docs/modules/M04/RFC-M04-001_cambios_ddl.md`): el **NIT vigente** de una cuenta empresa no tenía dónde vivir, y el **RUT adjunto** de la renovación de NIT presuponía un almacenamiento de archivos que no existe (el seed apuntaba a `storage.pintuclic.co`). Ambos cambios los **aprobó el Director Humano el 2026-10-21** (C-1 y C-3, opción A). La cabecera del script pasa a **esquema 4.0**.
+- **Total Tablas:** Pasa de 49 a 51 tablas.
+- **Foco de la versión:** Cuentas B2B (M04). Cambio aditivo: ninguna fila existente se pierde ni se reinterpreta.
+
+---
+
+### 🛑 1. Tablas Deprecadas / Eliminadas
+Ninguna tabla. **Columna deprecada:** `solicitud_actualizacion_nit.documento_adjunto_url` (ruta externa del diseño original). Pierde `NOT NULL`, conserva sus datos y se retirará en una entrega posterior, cuando no queden solicitudes que la usen.
+
+---
+
+### ✨ 2. Tablas Nuevas Creadas
+| Nueva Tabla | Clave Primaria (PK) | Claves Foráneas (FK) | Propósito Funcional |
+| :--- | :--- | :--- | :--- |
+| `cuenta_empresa` | `id_usuario INT` (PK y FK: relación 1:1) | `id_usuario -> usuario` (CASCADE); `id_solicitud_origen -> solicitud_empresa` (SET NULL) | NIT **vigente** y datos de la cuenta empresa aprobada (`RN-CUE-13`, `RN-CUE-19`). La renovación de NIT actualiza esta fila y las solicitudes quedan como historial inmutable. Se mantiene fuera de `usuario` porque esa tabla la comparten M20 y M17 y la mayoría de sus filas no son empresas. |
+| `documento_soporte` | `id_documento UUID` | Ninguna | Archivo adjunto sensible (RUT) en `BYTEA`, con tipo, tamaño y huella SHA-256 (`RN-CUE-20`). Se aísla tras un puerto de almacenamiento para poder migrar a un almacén de objetos sin tocar los servicios. |
+
+> **Nota de convención:** `cuenta_empresa` usa `id_usuario` como clave primaria en lugar del `id_[tabla]` que pide la guía, porque es una extensión 1:1 de `usuario`: una clave propia permitiría dos filas por cuenta.
+
+---
+
+### 🔄 3. Tablas Modificadas y Nuevas Relaciones
+- **`solicitud_actualizacion_nit`:**
+  - `id_documento UUID` (nueva): referencia al RUT almacenado.
+  - `documento_adjunto_url`: pasa a admitir `NULL` y queda deprecada.
+- **Nuevas Relaciones:**
+  - `cuenta_empresa.id_usuario -> usuario.id_usuario` con `ON DELETE CASCADE`.
+  - `cuenta_empresa.id_solicitud_origen -> solicitud_empresa.id_solicitud` con `ON DELETE SET NULL`.
+  - `solicitud_actualizacion_nit.id_documento -> documento_soporte.id_documento` con `ON DELETE RESTRICT`: un documento referenciado no se elimina.
+
+---
+
+### 🔒 4. Restricciones (CONSTRAINTS) y Tipos ENUM Agregados
+- **Nuevos ENUMs:** ninguno.
+- **Nuevos UNIQUE:** `uq_cuenta_empresa_nit (nit)`: un NIT pertenece a una sola cuenta empresa (`RN-CUE-14`).
+- **Nuevos CHECK:**
+  - `ck_cuenta_empresa_nit`: el NIT no puede ser vacío ni solo espacios.
+  - `ck_documento_tamano`: tamaño entre 1 byte y 5 MB (5242880).
+  - `ck_documento_mime`: solo `application/pdf`, `image/jpeg` e `image/png`.
+  - `ck_documento_sha256`: 64 caracteres hexadecimales en minúscula.
+  - `ck_documento_integridad`: `octet_length(contenido) = tamano_bytes`, de modo que el tamaño declarado no puede mentir.
+  - `ck_solicitud_nit_adjunto`: toda solicitud aporta el RUT por `id_documento` o por la URL antigua. **Transitoria**: pasará a `NOT NULL` sobre `id_documento` al retirar la columna URL.
+- **Migración para bases anteriores a v4.0:** `ADD COLUMN IF NOT EXISTS`, `DROP NOT NULL` (idempotente por naturaleza) y restricciones creadas en bloques `DO` que comprueban `pg_constraint`. Los `COMMENT ON COLUMN` van después de la migración.
+- **Sin `CHECK` de formato del NIT:** se deja al contrato Zod hasta que el Product Owner fije el formato; un `CHECK` prematuro rechazaría RUT legítimos.
+
+---
+
+### ⚡ 5. Nuevos Índices de Rendimiento
+- `CREATE INDEX IF NOT EXISTS idx_solicitud_nit_documento ON solicitud_actualizacion_nit(id_documento);`
+- `CREATE INDEX IF NOT EXISTS idx_cuenta_empresa_solicitud ON cuenta_empresa(id_solicitud_origen);`
+- `cuenta_empresa(nit)` queda cubierto por el índice de `uq_cuenta_empresa_nit`.
+
+---
+
+### 💻 6. Impacto y Acciones Requeridas en Backend y Frontend
+#### Backend (Prisma / Express):
+- **Pendiente, Gate 2 de M04 (Arquitecto):** añadir los modelos `CuentaEmpresa` y `DocumentoSoporte` y el campo `idDocumento` a `backend/prisma/schema.prisma`. Es un archivo **compartido** con M20 y M17: aplica la Directiva #3. Esta versión **no lo modifica**.
+- **Errata de la guía (corregida el 2026-10-21):** `GUIA_REFACTORIZACION_BD.md` y la documentación ya sincronizan con **Prisma 6** (`backend/prisma/schema.prisma`). Las entradas históricas conservan Kysely porque describen el stack de su fecha.
+- **Prohibición para el repositorio de M04:** nunca seleccionar `documento_soporte.contenido` en listados (`RN-CUE-20`); solo en la descarga autorizada.
+- **Módulos afectados:** solo **M04**. Ningún otro módulo lee estas tablas.
+- **Bases ya creadas:** la solicitud de renovación del seed conserva su URL antigua (válida por el `CHECK` transitorio) y el RUT de ejemplo nuevo queda sin vincular. Para desarrollo, `npm run db:reset` deja el estado canónico.
+
+#### Frontend (Vistas / UI):
+- Sin impacto directo en esta versión. La vista de renovación de NIT de M04 deberá subir el RUT (PDF, JPG o PNG de hasta 5 MB) y mostrar el estado.
+
+#### Verificación (PostgreSQL 18.6 local sobre un clúster desechable, 2026-10-21):
+| Prueba | Resultado |
+| :--- | :--- |
+| Línea base: esquema 3.9 y seed **antes** del cambio, dos pasadas cada uno | ✅ Código 0; 49 tablas |
+| Instalación limpia: esquema y seed nuevos, dos pasadas cada uno, `ON_ERROR_STOP=1` | ✅ Código 0, sin duplicados; 51 tablas |
+| Actualización de una base creada con el esquema 3.9: esquema y seed nuevos, dos pasadas cada uno | ✅ Código 0; 49 → 51 tablas; `cuenta_empresa` rellenada desde la solicitud aprobada; la solicitud anterior conserva su URL |
+| 10 inserciones inválidas (NIT duplicado, NIT vacío, usuario inexistente, tipo no permitido, 5 MB + 1 byte, tamaño declarado falso, huella mal formada, solicitud sin adjunto, documento inexistente, borrado de documento referenciado) | ✅ Las 10 rechazadas por la restricción prevista |
+| Casos válidos: PNG correcto, documento de **exactamente 5 MB**, borrado en cascada de la cuenta | ✅ Aceptados / comportamiento esperado |
+
+> **Nota de entorno (Windows):** `psql` asume la codificación WIN1252 y el seed falla con `byte sequence 0x8d`. Ejecutar con `PGCLIENTENCODING=UTF8` (o `SET client_encoding`). No es un defecto del archivo.
+
+---
+
 
 ## 📦 Versión 2.7 / v0.3.37.0 (2026-09-29)
 

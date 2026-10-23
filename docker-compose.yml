@@ -97,7 +97,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+        # Destino del proxy /api -> backend; se fija al compilar (ver next.config.ts).
+        # El navegador llama a /api/v1 en el mismo origen: no se define NEXT_PUBLIC_API_URL.
+        BACKEND_URL: ${BACKEND_URL:-http://backend:3000}
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     container_name: pintuclic-frontend
     restart: always
@@ -106,8 +108,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:3000}
-      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     depends_on:
       backend:
         condition: service_healthy

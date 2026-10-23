@@ -1,150 +1,136 @@
-import type { ClaveParametro } from '../dtos/m17-permisos.dto';
+import type { Prisma } from '@prisma/client';
+import { prisma } from '../../../core/db/client';
+import type {
+  AreaParametro,
+  ClaveParametro,
+  TipoDatoParametro,
+} from '../dtos/m17-permisos.dto';
 import type { ConfiguracionPort, EntidadParametro } from '../interfaces/configuracion.port';
 
-export class AlmacenConfiguracionMemoria implements ConfiguracionPort {
-  private parametros: Map<ClaveParametro, EntidadParametro>;
+/**
+ * Repositorio de configuración persistido en PostgreSQL vía Prisma (RFC-M17-001 / ADR-007).
+ *
+ * Incluye una caché corta en memoria (TTL por defecto: 30s) para garantizar que lecturas
+ * de alta frecuencia (como M20 en cada inicio de sesión) resuelvan en < 1ms sin saturar la BD.
+ * La caché se invalida automáticamente ante cualquier actualización.
+ */
+export class PrismaConfiguracionRepository implements ConfiguracionPort {
+  private cacheList: EntidadParametro[] | null = null;
+  private cacheExpiracion = 0;
+  private readonly ttlMs: number;
 
-  constructor() {
-    this.parametros = new Map<ClaveParametro, EntidadParametro>([
-      [
-        'auth.vigencia_codigo_registro_minutos',
-        {
-          clave: 'auth.vigencia_codigo_registro_minutos',
-          area: 'autenticacion',
-          tipoDato: 'numero',
-          valor: 15,
-          descripcion: 'Tiempo de vida en minutos del código OTP para confirmación de registro',
-          valorPorDefecto: 15,
-          rangoMinimo: 5,
-          rangoMaximo: 60,
-          fechaActualizacion: new Date(),
-        },
-      ],
-      [
-        'auth.intentos_codigo_registro',
-        {
-          clave: 'auth.intentos_codigo_registro',
-          area: 'autenticacion',
-          tipoDato: 'numero',
-          valor: 3,
-          descripcion: 'Cantidad máxima de intentos fallidos antes de invalidar el código OTP',
-          valorPorDefecto: 3,
-          rangoMinimo: 1,
-          rangoMaximo: 10,
-          fechaActualizacion: new Date(),
-        },
-      ],
-      [
-        'auth.complejidad_minima_contrasena',
-        {
-          clave: 'auth.complejidad_minima_contrasena',
-          area: 'autenticacion',
-          tipoDato: 'numero',
-          valor: 12,
-          descripcion: 'Longitud mínima exigida para contraseñas de cuentas',
-          valorPorDefecto: 12,
-          rangoMinimo: 8,
-          rangoMaximo: 32,
-          fechaActualizacion: new Date(),
-        },
-      ],
-      [
-        'auth.vigencia_enlace_recuperacion_minutos',
-        {
-          clave: 'auth.vigencia_enlace_recuperacion_minutos',
-          area: 'autenticacion',
-          tipoDato: 'numero',
-          valor: 30,
-          descripcion: 'Vigencia máxima del token o enlace para restablecimiento de contraseña',
-          valorPorDefecto: 30,
-          rangoMinimo: 10,
-          rangoMaximo: 120,
-          fechaActualizacion: new Date(),
-        },
-      ],
-      [
-        'auth.intentos_fallidos_bloqueo',
-        {
-          clave: 'auth.intentos_fallidos_bloqueo',
-          area: 'autenticacion',
-          tipoDato: 'numero',
-          valor: 5,
-          descripcion: 'Número de intentos erróneos consecutivos que disparan el bloqueo temporal',
-          valorPorDefecto: 5,
-          rangoMinimo: 3,
-          rangoMaximo: 10,
-          fechaActualizacion: new Date(),
-        },
-      ],
-      [
-        'auth.duracion_bloqueo_minutos',
-        {
-          clave: 'auth.duracion_bloqueo_minutos',
-          area: 'autenticacion',
-          tipoDato: 'numero',
-          valor: 15,
-          descripcion: 'Duración en minutos del bloqueo por intentos fallidos de autenticación',
-          valorPorDefecto: 15,
-          rangoMinimo: 5,
-          rangoMaximo: 1440,
-          fechaActualizacion: new Date(),
-        },
-      ],
-      [
-        'comms.reintentos_envio_transaccional',
-        {
-          clave: 'comms.reintentos_envio_transaccional',
-          area: 'comunicaciones',
-          tipoDato: 'numero',
-          valor: 3,
-          descripcion: 'Reintentos automáticos ante fallas transitorias de entrega SMTP',
-          valorPorDefecto: 3,
-          rangoMinimo: 1,
-          rangoMaximo: 5,
-          fechaActualizacion: new Date(),
-        },
-      ],
-      [
-        'comercial.iva_porcentaje',
-        {
-          clave: 'comercial.iva_porcentaje',
-          area: 'comercial',
-          tipoDato: 'numero',
-          valor: 19,
-          descripcion: 'Porcentaje general de impuesto al valor agregado (IVA) aplicable a ventas',
-          valorPorDefecto: 19,
-          rangoMinimo: 0,
-          rangoMaximo: 50,
-          fechaActualizacion: new Date(),
-        },
-      ],
-      [
-        'comercial.costo_envio_base',
-        {
-          clave: 'comercial.costo_envio_base',
-          area: 'comercial',
-          tipoDato: 'numero',
-          valor: 15000,
-          descripcion: 'Tarifa base de despacho estándar a domicilio',
-          valorPorDefecto: 15000,
-          rangoMinimo: 0,
-          fechaActualizacion: new Date(),
-        },
-      ],
-      [
-        'comercial.umbral_envio_gratis',
-        {
-          clave: 'comercial.umbral_envio_gratis',
-          area: 'comercial',
-          tipoDato: 'numero',
-          valor: 200000,
-          descripcion: 'Monto mínimo de compra para exoneración de costos de envío',
-          valorPorDefecto: 200000,
-          rangoMinimo: 0,
-          fechaActualizacion: new Date(),
-        },
-      ],
-    ]);
+  constructor(ttlMs: number = 30_000) {
+    this.ttlMs = ttlMs;
+  }
+
+  private mapearEntidad(fila: {
+    clave: string;
+    area: string;
+    tipoDato: string;
+    descripcion: string;
+    valor: Prisma.JsonValue;
+    valorPorDefecto: Prisma.JsonValue;
+    rangoMinimo: Prisma.Decimal | null;
+    rangoMaximo: Prisma.Decimal | null;
+    fechaActualizacion: Date;
+    idUsuarioActualizo: number | null;
+  }): EntidadParametro {
+    return {
+      clave: fila.clave as ClaveParametro,
+      area: fila.area as AreaParametro,
+      tipoDato: fila.tipoDato as TipoDatoParametro,
+      valor: fila.valor as number | string | boolean,
+      descripcion: fila.descripcion,
+      valorPorDefecto: fila.valorPorDefecto as number | string | boolean,
+      rangoMinimo: fila.rangoMinimo !== null ? Number(fila.rangoMinimo) : undefined,
+      rangoMaximo: fila.rangoMaximo !== null ? Number(fila.rangoMaximo) : undefined,
+      fechaActualizacion: fila.fechaActualizacion,
+      idUsuarioActualizo: fila.idUsuarioActualizo,
+    };
+  }
+
+  async listar(): Promise<EntidadParametro[]> {
+    const ahora = Date.now();
+    if (this.cacheList && ahora < this.cacheExpiracion) {
+      return [...this.cacheList];
+    }
+
+    const filas = await prisma.parametroSistema.findMany({
+      orderBy: { idParametro: 'asc' },
+    });
+
+    const entidades = filas.map((f) => this.mapearEntidad(f));
+    this.cacheList = entidades;
+    this.cacheExpiracion = ahora + this.ttlMs;
+    return entidades;
+  }
+
+  async obtener(clave: ClaveParametro): Promise<EntidadParametro | null> {
+    const ahora = Date.now();
+    if (this.cacheList && ahora < this.cacheExpiracion) {
+      const encontrado = this.cacheList.find((p) => p.clave === clave);
+      if (encontrado) return encontrado;
+    }
+
+    const fila = await prisma.parametroSistema.findUnique({
+      where: { clave },
+    });
+
+    if (!fila) return null;
+    return this.mapearEntidad(fila);
+  }
+
+  async actualizar(
+    clave: ClaveParametro,
+    nuevoValor: number | string | boolean,
+    idAdmin?: number,
+  ): Promise<EntidadParametro> {
+    const actual = await this.obtener(clave);
+    if (!actual) {
+      throw new Error(`Parámetro no reconocido: ${clave}`);
+    }
+
+    if (actual.tipoDato === 'numero' && typeof nuevoValor === 'number') {
+      if (actual.rangoMinimo !== undefined && nuevoValor < actual.rangoMinimo) {
+        throw new Error(
+          `El valor ${nuevoValor} es menor que el mínimo permitido (${actual.rangoMinimo})`,
+        );
+      }
+      if (actual.rangoMaximo !== undefined && nuevoValor > actual.rangoMaximo) {
+        throw new Error(
+          `El valor ${nuevoValor} supera el máximo permitido (${actual.rangoMaximo})`,
+        );
+      }
+    }
+
+    const fila = await prisma.parametroSistema.update({
+      where: { clave },
+      data: {
+        valor: nuevoValor,
+        idUsuarioActualizo: idAdmin ?? null,
+      },
+    });
+
+    this.invalidarCache();
+    return this.mapearEntidad(fila);
+  }
+
+  invalidarCache(): void {
+    this.cacheList = null;
+    this.cacheExpiracion = 0;
+  }
+}
+
+/**
+ * Adaptador en memoria para tests unitarios y entornos aislados sin base de datos.
+ * Cumple Directiva #10: no contiene datos pre-sembrados por defecto. Los fixtures
+ * se inyectan en el constructor según el escenario de prueba.
+ */
+export class AlmacenConfiguracionMemoria implements ConfiguracionPort {
+  private readonly parametros: Map<ClaveParametro, EntidadParametro>;
+
+  constructor(iniciales?: EntidadParametro[]) {
+    this.parametros = new Map(iniciales?.map((p) => [p.clave, p]) ?? []);
   }
 
   async listar(): Promise<EntidadParametro[]> {
@@ -158,6 +144,7 @@ export class AlmacenConfiguracionMemoria implements ConfiguracionPort {
   async actualizar(
     clave: ClaveParametro,
     nuevoValor: number | string | boolean,
+    idAdmin?: number,
   ): Promise<EntidadParametro> {
     const actual = this.parametros.get(clave);
     if (!actual) {
@@ -181,6 +168,7 @@ export class AlmacenConfiguracionMemoria implements ConfiguracionPort {
       ...actual,
       valor: nuevoValor,
       fechaActualizacion: new Date(),
+      idUsuarioActualizo: idAdmin ?? null,
     };
 
     this.parametros.set(clave, actualizado);

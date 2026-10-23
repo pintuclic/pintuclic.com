@@ -6,6 +6,115 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [v0.6.1] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔎 **Validación real de M04 contra PostgreSQL y correcciones.** Todas las HU de M04 (salvo `HU-CUE-02`, aplazada) recorridas en el navegador contra el backend real y la base `pintuclic_dev` (esquema v4.2 + seed): registro con OTP, primer acceso, recuperación con token de un solo uso, cambio de contraseña que cierra todas las sesiones, cambio de correo, direcciones con ubicación del dispositivo, ascenso y dictamen, renovación de NIT con un RUT real de 2 MB y descarga idéntica byte a byte, desactivación y 404 opaco sin permiso.
+- **Correcciones (autorizadas por el Director):**
+  - **Backend · perfil fuera de contrato:** `GET` y `PUT /cuentas/perfil` respondían `tipoUsuario`/`cuentaEmpresa` sin `cambioContrasenaPendiente`; ahora cumplen `perfilUsuarioResponseSchema` (una cuenta empresa se mostraba como personal).
+  - **Backend · unicidad del NIT (RN-CUE-14):** `900.555.666-1` evadía el duplicado de `900555666-1`. `nitSchema` normaliza (sin espacios ni puntos) en backend, contrato rector y frontend.
+  - **Frontend:** se retiró la promesa de aviso al correo anterior, que el backend no emite (CA-CUE-06-02 queda pendiente con M18).
+- **Verificación:** backend 205/205 (+6), frontend 136/136, `tsc`/ESLint/`check:no-any` limpios, contratos validados. Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.6.1_M04_validacion_real_y_correcciones_backend.md`.
+- **Pendiente:** el Product Owner debe fijar si un NIT sin guion equivale al mismo con guion; el correo real (OTP, enlaces y avisos) depende de M18.
+
+---
+
+## [v0.6.0] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔐 **Frontend de M04 — Cuentas, Autenticación y Perfil.** Registro de persona natural con OTP y de empresa según `VISTAS.pdf` págs. 3–6; login, recuperación, restablecimiento y primer acceso derivados del mismo modal; "Mi cuenta" (`/perfil`: datos, contraseña, correo con OTP, direcciones, ascenso a empresa, renovación de NIT con RUT, cierre de sesión y desactivación) y panel `/admin/empresas` (dictamen de registros, ascensos y renovaciones con descarga del RUT). Cubre `HU-CUE-01` y `03` a `10`; `HU-CUE-02` (Google) aplazada con el botón deshabilitado.
+- **✅ Estado:** **Gate 3B aprobado** por el Director Humano ("apruebo tu frontend"). Verificado con una API simulada en el navegador: **aún no se ha probado contra el backend real**; la integración (incluida la geolocalización de `CA-CUE-07-04`) se hará al enlazarlo.
+
+### Módulo M04 — Frontend
+- **Acceso en modal:** rutas interceptadas `@modal/(.)login` y `(.)registro` sobre cualquier página pública, con su versión de página completa para enlace directo y para la redirección del middleware (`?destino=`, validado contra redirecciones abiertas y bucles).
+- **Sesión (ADR-005):** `SesionBootstrap` hidrata `useAuthStore` con `GET /cuentas/perfil`; el header muestra el nombre y lleva a `/perfil`. Ningún token en el cliente.
+- **RUT:** validación previa de tipo y tamaño (5 MB exactos sí, 5 MB + 1 byte no) y huella SHA-256 calculada en el navegador, idéntica a la del backend.
+- **Core Kit (autorizado):** nuevos `PasswordInput`, `OtpInput`, `FileInput`, `Alert`, `Stepper`, `SegmentedTabs`, `SectionNav` y `TextButton`; `Input` gana `endAdornment` y `Header` lee la sesión.
+- **Verificación:** `next build` ✅ (17 rutas), `tsc`, ESLint y `lint:a11y` sin errores, 0 `any`, `audit:core-kit` 0 violaciones, `audit:a11y` aprobado, `audit:zod` ✅, Vitest **136/136** (+33). Navegador real a 1920 y 390 px recorriendo todos los flujos. Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.6.0_M04_cuentas_autenticacion_perfil_frontend.md`.
+- **Ajustes autorizados al aprobar:** (1) el backend conserva 100 kb de cuerpo JSON en toda la API y acepta hasta 7 MB **solo** en `POST /cuentas/empresas/renovacion-nit` (RUT de 5 MB en base64); el exceso responde 413 con código propio en vez de un 500 (`core/middlewares/cuerpoJson.middleware.ts`, backend 199/199, +6). (2) Entrada "Empresas" en la barra lateral y el breadcrumb del `AdminLayout` de M17.
+- **Integración de `main` (DevOps):** sin conflictos. `lucide-react` 1.x retiró los íconos de marca y rompía el `Footer` del Core; se reemplazaron por `IconosMarca.tsx` (Simple Icons, CC0). Verificado con `lucide-react` 1.60.0 y `dotenv` 18.0.8.
+- **URL de la API (autorizado por el Director):** el navegador llama a `/api/v1` en el mismo origen y Next lo reenvía al backend **conservando el prefijo** con `BACKEND_URL`, variable solo de servidor que se fija al compilar (`next.config.ts`, `ARG` en `frontend/Dockerfile`, `docker-compose.yml`, override y `.env.example`). Antes el *rewrite* descartaba `/api` y los `args` de compose no llegaban al build. Verificado con un backend de eco: ruta, cookie, cuerpo de ~7 MB y `Set-Cookie`.
+- **🛑 Pendiente para DevOps:** `frontend/package-lock.json` sigue fijando `lucide-react` 0.525 frente a `^1.58` en `package.json`. Detalle en el walkthrough §12.
+
+---
+
+## [v0.5.0] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🏠 **Landing page pública (frente propio FP-01).** Página de inicio `/` según la página 1 de `VISTAS.pdf` y la UI Spec §4.1: topbar, header con mega-menú de categorías, hero, franja de confianza, buscador con accesos a Calculadora y Asesoría de color, productos destacados, categorías y footer institucional. Responsive *mobile-first*.
+- **⚠️ Estado:** detenido en **Gate 3B** a la espera de la revisión visual del Director Humano. **Datos estáticos temporales** (productos, categorías, carrito y sesión) hasta que M01, M05 y M04 los alimenten; imágenes de producto, categoría y logo son marcadores extraídos del mockup.
+
+### Core Kit (ampliación autorizada)
+- **Nuevos:** `ButtonLink`, `IconButton`, `Select`, `SearchBar`, `Container`, `Logo`, `Topbar`, `Header`, `CategoriesMegaMenu`, `Footer`, `Carousel`, `ScrollRow`, `CategoryCard`, `formatCOP` y `button-styles.ts` (fuente única de estilos de botón, con la variante `outline-light`).
+- **Extendidos sin romper su API:** `Button` (estilos extraídos), `Input` (`appearance="bare"`), `Badge` (`pill`), `ProductCard` (`href`, precio con sufijo COP, fondos blancos fundidos, objetivos táctiles de 44 px en móvil). `app/layout.tsx`: Poppins 500 y favicon declarado.
+- **Verificación:** `next build` ✅ (`/` estática, 122 kB); `tsc`, ESLint y `lint:a11y` sin errores; 0 `any`; auditorías `a11y` y `core-kit` aprobadas; Vitest **103/103** (+38). Verificado en navegador real a 1366 y 500 px: sin desborde, objetivos táctiles ≥ 44 px, mega-menú accesible con retorno de foco.
+- **Conocido:** 14 errores 404 en consola por el *prefetch* de Next.js hacia rutas aún no construidas (`/productos`, `/login`, `/carrito`…). Walkthrough: `docs/walkthroughs/FP-01/walkthrough_v0.5.0_FP01_landing_frontend.md`.
+
+---
+
+## [v0.4.2] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** ✏️ **Motivo de rechazo opcional en el dictamen (M04).** Por decisión del Director Humano el contrato acepta rechazar sin motivo; se conserva obligatorio (mínimo 10 caracteres) solo al rechazar un **registro** de empresa (`RN-CUE-17`), regla que pasa del DTO al servicio porque depende del tipo de solicitud.
+- **Alcance:** contrato rector `m04-cuentas.contract.ts`, DTO del backend, `EmpresasService` (un motivo vacío se guarda como "sin motivo") y DTO del frontend (`dictamenSolicitudEmpresaFormSchema` opcional + `dictamenRegistroEmpresaFormSchema` obligatorio). Ajuste autorizado expresamente durante la Fase 3B.
+- **Verificación:** backend 20/20 suites · **193/193** (+5); frontend +8 pruebas de DTO; contratos 16/16; `tsc`, ESLint y `check:no-any` limpios. Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.4.2_M04_motivo_rechazo_opcional_backend.md`.
+- **Decisiones registradas:** ratificado el cambio de `app.routes.ts` (v0.4.1); la verificación del correo del registro de empresa la valida el administrador al aceptarla; auditoría de decisiones aplazada (`HU-SEG-04`).
+
+---
+
+## [v0.4.1] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🛡️ **Remediación de `BUG-M04-01` (S1 Blocker) — control de acceso en `/admin/empresas/*`.** Las rutas administrativas de empresas ahora exigen sesión válida y el permiso atómico `empresas.validar`, evaluado en servidor en cada petición; sin él responden el 404 opaco de M20.
+- **✅ Estado de certificación:** re-auditado y certificado formalmente por el QA Lead & Security Compliance Director en v0.4.1 tras resolución comprobada de `BUG-M04-01`. Veto Stop-the-Line levantado formalmente. Gate 3A (Backend) aprobado al 100%. Reporte oficial: `.sdlc/docs/qa/M04/v0.4.1/QA_REPORT.md`.
+
+### Módulo M04 — Cuentas, Autenticación y Perfil (Backend)
+- **Control de acceso (`HU-CUE-09` E2, `HU-ADM-03`):** guarda a nivel de router (`sesión → requirePermission('empresas.validar')`), protegida por omisión. `construirModuloM04` exige ahora el `AutorizacionService`; no se puede montar sin autorización administrativa.
+- **Por qué no `tipoSesion === 'admin'`:** el login concede ese tipo a todo usuario con rol, empleados incluidos; solo el permiso atómico impide que un colaborador sin `empresas.validar` dictamine.
+- **Raíz de composición:** `app.routes.ts` inyecta `m17.autorizacionService` (cambio de una línea en archivo compartido, por instrucción expresa del Director Humano; pendiente de su ratificación).
+
+#### Saneamiento del flujo de dictamen (defectos hallados al analizar `HU-CUE-09` / `HU-CUE-10`)
+- **Decisión atómica y transaccional (`RNF-CUE-09-01`, `ADR-010`):** `UPDATE ... WHERE estado = 'pendiente'`; la aprobación (activar cuenta, convertir a tipo `empresa`, crear `cuenta_empresa`, retirar Google) ocurre en **una** transacción que se revierte ante un conflicto de NIT. Antes eran escrituras sueltas y dos administradores simultáneos podían decidir ambos.
+- **Cuenta empresa correcta (`RN-CUE-15`, `HU-CUE-09` E8/E10):** el registro de empresa ya no nace como `empresa`; solo la aprobación convierte la cuenta (sobre la misma) y desactiva el acceso de Google.
+- **Códigos y reglas:** decisión repetida → `409 SOLICITUD_YA_DECIDIDA`; motivo de rechazo obligatorio solo en registros (`RN-CUE-17`).
+- **Identificadores mal formados** ya no provocan 500: responden el 404 opaco (solicitudes, renovaciones, documentos y direcciones).
+- **Endpoints nuevos:** `GET /cuentas/empresas/solicitudes/mias` (estado de solicitudes propias, `HU-CUE-03` E6 / `HU-CUE-10` E3), `GET /admin/empresas/renovaciones` y `/:id`, y `GET /admin/empresas/documentos/:id` (descarga del RUT con adjunto, `nosniff`, `no-store` y verificación SHA-256; `HU-CUE-09` E14).
+- **Pruebas y verificación:** 20/20 suites, **188/188 tests** (+72); `tsc` 0 errores; ESLint 0/0; 0 `any` en 102 archivos. Pruebas de mutación: la guarda de permiso, la condición `pendiente`, la conversión a `empresa` y la baja de Google fueron sabotadas una a una y cada mutante fue detectado.
+- **Límite de lo verificado:** la exclusión mutua real entre dos conexiones concurrentes requiere PostgreSQL y queda para la prueba de integración del Gate 4.
+- **Elevado para decisión (no se tocó):** el cuerpo JSON global de 100 kb impide subir un RUT de hasta 5 MB (`HU-CUE-10` E5; bloquea la renovación de punta a punta), catálogo de códigos de error divergente entre contrato y HU, motivo opcional en ascensos/renovaciones frente al DTO firmado, verificación de correo del registro de empresa, notificaciones de renovación de NIT y auditoría de decisiones. Detalle en el walkthrough §8.
+- **Errata:** el walkthrough `v0.4.0` §4.2 afirmaba una comprobación de permisos inexistente; corregido en el propio documento. Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.4.1_M04_remediacion_bug_m04_01_backend.md`.
+
+---
+
+## [v0.4.0] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔐 **Implementación Backend completa de Cuentas, Autenticación y Perfil (M04).** Endpoints REST canónicos bajo `/cuentas` y `/admin/empresas`, servicios hexagonales desacoplados, autenticación con OTP, federación Google Identity, señuelos anti-fuerza bruta, libreta de direcciones y flujo B2B corporativo con custodia de RUT.
+
+### Módulo M04 — Cuentas, Autenticación y Perfil (Backend)
+- **HU-CUE-01 (Registro B2C con OTP):** Código de verificación de 6 dígitos con hash BCrypt costo 12, expiración de 15 minutos y límite de 3 reintentos.
+- **HU-CUE-02 (Federación Google Identity):** Autenticación federada vía `GoogleAuthPort` con token de registro efímero JWT de 10 minutos para complementar datos en nuevos usuarios.
+- **HU-CUE-03 y HU-CUE-09 (Empresas B2B y Renovación de NIT):** Solicitudes corporativas con validación de NIT, custodia segura de archivo RUT (hasta 5MB, SHA-256) en `documento_soporte` y flujo de renovación de NIT.
+- **HU-CUE-04 (Login y Control de Fuerza Bruta):** Bloqueo temporal por 15m tras 5 intentos fallidos (ADR-012) y comparación con hash señuelo de tiempo constante ante correos inexistentes para prevenir ataques de temporización. Forzado de cambio de clave en primer acceso (ADR-011).
+- **HU-CUE-05 (Recuperación de Contraseña):** Enlace firmado seguro JWT de 30 minutos con respuesta indistinguible anti-enumeración y revocación masiva de sesiones en reset.
+- **HU-CUE-06 (Perfil y Credenciales):** Actualización de datos personales, cambio de contraseña con validación de clave actual y solicitud/confirmación de cambio de correo con OTP de 15m.
+- **HU-CUE-07 (Libreta de Direcciones):** Límite estricto de 10 direcciones por cliente (RN-CUE-07), auto-asignación de primera dirección como predeterminada y desmarcado atómico.
+- **HU-CUE-08 (Unicidad Universal):** Blindaje de unicidad en BD y repositorios contra colisiones de correo, NIT y solicitudes pendientes.
+- **HU-CUE-10 (Dictamen Administrativo y Desactivación):** Aprobación crea fila 1:1 en `cuenta_empresa` (ADR-010 / C-1); rechazo exige motivo >= 10 caracteres. Desactivación de cuenta con confirmación de clave y revocación de sesiones.
+- **Verificación:** 18/18 suites Vitest backend PASS (116/116 tests), 0 errores TypeScript (`npx tsc --noEmit`), 0 advertencias ESLint, y 0 usos de `any` en 99 archivos backend auditados. Walkthrough generado en `docs/walkthroughs/M04/walkthrough_v0.4.0_M04_cuentas_autenticacion_backend.md`.
+
+---
+
+## [v0.3.3] - 2026-10-21
+- **Autor:** DanExl24 (@DanExl24)
+- **Commit:** `3b10811` — `feat(m17-permisos): persistir parametros en base de datos con repositorio prisma HU-ADM-05`
+- **Hito:** ⚙️ **Persistencia relacional de configuración general según RFC-M17-001.** Se elimina el almacén volátil en memoria y se conecta la API administrativa con la tabla `parametro_sistema`.
+
+### Módulo M17 — Administración, Empleados y Permisos (Backend)
+
+Esta entrega resuelve de forma definitiva la deuda técnica transitoria documentada en `ADR-007` y formalizada en el `RFC-M17-001`:
+
+- **Conexión Prisma ↔ PostgreSQL:** Mapeo de la tabla `parametro_sistema` en `backend/prisma/schema.prisma` con enums `AreaParametro` y `TipoDatoParametro`.
+- **`PrismaConfiguracionRepository`:** Implementación del puerto `ConfiguracionPort` que reemplaza `AlmacenConfiguracionMemoria` en `m17.routes.ts`.
+- **Cero Datos Iniciales en Código (Directiva #10):** Se remueve el catálogo hardcodeado de 10 parámetros de TypeScript en `configuracion.repository.ts`. Toda la siembra reside exclusivamente en `bd/sql/seed_pintuclic.sql`.
+- **Auditoría del Administrador:** Propagación de `idAdmin` desde `req.actor?.idUsuario` en `ConfiguracionController` hasta `actualizar()` para registrar la autoría en `id_usuario_actualizo`.
+- **Caché en Memoria (TTL 30s):** Consultas de alta frecuencia resuelven en `< 1ms` sin saturar la base de datos, con invalidación reactiva ante cualquier actualización.
+- **Verificación:** 71/71 tests Vitest backend PASS (+1 test de caché e invalidación), 0 errores TypeScript (`npx tsc --noEmit`), 0 advertencias ESLint, y 0 usos de `any` en 145 archivos auditados.
+
 ---
 
 ## [v0.3.2] - 2026-10-21

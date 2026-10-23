@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 3.9 (alineado con schema_pintuclic.sql v3.9: copia histórica, descuentos por línea y consecutivo - M08)
+-- VERSIÓN: 4.2 (alineado con schema_pintuclic.sql v4.2 - RFC-M04-001)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -32,7 +32,7 @@ INSERT INTO rol (id_rol, nombre, id_sub_rol_empresa, estado) VALUES
     (3, 'empresa_vip',   1,    'activo')
 ON CONFLICT (id_rol) DO NOTHING;
 
--- 1.4 Permisos Atómicos (Catálogo Maestro Oficial M17 / M20)
+-- 1.4 Permisos Atómicos (Catálogo Maestro Oficial M17 / M20 / M04)
 INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     -- Permisos heredados / pruebas M20
     (1,  'seguridad.configurar_sesion',    'Ajustar tiempos y políticas de vigencia de sesión', 'activo'),
@@ -56,7 +56,9 @@ INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     (18, 'configuracion.ver',              'Consultar parámetros operativos del sistema',       'activo'),
     (19, 'configuracion.editar',           'Actualizar parámetros y reglas del sistema',        'activo'),
     -- Analítica de Búsqueda (M02 HU-BUS-06)
-    (20, 'estadisticas.consultar',         'Consultar estadísticas de búsqueda sin resultado',  'activo')
+    (20, 'estadisticas.consultar',         'Consultar estadísticas de búsqueda sin resultado',  'activo'),
+    -- Validación de Cuentas Empresa (M04 HU-CUE-09, RFC-M04-001 C-9)
+    (21, 'empresas.validar',               'Aprobar o rechazar solicitudes de cuenta empresa, ascenso y renovación de NIT', 'activo')
 ON CONFLICT (id_permiso) DO NOTHING;
 
 -- 1.5 Asignación de Permisos a Roles
@@ -65,6 +67,7 @@ INSERT INTO asignacion_permiso (id_rol, id_permiso) VALUES
     (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
     (1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
     (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
+    (1, 21),
     (3, 4), (3, 10)
 ON CONFLICT (id_rol, id_permiso) DO NOTHING;
 
@@ -411,7 +414,7 @@ INSERT INTO solicitud_supresion (id_solicitud_supresion, id_usuario, fecha_solic
 ON CONFLICT (id_solicitud_supresion) DO NOTHING;
 
 -- ==============================================================================
--- 9. MÓDULO DE CUENTAS, DIRECCIONES Y SOLICITUDES EMPRESA (5 Tablas - M04)
+-- 9. MÓDULO DE CUENTAS, DIRECCIONES Y SOLICITUDES EMPRESA (7 Tablas - M04)
 -- ==============================================================================
 
 -- 9.1 Direcciones de Cliente (HU-CUE-07)
@@ -427,9 +430,21 @@ INSERT INTO solicitud_empresa (id_solicitud, id_usuario, nombre_empresa, nombre_
     ('e0000000-0000-0000-0000-000000000002', 2, 'Ferretería El Progreso', 'Cliente Activo', 'progreso@ferreteria.com', '3001234567', '800111222-3', 'ascenso_particular', 'pendiente', NULL, NULL, now() - interval '1 day', NULL)
 ON CONFLICT (id_solicitud) DO NOTHING;
 
+-- 9.2b Cuenta Empresa: NIT vigente de las cuentas ya aprobadas (RFC-M04-001 C-1)
+INSERT INTO cuenta_empresa (id_usuario, nit, nombre_empresa, nombre_representante, correo_empresarial, telefono, id_solicitud_origen, fecha_aprobacion)
+SELECT id_usuario, nit, nombre_empresa, nombre_representante, correo_empresarial, telefono, id_solicitud, COALESCE(fecha_revision, fecha_solicitud)
+FROM solicitud_empresa
+WHERE estado = 'aprobada'
+ON CONFLICT (id_usuario) DO NOTHING;
+
+-- 9.3a Documento de soporte (RUT adjunto - RFC-M04-001 C-3). Mock: PDF mínimo de 15 bytes
+INSERT INTO documento_soporte (id_documento, nombre_original, tipo_mime, tamano_bytes, sha256, contenido) VALUES
+    ('f0000000-0000-0000-0000-000000000001', 'rut_actualizado_valle.pdf', 'application/pdf', 15, '14bcd090baf31edba64e9cbd8cdfc15f943344aa72cb3675ad8e91bfcbce03ad', '\x255044462d312e340a2525454f460a')
+ON CONFLICT (id_documento) DO NOTHING;
+
 -- 9.3 Solicitudes de Actualización de NIT (HU-CUE-09)
-INSERT INTO solicitud_actualizacion_nit (id_solicitud, id_usuario, nit_anterior, nit_nuevo, documento_adjunto_url, estado, motivo_rechazo, id_admin_revisor, fecha_solicitud, fecha_revision) VALUES
-    ('b0000000-0000-0000-0000-000000000001', 4, '900555666-1', '900555666-2', 'https://storage.pintuclic.co/ruts/rut_actualizado_valle.pdf', 'pendiente', NULL, NULL, now() - interval '2 days', NULL)
+INSERT INTO solicitud_actualizacion_nit (id_solicitud, id_usuario, nit_anterior, nit_nuevo, documento_adjunto_url, id_documento, estado, motivo_rechazo, id_admin_revisor, fecha_solicitud, fecha_revision) VALUES
+    ('b0000000-0000-0000-0000-000000000001', 4, '900555666-1', '900555666-2', NULL, 'f0000000-0000-0000-0000-000000000001', 'pendiente', NULL, NULL, now() - interval '2 days', NULL)
 ON CONFLICT (id_solicitud) DO NOTHING;
 
 -- 9.4 Identidad Externa OAuth (HU-CUE-02)
@@ -437,10 +452,37 @@ INSERT INTO usuario_identidad_externa (id_identidad, id_usuario, proveedor, id_p
     (1, 2, 'google', 'google-oauth2|102938475610293847561', 'cliente@pintuclic.co', now() - interval '5 days')
 ON CONFLICT (id_identidad) DO NOTHING;
 
--- 9.5 Códigos de Verificación OTP Efímeros (HU-CUE-01, 05, 06)
-INSERT INTO codigo_verificacion (id_codigo, correo, codigo, tipo, expiracion, intentos, max_intentos, datos_temporales) VALUES
-    ('c0000000-0000-0000-0000-000000000001', 'baja@pintuclic.co', '123456', 'registro', now() + interval '15 minutes', 0, 3, '{"id_usuario": 3}'::jsonb)
+-- 9.5 Códigos de Verificación OTP Efímeros (HU-CUE-01, 05, 06, RFC-M04-001 C-5)
+-- Hash BCrypt costo 12 derivado de '123456'
+INSERT INTO codigo_verificacion (id_codigo, correo, codigo_hash, tipo, expiracion, intentos, max_intentos, datos_temporales) VALUES
+    ('c0000000-0000-0000-0000-000000000001', 'baja@pintuclic.co', '$2b$12$UEjh98K3w36fJBWLtCWHKuAzhWy24tbz7kmqHcGuIdVkSSTtPsCmO', 'registro', now() + interval '15 minutes', 0, 3, '{"id_usuario": 3}'::jsonb)
 ON CONFLICT (id_codigo) DO NOTHING;
+
+-- ==============================================================================
+-- 9C. CONFIGURACIÓN GENERAL DEL SISTEMA (1 Tabla - M17 - RFC-M17-001)
+-- Catálogo oficial de HU-ADM-07, idéntico al que hasta ahora vivía en memoria (ADR-007).
+-- ON CONFLICT DO NOTHING: re-ejecutar el seed NO pisa valores que un administrador ya modificó.
+-- ==============================================================================
+
+INSERT INTO parametro_sistema (id_parametro, clave, area, tipo_dato, descripcion, valor, valor_por_defecto, rango_minimo, rango_maximo) VALUES
+    (1, 'auth.vigencia_codigo_registro_minutos', 'autenticacion', 'numero', 'Tiempo de vida en minutos del código OTP para confirmación de registro', '15'::jsonb, '15'::jsonb, 5, 60),
+    (2, 'auth.intentos_codigo_registro', 'autenticacion', 'numero', 'Cantidad máxima de intentos fallidos antes de invalidar el código OTP', '3'::jsonb, '3'::jsonb, 1, 10),
+    (3, 'auth.complejidad_minima_contrasena', 'autenticacion', 'numero', 'Longitud mínima exigida para contraseñas de cuentas', '12'::jsonb, '12'::jsonb, 12, 32),
+    (4, 'auth.vigencia_enlace_recuperacion_minutos', 'autenticacion', 'numero', 'Vigencia máxima del token o enlace para restablecimiento de contraseña', '30'::jsonb, '30'::jsonb, 10, 120),
+    (5, 'auth.intentos_fallidos_bloqueo', 'autenticacion', 'numero', 'Número de intentos erróneos consecutivos que disparan el bloqueo temporal', '5'::jsonb, '5'::jsonb, 3, 10),
+    (6, 'auth.duracion_bloqueo_minutos', 'autenticacion', 'numero', 'Duración en minutos del bloqueo por intentos fallidos de autenticación', '15'::jsonb, '15'::jsonb, 5, 1440),
+    (7, 'comms.reintentos_envio_transaccional', 'comunicaciones', 'numero', 'Reintentos automáticos ante fallas transitorias de entrega SMTP', '3'::jsonb, '3'::jsonb, 1, 5),
+    (8, 'comercial.iva_porcentaje', 'comercial', 'numero', 'Porcentaje general de impuesto al valor agregado (IVA) aplicable a ventas', '19'::jsonb, '19'::jsonb, 0, 50),
+    (9, 'comercial.costo_envio_base', 'comercial', 'numero', 'Tarifa base de despacho estándar a domicilio', '15000'::jsonb, '15000'::jsonb, 0, NULL),
+    (10, 'comercial.umbral_envio_gratis', 'comercial', 'numero', 'Monto mínimo de compra para exoneración de costos de envío', '200000'::jsonb, '200000'::jsonb, 0, NULL)
+ON CONFLICT (clave) DO NOTHING;
+
+-- Alineación con el piso de contraseña de M20 (12 caracteres, RN-SEG-01 / RFC-M17-001 D-5).
+-- Corrige las bases que se sembraron antes con el rango 8-32. Idempotente: solo actúa si el mínimo sigue por debajo de 12.
+UPDATE parametro_sistema
+SET rango_minimo = 12,
+    valor = to_jsonb(GREATEST((valor #>> '{}')::numeric, 12))
+WHERE clave = 'auth.complejidad_minima_contrasena' AND rango_minimo < 12;
 
 -- ==============================================================================
 -- 10. ACTUALIZACIÓN AUTOMÁTICA DE SECUENCIAS (EVITA COLISIONES DE IDs)
@@ -485,5 +527,6 @@ SELECT setval('aviso_privacidad_id_aviso_privacidad_seq',        COALESCE((SELEC
 SELECT setval('consentimiento_usuario_id_consentimiento_seq',    COALESCE((SELECT MAX(id_consentimiento) FROM consentimiento_usuario), 1));
 SELECT setval('solicitud_supresion_id_solicitud_supresion_seq',  COALESCE((SELECT MAX(id_solicitud_supresion) FROM solicitud_supresion), 1));
 SELECT setval('usuario_identidad_externa_id_identidad_seq',      COALESCE((SELECT MAX(id_identidad) FROM usuario_identidad_externa), 1));
+SELECT setval('parametro_sistema_id_parametro_seq',              COALESCE((SELECT MAX(id_parametro) FROM parametro_sistema), 1));
 
 COMMIT;

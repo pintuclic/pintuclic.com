@@ -3,6 +3,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import { construirAppRoutes } from './app.routes';
 import { construirCors } from './core/middlewares/cors.middleware';
+import { construirParserJson } from './core/middlewares/cuerpoJson.middleware';
 import { errorHandler, rutaNoEncontrada } from './core/middlewares/errorHandler';
 
 /** Composición root. */
@@ -11,7 +12,8 @@ export function construirApp(): express.Express {
 
   app.disable('x-powered-by'); // RF-SEG-06-04: no revelar componentes.
   app.use(construirCors());
-  app.use(express.json({ limit: '100kb' }));
+  // 100 kb en toda la API; 7 MB solo donde viaja el RUT en base64 (HU-CUE-10).
+  app.use(construirParserJson());
   app.use(cookieParser());
 
   app.use('/api/v1', construirAppRoutes());

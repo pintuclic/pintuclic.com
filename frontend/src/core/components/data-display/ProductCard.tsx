@@ -1,8 +1,11 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { ShoppingCart } from 'lucide-react';
 import { Button } from '../buttons/Button';
+import { ButtonLink } from '../buttons/ButtonLink';
+import { formatCOP } from '../../utils/moneda';
 import { Badge } from './Badge';
 
 export interface ProductCardProps {
@@ -16,6 +19,8 @@ export interface ProductCardProps {
   isSponsored?: boolean;
   isOffer?: boolean;
   offerBadgeText?: string;
+  /** Si existe, el nombre y "Ver producto" son enlaces de navegación a esta ruta. */
+  href?: string;
   onViewDetails?: (id: string) => void;
   onAddToCart?: (id: string) => void;
   className?: string;
@@ -32,17 +37,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   isSponsored = false,
   isOffer = false,
   offerBadgeText = 'Oferta',
+  href,
   onViewDetails,
   onAddToCart,
   className = '',
 }) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // UI Spec §4.1.1: "$ 98.900 COP".
+  const formatCurrency = (amount: number) => `${formatCOP(amount)} COP`;
 
   return (
     <div
@@ -67,7 +68,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <img
             src={imageUrl}
             alt={name}
-            className="w-full h-full object-contain object-center transition-transform duration-300 group-hover:scale-105"
+            width={400}
+            height={300}
+            /* mix-blend-multiply funde el fondo blanco de las fotos de catálogo con el gris del contenedor. */
+            className="w-full h-full object-contain object-center mix-blend-multiply transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
           />
         ) : (
@@ -89,7 +93,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           className="font-title font-semibold text-base text-neutral-black leading-snug"
           title={name}
         >
-          {onViewDetails ? (
+          {href ? (
+            <Link
+              href={href}
+              className="line-clamp-2 cursor-pointer rounded-btn transition-colors hover:text-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
+            >
+              {name}
+            </Link>
+          ) : onViewDetails ? (
             <button
               type="button"
               onClick={() => onViewDetails(id)}
@@ -122,15 +133,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Footer de Acciones (UI Spec sección 4.1.1) */}
         <div className="flex items-center gap-2 mt-4 pt-3 border-t border-neutral-light/50">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            fullWidth
-            onClick={() => onViewDetails?.(id)}
-          >
-            Ver producto
-          </Button>
+          {href ? (
+            <ButtonLink
+              href={href}
+              variant="outline"
+              size="sm"
+              fullWidth
+              aria-label={`Ver producto: ${name}`}
+              className="max-sm:min-h-11"
+            >
+              Ver producto
+            </ButtonLink>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              fullWidth
+              onClick={() => onViewDetails?.(id)}
+            >
+              Ver producto
+            </Button>
+          )}
 
           <Button
             type="button"
@@ -138,7 +162,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             size="sm"
             aria-label={`Agregar ${name} al carrito`}
             onClick={() => onAddToCart?.(id)}
-            className="px-3 shrink-0"
+            className="px-3 shrink-0 max-sm:min-h-11 max-sm:min-w-11"
           >
             <ShoppingCart className="w-4 h-4" aria-hidden="true" />
           </Button>

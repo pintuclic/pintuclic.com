@@ -2,16 +2,9 @@
 
 import React from 'react';
 import { Check } from 'lucide-react';
+import { getButtonClassName, type ButtonSize, type ButtonVariant } from './button-styles';
 
-export type ButtonVariant =
-  | 'primary-action'
-  | 'primary-conversion'
-  | 'selection'
-  | 'outline'
-  | 'ghost'
-  | 'danger';
-
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type { ButtonSize, ButtonVariant };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -42,45 +35,11 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const isDisabled = disabled || isLoading;
 
-    // Estilos base compartidos (Tokens de UI Spec v1.0)
-    const baseStyles =
-      'inline-flex items-center justify-center font-title font-medium rounded-btn transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 select-none cursor-pointer';
-
-    // Tamaños
-    const sizeStyles: Record<ButtonSize, string> = {
-      sm: 'px-3 py-1.5 text-xs gap-1.5 min-h-[36px]',
-      md: 'px-4 py-2.5 text-sm gap-2 min-h-[44px]', // 44px min para área táctil móvil WCAG
-      lg: 'px-6 py-3.5 text-base gap-2.5 min-h-[48px]',
-    };
-
-    // Variantes cromáticas oficiales
-    const variantStyles: Record<ButtonVariant, string> = {
-      'primary-action':
-        'bg-action text-neutral-white shadow-sm hover:bg-action-hover active:scale-[0.98]',
-      'primary-conversion':
-        'bg-conversion text-neutral-white shadow-sm hover:bg-conversion-hover active:scale-[0.98]',
-      selection: selected
-        ? 'bg-subaction text-corporate border-2 border-action shadow-xs font-semibold'
-        : 'bg-neutral-white text-neutral-dark border border-neutral-light hover:border-action/50 hover:bg-subaction/30 active:scale-[0.98]',
-      outline:
-        'bg-neutral-white text-action border border-action hover:bg-action hover:text-neutral-white active:scale-[0.98]',
-      ghost:
-        'bg-transparent text-neutral-dark hover:bg-neutral-light/60 active:scale-[0.98]',
-      danger:
-        'bg-danger text-neutral-white shadow-sm hover:bg-danger/90 active:scale-[0.98]',
-    };
-
-    // Estado deshabilitado oficial (#E5E7EB fondo, #6B7280 texto, cursor not-allowed)
-    const disabledStyles =
-      'disabled:bg-neutral-light disabled:text-neutral-medium disabled:border-transparent disabled:shadow-none disabled:cursor-not-allowed disabled:scale-100 disabled:opacity-80';
-
-    const widthStyle = fullWidth ? 'w-full' : '';
-
     return (
       <button
         ref={ref}
         disabled={isDisabled}
-        className={`${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${disabledStyles} ${widthStyle} ${className}`}
+        className={getButtonClassName({ variant, size, selected, fullWidth, className })}
         {...props}
       >
         {isLoading ? (

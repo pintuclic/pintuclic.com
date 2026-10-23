@@ -235,3 +235,72 @@ Los archivos corregidos viven en `frontend/src/core/`, entregable de infraestruc
    archivo. El script `lint:a11y` continua siendo el instrumento.
 3. **No se declara ninguna compuerta aprobada.** El entregable de este rol termina en el walkthrough
    y el commit; Gate 4 es potestad del QA Lead.
+
+---
+
+## 2026-10-22 — FP-01 · v0.5.0 · Landing page pública
+
+**Rol:** Frontend Lead Engineer · **Frente propio** registrado por el Director Humano (fuera de los 21 módulos)
+
+### Contexto
+El Director pidió la landing antes del frontend de M04: fuente visual `VISTAS.pdf` (solo página 1), tipografía global Poppins + Inter, datos estáticos temporales y autorización para ampliar el Core Kit.
+
+### Subroles convocados
+- **01 · Design System:** 13 componentes nuevos en `core/components` (layout, navegación, formularios, `CategoryCard`) y `button-styles.ts` como fuente única de estilos; extensiones compatibles de `Button`, `Input`, `Badge` y `ProductCard`.
+- **03 · Views & UX:** `app/(public)/` con layout (skip link, topbar, header, footer) y 5 secciones; contenido aislado en `_data/*.content.ts` y marcado como temporal.
+- **05 · Component TDD:** sin `jsdom`, render en servidor con `react-dom/server` (38 pruebas nuevas) e integridad del contenido (existencia de cada imagen, enlaces válidos).
+
+### Verificación
+- `next build` ✅ · `tsc` ✅ · ESLint ✅ · `lint:a11y` ✅ · 0 `any` · auditorías `a11y` y `core-kit` aprobadas · Vitest 103/103.
+- Navegador real (servidor de producción): 1366 px y 500 px, sin desborde, objetivos táctiles ≥ 44 px, mega-menú con foco retenido y retorno de foco. Corregidos en la revisión: título del hero en 3 líneas, fondos blancos de las fotos, sufijo COP, solape de la insignia del carrito, legibilidad del hero en móvil, objetivos táctiles < 44 px y 404 del favicon.
+
+### Pendiente / conocido
+- 14 errores 404 de *prefetch* hacia rutas aún no construidas; desaparecen con M01/M04/M05.
+- Imágenes de logo, productos y categorías son marcadores extraídos del mockup; el Director las sustituirá.
+- **Detenido en Gate 3B**: revisión visual del Director Humano. No se declara la compuerta aprobada.
+- **Walkthrough:** `docs/walkthroughs/FP-01/walkthrough_v0.5.0_FP01_landing_frontend.md`.
+
+---
+
+## 2026-10-22 — M04 · v0.6.0 · Frontend de Cuentas, Autenticación y Perfil
+
+**Rol:** Frontend Lead Engineer · **Módulo:** M04 (Fase 3B)
+
+### Contexto
+El Director aprobó la landing (FP-01) y pidió el login con `VISTAS.pdf` págs. 3–6 como fuente visual. Esas páginas son el **modal de registro**; se propusieron 7 decisiones (registro según mockup, login/recuperación/primer acceso derivados, empresa sin OTP, azul `action`, stepper del mockup, una sola contraseña, Términos solo en cliente, Google deshabilitado) y el Director respondió: "si, hazlo. y el frontend que falta, derivalo por funciones y diseño del proyecto, ya que parece que no tengo mas mockups."
+
+### Subroles convocados
+- **01 · Design System:** 8 componentes nuevos en el Core (`PasswordInput`, `OtpInput`, `FileInput`, `Alert`, `Stepper`, `SegmentedTabs`, `SectionNav`, `TextButton`); `Input.endAdornment` y `Header` con sesión.
+- **02 · Data & State:** servicios sobre la API real v0.4.2, mapa de errores propio del módulo, `SesionBootstrap` sobre `useAuthStore` (sin tokens en el cliente).
+- **03 · Views & UX:** modal interceptado + páginas completas de acceso, `/perfil` con 5 secciones y `/admin/empresas`.
+- **05 · Component TDD:** 33 pruebas nuevas (utilidades, RUT, render en servidor de formularios y del Core nuevo).
+
+### Verificación
+- `next build` ✅ · `tsc` ✅ · ESLint ✅ · `lint:a11y` ✅ · 0 `any` · `audit:core-kit` 0 violaciones (la primera pasada detectó 6 `<button>` crudos; se crearon `TextButton` y `SectionNav`) · `audit:a11y` ✅ · `audit:zod` ✅ · Vitest 136/136.
+- Navegador real con **API simulada en la página** (no hay backend ni base de datos en el entorno): todos los flujos de las HU recorridos a 1920 y 390 px. Corregidos en la revisión: placeholder engañoso del login, título descentrado, stepper desequilibrado, paso final "en curso", campos de solo lectura con aspecto editable, desborde de 772 px en móvil y sección activa fuera de vista.
+
+### Elevado al equipo (fuera del módulo, no se tocó — Directiva #3)
+1. `frontend/next.config.ts`: el *rewrite* `/api/:path*` → `http://backend:3000/:path*` descarta `/api`, pero el backend escucha en `/api/v1`.
+2. `backend/src/index.ts`: límite JSON de 100 kb frente a RUT de hasta 5 MB (ya elevado en v0.4.1).
+3. `m17-permisos/components/AdminLayout.tsx`: entrada "Empresas" en la barra lateral y su breadcrumb.
+
+### Pendiente / conocido
+- Integración contra el backend real (Gate 4). `HU-CUE-02` aplazada. Sin geocodificación inversa para `CA-CUE-07-04` (solo coordenadas).
+- **Detenido en Gate 3B**: revisión visual del Director Humano. No se declara la compuerta aprobada.
+- **Walkthrough:** `docs/walkthroughs/M04/walkthrough_v0.6.0_M04_cuentas_autenticacion_perfil_frontend.md`.
+
+### Cierre (mismo día) — Gate 3B aprobado
+- El Director aprobó la revisión visual ("apruebo tu frontend") y autorizó, antes del commit, dos cambios fuera del módulo: el límite JSON del backend y la barra lateral del admin de M17.
+- **Límite JSON:** nuevo `backend/src/core/middlewares/cuerpoJson.middleware.ts`: 100 kb en toda la API y 7 MB solo en `POST /cuentas/empresas/renovacion-nit`; el exceso responde 413 con código propio en lugar del 500 genérico. Backend: `tsc` 0, ESLint 0/0, 0 `any`, Vitest 199/199 (+6).
+- **M17:** entrada "Empresas" en la barra lateral y título en el breadcrumb; verificada en navegador.
+- **Siguiente:** integrar `main` (DevOps: Docker, SMTP, Google OAuth) y probar contra el backend real, incluida la geolocalización de `CA-CUE-07-04`. Sigue pendiente alinear el *rewrite* `/api` de `next.config.ts` con la configuración de DevOps.
+- **Commits:** v0.4.2 (`fix`), v0.5.0 landing (`chore(ui)`), M04 frontend (`feat`), límite JSON (`fix(core)`), barra lateral M17 (`fix(m17-permisos)`) y documentación (`docs`). Cada entrega lleva solo sus cambios; los archivos compartidos se prepararon en el índice con su versión intermedia y el commit de la landing se verificó aislado en un worktree (103/103, igual que v0.5.0).
+- **Integración de `main`:** sin conflictos. `lucide-react` 1.x retiró `Facebook`, `Instagram` y `Youtube` y rompía el Footer del Core: se reemplazaron por `IconosMarca.tsx` (Simple Icons, CC0). Verificado con `lucide-react` 1.60.0 y `dotenv` 18.0.8 instalados.
+- **Elevado a DevOps:** la configuración de `main` no conserva el prefijo `/api/v1` (`NEXT_PUBLIC_API_URL=/api` en el build, `http://localhost:3000` en `.env.example`) y `package-lock.json` del frontend quedó desincronizado. Detalle en el walkthrough §12.
+- **URL de la API (autorizado: "hazlo tu, te doy permiso"):** el *rewrite* descartaba `/api` y el Dockerfile del frontend no declaraba `ARG`, así que los `args` de compose nunca llegaban al build. Ahora el navegador llama a `/api/v1` en el mismo origen y Next reenvía con `BACKEND_URL` (solo servidor, fijado al compilar) conservando el prefijo. Verificado con un backend de eco: ruta, cookie, cuerpo de ~7 MB y `Set-Cookie`. Sigue para DevOps: `package-lock.json` desincronizado.
+
+## 2026-10-22 — M04 · v0.6.1 · Validación real contra el backend
+
+- Base local `pintuclic_dev` (PostgreSQL 18) + backend real con un arnés que imprime los OTP; frontend en producción con `BACKEND_URL`. Todas las HU de M04 recorridas en Chrome sin API simulada.
+- Hallazgos: perfil fuera de contrato y NIT sin normalizar (backend, corregidos con autorización) y texto falso sobre el aviso al correo anterior (frontend, retirado). `nitSchema` del frontend normaliza igual que el contrato.
+- Walkthrough: `docs/walkthroughs/M04/walkthrough_v0.6.1_M04_validacion_real_y_correcciones_backend.md`.

@@ -259,3 +259,113 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 - **Veredicto Gate 4A (Infraestructura Core Kit):** 🟢 **APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA**.
 - **Reporte Oficial:** `.sdlc/docs/qa/M20/v0.3.2/QA_REPORT.md`.
 - **Acción:** Deuda técnica de accesibilidad del Core Kit cerrada. Componentes listos para habilitar M04 y M01.
+
+---
+
+### [2026-10-21 23:35] — 🔴 AUDITORÍA FORENSE DE BACKEND Y VETO STOP-THE-LINE — M04 (v0.4.0)
+
+> **Insumo:** `docs/walkthroughs/M04/walkthrough_v0.4.0_M04_cuentas_autenticacion_backend.md`  
+> **Especificación:** `.sdlc/docs/modules/M04/` (01_SPEC_FUNCIONAL.md, 02_HISTORIAS_USUARIO.md, 01_ATDD_SPEC.md)  
+> **Auditor:** QA Lead & Security Compliance Director (`05_qa_security_tester`)  
+> **Naturaleza:** Auditoría de Calidad y Seguridad de Entrega Backend M04 (Gate 3A / 4A).
+
+#### 1. Resultados de Ejecución Real y Batería Automatizada
+- **Vitest Backend:** **116/116 tests PASS** (18 suites, 45 pruebas unitarias/integración de M04).
+- **Vitest Frontend:** **57/57 tests PASS** (9 suites, regresión cero en apps y módulos).
+- **Compilación TypeScript (`npx tsc --noEmit`):** **0 errores** en Backend.
+- **Linter Backend (`npm run lint`):** **0 errores, 0 warnings**.
+- **Auditoría AST Cero ANY (`npm run check:no-any`):** **99 archivos auditados en `backend/src`, 0 usos de ANY (PASS)**.
+- **Validación de Contratos Zod (`node .sdlc/tooling/validate-contracts.mjs`):** **16/16 checks PASS**.
+- **Auditorías de Gobernanza:**
+  - `node .sdlc/tooling/audit-core-kit.mjs`: **0 violaciones** (13 archivos conformes).
+  - `node .sdlc/tooling/audit-zod-chains.mjs`: **0 anti-patrones** (corregido delimitador de coma en tooling, 14 archivos conformes).
+  - `node .sdlc/tooling/audit-a11y.mjs`: **0 violaciones WCAG 2.1 AA** (28 archivos conformes).
+
+#### 2. Detección de Defecto Crítico de Seguridad (Veto Stop-the-Line)
+- **Defecto Detectado:** `BUG-M04-01` (**Severidad S1 — Blocker**).
+- **Descripción:** Falla crítica de control de acceso funcional (Broken Function-Level Access Control / Escalada Vertical de Privilegios) en endpoints administrativos `/api/v1/admin/empresas/*` (`/solicitudes`, `/solicitudes/:idSolicitud`, `/solicitudes/:idSolicitud/dictamen`, `/renovaciones/:idSolicitud/dictamen`).
+- **Causa Raíz:** En `backend/src/modules/m04-cuentas/m04.routes.ts:137-142` se montan las rutas solo con `authMiddleware`. En `backend/src/modules/m04-cuentas/controllers/empresas.controller.ts:190` únicamente se valida la presencia de `req.actor`, sin verificar si `actor.tipoSesion === 'admin'` o si el actor cuenta con permisos administrativos (`empresas.validar`).
+- **Impacto:** Cualquier comprador registrado como cliente ordinario (`tipoSesion: 'cliente'`) con su cookie de sesión `pc_sid` puede listar solicitudes de empresas con datos fiscales y de representación legal sensibles, así como aprobar o rechazar empresas y renovaciones de NIT. En el dictamen, el `idUsuario` del cliente atacante se graba en base de datos como `idAdminRevisor`.
+- **Infracción de Políticas:** Violación flagrante de `HU-ADM-03` (Control de acceso en servidor mandatorio), `HU-SEG-03` (Anti-BFLA), BDD Escenario 14 de `02_HISTORIAS_USUARIO.md`, y discrepancia con lo declarado en Walkthrough v0.4.0 §4.2.
+
+#### 3. Dictamen y Parada Obligatoria
+- **Veredicto Gate 3A / 4A:** 🔴 **RECHAZADO — VETO STOP-THE-LINE ACTIVADO**.
+- **Reporte Oficial:** `.sdlc/docs/qa/M04/v0.4.0/QA_REPORT.md`.
+- **Acción SDLC:** En virtud del Mandato #2 (Prohibición estricta de autocorrección por QA), se prohíbe a QA modificar el código de producción. Se transfiere el rol a `03_backend_engineer` para remediación prioritaria de `BUG-M04-01`, blindaje de rutas con HTTP 404 opaco ante clientes ordinarios y adición de tests de seguridad en `m04.routes.test.ts`.
+
+---
+
+### [2026-10-22 00:15] — 🟢 RE-AUDITORÍA FORENSE, CODE REVIEW Y LEVANTAMIENTO DE VETO — M04 (v0.4.1)
+
+> **Insumo:** `docs/walkthroughs/M04/walkthrough_v0.4.1_M04_remediacion_bug_m04_01_backend.md`  
+> **Auditor:** QA Lead & Security Compliance Director (`05_qa_security_tester`)  
+> **Naturaleza:** Re-auditoría forense, code review e inspección `/security-review` de remediación `v0.4.1`.
+
+#### 1. Resultados de Ejecución Real y Batería Automatizada
+- **Vitest Backend:** **188/188 tests PASS** (20 suites, +72 tests respecto a v0.4.0).
+- **Vitest Frontend:** **57/57 tests PASS** (9 suites, regresión cero).
+- **Compilación TypeScript (`tsc --noEmit`):** **0 errores** en Backend y Frontend.
+- **Linter Backend (`npm run lint`):** **0 errores, 0 warnings**.
+- **Auditoría AST Cero ANY (`npm run check:no-any`):** **102 archivos auditados en `backend/src`, 0 usos de ANY (PASS)**.
+- **Validación de Contratos Zod (`node .sdlc/tooling/validate-contracts.mjs`):** **16/16 checks PASS**.
+- **Auditorías de Gobernanza:**
+  - `node .sdlc/tooling/audit-core-kit.mjs`: **0 violaciones** (13 archivos conformes).
+  - `node .sdlc/tooling/audit-zod-chains.mjs`: **0 anti-patrones** (17 archivos conformes).
+  - `node .sdlc/tooling/audit-a11y.mjs`: **0 violaciones WCAG 2.1 AA** (28 archivos conformes).
+
+#### 2. Validación de Defectos y Saneamiento Transaccional
+1. **`BUG-M04-01` (Broken Access Control) RESUELTO:**
+   - Guarda `requirePermission(autorizacion, 'empresas.validar')` montada a nivel de router en `m04.routes.ts`.
+   - Evaluación en caliente contra base de datos vía `AutorizacionService` (M20/M17).
+   - Respuesta opaca institucional HTTP 404 (`RESPUESTA_RECURSO_NO_DISPONIBLE`) ante actores no autorizados sin filtrar rutas ni nombres de permisos.
+   - Batería de 45 pruebas HTTP reales en `admin-empresas.acceso.test.ts` verificando denegación a clientes y colaboradores sin permiso.
+2. **Atomicidad y Optimistic Concurrency:**
+   - Actualización condicionada `updateMany` (`where: { estado: 'pendiente' }`) en transacción `prisma.$transaction`.
+   - 409 `SOLICITUD_YA_DECIDIDA` ante condiciones de carrera (`RNF-CUE-09-01`).
+   - Reversión atómica y 409 `NIT_YA_REGISTRADO` ante colisión de NIT.
+3. **Hardening Anti-Crash y Custodia de Archivos:**
+   - `leerParamUuid` neutraliza excepciones 500 en Prisma ante UUIDs mal formados.
+   - Anti-IDOR en `/solicitudes/mias` tomando identidad estrictamente de sesión.
+   - Descarga segura de RUT con `Content-Disposition` sanitizada, `nosniff`, `no-store` y verificación de integridad SHA-256.
+
+#### 3. Dictamen Final
+- **Veredicto Gate 3A:** 🟢 **APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA Y DE SEGURIDAD**.
+- **Veto Stop-the-Line:** **FORMALMENTE LEVANTADO**.
+- **Reporte Oficial:** `.sdlc/docs/qa/M04/v0.4.1/QA_REPORT.md`.
+- **Acción:** M04 Backend queda certificado. Se habilita formalmente la Fase 3B para el Frontend Lead Engineer (`04_frontend_engineer`).
+
+---
+
+### [2026-10-22 21:25] — 🟢 AUDITORÍA INTEGRAL DE FRONTEND, UI/UX Y CERTIFICACIÓN GATE 4A (PASO A + B) — M04 (v0.6.1)
+
+> **Insumos:** `docs/walkthroughs/M04/walkthrough_v0.6.0_M04_cuentas_autenticacion_perfil_frontend.md` y `docs/walkthroughs/M04/walkthrough_v0.6.1_M04_validacion_real_y_correcciones_backend.md`  
+> **Fuentes de Verdad:** `Pintu_Clic_UI_Oficial.md`, `frontend/ARQUITECTURA.md`, `VISTAS.pdf` (págs. 1, 3, 4, 5, 6) y `AdminLayout.tsx` de M17.  
+> **Auditor:** QA Lead & Security Compliance Director (`05_qa_security_tester`)  
+> **Naturaleza:** Auditoría integral de 5 fases (Consistencia de Paneles, Código y Arquitectura, Sistema de Diseño, Mockups e Interacción Dinámica A11y).
+
+#### 1. Resultados de Ejecución Real y Batería Automatizada
+- **Vitest Frontend:** **136/136 tests PASS** (14 suites, +79 pruebas respecto a v0.4.1, 7.39s).
+- **Vitest Backend:** **205/205 tests PASS** (22 suites, corregida la cifra anterior de 188/20 de v0.4.1). Total proyecto: **341/341 tests PASS** (regresión cero).
+- **Auditoría AST Cero ANY (`npm run check:no-any`):** **259 archivos auditados, 0 usos de ANY (PASS)** (Frontend: 157, Backend: 102).
+- **Compilación TypeScript (`tsc --noEmit`):** **0 errores** en Frontend y Backend.
+- **Linter Frontend / Backend:** **0 errores, 0 warnings** (`next lint --max-warnings=0`).
+- **Next.js Production Build (`npm run build`):** **17/17 páginas generadas limpiamente**. First Load JS compartido: 103 kB.
+- **Auditorías de Gobernanza:**
+  - `node .sdlc/tooling/audit-core-kit.mjs`: **0 violaciones** (36 archivos conformes, Directiva #13).
+  - `node .sdlc/tooling/audit-zod-chains.mjs`: **0 anti-patrones** (17 archivos conformes).
+  - `npm run lint:a11y`: **0 errores, 0 warnings**; `node .sdlc/tooling/audit-a11y.mjs`: **0 violaciones, 4 advertencias** (93 archivos; las 4 advertencias en `FileInput.tsx:11/27`, `OtpInput.tsx:82` y `componentes-landing.test.tsx:98` son falsos positivos del analizador regex).
+
+#### 2. Hallazgos de las 5 Fases de Auditoría
+1. **Fase 1 (Consistencia de Paneles):** `/admin/empresas` se inserta limpiamente en `AdminLayout.tsx` (M17) respetando sidebar, topbar, encabezados gris `bg-neutral-lightest` de 11px en Poppins y hover de filas. `/perfil` mantiene coherencia con el storefront público usando `SectionNav.tsx` (sin mockup en `VISTAS.pdf`; derivado del sistema de diseño).
+2. **Fase 2 (Código y Arquitectura):** Cero Zod inline en componentes TSX (Directiva #12). Carpetas `interfaces/` con 0 bytes de runtime. Manejo de sesión seguro bajo ADR-005 (cookies `HttpOnly` vía `withCredentials: true`, sin tokens en `authStore` o `localStorage`). Traducción de errores centralizada sin fuga de excepciones internas (`HU-SEG-06`).
+3. **Fase 3 (Sistema de Diseño):** Paleta institucional 100% conforme con `colors.ts` (cero clases `bg-[#...]` o colores Tailwind no aprobados). Radios de borde milimétricos (`rounded-input` 6px, `rounded-btn` 6px, `rounded-card` 8px, `rounded-modal` 14px). Modales con franja arcoíris corporativa de 4 colores (`bg-brand-rainbow`).
+4. **Fase 4 (Fidelidad con Mockups `VISTAS.pdf` págs. 1, 3, 4, 5 y 6):** Páginas renderizadas a PNG con `pymupdf` y contrastadas en navegador real (`http://localhost:3100/` + `arnes-backend.mts` en `3000`): Landing (Pág. 1), Registro Natural (Pág. 3), Registro Empresa con Stepper dinámico de 2 pasos (`1 Datos · 2 Listo` por Decisión #2 del Director Humano, Pág. 4), Verifica tu correo OTP con correo enmascarado `q•••@pintuclic.test` y alerta de 15 min (Pág. 5), y pantalla final (Pág. 6).
+5. **Fase 5 (Interacción y A11y):** Verificada en navegador real vía Chrome DevTools MCP (`Shift+Tab` en trampa de foco envolviendo de `Cerrar modal` a `Crear cuenta`, `ArrowLeft` en `SegmentedTabs`, auto-avance `1`→`2`→`"Dígito 3 de 6"`, retroceso con `Backspace` y pegado `onPaste` en `OtpInput`) más pruebas unitarias y validación del Director Humano.
+
+#### 3. Dictamen Final
+- **Veredicto Gate 4A:** 🟢 **APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA Y DE DISEÑO**.
+- **Reporte Oficial:** `.sdlc/docs/qa/M04/v0.6.1/QA_REPORT.md`.
+- **Acción:** M04 v0.6.1 queda formalmente certificado en backend y frontend con métricas reales (341/341 tests PASS) y evidencia visual/dinámica verificada. Listo para Gate 5 (Release SemVer).
+
+
+
