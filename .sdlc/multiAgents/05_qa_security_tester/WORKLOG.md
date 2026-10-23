@@ -336,7 +336,7 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 
 ---
 
-### [2026-10-22 20:00] — 🟢 AUDITORÍA INTEGRAL DE FRONTEND, UI/UX Y CERTIFICACIÓN GATE 4A — M04 (v0.6.1)
+### [2026-10-22 20:55] — 🟡 SANEAMIENTO DE REPORTE QA (PASO A) — M04 (v0.6.1)
 
 > **Insumos:** `docs/walkthroughs/M04/walkthrough_v0.6.0_M04_cuentas_autenticacion_perfil_frontend.md` y `docs/walkthroughs/M04/walkthrough_v0.6.1_M04_validacion_real_y_correcciones_backend.md`  
 > **Fuentes de Verdad:** `Pintu_Clic_UI_Oficial.md`, `frontend/ARQUITECTURA.md`, `VISTAS.pdf` (págs. 1, 3, 4, 5, 6) y `AdminLayout.tsx` de M17.  
@@ -345,7 +345,7 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 
 #### 1. Resultados de Ejecución Real y Batería Automatizada
 - **Vitest Frontend:** **136/136 tests PASS** (14 suites, +79 pruebas respecto a v0.4.1, 7.39s).
-- **Vitest Backend:** **188/188 tests PASS** (20 suites). Total proyecto: **324 tests PASS** (regresión cero).
+- **Vitest Backend:** **205/205 tests PASS** (22 suites, corregida la cifra anterior de 188/20 de v0.4.1). Total proyecto: **341/341 tests PASS** (regresión cero).
 - **Auditoría AST Cero ANY (`npm run check:no-any`):** **259 archivos auditados, 0 usos de ANY (PASS)** (Frontend: 157, Backend: 102).
 - **Compilación TypeScript (`tsc --noEmit`):** **0 errores** en Frontend y Backend.
 - **Linter Frontend / Backend:** **0 errores, 0 warnings** (`next lint --max-warnings=0`).
@@ -353,19 +353,19 @@ Revisión formal de los entregables de M17 (`HU-ADM-01` a `HU-ADM-07`):
 - **Auditorías de Gobernanza:**
   - `node .sdlc/tooling/audit-core-kit.mjs`: **0 violaciones** (36 archivos conformes, Directiva #13).
   - `node .sdlc/tooling/audit-zod-chains.mjs`: **0 anti-patrones** (17 archivos conformes).
-  - `npm run lint:a11y` y `node .sdlc/tooling/audit-a11y.mjs`: **0 violaciones WCAG 2.1 AA** (93 archivos conformes).
+  - `npm run lint:a11y`: **0 errores, 0 warnings**; `node .sdlc/tooling/audit-a11y.mjs`: **0 violaciones, 4 advertencias** (93 archivos; las 4 advertencias en `FileInput.tsx:11/27`, `OtpInput.tsx:82` y `componentes-landing.test.tsx:98` son falsos positivos del analizador regex).
 
 #### 2. Hallazgos de las 5 Fases de Auditoría
-1. **Fase 1 (Consistencia de Paneles):** `/admin/empresas` se inserta limpiamente en `AdminLayout.tsx` (M17) respetando sidebar, topbar, encabezados gris `bg-neutral-lightest` de 11px en Poppins y hover de filas. `/perfil` mantiene coherencia con el storefront público de `VISTAS.pdf` pág. 9 usando `SectionNav.tsx`.
+1. **Fase 1 (Consistencia de Paneles):** `/admin/empresas` se inserta limpiamente en `AdminLayout.tsx` (M17) respetando sidebar, topbar, encabezados gris `bg-neutral-lightest` de 11px en Poppins y hover de filas. `/perfil` mantiene coherencia con el storefront público usando `SectionNav.tsx` (sin mockup en `VISTAS.pdf`; derivado del sistema de diseño).
 2. **Fase 2 (Código y Arquitectura):** Cero Zod inline en componentes TSX (Directiva #12). Carpetas `interfaces/` con 0 bytes de runtime. Manejo de sesión seguro bajo ADR-005 (cookies `HttpOnly` vía `withCredentials: true`, sin tokens en `authStore` o `localStorage`). Traducción de errores centralizada sin fuga de excepciones internas (`HU-SEG-06`).
 3. **Fase 3 (Sistema de Diseño):** Paleta institucional 100% conforme con `colors.ts` (cero clases `bg-[#...]` o colores Tailwind no aprobados). Radios de borde milimétricos (`rounded-input` 6px, `rounded-btn` 6px, `rounded-card` 8px, `rounded-modal` 14px). Modales con franja arcoíris corporativa de 4 colores (`bg-brand-rainbow`).
-4. **Fase 4 (Fidelidad con Mockups):** Validación milimétrica contra `VISTAS.pdf` de la Landing Page (Pág. 1) y los modales de Registro Natural, Empresa, OTP y Éxito (Págs. 3, 4, 5 y 6).
-5. **Fase 5 (Interacción y A11y):** Trampa de foco y cierre por `Escape` en modales (`foco.ts`). Entrada OTP con autoenfoque, avance secuencial, retroceso y pegado multicasilla. Botones e inputs con `min-h-[44px]` para tap targets móviles. Desmontaje limpio de rutas interceptadas `@modal`.
+4. **Fase 4 (Fidelidad con Mockups):** Verificada por inspección de código (incluyendo las divergencias aprobadas por el Director: empresa sin paso OTP y botón `action` `#0877E8`); comparación visual de `VISTAS.pdf` págs. 1, 3, 4, 5 y 6 contra capturas en vivo marcada como pendiente para el **Paso B**.
+5. **Fase 5 (Interacción y A11y):** Verificada estáticamente y por pruebas unitarias en Node (`foco.ts`, `OtpInput.tsx`, `min-h-[44px]`, `@modal/[...catchAll]`); recorrido en navegador en vivo pendiente para el **Paso B**.
 
 #### 3. Dictamen Final
-- **Veredicto Gate 4A:** 🟢 **APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA Y DE DISEÑO**.
+- **Veredicto Gate 4A (Paso A):** 🟡 **PARCIALMENTE VERIFICADO (Fases 1-3 y Suites OK; Fases 4-5 en curso en Paso B)**.
 - **Reporte Oficial:** `.sdlc/docs/qa/M04/v0.6.1/QA_REPORT.md`.
-- **Acción:** M04 queda formalmente certificado en backend y frontend. Listo para Gate 5 (Release SemVer y cierre de entrega).
+- **Acción:** Registro remoto saneado con métricas medidas reales; se inicia inmediatamente el **Paso B** (renderizado de `VISTAS.pdf` págs. 1, 3, 4, 5 y 6 y recorrido en navegador en vivo).
 
 
 

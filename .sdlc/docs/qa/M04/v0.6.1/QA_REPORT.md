@@ -4,7 +4,7 @@
 > **Versión Evaluada:** `v0.6.1` (Cierre Integral Frontend, UI Spec y Validación E2E con PostgreSQL Real)  
 > **Fecha de Certificación:** 2026-10-22  
 > **Auditor Responsable:** QA Lead & Security Compliance Director (Fase 4 — `05_qa_security_tester`)  
-> **Estado de la Compuerta:** 🟢 **GATE 4A APROBADO Y CERTIFICADO — EXCELENCIA TÉCNICA Y DE DISEÑO**  
+> **Estado de la Compuerta:** 🟡 **EN REVISIÓN (PASO A: MÉTRICAS Y EVIDENCIA ESTÁTICA CORREGIDAS — PENDIENTE PASO B: VERIFICACIÓN VISUAL Y DINÁMICA EN VIVO)**  
 
 ---
 
@@ -25,7 +25,7 @@
 | Instrumento / Quality Gate | Cuadrante Ágil | Objetivo de Verificación | Resultado Obtenido | Observaciones |
 | :--- | :---: | :--- | :---: | :--- |
 | **Vitest Frontend** | **Q1 / Q2** | Componentes, DTOs, stores, utilidades y accesibilidad | **✅ 136/136 tests PASS** (14 suites) | **+79 tests nuevos** respecto a v0.4.1 (57). Tiempo: 7.39s |
-| **Vitest Backend** | **Q1** | Servicios, repositorios, HTTP routing y concurrencia | **✅ 188/188 tests PASS** (20 suites) | Regresión cero en backend completo (Total suite combinada: **324 tests PASS**) |
+| **Vitest Backend** | **Q1** | Servicios, repositorios, HTTP routing, parser JSON y NIT | **✅ 205/205 tests PASS** (22 suites) | **+17 tests nuevos** respecto a v0.4.1 (188). Total suite combinada: **341/341 tests PASS** |
 | **Auditoría AST Cero ANY** | **Q4** | Eliminación estricta de `any` (`check:no-any`) | **✅ 157 archivos frontend PASS** (0 ANYs)<br>**✅ 102 archivos backend PASS** (0 ANYs) | Total proyecto: **259 archivos sin ningún ANY** |
 | **TypeScript Strict (Frontend)** | **Q1** | Compilación estricta Next.js `npx tsc --noEmit` | **✅ 0 errores** | Tipado estricto con React 19 + Next.js 15 |
 | **TypeScript Strict (Backend)** | **Q1** | Compilación estricta Express 5 `npx tsc --noEmit` | **✅ 0 errores** | Tipado estricto con Prisma 6 |
@@ -33,7 +33,7 @@
 | **Next.js Production Build** | **Q1 / Q4** | Optimización de empaquetado (`npm run build`) | **✅ 17/17 páginas exitosas** | Prerenderizado estático y rutas dinámicas. First load JS: 103 kB |
 | **Auditoría Core Kit (Directiva #13)** | **Q3** | Verificación de componentes canónicos UI (`audit:core-kit`) | **✅ 0 violaciones** (36 archivos) | Conforme: Cero etiquetas nativas HTML huérfanas en módulos |
 | **Auditoría Cadenas Zod (Anti-Bypass)**| **Q1** | Orden de sanitización `.trim().min()` (`audit:zod`) | **✅ 0 violaciones** (17 archivos) | Conforme |
-| **Auditoría A11y (WCAG 2.1 AA)** | **Q2 / Q3** | Accesibilidad estática y JSX-A11Y (`audit:a11y` y `lint:a11y`) | **✅ 0 violaciones** (93 archivos) | Conforme: Diálogos, roles ARIA y focus traps blindados |
+| **Auditoría A11y (WCAG 2.1 AA)** | **Q2 / Q3** | Accesibilidad estática y JSX-A11Y (`audit:a11y` y `lint:a11y`) | **✅ 0 violaciones / ⚠️ 4 advertencias** (93 archivos) | `lint:a11y` en 0 warnings. Las 4 advertencias de `audit:a11y` fueron inspeccionadas y son falsos positivos del regex (ver Fase 5) |
 
 ---
 
@@ -65,10 +65,10 @@
 ## 4. Dictamen Consolidado de las 5 Fases de Auditoría Frontend
 
 ### 🔹 Fase 1: Consistencia Estructural entre Paneles (`/admin` vs `/perfil`)
-* **Resultado:** **CONFORME**.
+* **Resultado:** **CONFORME (verificado por inspección de código)**.
 * **Evidencia:** 
   - La sección administrativa [`/admin/empresas`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/app/admin/empresas/page.tsx) se monta limpiamente sobre [`AdminLayout.tsx`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/modules/m17-permisos/components/AdminLayout.tsx), reutilizando el sidebar blanco, breadcrumbs, topbar y diseño de tablas administrativas de M17.
-  - La sección de cliente [`/perfil`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/app/(public)/perfil/page.tsx) convive dentro del storefront público (Header de catálogo y Footer) usando [`SectionNav.tsx`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/navigation/SectionNav.tsx), en total correspondencia con `VISTAS.pdf` Pág. 9.
+  - La sección de cliente [`/perfil`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/app/(public)/perfil/page.tsx) convive dentro del storefront público (Header de catálogo y Footer) usando [`SectionNav.tsx`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/navigation/SectionNav.tsx); como registra el Walkthrough v0.6.0 §1, `/perfil` no tiene mockup en `VISTAS.pdf` y su composición se derivó del sistema de diseño oficial (`ESPECIFICACION_TECNICA_UI_UX.md`).
 
 ### 🔹 Fase 2: Código, Tipos, DTOs y Arquitectura Next.js 15
 * **Resultado:** **CONFORME (100%)**.
@@ -86,20 +86,22 @@
   - Radios de borde configurados en `tailwind.config.ts`: `rounded-input` (6px), `rounded-btn` (6px), `rounded-card` (8px), `rounded-modal` (14px).
   - Presencia obligatoria de la franja superior arcoíris corporativa (`bg-brand-rainbow`) en [`Modal.tsx`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/overlays/Modal.tsx).
 
-### 🔹 Fase 4: Fidelidad Visual con Mockups (`VISTAS.pdf`)
-* **Resultado:** **CONFORME (100%)**.
-* **Evidencia:**
-  - **Pág 1 (Landing):** Los 7 bloques estructurados (Topbar, Header, MegaMenú modal, Hero, TrustStrip, SearchBar, Productos Destacados, Categorías y Footer) reproducen con fidelidad total el diseño aprobado.
-  - **Págs 3, 4, 5 y 6 (Auth Modals):** Stepper de pasos numerados con conectores, formulario Natural y Empresa, casillas individuales OTP con banner de tiempo y pantalla final de éxito con check verde heroico (`Check` con `strokeWidth={3}`).
+### 🔹 Fase 4: Fidelidad Visual con Mockups (`VISTAS.pdf` Págs. 1, 3, 4, 5 y 6)
+* **Resultado:** **NO VERIFICADO EN NAVEGADOR — PENDIENTE (Paso B)**.
+* **Estado actual:**
+  - La inspección de código confirma la presencia de los bloques de Landing (`FP-01`) y de los componentes del flujo de registro (`Stepper`, `SegmentedTabs`, `OtpInput`, pantalla final con check verde), así como las decisiones autorizadas por el Director Humano (empresa sin paso OTP: `Datos → ¡Solicitud enviada!`, y botón principal con token `action` `#0877E8`).
+  - Queda pendiente en el **Paso B** renderizar las páginas 1, 3, 4, 5 y 6 de `VISTAS.pdf` a imagen y contrastarlas contra capturas reales del navegador.
 
 ### 🔹 Fase 5: Interacción Dinámica y Accesibilidad (A11y WCAG 2.2)
-* **Resultado:** **CONFORME (100%)**.
-* **Evidencia:**
-  - Trampa de foco y ciclo cerrado con Tab/Shift+Tab verificado mediante [`foco.ts`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/overlays/foco.ts).
-  - Tecla `Escape` cierra modales y retorna el foco al elemento disparador.
-  - Avance automático de foco en casillas numéricas OTP, retroceso con Backspace y soporte completo de pegado desde portapapeles (`onPaste`).
-  - Áreas táctiles móviles conformes con `min-h-[44px]` (WCAG 2.5.5 / 2.5.8).
-  - Desmontaje limpio de rutas interceptadas de Next.js mediante `@modal/[...catchAll]`.
+* **Resultado:** **VERIFICADO ESTÁTICAMENTE Y EN UNIDAD / RECORRIDO EN NAVEGADOR PENDIENTE (Paso B)**.
+* **Evidencia estática y unitaria verificada:**
+  - Algoritmo de trampa de foco y ciclo cerrado con `Tab`/`Shift+Tab` verificado mediante pruebas unitarias de [`foco.ts`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/overlays/foco.ts).
+  - Manejadores de cierre con `Escape`, avance/retroceso/pegado (`onPaste`) en [`OtpInput.tsx`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/forms/OtpInput.tsx), áreas táctiles `min-h-[44px]` y desmontaje de rutas interceptadas `@modal/[...catchAll]` verificados por lectura de código y tests unitarios en entorno Node.
+  - **Desglose de las 4 advertencias de `node .sdlc/tooling/audit-a11y.mjs` (`0 violaciones, 4 warnings`):**
+    1. [`FileInput.tsx:11`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/forms/FileInput.tsx#L11) y [`FileInput.tsx:27`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/forms/FileInput.tsx#L27): falsos positivos del analizador regex sobre comentarios JSDoc que mencionan `<input accept>` e `<input type="file">`. El `<input>` real en la línea 87 cuenta con `id={inputId}` asociado al `<label htmlFor={inputId}>` y `aria-labelledby`.
+    2. [`OtpInput.tsx:82`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/components/forms/OtpInput.tsx#L82-L94): falso positivo por salto de línea; la etiqueta `<input` abre en la línea 82 y su atributo `aria-label={`Dígito ${indice + 1} de ${length}`}` está declarado en la línea 94.
+    3. [`componentes-landing.test.tsx:98`](file:///c:/Users/alejo/Downloads/proyectos-dev/pintuclic.com/frontend/src/core/tests/componentes-landing.test.tsx#L98): falso positivo sobre una expresión regular de prueba (`expect(html).toMatch(/<input[^>]*name="q"/);`).
+  - Queda pendiente en el **Paso B** el recorrido interactivo en navegador en vivo.
 
 ---
 
@@ -121,8 +123,8 @@
  MÓDULO:             M04 — Cuentas, Autenticación y Perfil
  VERSIÓN:            v0.6.1 (Backend + Frontend + E2E Integrado)
  COMPUERTA:          GATE 4A (Auditoría Forense y Verificación de Calidad)
- ESTADO:             🟢 APROBADO Y CERTIFICADO SIN RESERVAS
- RECOMENDACIÓN:      AVANZAR A GATE 5 (Release SemVer / Cierre de Módulo)
+ ESTADO:             🟡 PARCIALMENTE VERIFICADO (Fases 1-3 y Suites OK; Fases 4-5 en Paso B)
+ RECOMENDACIÓN:      COMPLETAR VERIFICACIÓN VISUAL Y NAVEGADOR EN VIVO ANTES DE GATE 5
 ===================================================================================
 ```
 
