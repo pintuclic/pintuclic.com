@@ -12,6 +12,7 @@ export interface UsuarioAutenticado {
   correo: string;
   nombre: string;
   tipo: TipoCuenta;
+  esAdmin?: boolean;
 }
 
 /** Espejo de `enum_tipo_usuario` en bd/sql/schema_pintuclic.sql. */

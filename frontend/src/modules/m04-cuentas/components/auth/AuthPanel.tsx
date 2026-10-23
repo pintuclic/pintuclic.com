@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/core/store/authStore';
+import type { UsuarioResumen } from '../../interfaces/api.interfaces';
 import { LoginForm } from './LoginForm';
 import { PrimerAccesoForm } from './PrimerAccesoForm';
 import { RecuperarForm } from './RecuperarForm';
@@ -44,8 +45,16 @@ export function AuthPanel({ vistaInicial, modo, destino }: AuthPanelProps) {
   const [vista, setVista] = useState<Vista>(vistaInicial);
   const [tokenCambio, setTokenCambio] = useState<string | null>(null);
 
-  const finalizar = () => {
+  const finalizar = (usuario: UsuarioResumen) => {
     const pendiente = consumirDestino();
+    if (usuario.esAdmin) {
+      if (modo === 'modal' && typeof window !== 'undefined') {
+        window.location.assign('/admin');
+        return;
+      }
+      router.replace('/admin');
+      return;
+    }
     if (modo === 'modal' && !destino) {
       router.back();
       return;

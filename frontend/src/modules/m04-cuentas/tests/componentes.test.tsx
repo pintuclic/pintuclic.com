@@ -201,4 +201,12 @@ describe('Header con sesión (M04 → Core)', () => {
       href: '/perfil',
     });
   });
+
+  it('con sesión de administrador lleva a /admin (Panel admin)', () => {
+    expect(cuentaDeEncabezado({ nombre: 'Admin Pintuclic', esAdmin: true }, anonima)).toEqual({
+      label: 'Admin',
+      sublabel: 'Panel admin',
+      href: '/admin',
+    });
+  });
 });

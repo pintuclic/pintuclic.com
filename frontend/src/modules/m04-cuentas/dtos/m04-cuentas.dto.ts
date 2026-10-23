@@ -273,6 +273,7 @@ export const perfilUsuarioViewSchema = z.object({
   correo: correoSchema,
   telefono: telefonoSchema.nullable(),
   tipo: tipoUsuarioSchema,
+  esAdmin: z.boolean().optional(),
   estado: estadoUsuarioSchema,
   cambioContrasenaPendiente: z.boolean(),
   empresa: z

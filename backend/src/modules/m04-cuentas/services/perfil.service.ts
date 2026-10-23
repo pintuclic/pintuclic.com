@@ -1,5 +1,5 @@
 import { derivarContrasena, verificarContrasena } from '../../../core/utils/crypto';
-import type { CuentasRepository } from '../repositories/cuentas.repository';
+import { esUsuarioAdministrativo, type CuentasRepository } from '../repositories/cuentas.repository';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
 import type { NotificacionesPort } from '../interfaces/notificaciones.port';
 import type { DateProviderPort } from '../interfaces/date-provider.port';
@@ -53,6 +53,7 @@ export class PerfilService {
       correo: usuario.correo,
       telefono: usuario.telefono,
       tipo: usuario.tipo,
+      esAdmin: esUsuarioAdministrativo(usuario),
       estado: usuario.estado,
       cambioContrasenaPendiente: usuario.cambioContrasenaPendiente,
       empresa: empresa

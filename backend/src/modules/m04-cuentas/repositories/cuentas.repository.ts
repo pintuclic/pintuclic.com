@@ -1,10 +1,18 @@
 import type { Prisma, Usuario, CuentaEmpresa, UsuarioIdentidadExterna, EstadoUsuario, TipoUsuario } from '@prisma/client';
 import { prisma } from '../../../core/db/client';
 
+export type UsuarioConRol = Usuario & { usuarioRol?: { idRol: number } | null };
+
+export function esUsuarioAdministrativo(usuario: UsuarioConRol): boolean {
+  if (usuario.tipo === 'empresa') return false;
+  const idRolEfectivo = usuario.idRol ?? usuario.usuarioRol?.idRol ?? null;
+  return idRolEfectivo !== null && idRolEfectivo !== 2 && idRolEfectivo !== 3;
+}
+
 export interface CuentasRepository {
-  buscarPorCorreo(correo: string): Promise<Usuario | null>;
-  buscarPorId(idUsuario: number): Promise<Usuario | null>;
-  buscarConEmpresaPorId(idUsuario: number): Promise<(Usuario & { cuentaEmpresa: CuentaEmpresa | null }) | null>;
+  buscarPorCorreo(correo: string): Promise<UsuarioConRol | null>;
+  buscarPorId(idUsuario: number): Promise<UsuarioConRol | null>;
+  buscarConEmpresaPorId(idUsuario: number): Promise<(UsuarioConRol & { cuentaEmpresa: CuentaEmpresa | null }) | null>;
   crearUsuarioCliente(datos: {
     nombre: string;
     correo: string;
@@ -30,7 +38,7 @@ export interface CuentasRepository {
 }
 
 export class PrismaCuentasRepository implements CuentasRepository {
-  async buscarPorCorreo(correo: string): Promise<Usuario | null> {
+  async buscarPorCorreo(correo: string): Promise<UsuarioConRol | null> {
     const normalizado = correo.trim().toLowerCase();
     return prisma.usuario.findFirst({
       where: {
@@ -39,19 +47,28 @@ export class PrismaCuentasRepository implements CuentasRepository {
           mode: 'insensitive',
         },
       },
+      include: {
+        usuarioRol: { select: { idRol: true } },
+      },
     });
   }
 
-  async buscarPorId(idUsuario: number): Promise<Usuario | null> {
+  async buscarPorId(idUsuario: number): Promise<UsuarioConRol | null> {
     return prisma.usuario.findUnique({
       where: { idUsuario },
+      include: {
+        usuarioRol: { select: { idRol: true } },
+      },
     });
   }
 
-  async buscarConEmpresaPorId(idUsuario: number): Promise<(Usuario & { cuentaEmpresa: CuentaEmpresa | null }) | null> {
+  async buscarConEmpresaPorId(idUsuario: number): Promise<(UsuarioConRol & { cuentaEmpresa: CuentaEmpresa | null }) | null> {
     return prisma.usuario.findUnique({
       where: { idUsuario },
-      include: { cuentaEmpresa: true },
+      include: {
+        cuentaEmpresa: true,
+        usuarioRol: { select: { idRol: true } },
+      },
     });
   }
 

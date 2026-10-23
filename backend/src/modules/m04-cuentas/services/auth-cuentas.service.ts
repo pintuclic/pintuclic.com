@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Prisma, type Sesion, type Usuario } from '@prisma/client';
 import { derivarContrasena, verificarContrasena } from '../../../core/utils/crypto';
-import type { CuentasRepository } from '../repositories/cuentas.repository';
+import { esUsuarioAdministrativo, type CuentasRepository } from '../repositories/cuentas.repository';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
 import type { ControlIntentosRepository } from '../repositories/control-intentos.repository';
 import type { NotificacionesPort } from '../interfaces/notificaciones.port';
@@ -255,7 +255,7 @@ export class AuthCuentasService {
    * HU-CUE-04: Autenticación con Correo y Contraseña
    */
   async login(input: LoginRequest): Promise<
-    | { requiereCambioContrasena: false; usuario: Usuario; sesion: Sesion }
+    | { requiereCambioContrasena: false; usuario: Usuario; sesion: Sesion; esAdmin: boolean }
     | { requiereCambioContrasena: true; tokenCambio: string; idUsuario: number }
   > {
     const correoNormalizado = input.correo.trim().toLowerCase();
@@ -347,13 +347,15 @@ export class AuthCuentasService {
     }
 
     // 8. Crear sesión activa
-    const tipoSesion = usuario.tipo === 'empresa' ? 'cliente' : usuario.idRol !== null ? 'admin' : 'cliente';
+    const esAdmin = esUsuarioAdministrativo(usuario);
+    const tipoSesion = esAdmin ? 'admin' : 'cliente';
     const sesion = await this.sesionService.crear(usuario.idUsuario, tipoSesion);
 
     return {
       requiereCambioContrasena: false,
       usuario,
       sesion,
+      esAdmin,
     };
   }
 
@@ -363,7 +365,7 @@ export class AuthCuentasService {
   async cambiarContrasenaPrimerAcceso(
     tokenCambio: string,
     nuevaContrasena: string,
-  ): Promise<{ usuario: Usuario; sesion: Sesion }> {
+  ): Promise<{ usuario: Usuario; sesion: Sesion; esAdmin: boolean }> {
     let payload: { idUsuario: number; tipo: string };
     try {
       payload = jwt.verify(tokenCambio, this.obtenerJwtSecret()) as {
@@ -390,10 +392,11 @@ export class AuthCuentasService {
       false, // cambioContrasenaPendiente = false
     );
 
-    const tipoSesion = usuario.tipo === 'empresa' ? 'cliente' : usuario.idRol !== null ? 'admin' : 'cliente';
+    const esAdmin = esUsuarioAdministrativo(usuario);
+    const tipoSesion = esAdmin ? 'admin' : 'cliente';
     const sesion = await this.sesionService.crear(usuario.idUsuario, tipoSesion);
 
-    return { usuario: usuarioActualizado, sesion };
+    return { usuario: usuarioActualizado, sesion, esAdmin };
   }
 
   /**

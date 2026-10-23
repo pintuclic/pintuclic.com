@@ -44,13 +44,23 @@ export function PerfilView({ seccionInicial = 'datos' }: { seccionInicial?: Secc
   const cargar = useCallback(async () => {
     try {
       const perfil = await obtenerPerfil();
-      establecerUsuario({ idUsuario: perfil.idUsuario, correo: perfil.correo, nombre: perfil.nombre, tipo: perfil.tipo });
+      establecerUsuario({
+        idUsuario: perfil.idUsuario,
+        correo: perfil.correo,
+        nombre: perfil.nombre,
+        tipo: perfil.tipo,
+        ...(perfil.esAdmin !== undefined ? { esAdmin: perfil.esAdmin } : {}),
+      });
+      if (perfil.esAdmin) {
+        router.replace('/admin');
+        return;
+      }
       setEstado({ tipo: 'listo', perfil });
     } catch (error) {
       const { estado: http, mensaje } = aErrorCuentas(error);
       setEstado(http === 401 ? { tipo: 'anonimo' } : { tipo: 'error', mensaje });
     }
-  }, [establecerUsuario]);
+  }, [establecerUsuario, router]);
 
   useEffect(() => {
     void cargar();
@@ -63,7 +73,13 @@ export function PerfilView({ seccionInicial = 'datos' }: { seccionInicial?: Secc
 
   const actualizarPerfil = (perfil: PerfilUsuario) => {
     setEstado({ tipo: 'listo', perfil });
-    establecerUsuario({ idUsuario: perfil.idUsuario, correo: perfil.correo, nombre: perfil.nombre, tipo: perfil.tipo });
+    establecerUsuario({
+      idUsuario: perfil.idUsuario,
+      correo: perfil.correo,
+      nombre: perfil.nombre,
+      tipo: perfil.tipo,
+      ...(perfil.esAdmin !== undefined ? { esAdmin: perfil.esAdmin } : {}),
+    });
   };
 
   const sesionInvalidada = (aviso: string) => {

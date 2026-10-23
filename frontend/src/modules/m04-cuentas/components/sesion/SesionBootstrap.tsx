@@ -15,8 +15,16 @@ export function SesionBootstrap() {
   useEffect(() => {
     let vigente = true;
     obtenerPerfil()
-      .then(({ idUsuario, correo, nombre, tipo }) => {
-        if (vigente) establecerUsuario({ idUsuario, correo, nombre, tipo });
+      .then(({ idUsuario, correo, nombre, tipo, esAdmin }) => {
+        if (vigente) {
+          establecerUsuario({
+            idUsuario,
+            correo,
+            nombre,
+            tipo,
+            ...(esAdmin !== undefined ? { esAdmin } : {}),
+          });
+        }
       })
       .catch(() => {
         // Anónimo o API caída: la interfaz sigue como visitante; cada vista

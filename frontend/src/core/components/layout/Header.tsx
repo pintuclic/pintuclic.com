@@ -33,13 +33,17 @@ export interface HeaderProps {
 
 const FOCO = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50';
 
-/** Con sesión abierta, "Mi cuenta" saluda por el primer nombre y lleva al perfil (M04). */
+/** Con sesión abierta, "Mi cuenta" saluda por el primer nombre y lleva al perfil o al panel admin (M04 / M17). */
 export function cuentaDeEncabezado(
-  usuario: Pick<UsuarioAutenticado, 'nombre'> | null,
+  usuario: Pick<UsuarioAutenticado, 'nombre' | 'esAdmin'> | null,
   anonima: HeaderProps['account'],
 ): HeaderProps['account'] {
   if (!usuario) return anonima;
-  return { label: usuario.nombre.trim().split(/\s+/)[0] || usuario.nombre, sublabel: 'Mi perfil', href: '/perfil' };
+  const primerNombre = usuario.nombre.trim().split(/\s+/)[0] || usuario.nombre;
+  if (usuario.esAdmin) {
+    return { label: primerNombre, sublabel: 'Panel admin', href: '/admin' };
+  }
+  return { label: primerNombre, sublabel: 'Mi perfil', href: '/perfil' };
 }
 
 /**

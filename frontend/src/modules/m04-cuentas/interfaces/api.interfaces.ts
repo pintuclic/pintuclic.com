@@ -15,6 +15,7 @@ export interface UsuarioResumen {
   nombre: string;
   correo: string;
   tipo: TipoUsuario;
+  esAdmin?: boolean;
 }
 
 /** POST /cuentas/registro y /registro/reenviar-otp */
@@ -45,6 +46,7 @@ export interface PerfilUsuario {
   correo: string;
   telefono: string | null;
   tipo: TipoUsuario;
+  esAdmin?: boolean;
   estado: EstadoUsuario;
   cambioContrasenaPendiente: boolean;
   empresa?: EmpresaAprobada | null;

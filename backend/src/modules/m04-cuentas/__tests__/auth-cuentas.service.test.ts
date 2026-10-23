@@ -377,8 +377,37 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
       expect(res.requiereCambioContrasena).toBe(false);
       if (!res.requiereCambioContrasena) {
         expect(res.usuario.idUsuario).toBe(5);
+        expect(res.esAdmin).toBe(false);
         expect(res.sesion.idSesion).toBe('sesion-activa-uuid');
+        expect(sesionService.crear).toHaveBeenCalledWith(5, 'cliente');
         expect(controlIntentosRepo.limpiar).toHaveBeenCalledWith('login@pintuclic.com');
+      }
+    });
+
+    it('identifica como esAdmin=true y abre sesión admin para administrador o colaborador de M17', async () => {
+      const passHash = await derivarContrasena('Pintuclic2026');
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 1,
+        nombre: 'Admin Pintuclic',
+        telefono: '3001112233',
+        correo: 'admin@pintuclic.co',
+        contrasena: passHash,
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: 1,
+        usuarioRol: { idRol: 1 },
+        cambioContrasenaPendiente: false,
+      });
+
+      const res = await authService.login({
+        correo: 'admin@pintuclic.co',
+        contrasena: 'Pintuclic2026',
+      });
+
+      expect(res.requiereCambioContrasena).toBe(false);
+      if (!res.requiereCambioContrasena) {
+        expect(res.esAdmin).toBe(true);
+        expect(sesionService.crear).toHaveBeenCalledWith(1, 'admin');
       }
     });
 

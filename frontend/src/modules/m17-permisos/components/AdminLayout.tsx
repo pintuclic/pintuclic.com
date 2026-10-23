@@ -17,11 +17,14 @@ import {
   Shield,
   ShieldAlert,
   Sparkles,
+  Store,
   UserCheck,
   Users,
   X,
 } from 'lucide-react';
 import { Button, Input } from '@/core/components';
+import { apiClient } from '@/core/api/apiClient';
+import { useAuthStore } from '@/core/store/authStore';
 
 export interface AdminLayoutProps {
   children: React.ReactNode;
@@ -29,9 +32,40 @@ export interface AdminLayoutProps {
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const pathname = usePathname();
+  const usuario = useAuthStore((s) => s.usuario);
+  const establecerUsuario = useAuthStore((s) => s.establecerUsuario);
+  const limpiarSesion = useAuthStore((s) => s.limpiarSesion);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const perfilRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (usuario) return;
+    let vigente = true;
+    apiClient
+      .get<{ data: { idUsuario: number; correo: string; nombre: string; tipo: 'normal' | 'empresa'; esAdmin?: boolean } }>(
+        '/cuentas/perfil',
+      )
+      .then(({ data }) => {
+        if (vigente && data?.data) {
+          establecerUsuario(data.data);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [usuario, establecerUsuario]);
+
+  const nombreVisible = usuario?.nombre || 'Carlos Álvarez';
+  const correoVisible = usuario?.correo || 'admin@pintuclic.co';
+  const iniciales =
+    nombreVisible
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? '')
+      .join('') || 'CA';
 
   /**
    * En escritorio el sidebar está siempre visible; en móvil se desplaza fuera
@@ -222,11 +256,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               className="flex items-center gap-2.5 p-1 sm:px-2 sm:py-1 rounded-btn hover:bg-neutral-lightest transition-colors cursor-pointer select-none min-h-[36px]"
             >
               <div className="w-8 h-8 rounded-full bg-corporate text-neutral-white font-title font-bold text-xs flex items-center justify-center shadow-xs">
-                CA
+                {iniciales}
               </div>
               <div className="hidden sm:flex flex-col text-left">
                 <span className="font-title font-semibold text-xs text-neutral-black leading-tight">
-                  Carlos Álvarez
+                  {nombreVisible}
                 </span>
                 <span className="font-sans text-[11px] text-neutral-medium leading-tight">
                   Administrador
@@ -243,10 +277,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               >
                 <div className="px-3 py-2 border-b border-neutral-light/50">
                   <p className="font-title font-semibold text-xs text-neutral-black">
-                    Carlos Álvarez
+                    {nombreVisible}
                   </p>
                   <p className="font-sans text-xs text-neutral-medium truncate">
-                    admin@pintuclic.com
+                    {correoVisible}
                   </p>
                 </div>
                 <div className="py-1">
@@ -267,7 +301,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     <span>Configuración Global</span>
                   </Link>
                 </div>
-                <div className="border-t border-neutral-light/50 pt-1">
+                <div className="border-t border-neutral-light/50 pt-1 flex flex-col gap-1">
+                  <Link
+                    href="/"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-sans text-neutral-dark hover:bg-subaction hover:text-action rounded-btn transition-colors"
+                  >
+                    <Store className="w-4 h-4" />
+                    <span>Ir a Tienda Pública</span>
+                  </Link>
                   <Button
                     type="button"
                     variant="ghost"
@@ -275,12 +317,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     fullWidth
                     onClick={() => {
                       setProfileMenuOpen(false);
-                      window.location.href = '/';
+                      void apiClient
+                        .post('/cuentas/logout', {})
+                        .catch(() => undefined)
+                        .finally(() => {
+                          limpiarSesion();
+                          window.location.href = '/login';
+                        });
                     }}
                     leftIcon={<LogOut className="w-4 h-4" />}
                     className="justify-start text-xs text-danger hover:bg-danger/10 min-h-[32px]"
                   >
-                    Ir a Tienda Pública
+                    Cerrar sesión
                   </Button>
                 </div>
               </div>

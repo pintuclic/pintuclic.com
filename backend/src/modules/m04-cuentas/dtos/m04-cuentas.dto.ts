@@ -232,6 +232,7 @@ export const loginResponseSchema = z.object({
     nombre: nombreSchema,
     correo: correoSchema,
     tipo: tipoUsuarioSchema,
+    esAdmin: z.boolean().optional(),
   }),
   cambioContrasenaPendiente: z.boolean(),
 });
@@ -353,6 +354,7 @@ export const perfilUsuarioResponseSchema = z.object({
   correo: correoSchema,
   telefono: telefonoSchema.nullable(),
   tipo: tipoUsuarioSchema,
+  esAdmin: z.boolean().optional(),
   estado: estadoUsuarioSchema,
   cambioContrasenaPendiente: z.boolean(),
   empresa: cuentaEmpresaDetalleSchema.nullable().optional(),
