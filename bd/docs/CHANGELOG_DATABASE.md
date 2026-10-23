@@ -10,6 +10,21 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.1] - 2026-10-23
+### Esquema 4.3 (58 Tablas) - M01 Catálogo: rediseño con las reglas del Tech Lead
+- **Alcance General:** Rediseño del catálogo antes de construir M01 (ninguna tabla del catálogo tenía código encima). Reglas en [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md).
+  - **Nuevas (10):** `superficie`, `acabado`, `familia_color`, `tipo_medida`, `medida`, `ficha_recubrimiento`, `producto_superficie`, `producto_acabado`, `producto_color`, `producto_caracteristica`.
+  - **Eliminadas (5):** `sub_subcategorias` (solo dos niveles), `tonos`, `presentacion` (reemplazada por `medida` + `tipo_medida`), `caracteristica` (pasa a `producto_caracteristica`), `producto_subcategoria` (el producto tiene una sola subcategoría).
+  - **`subcategorias` → `subcategoria`.** `linea` pierde `id_sub_subcategoria`.
+  - **`base`** global (sin `id_marca`): Tint, Deep, Pastel, Accent.
+  - **`color`:** `id_base` opcional, `id_acabado` obligatorio, `id_familia_color`, `hexadecimal` obligatorio; CIELAB pasa a opcional. Unicidad `(id_marca, nombre, id_acabado)`.
+  - **`producto`:** `id_subcategoria` obligatoria, `uso_interior`/`uso_exterior`, FK compuesta `(id_linea, id_marca)`; resina y rendimiento pasan a `ficha_recubrimiento`; desaparece `clase_color` (y `enum_clase_color`): los colores que ofrece se derivan de sus bases, acabados y colores de fábrica.
+  - **`variante` = producto + medida** con `sku` UNIQUE y precio; sin base ni color.
+  - **`linea_carrito.id_color`** con `UNIQUE NULLS NOT DISTINCT (id_carrito, id_variante, id_color)`; **`linea_orden.sku_vendido`**.
+  - **Migración:** los cambios de forma no se aplican sobre una base existente (`CREATE TABLE IF NOT EXISTS`). En desarrollo hay que recrear el volumen de la BD (`docker compose down -v`).
+
+---
+
 ## [v3.0] - 2026-10-21
 ### Esquema 4.2 (53 Tablas) - M04 Cuentas: Unicidad, hash OTP, anti-fuerza bruta y cambio de clave
 - **Alcance General:** Aprobación en bloque del Director Humano sobre los cambios C-2 y C-4 a C-9 de `RFC-M04-001` (`.sdlc/docs/modules/M04/`) para sincronizar DDL y modelo Prisma de M04:
