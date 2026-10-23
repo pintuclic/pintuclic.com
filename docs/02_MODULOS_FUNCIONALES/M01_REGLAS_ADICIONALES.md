@@ -46,43 +46,52 @@ Cada regla con su fecha y quién la dio. Las marcadas ❓ tienen una pregunta ab
 | RC-12 | 2026-10-23 ❓ | **Acabados** (mate, brillante, semimate, transparente…): un producto puede tener varios. El color tiene un acabado **opcional**; los colores con acabado (ej. "Negro Mate") solo se habilitan en productos que tengan ese acabado. Los colores sin acabado aplican a todos. | Tech Lead |
 | RC-13 | 2026-10-23 ❓ | **Variantes:** no se pueden registrar decenas de miles. Al producto se le agrega una variante = **medida + precio**; la combinación con el color y su SKU se genera **en la venta**. | Tech Lead |
 | RC-14 | 2026-10-23 ❓ | Pintuco navega por **ambiente** (Pintura Interior / Exterior / Herramientas) → **superficie** (Paredes y techos, Madera, Metal, Otras) → **tipo de producto** (Pinturas, Estucos) → producto. Hay confusión entre ambiente, categoría y subcategoría. | Tech Lead |
+| RC-15 | 2026-10-23 | El 90 % de las pinturas son **entonables y además traen colores de fábrica** (Pintuco distribuye el producto con su catálogo A, B, C, D). Excepción: la línea **ICO**, que solo vende colores de fábrica, sin bases. | Tech Lead |
+| RC-16 | 2026-10-23 | Todo color **pertenece a una base**, también los de fábrica (Pintuco publica "Maní" en vez de "Maní-Tint"; Pintu Clic no puede permitirse eso). Los colores "exclusivos" de un producto se registran en la misma tabla de colores, con su base; marcarlos como exclusivos es solo visual. | Tech Lead |
+| RC-17 | 2026-10-23 | Las **bases son un estándar internacional** (Tint, Deep, Pastel, Accent): no dependen de la marca. | Tech Lead |
+| RC-18 | 2026-10-23 | El acabado del color es obligatorio y por defecto **Brillante**; así sirve para la mayoría de productos. Si el producto tiene acabado mate, al escoger color aparecen también los mates. El cliente puede buscar "mate" en el selector. | Tech Lead |
+| RC-19 | 2026-10-23 | Selector de color en el detalle del producto: por **familias** (Blancos, Rojos, Amarillos…) en matriz, o por nombre. Solo muestra los colores que el producto permite. | Tech Lead |
+| RC-20 | 2026-10-23 | El **precio es de la variante** (medida), nunca del producto ni del color, por ahora. A futuro podría existir precio por color. | Tech Lead |
+| RC-21 | 2026-10-23 | En el carrito, el producto con color es una **variante temporal** identificada por un SKU compuesto, ej. `P1-V2-Rojo` (producto, variante, color). | Tech Lead |
+| RC-22 | 2026-10-23 | La tabla `tonos` **se elimina**. | Tech Lead |
+| RC-23 | 2026-10-23 ❓ | Para M06: evento **"Miércoles de color"**: descuento semanal en algunas líneas de Pintuco; el descuento "no afecta exclusivamente al blanco". | Tech Lead |
 
-## 4. Modelo de dominio propuesto (pendiente de confirmar)
+## 4. Modelo de dominio propuesto (versión 2, pendiente de confirmar)
 
 ```
-marca ─┬─ linea (opcional en el producto)
-       ├─ base (Tint, Deep, Pastel, Accent)
-       └─ color ── base (obligatoria en colores de carta) · acabado (opcional)
+marca ── linea (opcional en el producto)
+categoria ── subcategoria                 (dos niveles; ver pregunta 1)
+producto ─ N:M ─ subcategoria
+producto ── ambiente: interior / exterior (puede tener ambos)
+producto ── ficha de recubrimiento (opcional; no la tienen las herramientas):
+            tipo de resina · tipo 1/2/3 · rendimiento m²
+producto ─ N:M ─ acabado                  (Brillante, Mate, Semimate, Satinado, Transparente…)
+producto ─ N:M ─ base                     (entonables; ICO no tiene)
+producto ─ N:M ─ color "exclusivo"        (colores de fábrica; solo visual, salvo en ICO)
 
-categoria = AMBIENTE (Interior, Exterior, Herramientas)
-  └─ subcategoria = SUPERFICIE (Paredes y techos, Madera, Metal…)
-producto ─ N:M ─ subcategoria          (un producto puede estar en interior y exterior)
-producto ── tipo de producto (Pintura, Estuco, Barniz, Herramienta…)
-producto ── clase de color: entonable | colores_fijos | sin_color
-producto ── ficha de recubrimiento (opcional, no la tienen las herramientas):
-            tipo de resina · tipo 1/2/3 · rendimiento m² · acabados (N:M)
-producto ─ N:M ─ base                  (solo entonables: define su carta)
-producto ─ N:M ─ color                 (solo colores_fijos: sus colores de fábrica)
-producto ── variante = medida + precio + SKU base + existencia referencial
-medida = valor + tipo de medida (galón, litro, pulgada, metro…)
+base   = Tint · Deep · Pastel · Accent     (global, no depende de la marca)
+color  = marca · nombre · código · base (obligatoria) · acabado (obligatorio, Brillante)
+         · familia (Blancos, Rojos…) · hexadecimal (obligatorio) · CIELAB (opcional)
 
-Línea de venta (carrito y orden) = variante + color elegido (si aplica)
-  → SKU final = SKU de la variante + código del color
-  → la base que se consume sale del color
+variante = producto + medida + precio + SKU base + existencia referencial
+medida   = valor + tipo de medida (galón, litro, pulgada, metro, unidad…)
+
+Línea de carrito / orden = variante + color (si aplica) → SKU compuesto P1-V2-Rojo
+                           → la base que se consume sale del color
 ```
 
-**Colores que ofrece un producto entonable** = colores activos cuya base está entre las bases del producto
-**y** (sin acabado **o** con un acabado que el producto tiene).
+**Colores que ofrece un producto** =
+(colores cuya base está entre las bases del producto **y** cuyo acabado está entre los acabados del producto)
+**más** sus colores exclusivos. Un producto sin bases ni colores exclusivos no lleva color (herramientas, barnices transparentes).
+
+**Cambios al DDL actual:** se eliminan `tonos`, `sub_subcategorias`, `linea.id_sub_subcategoria`, `presentacion`,
+`base.id_marca` y la forma actual de `variante` (producto + base + color + presentación). Se agregan `acabado`,
+`familia_color`, `tipo_medida`, `medida`, `producto_acabado`, `producto_color` y el color en la línea del carrito.
 
 ## 5. Preguntas abiertas
 
-1. ❓ RC-12: "que por defecto sea blanco" ¿significa **vacío** (sin acabado, aplica a todos)?
-2. ❓ RC-13: ¿el **precio cambia según la base o el color**? En colorimetría las bases Deep/Accent suelen costar más. Si cambia, la variante necesita un precio por base.
-3. ❓ RC-12: si un producto tiene mate y brillante, ¿el cliente **elige el acabado** al comprar? ¿Cambia el precio?
-4. ❓ RC-10: en productos de color de fábrica, ¿el precio o la existencia **cambian por color**? Con variante = medida, la existencia queda por medida y no por color.
-5. ❓ RC-14: ¿sirve **categoría = ambiente** y **subcategoría = superficie**, con el tipo de producto como dato del producto?
-6. ❓ RC-05: el spec exige CIELAB obligatorio y no hay archivo. ¿Basta con un **hexadecimal** obligatorio y CIELAB opcional?
-7. ❓ ¿Las bases son por marca (otras marcas tienen sus propias bases y colores)?
-8. ❓ ¿Existe un archivo con la **base de datos que propuso el Tech Lead**? El DDL del repo es distinto (presentación sin unidad, tabla `tonos`, tercer nivel de categorías, variante con base y color).
-9. ❓ Unidad y uso del volumen: ¿la medida sirve para **comparar precios** entre productos o es solo informativa?
-10. Mayúsculas en nombres (D4) y reactivación sin cascada (D3), del contrato de la entrega 1.
+1. ❓ **Categorías.** El Excel `bd/script/Pintuco_Categorias_y_Subcategorias.xlsx` (9 categorías, 53 subcategorías) clasifica por **uso** (Paredes y techos, Maderas, Metales, Pisos, Automotriz…) y lleva interior/exterior dentro de la subcategoría. Ahí "ambiente" como categoría no funciona para Pisos, Automotriz o Industrial. Propuesta: categorías del Excel y **ambiente como dato del producto**, que alimenta las pestañas "Pintura Interior / Exterior" de la web.
+2. ❓ **Colores de ICO** (RC-16): si no se consigue la base de esos colores, no se podrían registrar con la base obligatoria.
+3. ❓ **Miércoles de color** (RC-23): ¿significa que el blanco queda **excluido** del descuento?
+4. ❓ **Hexadecimal obligatorio y CIELAB opcional** (ver explicación en el chat del 2026-10-23).
+5. Mayúsculas en nombres (D4) y reactivación sin cascada (D3), del contrato de la entrega 1.
