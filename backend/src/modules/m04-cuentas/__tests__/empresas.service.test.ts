@@ -319,7 +319,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
 
       await expect(
         service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'rechazar' })
-      ).rejects.toMatchObject({ codigo: 'MOTIVO_RECHAZO_REQUERIDO' });
+      ).rejects.toMatchObject({ codigo: 'DATOS_INVALIDOS' });
 
       expect(solicitudesRepo.decidirSolicitud).not.toHaveBeenCalled();
     });
@@ -346,7 +346,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
 
       await expect(
         service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'rechazar', motivoRechazo: 'corto' })
-      ).rejects.toMatchObject({ codigo: 'MOTIVO_RECHAZO_REQUERIDO', statusCode: 400 });
+      ).rejects.toMatchObject({ codigo: 'DATOS_INVALIDOS', statusCode: 400 });
 
       expect(solicitudesRepo.decidirSolicitud).not.toHaveBeenCalled();
     });
@@ -371,7 +371,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
 
       await expect(
         service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'rechazar', motivoRechazo: 'Ya no aplica' })
-      ).rejects.toMatchObject({ codigo: 'SOLICITUD_YA_DECIDIDA', statusCode: 409 });
+      ).rejects.toMatchObject({ codigo: 'RECURSO_NO_ENCONTRADO', statusCode: 409 });
 
       expect(solicitudesRepo.decidirSolicitud).not.toHaveBeenCalled();
       expect(notificaciones.notificarDictamenEmpresa).not.toHaveBeenCalled();
@@ -383,7 +383,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
 
       await expect(
         service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'aprobar' })
-      ).rejects.toMatchObject({ codigo: 'SOLICITUD_YA_DECIDIDA', statusCode: 409 });
+      ).rejects.toMatchObject({ codigo: 'RECURSO_NO_ENCONTRADO', statusCode: 409 });
 
       expect(notificaciones.notificarDictamenEmpresa).not.toHaveBeenCalled();
     });
@@ -402,7 +402,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
     it('una solicitud inexistente responde 404', async () => {
       await expect(
         service.dictaminarSolicitud('no-existe', 1, { decision: 'aprobar' })
-      ).rejects.toMatchObject({ codigo: 'SOLICITUD_NO_ENCONTRADA', statusCode: 404 });
+      ).rejects.toMatchObject({ codigo: 'RECURSO_NO_ENCONTRADO', statusCode: 404 });
     });
   });
 
@@ -465,13 +465,13 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       );
       await expect(
         service.dictaminarRenovacionNit('renovacion-uuid-1', 1, { decision: 'aprobar' })
-      ).rejects.toMatchObject({ codigo: 'SOLICITUD_YA_DECIDIDA', statusCode: 409 });
+      ).rejects.toMatchObject({ codigo: 'RECURSO_NO_ENCONTRADO', statusCode: 409 });
 
       vi.mocked(solicitudesRepo.buscarRenovacionPorId).mockResolvedValueOnce(renovacionPendiente());
       vi.mocked(solicitudesRepo.decidirRenovacionNit).mockResolvedValueOnce({ resultado: 'ya_decidida' });
       await expect(
         service.dictaminarRenovacionNit('renovacion-uuid-1', 1, { decision: 'aprobar' })
-      ).rejects.toMatchObject({ codigo: 'SOLICITUD_YA_DECIDIDA', statusCode: 409 });
+      ).rejects.toMatchObject({ codigo: 'RECURSO_NO_ENCONTRADO', statusCode: 409 });
     });
 
     it('si el NIT nuevo pasó a otra cuenta mientras esperaba, responde 409 NIT_YA_REGISTRADO', async () => {
@@ -561,7 +561,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
 
     it('un documento inexistente responde 404', async () => {
       await expect(service.obtenerDocumentoRut('doc-uuid-1')).rejects.toMatchObject({
-        codigo: 'DOCUMENTO_NO_ENCONTRADO',
+        codigo: 'RECURSO_NO_ENCONTRADO',
         statusCode: 404,
       });
     });
@@ -572,7 +572,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       );
 
       await expect(service.obtenerDocumentoRut('doc-uuid-1')).rejects.toMatchObject({
-        codigo: 'DOCUMENTO_INTEGRIDAD_NO_VERIFICADA',
+        codigo: 'ARCHIVO_NO_PERMITIDO',
         statusCode: 500,
       });
     });

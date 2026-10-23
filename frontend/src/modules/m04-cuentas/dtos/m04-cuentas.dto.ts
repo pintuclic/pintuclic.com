@@ -38,8 +38,10 @@ export const nombreSchema = z
   .min(2, 'El nombre debe tener al menos 2 caracteres')
   .max(150, 'El nombre no puede exceder 150 caracteres');
 
-/** Misma normalización que el contrato (RN-CUE-14): sin espacios ni puntos; el guion se conserva. */
+/** Misma regla que el contrato (RN-CUE-14): sin espacios ni puntos y con guion obligatorio. */
 export const normalizarNit = (nit: string): string => nit.replace(/[\s.]/g, '');
+
+export const FORMATO_NIT = /^\d{5,15}-\d$/;
 
 export const nitSchema = z
   .string()
@@ -47,8 +49,7 @@ export const nitSchema = z
   .pipe(
     z
       .string()
-      .min(5, 'El NIT debe tener al menos 5 caracteres')
-      .max(30, 'El NIT no puede exceder 30 caracteres'),
+      .regex(FORMATO_NIT, 'El NIT debe tener el formato 900123456-7, con guion antes del dígito de verificación'),
   );
 
 export const codigoOtpSchema = z
@@ -92,6 +93,7 @@ export const CODIGOS_ERROR_CUENTAS = {
   NO_AUTORIZADO: 'NO_AUTORIZADO',
   PERMISO_DENEGADO: 'PERMISO_DENEGADO',
   RECURSO_NO_ENCONTRADO: 'RECURSO_NO_ENCONTRADO',
+  DATOS_INVALIDOS: 'DATOS_INVALIDOS',
   ERROR_INTERNO: 'ERROR_INTERNO',
 } as const;
 

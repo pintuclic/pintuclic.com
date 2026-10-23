@@ -21,6 +21,7 @@ describe('RecuperacionPasswordService (HU-CUE-05)', () => {
   const fechaBase = new Date('2026-10-21T12:00:00Z');
 
   beforeEach(() => {
+    vi.stubEnv('JWT_SECRET', 'secreto-de-pruebas-m04-con-mas-de-32-caracteres');
     dateProvider = new SimuladoDateProviderAdapter(fechaBase);
 
     cuentasRepo = {
@@ -93,6 +94,63 @@ describe('RecuperacionPasswordService (HU-CUE-05)', () => {
     );
   });
 
+  /** Código tal como lo dejó guardarCodigo, con el hash real del valor aleatorio. */
+  const codigoGuardado = (idUsuarioDelCodigo: number): CodigoVerificacion => {
+    const guardado = vi.mocked(codigosRepo.guardarCodigo).mock.calls[0]![0];
+    return {
+      idCodigo: 'recup-uuid-999',
+      correo: 'recuperar@pintuclic.com',
+      codigoHash: guardado.codigoHash,
+      tipo: 'recuperacion_password',
+      intentos: 0,
+      maxIntentos: 3,
+      expiracion: new Date(fechaBase.getTime() + 30 * 60 * 1000),
+      datosTemporales: { idUsuario: idUsuarioDelCodigo },
+      fechaCreacion: fechaBase,
+    } as CodigoVerificacion;
+  };
+
+  const solicitarPara42 = async (): Promise<string> => {
+    vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+      idUsuario: 42,
+      correo: 'recuperar@pintuclic.com',
+      estado: 'activo',
+    } as Usuario);
+    await service.solicitarRecuperacion('recuperar@pintuclic.com');
+    return vi.mocked(notificaciones.enviarEnlaceRecuperacion).mock.calls[0]![1];
+  };
+
+  it('no persiste el valor aleatorio del enlace en texto plano', async () => {
+    await solicitarPara42();
+
+    const guardado = vi.mocked(codigosRepo.guardarCodigo).mock.calls[0]![0];
+    expect(guardado.datosTemporales).toEqual({ idUsuario: 42 });
+  });
+
+  it('rechaza un enlace cuyo código pertenece a otro usuario sin cambiar ninguna contraseña', async () => {
+    const tokenEmitido = await solicitarPara42();
+    vi.mocked(codigosRepo.buscarPorId).mockResolvedValueOnce(codigoGuardado(7));
+
+    await expect(
+      service.restablecerPassword({ token: tokenEmitido, nuevaContrasena: 'NuevaPasswordSegura123!' }),
+    ).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO_O_EXPIRADO' });
+    expect(cuentasRepo.actualizarContrasena).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un enlace cuyo valor aleatorio no coincide con el hash y cuenta el intento', async () => {
+    const tokenEmitido = await solicitarPara42();
+    vi.mocked(codigosRepo.buscarPorId).mockResolvedValueOnce({
+      ...codigoGuardado(42),
+      codigoHash: '$2b$12$C6UzMDM.H6dfI/f/IKcEe.JustAPlaceholderHashForTimingXXXXXXXXXX',
+    });
+
+    await expect(
+      service.restablecerPassword({ token: tokenEmitido, nuevaContrasena: 'NuevaPasswordSegura123!' }),
+    ).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO_O_EXPIRADO' });
+    expect(codigosRepo.incrementarIntentos).toHaveBeenCalledWith('recup-uuid-999');
+    expect(cuentasRepo.actualizarContrasena).not.toHaveBeenCalled();
+  });
+
   it('solicita recuperación para correo existente y emite notificación con enlace seguro (30m)', async () => {
     vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
       idUsuario: 42,
@@ -130,18 +188,7 @@ describe('RecuperacionPasswordService (HU-CUE-05)', () => {
     await service.solicitarRecuperacion('recuperar@pintuclic.com');
 
     const tokenEmitido = vi.mocked(notificaciones.enviarEnlaceRecuperacion).mock.calls[0]![1];
-
-    vi.mocked(codigosRepo.buscarPorId).mockResolvedValueOnce({
-      idCodigo: 'recup-uuid-999',
-      correo: 'recuperar@pintuclic.com',
-      codigoHash: 'hash',
-      tipo: 'recuperacion_password',
-      intentos: 0,
-      maxIntentos: 3,
-      expiracion: new Date(fechaBase.getTime() + 30 * 60 * 1000),
-      datosTemporales: { idUsuario: 42 },
-      fechaCreacion: fechaBase,
-    } as CodigoVerificacion);
+    vi.mocked(codigosRepo.buscarPorId).mockResolvedValueOnce(codigoGuardado(42));
 
     vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce({
       idUsuario: 42,

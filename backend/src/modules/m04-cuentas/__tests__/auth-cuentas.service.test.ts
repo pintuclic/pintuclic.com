@@ -23,6 +23,7 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
   const fechaBase = new Date('2026-10-21T12:00:00Z');
 
   beforeEach(() => {
+    vi.stubEnv('JWT_SECRET', 'secreto-de-pruebas-m04-con-mas-de-32-caracteres');
     dateProvider = new SimuladoDateProviderAdapter(fechaBase);
 
     cuentasRepo = {
@@ -148,6 +149,7 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
         sub: 'google-sub-456',
         email: 'nuevo-google@pintuclic.com',
         nombre: 'Google Usuario',
+        emailVerified: true,
       }),
     };
 
@@ -290,6 +292,22 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
    * HU-CUE-02: FEDERACIÓN GOOGLE IDENTITY
    * ─────────────────────────────────────────────────────────────────────────── */
   describe('HU-CUE-02: Federación con Google', () => {
+    it('rechaza un correo no verificado por Google sin buscar ni vincular cuentas', async () => {
+      vi.mocked(googleAuth.verificarIdToken).mockResolvedValueOnce({
+        sub: 'google-sub-789',
+        email: 'cliente@pintuclic.com',
+        nombre: 'Sin Verificar',
+        emailVerified: false,
+      });
+
+      await expect(authService.autenticarGoogle({ idToken: 'token-sin-verificar' })).rejects.toMatchObject({
+        codigo: 'CREDENCIALES_INVALIDAS',
+        statusCode: 401,
+      });
+      expect(cuentasRepo.buscarPorCorreo).not.toHaveBeenCalled();
+      expect(cuentasRepo.vincularIdentidadExterna).not.toHaveBeenCalled();
+    });
+
     it('inicia sesión directamente si el usuario ya tiene la identidad vinculada', async () => {
       vi.mocked(cuentasRepo.buscarIdentidadExterna).mockResolvedValueOnce({
         idIdentidad: 1,
@@ -382,6 +400,42 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
         expect(sesionService.crear).toHaveBeenCalledWith(5, 'cliente');
         expect(controlIntentosRepo.limpiar).toHaveBeenCalledWith('login@pintuclic.com');
       }
+    });
+
+    it('cuenta inactiva con clave errónea responde igual que una inexistente (RF-SEG-06-06)', async () => {
+      const passHash = await derivarContrasena('ClaveCorrecta123!');
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 3,
+        correo: 'baja@pintuclic.com',
+        contrasena: passHash,
+        estado: 'inactivo',
+        tipo: 'normal',
+        idRol: null,
+        cambioContrasenaPendiente: false,
+      } as Usuario);
+
+      await expect(
+        authService.login({ correo: 'baja@pintuclic.com', contrasena: 'ClaveErronea123!' }),
+      ).rejects.toMatchObject({ codigo: 'CREDENCIALES_INVALIDAS', statusCode: 401 });
+      expect(controlIntentosRepo.registrarFallo).toHaveBeenCalled();
+    });
+
+    it('cuenta inactiva con clave correcta informa el estado sin abrir sesión', async () => {
+      const passHash = await derivarContrasena('ClaveCorrecta123!');
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 3,
+        correo: 'baja@pintuclic.com',
+        contrasena: passHash,
+        estado: 'inactivo',
+        tipo: 'normal',
+        idRol: null,
+        cambioContrasenaPendiente: false,
+      } as Usuario);
+
+      await expect(
+        authService.login({ correo: 'baja@pintuclic.com', contrasena: 'ClaveCorrecta123!' }),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      expect(sesionService.crear).not.toHaveBeenCalled();
     });
 
     it('identifica como esAdmin=true y abre sesión admin para administrador o colaborador de M17', async () => {

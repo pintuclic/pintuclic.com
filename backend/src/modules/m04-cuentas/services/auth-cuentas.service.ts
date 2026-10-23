@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { Prisma, type Sesion, type Usuario } from '@prisma/client';
 import { derivarContrasena, verificarContrasena } from '../../../core/utils/crypto';
 import { esUsuarioAdministrativo, type CuentasRepository } from '../repositories/cuentas.repository';
+import { obtenerSecretoJwt } from './secreto-jwt';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
 import type { ControlIntentosRepository } from '../repositories/control-intentos.repository';
 import type { NotificacionesPort } from '../interfaces/notificaciones.port';
@@ -51,7 +52,7 @@ export class AuthCuentasService {
   ) {}
 
   private obtenerJwtSecret(): string {
-    return process.env.JWT_SECRET ?? 'clave-secreta-predeterminada-para-desarrollo-minimo-32-caracteres';
+    return obtenerSecretoJwt();
   }
 
   /**
@@ -122,7 +123,7 @@ export class AuthCuentasService {
   ): Promise<{ usuario: Usuario; sesion: Sesion }> {
     const registro = await this.codigosRepo.buscarPorId(idVerificacion);
     if (!registro || registro.tipo !== 'registro') {
-      throw new AuthCuentasError('Código o verificación inexistente.', 'CODIGO_NO_ENCONTRADO', 404);
+      throw new AuthCuentasError('Código o verificación inexistente.', 'CODIGO_INVALIDO_O_EXPIRADO', 404);
     }
 
     const ahora = this.dateProvider.ahora();
@@ -132,7 +133,7 @@ export class AuthCuentasService {
       await this.codigosRepo.eliminar(idVerificacion);
       throw new AuthCuentasError(
         'El código de verificación ha expirado.',
-        'CODIGO_EXPIRADO',
+        'CODIGO_INVALIDO_O_EXPIRADO',
         400,
       );
     }
@@ -142,7 +143,7 @@ export class AuthCuentasService {
       await this.codigosRepo.eliminar(idVerificacion);
       throw new AuthCuentasError(
         'Se ha superado el número máximo de intentos permitidos.',
-        'INTENTOS_AGOTADOS',
+        'MAXIMO_INTENTOS_EXCEDIDO',
         400,
       );
     }
@@ -154,7 +155,7 @@ export class AuthCuentasService {
       const restantes = Math.max(0, registro.maxIntentos - actualizado.intentos);
       throw new AuthCuentasError(
         `Código de verificación incorrecto. Intentos restantes: ${restantes}.`,
-        'CODIGO_INVALIDO',
+        'CODIGO_INVALIDO_O_EXPIRADO',
         400,
         { intentosRestantes: restantes },
       );
@@ -170,7 +171,7 @@ export class AuthCuentasService {
     if (!datos || !datos.contrasenaHash) {
       throw new AuthCuentasError(
         'Datos de registro incompletos o corruptos.',
-        'DATOS_REGISTRO_INVALIDOS',
+        'DATOS_INVALIDOS',
         400,
       );
     }
@@ -218,7 +219,7 @@ export class AuthCuentasService {
   }> {
     const registro = await this.codigosRepo.buscarPorId(idVerificacion);
     if (!registro || registro.tipo !== 'registro') {
-      throw new AuthCuentasError('Solicitud de verificación no encontrada.', 'VERIFICACION_NO_ENCONTRADA', 404);
+      throw new AuthCuentasError('Solicitud de verificación no encontrada.', 'CODIGO_INVALIDO_O_EXPIRADO', 404);
     }
 
     const nuevoCodigo = Math.floor(100000 + Math.random() * 900000).toString();
@@ -269,7 +270,7 @@ export class AuthCuentasService {
       );
       throw new AuthCuentasError(
         `Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intente nuevamente en ${Math.ceil(segundosRestantes / 60)} minutos.`,
-        'CUENTA_BLOQUEADA_TEMPORALMENTE',
+        'CUENTA_BLOQUEADA',
         423,
         { reintentarEnSegundos: segundosRestantes },
       );
@@ -290,17 +291,8 @@ export class AuthCuentasService {
       throw new AuthCuentasError('Credenciales incorrectas.', 'CREDENCIALES_INVALIDAS', 401);
     }
 
-    // 4. Si la cuenta no está activa
-    if (usuario.estado !== 'activo') {
-      await verificarContrasena(input.contrasena, DERIVACION_SENUELO);
-      throw new AuthCuentasError(
-        'La cuenta se encuentra inactiva, bloqueada o pendiente de validación.',
-        'CUENTA_NO_ACTIVA',
-        403,
-      );
-    }
-
-    // 5. Comparar contraseña con BCrypt
+    // 4. Comparar contraseña con BCrypt ANTES de revelar el estado de la cuenta:
+    // con clave errónea, una cuenta inactiva responde igual que una inexistente (RF-SEG-06-06).
     const coincide = await verificarContrasena(input.contrasena, usuario.contrasena);
     if (!coincide) {
       const fallo = await this.controlIntentosRepo.registrarFallo(
@@ -313,7 +305,7 @@ export class AuthCuentasService {
       if (fallo.bloqueadoHasta && fallo.bloqueadoHasta.getTime() > ahora.getTime()) {
         throw new AuthCuentasError(
           'Ha superado el número de intentos permitidos. Su cuenta ha sido bloqueada temporalmente por 15 minutos.',
-          'CUENTA_BLOQUEADA_TEMPORALMENTE',
+          'CUENTA_BLOQUEADA',
           423,
           { reintentarEnSegundos: MINUTOS_BLOQUEO_INTENTOS * 60 },
         );
@@ -325,6 +317,22 @@ export class AuthCuentasService {
         'CREDENCIALES_INVALIDAS',
         401,
         { intentosRestantes: restantes },
+      );
+    }
+
+    // 5. Solo quien demostró conocer la clave sabe que la cuenta no está activa.
+    if (usuario.estado === 'pendiente') {
+      throw new AuthCuentasError(
+        'La cuenta está pendiente de activación.',
+        'CUENTA_PENDIENTE_ACTIVACION',
+        403,
+      );
+    }
+    if (usuario.estado !== 'activo') {
+      throw new AuthCuentasError(
+        'La cuenta se encuentra inactiva o bloqueada.',
+        'CUENTA_BLOQUEADA',
+        403,
       );
     }
 
@@ -373,16 +381,16 @@ export class AuthCuentasService {
         tipo: string;
       };
     } catch {
-      throw new AuthCuentasError('Token de cambio de contraseña inválido o expirado.', 'TOKEN_INVALIDO', 401);
+      throw new AuthCuentasError('Token de cambio de contraseña inválido o expirado.', 'TOKEN_INVALIDO_O_EXPIRADO', 401);
     }
 
     if (payload.tipo !== 'cambio_primer_acceso') {
-      throw new AuthCuentasError('Tipo de token no autorizado.', 'TOKEN_INVALIDO', 401);
+      throw new AuthCuentasError('Tipo de token no autorizado.', 'TOKEN_INVALIDO_O_EXPIRADO', 401);
     }
 
     const usuario = await this.cuentasRepo.buscarPorId(payload.idUsuario);
     if (!usuario) {
-      throw new AuthCuentasError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
+      throw new AuthCuentasError('Usuario no encontrado.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     const contrasenaHash = await derivarContrasena(nuevaContrasena);
@@ -407,6 +415,10 @@ export class AuthCuentasService {
     | { cuentaNueva: true; tokenRegistroTemporal: string; email: string; nombre: string }
   > {
     const claims = await this.googleAuth.verificarIdToken(input.idToken);
+    // Sin correo verificado por Google no hay prueba de titularidad para vincular cuentas.
+    if (!claims.emailVerified) {
+      throw new AuthCuentasError('Credenciales incorrectas.', 'CREDENCIALES_INVALIDAS', 401);
+    }
     const emailNormalizado = claims.email.trim().toLowerCase();
 
     // 1. Buscar si ya existe la identidad externa vinculada
@@ -414,10 +426,10 @@ export class AuthCuentasService {
     if (identidad) {
       const usuario = await this.cuentasRepo.buscarPorId(identidad.idUsuario);
       if (!usuario || usuario.estado !== 'activo') {
-        throw new AuthCuentasError('Cuenta asociada inactiva o no disponible.', 'CUENTA_NO_ACTIVA', 403);
+        throw new AuthCuentasError('Cuenta asociada inactiva o no disponible.', 'CUENTA_BLOQUEADA', 403);
       }
 
-      const tipoSesion = usuario.tipo === 'empresa' ? 'cliente' : usuario.idRol !== null ? 'admin' : 'cliente';
+      const tipoSesion = esUsuarioAdministrativo(usuario) ? 'admin' : 'cliente';
       const sesion = await this.sesionService.crear(usuario.idUsuario, tipoSesion);
       return { cuentaNueva: false, usuario, sesion };
     }
@@ -426,7 +438,7 @@ export class AuthCuentasService {
     const usuarioExistente = await this.cuentasRepo.buscarPorCorreo(emailNormalizado);
     if (usuarioExistente) {
       if (usuarioExistente.estado !== 'activo') {
-        throw new AuthCuentasError('Cuenta existente no se encuentra activa.', 'CUENTA_NO_ACTIVA', 403);
+        throw new AuthCuentasError('Cuenta existente no se encuentra activa.', 'CUENTA_BLOQUEADA', 403);
       }
 
       // Vincular automáticamente la identidad de Google a la cuenta existente
@@ -437,8 +449,7 @@ export class AuthCuentasService {
         correoProveedor: emailNormalizado,
       });
 
-      const tipoSesion =
-        usuarioExistente.tipo === 'empresa' ? 'cliente' : usuarioExistente.idRol !== null ? 'admin' : 'cliente';
+      const tipoSesion = esUsuarioAdministrativo(usuarioExistente) ? 'admin' : 'cliente';
       const sesion = await this.sesionService.crear(usuarioExistente.idUsuario, tipoSesion);
       return { cuentaNueva: false, usuario: usuarioExistente, sesion };
     }
@@ -474,11 +485,11 @@ export class AuthCuentasService {
     try {
       payload = jwt.verify(input.tokenRegistroTemporal, this.obtenerJwtSecret()) as TokenRegistroGooglePayload;
     } catch {
-      throw new AuthCuentasError('Token de registro Google expirado o inválido.', 'TOKEN_INVALIDO', 401);
+      throw new AuthCuentasError('Token de registro Google expirado o inválido.', 'TOKEN_INVALIDO_O_EXPIRADO', 401);
     }
 
     if (payload.tipo !== 'google_registro') {
-      throw new AuthCuentasError('Tipo de token no válido para completar registro.', 'TOKEN_INVALIDO', 401);
+      throw new AuthCuentasError('Tipo de token no válido para completar registro.', 'TOKEN_INVALIDO_O_EXPIRADO', 401);
     }
 
     // Comprobar que el correo no se haya registrado entretanto

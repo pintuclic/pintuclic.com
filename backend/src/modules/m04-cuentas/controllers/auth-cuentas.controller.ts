@@ -270,7 +270,7 @@ export class AuthCuentasController {
       res.status(401).json({
         success: false,
         error: {
-          code: 'TOKEN_INVALIDO',
+          code: 'TOKEN_INVALIDO_O_EXPIRADO',
           message: 'Token de primer acceso requerido para cambiar la contraseña.',
         },
       });

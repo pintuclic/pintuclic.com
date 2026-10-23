@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  nitSchema,
   normalizarNit,
   registroEmpresaRequestSchema,
   solicitarAscensoEmpresaRequestSchema,
@@ -18,8 +19,22 @@ describe('normalizarNit', () => {
     expect(normalizarNit('900555666-1')).toBe('900555666-1');
   });
 
-  it('no infiere el dígito de verificación: sin guion queda tal cual (decisión del PO)', () => {
+  it('no infiere el dígito de verificación: sin guion queda tal cual', () => {
     expect(normalizarNit('9005556661')).toBe('9005556661');
+  });
+});
+
+/** Decisión del PO (2026-10-23): todo NIT lleva guion antes del dígito de verificación. */
+describe('formato de NIT con guion obligatorio', () => {
+  it.each(['9005556661', '900555666', '900555666-', '900555666-12', '-1', 'ABC555666-1'])(
+    'rechaza "%s"',
+    (nit) => {
+      expect(nitSchema.safeParse(nit).success).toBe(false);
+    },
+  );
+
+  it.each(['900555666-1', '900.555.666-1', ' 12345-6 '])('acepta "%s"', (nit) => {
+    expect(nitSchema.safeParse(nit).success).toBe(true);
   });
 });
 
@@ -55,5 +70,20 @@ describe('esquemas con NIT normalizado', () => {
 
   it('la longitud mínima se valida sobre el NIT ya normalizado', () => {
     expect(registroEmpresaRequestSchema.safeParse({ ...empresa, nit: '1.2.3', contrasena: 'ClaveSegura2026!' }).success).toBe(false);
+  });
+
+  it('las tres entradas rechazan un NIT sin guion', () => {
+    expect(registroEmpresaRequestSchema.safeParse({ ...empresa, nit: '9005556661', contrasena: 'ClaveSegura2026!' }).success).toBe(false);
+    expect(solicitarAscensoEmpresaRequestSchema.safeParse({ ...empresa, nit: '9005556661' }).success).toBe(false);
+    expect(
+      solicitarRenovacionNitRequestSchema.safeParse({
+        nitNuevo: '9012345679',
+        nombreOriginal: 'rut.pdf',
+        tipoMime: 'application/pdf',
+        tamanoBytes: 10,
+        sha256: 'a'.repeat(64),
+        contenidoBase64: 'QQ==',
+      }).success,
+    ).toBe(false);
   });
 });

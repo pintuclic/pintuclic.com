@@ -7,6 +7,17 @@ export class GoogleAuthTokenInvalidoError extends Error {
   }
 }
 
+/**
+ * HU-CUE-02 aplazada: mientras no exista un adaptador que verifique la firma del
+ * ID token contra Google, ningún token es válido. Es el adaptador por omisión.
+ */
+export class GoogleAuthDeshabilitadoAdapter implements GoogleAuthPort {
+  async verificarIdToken(): Promise<GoogleUserClaims> {
+    throw new GoogleAuthTokenInvalidoError('El inicio de sesión con Google no está habilitado.');
+  }
+}
+
+/** Solo para pruebas: acepta tokens sin verificarlos criptográficamente. */
 export class MockGoogleAuthAdapter implements GoogleAuthPort {
   private tokens: Map<string, GoogleUserClaims> = new Map();
 

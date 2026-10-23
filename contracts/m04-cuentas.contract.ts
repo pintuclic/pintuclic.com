@@ -46,10 +46,14 @@ export const nombreSchema = z
 /**
  * RN-CUE-14 / RFC-M04-001: el contrato normaliza el NIT antes de compararlo o
  * guardarlo. Se quitan espacios y puntos (separadores de miles: "900.555.666-1" y
- * "900555666-1" son el mismo NIT); el guion del dígito de verificación se conserva
- * tal cual, porque el formato definitivo lo fija el Product Owner.
+ * "900555666-1" son el mismo NIT).
+ *
+ * Decisión del Product Owner (2026-10-23): todo NIT lleva guion antes del dígito
+ * de verificación. "9005556661" se rechaza; no se adivina dónde va el guion.
  */
 export const normalizarNit = (nit: string): string => nit.replace(/[\s.]/g, '');
+
+export const FORMATO_NIT = /^\d{5,15}-\d$/;
 
 export const nitSchema = z
   .string()
@@ -57,8 +61,7 @@ export const nitSchema = z
   .pipe(
     z
       .string()
-      .min(5, 'El NIT debe tener al menos 5 caracteres')
-      .max(30, 'El NIT no puede exceder 30 caracteres'),
+      .regex(FORMATO_NIT, 'El NIT debe tener el formato 900123456-7, con guion antes del dígito de verificación'),
   );
 
 export const codigoOtpSchema = z
@@ -102,6 +105,7 @@ export const CODIGOS_ERROR_CUENTAS = {
   NO_AUTORIZADO: 'NO_AUTORIZADO',
   PERMISO_DENEGADO: 'PERMISO_DENEGADO',
   RECURSO_NO_ENCONTRADO: 'RECURSO_NO_ENCONTRADO',
+  DATOS_INVALIDOS: 'DATOS_INVALIDOS',
   ERROR_INTERNO: 'ERROR_INTERNO',
 } as const;
 
@@ -122,6 +126,7 @@ export const codigoErrorCuentasSchema = z.enum([
   CODIGOS_ERROR_CUENTAS.NO_AUTORIZADO,
   CODIGOS_ERROR_CUENTAS.PERMISO_DENEGADO,
   CODIGOS_ERROR_CUENTAS.RECURSO_NO_ENCONTRADO,
+  CODIGOS_ERROR_CUENTAS.DATOS_INVALIDOS,
   CODIGOS_ERROR_CUENTAS.ERROR_INTERNO,
 ]);
 
@@ -394,7 +399,7 @@ export type SolicitudEmpresaItem = z.infer<typeof solicitudEmpresaItemSchema>;
  * El motivo es OPCIONAL en el contrato (decisión del Director Humano, 2026-10-22).
  * La excepción es el rechazo de un REGISTRO de empresa, donde RN-CUE-17 lo exige:
  * esa regla depende del tipo de solicitud, que solo conoce el servidor, y se aplica
- * en `EmpresasService.dictaminarSolicitud` (MOTIVO_RECHAZO_REQUERIDO).
+ * en `EmpresasService.dictaminarSolicitud` (DATOS_INVALIDOS).
  */
 export const dictamenSolicitudEmpresaRequestSchema = z.object({
   decision: z.enum(['aprobar', 'rechazar']),

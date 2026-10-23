@@ -43,7 +43,7 @@ export class PerfilService {
   async obtenerPerfil(idUsuario: number): Promise<PerfilUsuarioResponse> {
     const usuario = await this.cuentasRepo.buscarConEmpresaPorId(idUsuario);
     if (!usuario) {
-      throw new PerfilError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
+      throw new PerfilError('Usuario no encontrado.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     const empresa = usuario.cuentaEmpresa;
@@ -75,7 +75,7 @@ export class PerfilService {
   async actualizarDatos(idUsuario: number, input: ActualizarDatosPerfilRequest) {
     const usuario = await this.cuentasRepo.buscarPorId(idUsuario);
     if (!usuario) {
-      throw new PerfilError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
+      throw new PerfilError('Usuario no encontrado.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     await this.cuentasRepo.actualizarDatosPerfil(idUsuario, {
@@ -93,12 +93,12 @@ export class PerfilService {
   async cambiarPassword(idUsuario: number, input: CambiarContrasenaPerfilRequest) {
     const usuario = await this.cuentasRepo.buscarPorId(idUsuario);
     if (!usuario) {
-      throw new PerfilError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
+      throw new PerfilError('Usuario no encontrado.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     const coincideActual = await verificarContrasena(input.contrasenaActual, usuario.contrasena);
     if (!coincideActual) {
-      throw new PerfilError('La contraseña actual es incorrecta.', 'CONTRASENA_ACTUAL_INCORRECTA', 400);
+      throw new PerfilError('La contraseña actual es incorrecta.', 'CREDENCIALES_INVALIDAS', 400);
     }
 
     const nuevoHash = await derivarContrasena(input.nuevaContrasena);
@@ -118,20 +118,20 @@ export class PerfilService {
   async solicitarCambioCorreo(idUsuario: number, input: SolicitarCambioCorreoRequest) {
     const usuario = await this.cuentasRepo.buscarPorId(idUsuario);
     if (!usuario) {
-      throw new PerfilError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
+      throw new PerfilError('Usuario no encontrado.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     // Validar contraseña antes de emitir cambio
     const coincide = await verificarContrasena(input.contrasena, usuario.contrasena);
     if (!coincide) {
-      throw new PerfilError('La contraseña es incorrecta.', 'CONTRASENA_INCORRECTA', 400);
+      throw new PerfilError('La contraseña es incorrecta.', 'CREDENCIALES_INVALIDAS', 400);
     }
 
     const nuevoCorreoNormalizado = input.nuevoCorreo.trim().toLowerCase();
     if (usuario.correo.toLowerCase() === nuevoCorreoNormalizado) {
       throw new PerfilError(
         'El nuevo correo debe ser diferente al correo actual.',
-        'CORREO_IDENTICO',
+        'DATOS_INVALIDOS',
         400,
       );
     }
@@ -193,12 +193,12 @@ export class PerfilService {
     );
 
     if (!registro) {
-      throw new PerfilError('Solicitud de verificación no encontrada.', 'VERIFICACION_NO_ENCONTRADA', 404);
+      throw new PerfilError('Solicitud de verificación no encontrada.', 'CODIGO_INVALIDO_O_EXPIRADO', 404);
     }
 
     if (ahora.getTime() > registro.expiracion.getTime()) {
       await this.codigosRepo.eliminar(registro.idCodigo);
-      throw new PerfilError('El código de verificación ha expirado.', 'CODIGO_EXPIRADO', 400);
+      throw new PerfilError('El código de verificación ha expirado.', 'CODIGO_INVALIDO_O_EXPIRADO', 400);
     }
 
     const coincide = await verificarContrasena(input.codigo, registro.codigoHash);
@@ -207,7 +207,7 @@ export class PerfilService {
       const restantes = Math.max(0, registro.maxIntentos - actualizado.intentos);
       throw new PerfilError(
         `Código de verificación incorrecto. Intentos restantes: ${restantes}.`,
-        'CODIGO_INVALIDO',
+        'CODIGO_INVALIDO_O_EXPIRADO',
         400,
       );
     }
@@ -218,7 +218,7 @@ export class PerfilService {
       nuevoCorreo?: string;
     } | null;
     if (datos?.idUsuario !== idUsuario || !datos?.nuevoCorreo) {
-      throw new PerfilError('Inconsistencia en la verificación de usuario.', 'USUARIO_NO_COINCIDE', 403);
+      throw new PerfilError('Inconsistencia en la verificación de usuario.', 'CODIGO_INVALIDO_O_EXPIRADO', 403);
     }
 
     await this.cuentasRepo.actualizarCorreo(idUsuario, datos.nuevoCorreo);
@@ -240,12 +240,12 @@ export class PerfilService {
   async desactivarCuenta(idUsuario: number, input: DesactivarCuentaRequest) {
     const usuario = await this.cuentasRepo.buscarPorId(idUsuario);
     if (!usuario) {
-      throw new PerfilError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
+      throw new PerfilError('Usuario no encontrado.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     const coincide = await verificarContrasena(input.contrasena, usuario.contrasena);
     if (!coincide) {
-      throw new PerfilError('Contraseña incorrecta.', 'CONTRASENA_INCORRECTA', 400);
+      throw new PerfilError('Contraseña incorrecta.', 'CREDENCIALES_INVALIDAS', 400);
     }
 
     await this.cuentasRepo.desactivarCuenta(idUsuario);

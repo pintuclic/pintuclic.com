@@ -7,6 +7,7 @@ import type { NotificacionesPort } from '../interfaces/notificaciones.port';
 import type { DateProviderPort } from '../interfaces/date-provider.port';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import type { RestablecerPasswordRequest } from '../dtos/m04-cuentas.dto';
+import { obtenerSecretoJwt } from './secreto-jwt';
 
 const DERIVACION_SENUELO = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.JustAPlaceholderHashForTimingXXXXXXXXXX';
 const MINUTOS_VIGENCIA_RECUPERACION = 30;
@@ -32,7 +33,7 @@ export class RecuperacionPasswordService {
   ) {}
 
   private obtenerJwtSecret(): string {
-    return process.env.JWT_SECRET ?? 'clave-secreta-predeterminada-para-desarrollo-minimo-32-caracteres';
+    return obtenerSecretoJwt();
   }
 
   /**
@@ -64,9 +65,9 @@ export class RecuperacionPasswordService {
       tipo: 'recuperacion_password',
       expiracion,
       maxIntentos: 3,
+      // Solo el hash del valor aleatorio queda en BD; el valor plano viaja únicamente en el enlace.
       datosTemporales: {
         idUsuario: usuario.idUsuario,
-        tokenPlano: tokenAleatorio,
       },
     });
 
@@ -104,59 +105,63 @@ export class RecuperacionPasswordService {
    */
   async restablecerPassword(input: RestablecerPasswordRequest): Promise<{ mensaje: string }> {
     const ahora = this.dateProvider.ahora();
+    // Toda causa de rechazo responde igual: no se revela qué parte del enlace falló.
+    const enlaceInvalido = (): RecuperacionPasswordError =>
+      new RecuperacionPasswordError(
+        'El enlace de recuperación es inválido o ha expirado.',
+        'TOKEN_INVALIDO_O_EXPIRADO',
+        400,
+      );
 
-    let idCodigo: string | null = null;
-    let idUsuario: number | null = null;
-
+    let payload: { idCodigo?: unknown; idUsuario?: unknown; rnd?: unknown; tipo?: unknown };
     try {
-      const payload = jwt.verify(input.token, this.obtenerJwtSecret()) as {
-        idCodigo: string;
-        idUsuario: number;
-        tipo: string;
-      };
-      if (payload.tipo === 'recuperacion_password') {
-        idCodigo = payload.idCodigo;
-        idUsuario = payload.idUsuario;
-      }
+      payload = jwt.verify(input.token, this.obtenerJwtSecret(), { algorithms: ['HS256'] }) as typeof payload;
     } catch {
-      // Si no es un JWT válido, se rechaza
-      throw new RecuperacionPasswordError(
-        'El enlace de recuperación es inválido o ha expirado.',
-        'TOKEN_INVALIDO_O_EXPIRADO',
-        400,
-      );
+      throw enlaceInvalido();
     }
 
-    if (!idCodigo || !idUsuario) {
-      throw new RecuperacionPasswordError(
-        'El enlace de recuperación es inválido o ha expirado.',
-        'TOKEN_INVALIDO_O_EXPIRADO',
-        400,
-      );
+    const { idCodigo, idUsuario, rnd } = payload;
+    if (
+      payload.tipo !== 'recuperacion_password' ||
+      typeof idCodigo !== 'string' ||
+      typeof idUsuario !== 'number' ||
+      typeof rnd !== 'string'
+    ) {
+      throw enlaceInvalido();
     }
 
+    // El código debe pertenecer al mismo usuario que nombra el token.
     const codigoRegistro = await this.codigosRepo.buscarPorId(idCodigo);
-    if (!codigoRegistro || codigoRegistro.tipo !== 'recuperacion_password') {
-      throw new RecuperacionPasswordError(
-        'El enlace de recuperación es inválido o ha expirado.',
-        'TOKEN_INVALIDO_O_EXPIRADO',
-        400,
-      );
+    const datos = codigoRegistro?.datosTemporales;
+    const idUsuarioDelCodigo =
+      typeof datos === 'object' && datos !== null && !Array.isArray(datos) ? datos.idUsuario : undefined;
+    if (
+      !codigoRegistro ||
+      codigoRegistro.tipo !== 'recuperacion_password' ||
+      idUsuarioDelCodigo !== idUsuario
+    ) {
+      throw enlaceInvalido();
     }
 
-    // Validar expiración (RN-CUE-05: BVA 29:59 vs 30:01)
-    if (ahora.getTime() > codigoRegistro.expiracion.getTime()) {
+    // Validar expiración (RN-CUE-05: BVA 29:59 vs 30:01) y agotamiento de intentos.
+    if (
+      ahora.getTime() > codigoRegistro.expiracion.getTime() ||
+      codigoRegistro.intentos >= codigoRegistro.maxIntentos
+    ) {
       await this.codigosRepo.eliminar(codigoRegistro.idCodigo);
-      throw new RecuperacionPasswordError(
-        'El enlace de recuperación ha expirado.',
-        'TOKEN_EXPIRADO',
-        400,
-      );
+      throw enlaceInvalido();
+    }
+
+    // El valor aleatorio del enlace se compara contra el hash almacenado.
+    const coincide = await verificarContrasena(rnd, codigoRegistro.codigoHash);
+    if (!coincide) {
+      await this.codigosRepo.incrementarIntentos(codigoRegistro.idCodigo);
+      throw enlaceInvalido();
     }
 
     const usuario = await this.cuentasRepo.buscarPorId(idUsuario);
-    if (!usuario) {
-      throw new RecuperacionPasswordError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
+    if (!usuario || usuario.estado !== 'activo') {
+      throw enlaceInvalido();
     }
 
     // 1. Derivar nueva contraseña con BCrypt costo 12

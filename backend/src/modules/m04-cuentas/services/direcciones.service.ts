@@ -64,7 +64,7 @@ export class DireccionesService {
   ): Promise<DireccionCliente> {
     const direccion = await this.direccionesRepo.buscarPorId(idDireccion, idUsuario);
     if (!direccion) {
-      throw new DireccionesError('Dirección no encontrada o no pertenece a la cuenta.', 'DIRECCION_NO_ENCONTRADA', 404);
+      throw new DireccionesError('Dirección no encontrada o no pertenece a la cuenta.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     const datosActualizacion: {
@@ -96,7 +96,7 @@ export class DireccionesService {
   async eliminar(idDireccion: string, idUsuario: number): Promise<{ mensaje: string }> {
     const direccion = await this.direccionesRepo.buscarPorId(idDireccion, idUsuario);
     if (!direccion) {
-      throw new DireccionesError('Dirección no encontrada o no pertenece a la cuenta.', 'DIRECCION_NO_ENCONTRADA', 404);
+      throw new DireccionesError('Dirección no encontrada o no pertenece a la cuenta.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     await this.direccionesRepo.eliminar(idDireccion, idUsuario);
@@ -109,7 +109,7 @@ export class DireccionesService {
   async establecerPredeterminada(idDireccion: string, idUsuario: number): Promise<DireccionCliente> {
     const direccion = await this.direccionesRepo.buscarPorId(idDireccion, idUsuario);
     if (!direccion) {
-      throw new DireccionesError('Dirección no encontrada o no pertenece a la cuenta.', 'DIRECCION_NO_ENCONTRADA', 404);
+      throw new DireccionesError('Dirección no encontrada o no pertenece a la cuenta.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     return this.direccionesRepo.establecerPredeterminada(idDireccion, idUsuario);
