@@ -14,7 +14,6 @@ import {
 import { AuthCuentasError, type AuthCuentasService } from '../services/auth-cuentas.service';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 
-const VIGENCIA_COOKIE_SEGUNDOS = 60 * 60; // 1 hora deslizante
 
 export class AuthCuentasController {
   constructor(
@@ -22,9 +21,14 @@ export class AuthCuentasController {
     private readonly sesionService: SesionService,
   ) {}
 
-  private fijarCookie(res: Response, idSesion: string): void {
-    const token = emitirToken(idSesion, VIGENCIA_COOKIE_SEGUNDOS);
-    res.cookie(ATRIBUTOS_COOKIE_SESION.nombre, token, opcionesCookieSesion(VIGENCIA_COOKIE_SEGUNDOS));
+  /** RF-SEG-02-02: la cookie vive lo mismo que la ventana de inactividad de la sesión creada. */
+  private fijarCookie(res: Response, sesion: { idSesion: string; fechaExpiracion: Date }): void {
+    const vigenciaSegundos = Math.max(
+      1,
+      Math.floor((sesion.fechaExpiracion.getTime() - Date.now()) / 1000),
+    );
+    const token = emitirToken(sesion.idSesion, vigenciaSegundos);
+    res.cookie(ATRIBUTOS_COOKIE_SESION.nombre, token, opcionesCookieSesion(vigenciaSegundos));
   }
 
   private limpiarCookie(res: Response): void {
@@ -104,7 +108,7 @@ export class AuthCuentasController {
 
     try {
       const resultado = await this.authService.verificarCodigoRegistro(idVerificacion, parse.data.codigo);
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
@@ -217,7 +221,7 @@ export class AuthCuentasController {
         return;
       }
 
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
@@ -282,7 +286,7 @@ export class AuthCuentasController {
         tokenCambio,
         parse.data.nuevaContrasena,
       );
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
@@ -342,7 +346,7 @@ export class AuthCuentasController {
         return;
       }
 
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
@@ -388,7 +392,7 @@ export class AuthCuentasController {
 
     try {
       const resultado = await this.authService.completarRegistroGoogle(parse.data);
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
