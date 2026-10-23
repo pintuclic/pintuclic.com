@@ -107,8 +107,11 @@ let secretoOriginal: string | undefined;
 
 /** Simula la sesión que el servidor resolvería para la cookie recibida. */
 function simularSesion(actor: ActorSimulado | null): void {
+  // La sesión renovada trae su nueva expiración: el middleware desliza la cookie con ella.
   validarYRenovar.mockResolvedValue(
-    actor === null ? { valida: false } : { valida: true, sesion: actor },
+    actor === null
+      ? { valida: false }
+      : { valida: true, sesion: { ...actor, fechaExpiracion: new Date(Date.now() + 1800 * 1000) } },
   );
 }
 
