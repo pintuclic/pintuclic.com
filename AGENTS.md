@@ -37,7 +37,7 @@ si falta un predecesor, avisa al usuario y propone una alternativa; decide el Te
 ## Seguridad
 
 - Autorización siempre en el servidor, también en los `GET`. Permisos atómicos por empleado, resueltos en cada petición.
-- 403 genérico, sin revelar si el recurso existe ni el nombre del permiso.
+- Sin permiso → 404 opaco `RECURSO_NO_DISPONIBLE` (ADR-003), idéntico al de un recurso inexistente: no revela si existe ni el nombre del permiso.
 - Nunca devolver contraseñas, hashes, trazas ni SQL. Payloads mínimos.
 - Contraseñas con bcrypt costo 12. Sesión en cookie `HttpOnly`.
 - Detalle: [`CHECKLIST_CIERRE_MODULOS.md`](docs/00_SISTEMA/03_PLANTILLAS_Y_CHECKLISTS/CHECKLIST_CIERRE_MODULOS.md) y `docs/01_TRANSVERSALES/POLITICAS/`.
