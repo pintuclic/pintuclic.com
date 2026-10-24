@@ -11,7 +11,7 @@ export interface EntidadClienteAdmin {
 }
 
 export interface FiltrosBusquedaClientes {
-  termino: string;
+  termino?: string | undefined;
   tipo?: 'todos' | 'normal' | 'empresa';
   pagina: number;
   limite: number;

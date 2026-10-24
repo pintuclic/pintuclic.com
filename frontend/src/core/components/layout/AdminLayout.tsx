@@ -14,6 +14,7 @@ import {
   LogOut,
   Mail,
   Menu,
+  Package,
   Search,
   Settings,
   Shield,
@@ -48,6 +49,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     href: '/admin',
     icon: <Home className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: true,
+  },
+  {
+    label: 'Catálogo',
+    href: '/admin/catalogo',
+    icon: <Package className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
   },
   {
     label: 'Colaboradores',

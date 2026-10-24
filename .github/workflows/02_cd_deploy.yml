@@ -65,6 +65,7 @@ jobs:
 
             # 4. Validacion de configuracion de Docker Compose
             echo "Validando configuracion de docker-compose..."
+            docker network inspect proxy-network >/dev/null 2>&1 || docker network create proxy-network
             docker compose -f docker-compose.yml config --quiet
 
             # 5. Accion principal: Compilar y levantar la infraestructura
