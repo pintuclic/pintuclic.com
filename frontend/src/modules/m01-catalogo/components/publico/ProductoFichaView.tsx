@@ -1,0 +1,232 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Alert, Badge, Container, Skeleton } from '@/core/components';
+import { formatCOP } from '@/core/utils/moneda';
+import type { ColorOfrecido, ProductoPublicoFicha, VariantePublica } from '../../dtos/m01-catalogo-productos.dto';
+import { leerErrorCatalogo } from '../../services/mensaje-error';
+import { catalogoPublicoApi } from '../../services/consulta-publica-api';
+import { Muestra } from '../admin/comunes';
+import { SelectorColorProducto } from './SelectorColorProducto';
+
+const TIPOS_CALIDAD: Record<number, string> = { 1: 'Tipo 1 (gama alta)', 2: 'Tipo 2', 3: 'Tipo 3' };
+
+const aTexto = (n: number): string => n.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+
+/** U6: el rendimiento por presentación, siempre marcado como aproximado. */
+export function textoRendimiento(v: VariantePublica): string | null {
+  return v.rendimiento === null ? null : `Rinde aprox. ${aTexto(v.rendimiento.min)} a ${aTexto(v.rendimiento.max)} m²`;
+}
+
+export interface ProductoFichaViewProps {
+  idProducto: number;
+}
+
+/** HU-CAT-06: ficha pública de un producto con presentaciones, rendimiento y selector de color. */
+type EstadoFicha =
+  | { tipo: 'cargando' }
+  | { tipo: 'lista'; ficha: ProductoPublicoFicha }
+  | { tipo: 'no_disponible' }
+  | { tipo: 'error'; mensaje: string };
+
+export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto }) => {
+  const [estado, setEstado] = useState<EstadoFicha>({ tipo: 'cargando' });
+  const [idVariante, setIdVariante] = useState<number | null>(null);
+  const [color, setColor] = useState<ColorOfrecido | null>(null);
+
+  useEffect(() => {
+    let vigente = true;
+    setEstado({ tipo: 'cargando' });
+    setColor(null);
+    catalogoPublicoApi
+      .ficha(idProducto)
+      .then((ficha) => {
+        if (!vigente) return;
+        setIdVariante(ficha.variantes[0]?.idVariante ?? null);
+        setEstado({ tipo: 'lista', ficha });
+      })
+      .catch((err: unknown) => {
+        if (!vigente) return;
+        const error = leerErrorCatalogo(err, 'No se pudo cargar el producto.');
+        // U1: 404 uniforme para lo que no existe, no está publicado o tiene un padre inactivo.
+        setEstado(error.status === 404 ? { tipo: 'no_disponible' } : { tipo: 'error', mensaje: error.message });
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [idProducto]);
+
+  if (estado.tipo === 'cargando') {
+    return (
+      <Container className="py-8">
+        <Skeleton className="h-8 w-2/3" rounded="btn" />
+        <Skeleton className="mt-6 h-96" rounded="card" />
+      </Container>
+    );
+  }
+  if (estado.tipo !== 'lista') {
+    return (
+      <Container className="py-12">
+        <div className="mx-auto max-w-lg space-y-4 text-center">
+          <h1 className="font-title text-2xl font-bold text-corporate">Este producto no está disponible</h1>
+          <p className="font-sans text-sm text-neutral-medium">
+            {estado.tipo === 'no_disponible'
+              ? 'Puede que se haya retirado del catálogo o que aún no esté publicado.'
+              : estado.mensaje}
+          </p>
+          <Link href="/productos" className="font-title text-sm font-medium text-action hover:text-action-hover">
+            Volver al catálogo
+          </Link>
+        </div>
+      </Container>
+    );
+  }
+
+  const p = estado.ficha;
+  const variante = p.variantes.find((v) => v.idVariante === idVariante) ?? p.variantes[0] ?? null;
+  const rendimiento = variante === null ? null : textoRendimiento(variante);
+  const ambientes = [p.usoInterior ? 'Interior' : null, p.usoExterior ? 'Exterior' : null].filter(
+    (x): x is string => x !== null,
+  );
+  const datosTecnicos: Array<[string, string]> = [
+    ...(p.tipoResina === null ? [] : ([['Tipo de resina', p.tipoResina]] as Array<[string, string]>)),
+    ...(p.tipoCalidad === null
+      ? []
+      : ([['Calidad', TIPOS_CALIDAD[p.tipoCalidad] ?? `Tipo ${p.tipoCalidad}`]] as Array<[string, string]>)),
+    ...(ambientes.length === 0 ? [] : ([['Ambiente', ambientes.join(' y ')]] as Array<[string, string]>)),
+    ...(p.superficies.length === 0 ? [] : ([['Superficies', p.superficies.join(', ')]] as Array<[string, string]>)),
+    ...p.caracteristicas.map((c): [string, string] => [c.nombre, c.valor]),
+  ];
+
+  return (
+    <Container className="py-8">
+      <nav aria-label="Ruta de navegación" className="mb-4 font-sans text-sm text-neutral-medium">
+        <ol className="flex flex-wrap items-center gap-2">
+          <li>
+            <Link href="/" className="hover:text-action">
+              Inicio
+            </Link>
+          </li>
+          <li aria-hidden="true">›</li>
+          <li>
+            <Link href="/productos" className="hover:text-action">
+              Productos
+            </Link>
+          </li>
+          <li aria-hidden="true">›</li>
+          <li>{p.categoria}</li>
+          <li aria-hidden="true">›</li>
+          <li aria-current="page" className="text-neutral-dark">
+            {p.nombre}
+          </li>
+        </ol>
+      </nav>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div
+          className="flex min-h-72 items-center justify-center rounded-card bg-neutral-lightest p-6"
+          aria-label={color === null ? 'Sin color elegido' : `Color elegido: ${color.nombre}`}
+        >
+          {color !== null ? (
+            <div className="text-center">
+              <span
+                role="img"
+                aria-label={`Muestra del color ${color.nombre}`}
+                className="mx-auto block h-40 w-40 rounded-full border border-neutral-light shadow-card"
+                style={{ backgroundColor: color.hexadecimal }}
+              />
+              <p className="mt-4 font-title text-lg font-semibold text-neutral-black">{color.nombre}</p>
+              {color.codigo !== null && <p className="font-sans text-sm text-neutral-medium">Código {color.codigo}</p>}
+            </div>
+          ) : (
+            <p className="font-sans text-sm text-neutral-medium">Las imágenes del producto llegarán pronto.</p>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <p className="font-title text-xs uppercase tracking-wider text-neutral-medium">
+              {p.marca}
+              {p.linea !== null && ` · ${p.linea}`}
+            </p>
+            <h1 className="mt-1 font-title text-3xl font-bold text-neutral-black">{p.nombre}</h1>
+            {p.descripcion !== null && <p className="mt-2 font-sans text-sm text-neutral-dark">{p.descripcion}</p>}
+          </div>
+
+          {variante !== null && (
+            <div>
+              <p className="font-title text-3xl font-bold text-corporate">
+                {formatCOP(variante.precio)} <span className="text-base font-medium">COP</span>
+              </p>
+              <p className="mt-1 flex items-center gap-2 font-sans text-sm">
+                <Badge variant={variante.disponibilidad === 'disponible' ? 'success' : 'neutral'}>
+                  {variante.disponibilidad === 'disponible' ? 'Disponible' : 'Agotado por ahora'}
+                </Badge>
+                {rendimiento !== null && <span className="text-neutral-dark">{rendimiento}</span>}
+              </p>
+            </div>
+          )}
+
+          {p.variantes.length > 0 ? (
+            <fieldset className="space-y-2">
+              <legend className="font-title text-sm font-medium text-neutral-dark">Presentación</legend>
+              <div className="flex flex-wrap gap-2">
+                {p.variantes.map((v) => (
+                  <button
+                    key={v.idVariante}
+                    type="button"
+                    aria-pressed={variante?.idVariante === v.idVariante}
+                    onClick={() => setIdVariante(v.idVariante)}
+                    className={`min-h-11 rounded-full border px-4 font-title text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
+                      variante?.idVariante === v.idVariante
+                        ? 'border-action bg-subaction text-corporate'
+                        : 'border-neutral-light bg-neutral-white text-neutral-dark hover:border-neutral-medium'
+                    }`}
+                  >
+                    {v.medida}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          ) : (
+            <Alert variant="info">Este producto no tiene presentaciones disponibles por ahora.</Alert>
+          )}
+
+          {p.claseColor !== 'sin_color' && (
+            <SelectorColorProducto idProducto={p.idProducto} elegido={color} onElegir={setColor} />
+          )}
+          {color !== null && (
+            <p className="flex items-center gap-2 font-sans text-sm text-neutral-dark" role="status">
+              <Muestra hexadecimal={color.hexadecimal} etiqueta={`Muestra de ${color.nombre}`} /> {color.nombre} ·{' '}
+              {color.acabado}
+            </p>
+          )}
+
+          {p.acabados.length > 0 && (
+            <p className="font-sans text-sm text-neutral-dark">
+              <span className="font-title font-medium">Acabados: </span>
+              {p.acabados.map((a) => a.nombre).join(', ')}
+            </p>
+          )}
+
+          {datosTecnicos.length > 0 && (
+            <details className="rounded-card border border-neutral-light bg-neutral-white" open>
+              <summary className="min-h-11 cursor-pointer px-4 py-3 font-title text-sm font-semibold text-corporate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50">
+                Ficha técnica
+              </summary>
+              <dl className="divide-y divide-neutral-light px-4 pb-2">
+                {datosTecnicos.map(([nombre, valor]) => (
+                  <div key={nombre} className="grid grid-cols-[1fr_2fr] gap-3 py-2 font-sans text-sm">
+                    <dt className="text-neutral-medium">{nombre}</dt>
+                    <dd className="text-neutral-black">{valor}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+          )}
+        </div>
+      </div>
+    </Container>
+  );
+};
