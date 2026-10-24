@@ -123,6 +123,7 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
         } as CodigoVerificacion)
       ),
       eliminar: vi.fn().mockResolvedValue(undefined),
+      eliminarPorCorreoYTipo: vi.fn(),
     };
 
     controlIntentosRepo = {
@@ -143,6 +144,7 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
       enviarCodigoRegistro: vi.fn().mockResolvedValue(undefined),
       enviarCodigoCambioCorreo: vi.fn().mockResolvedValue(undefined),
       enviarEnlaceRecuperacion: vi.fn().mockResolvedValue(undefined),
+      enviarEnlaceActivacion: vi.fn(),
       notificarDictamenEmpresa: vi.fn().mockResolvedValue(undefined),
     };
 

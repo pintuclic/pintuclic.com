@@ -32,6 +32,7 @@ describe('M04 Frontend — utilidades de autenticación', () => {
       expect(destinoSeguro('/login?destino=/perfil')).toBe('/');
       expect(destinoSeguro('/registro')).toBe('/');
       expect(destinoSeguro('/restablecer-contrasena?token=abc')).toBe('/');
+      expect(destinoSeguro('/activar-cuenta?token=abc')).toBe('/');
       expect(destinoSeguro('/loginx')).toBe('/loginx');
     });
   });

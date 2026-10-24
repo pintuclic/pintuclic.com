@@ -74,12 +74,14 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
         } as CodigoVerificacion)
       ),
       eliminar: vi.fn().mockResolvedValue(undefined),
+      eliminarPorCorreoYTipo: vi.fn(),
     };
 
     notificaciones = {
       enviarCodigoRegistro: vi.fn(),
       enviarCodigoCambioCorreo: vi.fn().mockResolvedValue(undefined),
       enviarEnlaceRecuperacion: vi.fn(),
+      enviarEnlaceActivacion: vi.fn(),
       notificarDictamenEmpresa: vi.fn(),
     };
 

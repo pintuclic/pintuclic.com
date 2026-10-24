@@ -13,7 +13,8 @@ export type ClaveParametroCuentas =
   | 'auth.intentos_codigo_registro'
   | 'auth.vigencia_enlace_recuperacion_minutos'
   | 'auth.intentos_fallidos_bloqueo'
-  | 'auth.duracion_bloqueo_minutos';
+  | 'auth.duracion_bloqueo_minutos'
+  | 'auth.vigencia_enlace_activacion_horas';
 
 export interface ParametrosCuentasPort {
   /** Valor numérico vigente, o `null` si no está configurado. */

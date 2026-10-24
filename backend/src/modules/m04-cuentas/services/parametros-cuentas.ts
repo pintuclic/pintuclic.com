@@ -10,6 +10,7 @@ const VALORES_POR_DEFECTO: Readonly<Record<ClaveParametroCuentas, number>> = {
   'auth.vigencia_enlace_recuperacion_minutos': 30,
   'auth.intentos_fallidos_bloqueo': 5,
   'auth.duracion_bloqueo_minutos': 15,
+  'auth.vigencia_enlace_activacion_horas': 72,
 };
 
 /**

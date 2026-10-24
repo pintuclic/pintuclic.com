@@ -97,6 +97,12 @@ describe('Recuperación y restablecimiento (HU-CUE-05)', () => {
     expect(salida.match(/autoComplete="new-password"/gi)).toHaveLength(2);
   });
 
+  it('la activación de un colaborador sin token remite al administrador, no a recuperar', () => {
+    const salida = html(<RestablecerForm token={null} variante="activacion" />);
+    expect(salida).toContain('Pide al administrador');
+    expect(salida).not.toContain('href="/recuperar-contrasena"');
+  });
+
   it('el primer acceso pide la temporal, la nueva y su confirmación', () => {
     const salida = html(<PrimerAccesoForm tokenCambio="t" onCompletado={nada} onVolver={nada} />);
     expect(salida.match(/type="password"/g)).toHaveLength(3);

@@ -161,6 +161,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       enviarCodigoRegistro: vi.fn(),
       enviarCodigoCambioCorreo: vi.fn(),
       enviarEnlaceRecuperacion: vi.fn(),
+      enviarEnlaceActivacion: vi.fn(),
       notificarDictamenEmpresa: vi.fn().mockResolvedValue(undefined),
     };
 

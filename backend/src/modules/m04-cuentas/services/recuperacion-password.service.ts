@@ -55,41 +55,11 @@ export class RecuperacionPasswordService {
       };
     }
 
-    // Generar token criptográfico seguro
     const minutosVigencia = await leerParametroCuentas(
       this.parametros,
       'auth.vigencia_enlace_recuperacion_minutos',
     );
-    const tokenAleatorio = crypto.randomBytes(32).toString('hex');
-    const tokenHash = await derivarContrasena(tokenAleatorio);
-    const expiracion = new Date(
-      this.dateProvider.ahora().getTime() + minutosVigencia * 60 * 1000,
-    );
-
-    const guardado = await this.codigosRepo.guardarCodigo({
-      correo: correoNormalizado,
-      codigoHash: tokenHash,
-      tipo: 'recuperacion_password',
-      expiracion,
-      maxIntentos: 3,
-      // Solo el hash del valor aleatorio queda en BD; el valor plano viaja únicamente en el enlace.
-      datosTemporales: {
-        idUsuario: usuario.idUsuario,
-      },
-    });
-
-    // Token firmado con payload identificador para consumo stateless
-    const tokenJwt = jwt.sign(
-      {
-        idCodigo: guardado.idCodigo,
-        idUsuario: usuario.idUsuario,
-        correo: correoNormalizado,
-        rnd: tokenAleatorio,
-        tipo: 'recuperacion_password',
-      },
-      this.obtenerJwtSecret(),
-      { expiresIn: `${minutosVigencia}m` },
-    );
+    const tokenJwt = await this.emitirEnlace(usuario.idUsuario, correoNormalizado, minutosVigencia);
 
     // RF-SEG-06-06: el envío no se espera. Esperarlo haría que un correo registrado
     // tarde lo que tarda el SMTP y delataría su existencia; un fallo de transporte
@@ -102,6 +72,65 @@ export class RecuperacionPasswordService {
       mensaje:
         'Si el correo electrónico se encuentra registrado en nuestro sistema, recibirá un enlace para restablecer su contraseña.',
     };
+  }
+
+  /**
+   * HU-ADM-01: enlace de activación para un empleado creado en M17. Sustituye la
+   * clave temporal: el empleado fija su contraseña y el admin nunca la conoce.
+   * Un enlace nuevo invalida los anteriores. Si el correo falla, el error se
+   * propaga para que M17 avise al admin y le permita reenviarlo.
+   */
+  async emitirEnlaceActivacion(idUsuario: number): Promise<void> {
+    const usuario = await this.cuentasRepo.buscarPorId(idUsuario);
+    if (!usuario || usuario.estado !== 'activo' || !usuario.cambioContrasenaPendiente) {
+      throw new RecuperacionPasswordError(
+        'La cuenta no tiene una activación pendiente.',
+        'RECURSO_NO_ENCONTRADO',
+        404,
+      );
+    }
+
+    const horasVigencia = await leerParametroCuentas(
+      this.parametros,
+      'auth.vigencia_enlace_activacion_horas',
+    );
+    const correo = usuario.correo.trim().toLowerCase();
+    await this.codigosRepo.eliminarPorCorreoYTipo(correo, 'recuperacion_password');
+    const tokenJwt = await this.emitirEnlace(usuario.idUsuario, correo, horasVigencia * 60);
+    await this.notificaciones.enviarEnlaceActivacion(correo, usuario.nombre, tokenJwt, horasVigencia);
+  }
+
+  /**
+   * Enlace de un solo uso para fijar contraseña. En BD queda solo el hash del valor
+   * aleatorio; el valor plano viaja únicamente dentro del token del enlace.
+   */
+  private async emitirEnlace(idUsuario: number, correo: string, minutosVigencia: number): Promise<string> {
+    const tokenAleatorio = crypto.randomBytes(32).toString('hex');
+    const tokenHash = await derivarContrasena(tokenAleatorio);
+    const expiracion = new Date(
+      this.dateProvider.ahora().getTime() + minutosVigencia * 60 * 1000,
+    );
+
+    const guardado = await this.codigosRepo.guardarCodigo({
+      correo,
+      codigoHash: tokenHash,
+      tipo: 'recuperacion_password',
+      expiracion,
+      maxIntentos: 3,
+      datosTemporales: { idUsuario },
+    });
+
+    return jwt.sign(
+      {
+        idCodigo: guardado.idCodigo,
+        idUsuario,
+        correo,
+        rnd: tokenAleatorio,
+        tipo: 'recuperacion_password',
+      },
+      this.obtenerJwtSecret(),
+      { expiresIn: `${minutosVigencia}m` },
+    );
   }
 
   /**
