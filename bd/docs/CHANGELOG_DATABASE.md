@@ -10,6 +10,21 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.2] - 2026-10-24
+### Esquema 4.3 (58 Tablas) - M01 Catálogo: rediseño con las reglas del Tech Lead
+- **Alcance General:** Rediseño del catálogo antes de construir M01 (ninguna tabla del catálogo tenía código encima). Reglas en [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md).
+  - **Nuevas (10):** `superficie`, `acabado`, `familia_color`, `tipo_medida`, `medida`, `ficha_recubrimiento`, `producto_superficie`, `producto_acabado`, `producto_color`, `producto_caracteristica`.
+  - **Eliminadas (5):** `sub_subcategorias` (solo dos niveles), `tonos`, `presentacion` (reemplazada por `medida` + `tipo_medida`), `caracteristica` (pasa a `producto_caracteristica`), `producto_subcategoria` (el producto tiene una sola subcategoría).
+  - **`subcategorias` → `subcategoria`.** `linea` pierde `id_sub_subcategoria`.
+  - **`base`** global (sin `id_marca`): Tint, Deep, Pastel, Accent.
+  - **`color`:** `id_base` opcional, `id_acabado` obligatorio, `id_familia_color`, `hexadecimal` obligatorio; CIELAB pasa a opcional. Unicidad `(id_marca, nombre, id_acabado)`.
+  - **`producto`:** `id_subcategoria` obligatoria, `uso_interior`/`uso_exterior`, FK compuesta `(id_linea, id_marca)`; resina y rendimiento pasan a `ficha_recubrimiento`; desaparece `clase_color` (y `enum_clase_color`): los colores que ofrece se derivan de sus bases, acabados y colores de fábrica.
+  - **`variante` = producto + medida** con `sku` UNIQUE y precio; sin base ni color.
+  - **`linea_carrito.id_color`** con `UNIQUE NULLS NOT DISTINCT (id_carrito, id_variante, id_color)`; **`linea_orden.sku_vendido`**.
+  - **Migración de bases existentes (ej. el VPS):** el DDL trae un bloque que se activa solo si existe `tonos` (catálogo viejo): borra el catálogo anterior, las líneas de carrito y las reservaciones del seed, crea el nuevo y reconecta `linea_carrito` y `reservaciones`. Si el catálogo viejo tiene más filas que el seed anterior, se detiene sin tocar nada. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` y luego `npm run db:seed`. Probado en PostgreSQL 16: el esquema migrado es idéntico al creado desde cero y el DDL se puede repetir.
+
+---
+
 ## [v3.1] - 2026-10-23
 ### Esquema 4.2 sin cambios (53 Tablas) - Seed: vigencia del enlace de activación de empleados
 - **Alcance General:** Sin cambios de DDL ni del modelo Prisma. Acompaña a la versión de aplicación v0.7.0 ([`docs/CHANGELOG.md`](../../docs/CHANGELOG.md)):

@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.2 (v4.1 + M04: RFC-M04-001 C-2 a C-8 - unicidad pendientes, direcciones, hash OTP, control intentos, cambio clave)
+-- VERSIÓN: 4.3 (v4.2 + M01: rediseño del catálogo — colores con base y acabado, medidas, variante = producto + medida)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 53
+-- TOTAL TABLAS: 58
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -106,11 +106,6 @@ BEGIN
     -- Propósito transaccional del código OTP efímero (M04 - HU-CUE-01, 05, 06)
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_codigo_otp') THEN
         CREATE TYPE enum_tipo_codigo_otp AS ENUM ('registro', 'recuperacion_password', 'cambio_correo');
-    END IF;
-
-    -- Clase de color de un producto (M01 - HU-CAT-02, RF-CAT-02-03)
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_clase_color') THEN
-        CREATE TYPE enum_clase_color AS ENUM ('entonable', 'colores_fijos', 'sin_color');
     END IF;
 
     -- Área funcional de un parámetro configurable (M17 - HU-ADM-07)
@@ -293,8 +288,51 @@ COMMENT ON COLUMN sesion.fecha_expiracion IS 'Último acceso + ventana de inacti
 COMMENT ON COLUMN sesion.motivo_cierre IS 'Causa del cierre; nulo mientras la sesión sigue activa';
 
 -- ==============================================================================
--- 3. MÓDULO DE CATÁLOGO Y JERARQUÍA DE PRODUCTOS
+-- MIGRACIÓN 4.2 → 4.3 (bases creadas antes del rediseño del catálogo, ej. el VPS)
+-- Se activa solo si existe la tabla `tonos` (marca del catálogo anterior) y se ejecuta
+-- una única vez. Borra el catálogo viejo, que solo tenía datos del seed: si encuentra
+-- más filas que las del seed anterior, se detiene sin tocar nada para migrar a mano.
+-- Las líneas de carrito y las reservaciones del seed se borran porque apuntan al
+-- catálogo viejo; el seed nuevo las vuelve a crear.
 -- ==============================================================================
+DO $$
+BEGIN
+    IF to_regclass('public.tonos') IS NULL THEN
+        RETURN;
+    END IF;
+    IF (SELECT count(*) FROM producto) > 3
+       OR (SELECT count(*) FROM variante) > 33
+       OR (SELECT count(*) FROM color) > 30
+       OR (SELECT count(*) FROM linea_carrito) > 2
+       OR (SELECT count(*) FROM reservaciones) > 2 THEN
+        RAISE EXCEPTION 'Migración 4.3: el catálogo tiene datos que no son del seed. Migrar a mano.';
+    END IF;
+    DELETE FROM linea_carrito;
+    DELETE FROM reservaciones;
+    DROP TABLE IF EXISTS variante_combo, combo, imagen, caracteristica, variante, presentacion,
+        tonos, producto_base, producto_subcategoria, producto, color, base, linea,
+        sub_subcategorias, subcategorias, categoria, marca CASCADE;
+    DROP TYPE IF EXISTS enum_clase_color;
+    RAISE NOTICE 'Migración 4.3: catálogo anterior eliminado; se crea el nuevo a continuación.';
+END $$;
+
+-- ==============================================================================
+-- 3. MÓDULO DE CATÁLOGO (M01) — rediseño del esquema 4.3 (2026-10-23)
+-- Reglas de negocio y decisiones del Tech Lead:
+--   docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md
+-- Principios:
+--   · marca → línea (opcional) → producto.
+--   · Un producto pertenece a UNA subcategoría y se etiqueta con superficies y ambiente.
+--   · Todo color tiene acabado; la base es opcional pero esencial (solo los colores de
+--     fábrica sin preparación, como ICO, aerosoles o transparentes, no la tienen).
+--   · Colores que ofrece un producto = (base ∈ bases del producto Y acabado ∈ acabados
+--     del producto) ∪ colores exclusivos del producto.
+--   · La variante es producto + medida, con su precio. El color se elige en la venta.
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- 3.1 Clasificación
+-- ------------------------------------------------------------------------------
 
 -- Tabla: categoria
 CREATE TABLE IF NOT EXISTS categoria (
@@ -304,35 +342,36 @@ CREATE TABLE IF NOT EXISTS categoria (
     estado enum_estado_general NOT NULL DEFAULT 'activo'
 );
 
-COMMENT ON TABLE categoria IS 'Nivel 1 de la jerarquía de catálogo: Categoría principal';
-COMMENT ON COLUMN categoria.orden IS 'Orden de presentación en la navegación pública (HU-CAT-01, CA-CAT-01-04)';
-COMMENT ON COLUMN categoria.estado IS 'Baja lógica: una categoría inactiva desactiva en cascada sus subcategorías (RF-CAT-01-04)';
+COMMENT ON TABLE categoria IS 'Nivel 1 de la clasificación: qué ES el producto (Pinturas, Maderas, Herramientas…). Desactivarla desactiva sus subcategorías (RF-CAT-01-04).';
+COMMENT ON COLUMN categoria.orden IS 'Orden de presentación en la navegación (CA-CAT-01-04)';
 
--- Tabla: subcategorias
-CREATE TABLE IF NOT EXISTS subcategorias (
+-- Tabla: subcategoria
+CREATE TABLE IF NOT EXISTS subcategoria (
     id_subcategoria SERIAL PRIMARY KEY,
     id_categoria INT NOT NULL,
     nombre VARCHAR(100) NOT NULL,
     orden INT NOT NULL DEFAULT 0,
     estado enum_estado_general NOT NULL DEFAULT 'activo',
-    CONSTRAINT fk_subcat_categoria FOREIGN KEY (id_categoria)
-        REFERENCES categoria (id_categoria) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_subcategoria_categoria FOREIGN KEY (id_categoria)
+        REFERENCES categoria (id_categoria) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT uq_subcategoria_nombre_categoria UNIQUE (id_categoria, nombre)
 );
 
-COMMENT ON TABLE subcategorias IS 'Nivel 2 de la jerarquía de catálogo: Subcategorías';
-COMMENT ON CONSTRAINT uq_subcategoria_nombre_categoria ON subcategorias IS 'Impide nombres duplicados bajo la misma categoría padre; permite el mismo nombre bajo padres distintos (RF-CAT-01-03, CA-CAT-01-03)';
+COMMENT ON TABLE subcategoria IS 'Nivel 2 y último de la clasificación (RF-CAT-01-02). Mismo nombre permitido bajo categorías distintas (RF-CAT-01-03).';
 
--- Tabla: sub_subcategorias
-CREATE TABLE IF NOT EXISTS sub_subcategorias (
-    id_sub_subcategoria SERIAL PRIMARY KEY,
-    id_subcategoria INT NOT NULL,
-    nombre VARCHAR(100) NOT NULL,
-    CONSTRAINT fk_subsubcat_subcat FOREIGN KEY (id_subcategoria) 
-        REFERENCES subcategorias (id_subcategoria) ON UPDATE CASCADE ON DELETE CASCADE
+-- Tabla: superficie
+CREATE TABLE IF NOT EXISTS superficie (
+    id_superficie SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
+    orden INT NOT NULL DEFAULT 0,
+    estado enum_estado_general NOT NULL DEFAULT 'activo'
 );
 
-COMMENT ON TABLE sub_subcategorias IS 'Nivel 3 de la jerarquía de catálogo: Sub-subcategorías';
+COMMENT ON TABLE superficie IS 'Dónde se aplica un producto (Paredes y techos, Madera, Metal, Pisos…). Etiqueta N:M del producto; con el ambiente arma la navegación tipo "Pintura Interior → Paredes y techos".';
+
+-- ------------------------------------------------------------------------------
+-- 3.2 Marca y línea
+-- ------------------------------------------------------------------------------
 
 -- Tabla: marca
 CREATE TABLE IF NOT EXISTS marca (
@@ -343,105 +382,227 @@ CREATE TABLE IF NOT EXISTS marca (
     estado enum_estado_general NOT NULL DEFAULT 'activo'
 );
 
-COMMENT ON TABLE marca IS 'Catálogo maestro de marcas (HU-CAT-04).';
-COMMENT ON COLUMN marca.logotipo IS 'Bytes crudos del logotipo (RF-CAT-04-01). Máximo 5MB y formatos jpeg/png/webp validados en el servicio; el límite exacto del "Anexo B de la Tanda 2" (RF-CAT-04-02) está pendiente de confirmar por el equipo, hoy se usa 5MB como supuesto aprobado por el Product Owner.';
-COMMENT ON COLUMN marca.logotipo_mime_type IS 'Tipo MIME del logotipo, para servirlo con el Content-Type correcto';
+COMMENT ON TABLE marca IS 'Catálogo maestro de marcas (HU-CAT-04). Desactivarla desactiva sus líneas, colores y productos (RF-CAT-04-03).';
+COMMENT ON COLUMN marca.logotipo IS 'Bytes del logotipo (RF-CAT-04-01). Máximo 5 MB, jpeg/png/webp, validado en el servicio (supuesto aprobado por el Product Owner).';
 
 -- Tabla: linea
 CREATE TABLE IF NOT EXISTS linea (
     id_linea SERIAL PRIMARY KEY,
-    id_sub_subcategoria INT,
     id_marca INT NOT NULL,
     nombre VARCHAR(100) NOT NULL,
     gama_comercial VARCHAR(100),
     estado enum_estado_general NOT NULL DEFAULT 'activo',
-    CONSTRAINT fk_linea_subsubcat FOREIGN KEY (id_sub_subcategoria)
-        REFERENCES sub_subcategorias (id_sub_subcategoria) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_linea_marca FOREIGN KEY (id_marca)
         REFERENCES marca (id_marca) ON UPDATE CASCADE ON DELETE RESTRICT,
-    CONSTRAINT uq_linea_nombre_marca UNIQUE (id_marca, nombre)
+    CONSTRAINT uq_linea_nombre_marca UNIQUE (id_marca, nombre),
+    CONSTRAINT uq_linea_id_marca UNIQUE (id_linea, id_marca)
 );
 
-COMMENT ON TABLE linea IS 'Línea comercial de una marca (HU-CAT-11). `id_sub_subcategoria` es un remanente del árbol de categorías previo a esta HU: pendiente de retirar cuando HU-CAT-02 defina la relación real producto↔subcategoría.';
-COMMENT ON COLUMN linea.id_marca IS 'Marca dueña de la línea (RF-CAT-11-01, RF-CAT-11-02)';
-COMMENT ON COLUMN linea.gama_comercial IS 'Dato descriptivo opcional de la línea (RF-CAT-11-01)';
-COMMENT ON CONSTRAINT uq_linea_nombre_marca ON linea IS 'Impide nombres de línea duplicados dentro de la misma marca; permite el mismo nombre entre marcas distintas (RF-CAT-11-02, CA-CAT-11-03)';
+COMMENT ON TABLE linea IS 'Línea comercial de una marca (HU-CAT-11), ej. Viniltex. Es opcional en el producto (las herramientas a veces no tienen).';
+COMMENT ON CONSTRAINT uq_linea_id_marca ON linea IS 'Soporte de la FK compuesta de producto: garantiza que la línea pertenezca a la marca del producto (RF-CAT-11-02).';
 
--- Tabla: base
-CREATE TABLE IF NOT EXISTS base (
-    id_base SERIAL PRIMARY KEY,
-    id_marca INT NOT NULL,
-    nombre VARCHAR(100) NOT NULL,
-    estado enum_estado_general NOT NULL DEFAULT 'activo',
-    CONSTRAINT fk_base_marca FOREIGN KEY (id_marca)
-        REFERENCES marca (id_marca) ON UPDATE CASCADE ON DELETE RESTRICT,
-    CONSTRAINT uq_base_nombre_marca UNIQUE (id_marca, nombre)
-);
+-- ------------------------------------------------------------------------------
+-- 3.3 Catálogos técnicos de pintura
+-- ------------------------------------------------------------------------------
 
-COMMENT ON TABLE base IS 'Base sobre la que se prepara cada color de un producto entonable (HU-CAT-12). El tipo de resina que pide RF-CAT-12-01 se excluyó a petición explícita del Product Owner. La asignación de bases a productos entonables (RF-CAT-12-02/03) y la asociación color↔base (RF-CAT-12-04) quedan pendientes: dependen de que existan producto (HU-CAT-02) y color (HU-CAT-05), y esta última regla además está marcada como no definida en la especificación (RF-CAT-12-12).';
-COMMENT ON CONSTRAINT uq_base_nombre_marca ON base IS 'Impide nombres de base duplicados dentro de la misma marca (RF-CAT-12-01)';
-
--- Tabla: tipo_resina (catálogo administrable - RF-CAT-02-04)
+-- Tabla: tipo_resina
 CREATE TABLE IF NOT EXISTS tipo_resina (
     id_tipo_resina SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL UNIQUE,
     estado enum_estado_general NOT NULL DEFAULT 'activo'
 );
 
-COMMENT ON TABLE tipo_resina IS 'Catálogo administrable de tipos de resina (RF-CAT-02-04). Reemplaza cualquier lista fija en el código.';
+COMMENT ON TABLE tipo_resina IS 'Tipo de resina o vehículo (Base agua, Base aceite…). Catálogo administrable (RF-CAT-02-04).';
+
+-- Tabla: acabado
+CREATE TABLE IF NOT EXISTS acabado (
+    id_acabado SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    orden INT NOT NULL DEFAULT 0,
+    estado enum_estado_general NOT NULL DEFAULT 'activo'
+);
+
+COMMENT ON TABLE acabado IS 'Acabados (Brillante, Mate, Semimate, Satinado, Transparente…). Un producto ofrece varios; cada color tiene uno (por defecto Brillante).';
+
+-- Tabla: base
+CREATE TABLE IF NOT EXISTS base (
+    id_base SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    orden INT NOT NULL DEFAULT 0,
+    estado enum_estado_general NOT NULL DEFAULT 'activo'
+);
+
+COMMENT ON TABLE base IS 'Base de colorimetría (Tint, Deep, Pastel, Accent). Estándar internacional: no depende de la marca. Cada color de la carta se prepara sobre una base.';
+
+-- Tabla: familia_color
+CREATE TABLE IF NOT EXISTS familia_color (
+    id_familia_color SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    hexadecimal CHAR(7) NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    CONSTRAINT chk_familia_color_hex CHECK (hexadecimal ~ '^#[0-9A-Fa-f]{6}$')
+);
+
+COMMENT ON TABLE familia_color IS 'Familias cromáticas del selector de color (Blancos, Rojos, Azules…) (RF-CAT-05-03). El hexadecimal es la muestra de la familia.';
+
+-- Tabla: tipo_medida
+CREATE TABLE IF NOT EXISTS tipo_medida (
+    id_tipo_medida SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    abreviatura VARCHAR(10) NOT NULL UNIQUE,
+    estado enum_estado_general NOT NULL DEFAULT 'activo'
+);
+
+COMMENT ON TABLE tipo_medida IS 'Unidad de una medida (galón, litro, pulgada, metro, unidad…). Referencial.';
+
+-- Tabla: medida
+CREATE TABLE IF NOT EXISTS medida (
+    id_medida SERIAL PRIMARY KEY,
+    id_tipo_medida INT NOT NULL,
+    valor NUMERIC(12, 3) NOT NULL,
+    nombre VARCHAR(60) NOT NULL UNIQUE,
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    CONSTRAINT fk_medida_tipo FOREIGN KEY (id_tipo_medida)
+        REFERENCES tipo_medida (id_tipo_medida) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT chk_medida_valor CHECK (valor > 0),
+    CONSTRAINT uq_medida_valor_tipo UNIQUE (id_tipo_medida, valor)
+);
+
+COMMENT ON TABLE medida IS 'Medida vendible reutilizable entre productos: valor + tipo de medida (ej. 1 galón, 5 galones, 2 pulgadas).';
+COMMENT ON COLUMN medida.nombre IS 'Cómo se muestra al cliente (ej. "1/4 de galón")';
+
+-- ------------------------------------------------------------------------------
+-- 3.4 Color
+-- ------------------------------------------------------------------------------
+
+-- Tabla: color
+CREATE TABLE IF NOT EXISTS color (
+    id_color SERIAL PRIMARY KEY,
+    id_marca INT NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    codigo VARCHAR(60),
+    id_base INT,
+    id_acabado INT NOT NULL,
+    id_familia_color INT,
+    hexadecimal CHAR(7) NOT NULL,
+    cie_l NUMERIC(6, 3),
+    cie_a NUMERIC(6, 3),
+    cie_b NUMERIC(6, 3),
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    CONSTRAINT fk_color_marca FOREIGN KEY (id_marca)
+        REFERENCES marca (id_marca) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_color_base FOREIGN KEY (id_base)
+        REFERENCES base (id_base) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_color_acabado FOREIGN KEY (id_acabado)
+        REFERENCES acabado (id_acabado) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_color_familia FOREIGN KEY (id_familia_color)
+        REFERENCES familia_color (id_familia_color) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT uq_color_nombre_marca_acabado UNIQUE (id_marca, nombre, id_acabado),
+    CONSTRAINT chk_color_hex CHECK (hexadecimal ~ '^#[0-9A-Fa-f]{6}$'),
+    CONSTRAINT chk_color_cielab_completo CHECK (
+        (cie_l IS NULL AND cie_a IS NULL AND cie_b IS NULL)
+        OR (cie_l IS NOT NULL AND cie_a IS NOT NULL AND cie_b IS NOT NULL)
+    ),
+    CONSTRAINT chk_color_cie_l CHECK (cie_l IS NULL OR (cie_l >= 0 AND cie_l <= 100)),
+    CONSTRAINT chk_color_cie_a CHECK (cie_a IS NULL OR (cie_a >= -128 AND cie_a <= 128)),
+    CONSTRAINT chk_color_cie_b CHECK (cie_b IS NULL OR (cie_b >= -128 AND cie_b <= 128))
+);
+
+COMMENT ON TABLE color IS 'Color de una marca (HU-CAT-05). Carta (con base) y colores de fábrica (con o sin base) viven aquí. Que un color sea "exclusivo" de un producto se declara en producto_color.';
+COMMENT ON COLUMN color.id_base IS 'Base de colorimetría. Opcional pero esencial: solo la omiten los colores de fábrica sin preparación (ICO, aerosoles, transparentes).';
+COMMENT ON COLUMN color.id_acabado IS 'Acabado del color; por defecto Brillante (lo asigna el servicio). Un color solo se ofrece en productos con ese acabado.';
+COMMENT ON COLUMN color.hexadecimal IS 'Muestra visual del color (#RRGGBB). Obligatoria: el selector la necesita.';
+COMMENT ON COLUMN color.cie_l IS 'CIELAB opcional (L*, a*, b*): se llena si algún día llega el dato del fabricante o de SAMIT (RF-CAT-05-20).';
+
+-- Código único dentro de la marca cuando existe
+CREATE UNIQUE INDEX IF NOT EXISTS uq_color_codigo_marca ON color (id_marca, codigo) WHERE codigo IS NOT NULL;
+
+-- ------------------------------------------------------------------------------
+-- 3.5 Producto
+-- ------------------------------------------------------------------------------
 
 -- Tabla: producto
 CREATE TABLE IF NOT EXISTS producto (
     id_producto SERIAL PRIMARY KEY,
     id_marca INT NOT NULL,
     id_linea INT,
-    id_tipo_resina INT,
+    id_subcategoria INT NOT NULL,
     nombre VARCHAR(150) NOT NULL,
     descripcion TEXT,
-    clase_color enum_clase_color NOT NULL,
+    uso_interior BOOLEAN NOT NULL DEFAULT false,
+    uso_exterior BOOLEAN NOT NULL DEFAULT false,
     estado enum_estado_general NOT NULL DEFAULT 'activo',
     publicado BOOLEAN NOT NULL DEFAULT false,
-    rendimiento_min NUMERIC(8, 2),
-    rendimiento_max NUMERIC(8, 2),
     id_categoria_complementaria INT,
     patrocinado BOOLEAN NOT NULL DEFAULT false,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT fk_producto_marca FOREIGN KEY (id_marca)
         REFERENCES marca (id_marca) ON UPDATE CASCADE ON DELETE RESTRICT,
-    CONSTRAINT fk_producto_linea FOREIGN KEY (id_linea)
-        REFERENCES linea (id_linea) ON UPDATE CASCADE ON DELETE RESTRICT,
-    CONSTRAINT fk_producto_resina FOREIGN KEY (id_tipo_resina)
-        REFERENCES tipo_resina (id_tipo_resina) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_producto_linea_marca FOREIGN KEY (id_linea, id_marca)
+        REFERENCES linea (id_linea, id_marca) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_producto_subcategoria FOREIGN KEY (id_subcategoria)
+        REFERENCES subcategoria (id_subcategoria) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_producto_categoria_complementaria FOREIGN KEY (id_categoria_complementaria)
         REFERENCES categoria (id_categoria) ON UPDATE CASCADE ON DELETE SET NULL,
-    CONSTRAINT chk_producto_rendimiento CHECK (
+    CONSTRAINT uq_producto_nombre_marca UNIQUE (id_marca, nombre)
+);
+
+COMMENT ON TABLE producto IS 'Producto del catálogo (HU-CAT-02): marca → línea (opcional) → producto. Pertenece a una subcategoría y se etiqueta con superficies y ambiente.';
+COMMENT ON CONSTRAINT fk_producto_linea_marca ON producto IS 'La línea, si existe, debe ser de la misma marca del producto (RF-CAT-11-02, CA-CAT-11-02).';
+COMMENT ON COLUMN producto.uso_interior IS 'Ambiente: apto para interiores. Junto con uso_exterior alimenta las pestañas Pintura Interior / Exterior.';
+COMMENT ON COLUMN producto.publicado IS 'Visible en el catálogo público (RF-CAT-02-05).';
+
+-- Tabla: ficha_recubrimiento (1:1 opcional con producto)
+CREATE TABLE IF NOT EXISTS ficha_recubrimiento (
+    id_producto INT PRIMARY KEY,
+    id_tipo_resina INT NOT NULL,
+    tipo_calidad SMALLINT,
+    rendimiento_min NUMERIC(8, 2),
+    rendimiento_max NUMERIC(8, 2),
+    CONSTRAINT fk_ficha_producto FOREIGN KEY (id_producto)
+        REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_ficha_resina FOREIGN KEY (id_tipo_resina)
+        REFERENCES tipo_resina (id_tipo_resina) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT chk_ficha_tipo_calidad CHECK (tipo_calidad IS NULL OR tipo_calidad BETWEEN 1 AND 3),
+    CONSTRAINT chk_ficha_rendimiento CHECK (
         (rendimiento_min IS NULL AND rendimiento_max IS NULL)
         OR (rendimiento_min IS NOT NULL AND rendimiento_max IS NOT NULL
             AND rendimiento_min > 0 AND rendimiento_min <= rendimiento_max)
     )
 );
 
-COMMENT ON TABLE producto IS 'Producto del catálogo (HU-CAT-02). Información común independiente de sus variantes. Marca obligatoria; línea y tipo de resina obligatorios solo para pinturas (clase_color != sin_color); una brocha (sin_color) puede omitirlos (RF-CAT-02-02). La clase de color no puede cambiarse una vez el producto tiene variantes (RF-CAT-02-03).';
-COMMENT ON COLUMN producto.clase_color IS 'Clase del producto: entonable | colores_fijos | sin_color (RF-CAT-02-03)';
-COMMENT ON COLUMN producto.publicado IS 'Publicación en catálogo público (RF-CAT-02-05). Requiere >=1 variante activa y >=1 imagen; la exigencia de imagen queda pendiente de HU-CAT-07.';
-COMMENT ON COLUMN producto.rendimiento_min IS 'Rendimiento mínimo en m² por galón (HU-CAT-10, RF-CAT-10-02). El rendimiento por presentación se deriva de este valor y del volumen (RF-CAT-10-03).';
-COMMENT ON COLUMN producto.rendimiento_max IS 'Rendimiento máximo en m² por galón (HU-CAT-10, RF-CAT-10-02). Debe ser >= rendimiento_min (RF-CAT-10-05).';
-COMMENT ON COLUMN producto.id_categoria_complementaria IS 'Categoría de la que se extraen los productos complementarios de este producto (HU-CAT-08, RF-CAT-08-01).';
-COMMENT ON COLUMN producto.patrocinado IS 'Producto patrocinado: se prioriza como complementario (HU-CAT-08, RF-CAT-08-02).';
+COMMENT ON TABLE ficha_recubrimiento IS 'Datos técnicos de pinturas, estucos, barnices y demás recubrimientos (HU-CAT-10). Las herramientas no tienen ficha.';
+COMMENT ON COLUMN ficha_recubrimiento.tipo_calidad IS 'Tipo 1, 2 o 3 del fabricante (1 = gama alta, ej. Viniltex Ultralavable). Opcional.';
+COMMENT ON COLUMN ficha_recubrimiento.rendimiento_min IS 'Rendimiento mínimo en m² por galón (RF-CAT-10-02).';
 
--- Tabla: producto_subcategoria (relación N:M - RF-CAT-02-02: al menos una subcategoría)
-CREATE TABLE IF NOT EXISTS producto_subcategoria (
+-- Tabla: producto_superficie
+CREATE TABLE IF NOT EXISTS producto_superficie (
     id_producto INT NOT NULL,
-    id_subcategoria INT NOT NULL,
-    PRIMARY KEY (id_producto, id_subcategoria),
-    CONSTRAINT fk_prodsubcat_producto FOREIGN KEY (id_producto)
+    id_superficie INT NOT NULL,
+    PRIMARY KEY (id_producto, id_superficie),
+    CONSTRAINT fk_prodsup_producto FOREIGN KEY (id_producto)
         REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE,
-    CONSTRAINT fk_prodsubcat_subcat FOREIGN KEY (id_subcategoria)
-        REFERENCES subcategorias (id_subcategoria) ON UPDATE CASCADE ON DELETE RESTRICT
+    CONSTRAINT fk_prodsup_superficie FOREIGN KEY (id_superficie)
+        REFERENCES superficie (id_superficie) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE producto_subcategoria IS 'Relación N:M producto↔subcategoría (RF-CAT-02-02: un producto exige al menos una subcategoría). Es la relación real que reemplaza el remanente linea.id_sub_subcategoria del árbol previo.';
+COMMENT ON TABLE producto_superficie IS 'Superficies donde se aplica el producto.';
 
--- Tabla: producto_base (HU-CAT-12 flujo 2 - RF-CAT-12-02: bases que ofrece un producto entonable)
+-- Tabla: producto_acabado
+CREATE TABLE IF NOT EXISTS producto_acabado (
+    id_producto INT NOT NULL,
+    id_acabado INT NOT NULL,
+    PRIMARY KEY (id_producto, id_acabado),
+    CONSTRAINT fk_prodacab_producto FOREIGN KEY (id_producto)
+        REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_prodacab_acabado FOREIGN KEY (id_acabado)
+        REFERENCES acabado (id_acabado) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+COMMENT ON TABLE producto_acabado IS 'Acabados que ofrece el producto. Filtra los colores de la carta por su acabado.';
+
+-- Tabla: producto_base
 CREATE TABLE IF NOT EXISTS producto_base (
     id_producto INT NOT NULL,
     id_base INT NOT NULL,
@@ -452,103 +613,70 @@ CREATE TABLE IF NOT EXISTS producto_base (
         REFERENCES base (id_base) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE producto_base IS 'Bases que ofrece un producto entonable (HU-CAT-12 flujo 2, RF-CAT-12-02); no se fija en el código cuántas son. La base debe pertenecer a la marca del producto (RF-CAT-12-03). Una variante entonable solo puede usar una base aquí declarada.';
+COMMENT ON TABLE producto_base IS 'Bases que admite un producto entonable (RF-CAT-12-02). Define su carta: los colores de esas bases. ICO y las herramientas no tienen bases.';
 
--- Tabla: color
-CREATE TABLE IF NOT EXISTS color (
-    id_color SERIAL PRIMARY KEY,
-    id_marca INT NOT NULL,
-    nombre VARCHAR(100) NOT NULL,
-    codigo VARCHAR(60),
-    cie_l NUMERIC(6, 3) NOT NULL,
-    cie_a NUMERIC(6, 3) NOT NULL,
-    cie_b NUMERIC(6, 3) NOT NULL,
-    estado enum_estado_general NOT NULL DEFAULT 'activo',
-    CONSTRAINT fk_color_marca FOREIGN KEY (id_marca)
-        REFERENCES marca (id_marca) ON UPDATE CASCADE ON DELETE RESTRICT,
-    CONSTRAINT uq_color_nombre_marca UNIQUE (id_marca, nombre),
-    CONSTRAINT chk_color_cie_l CHECK (cie_l >= 0 AND cie_l <= 100),
-    CONSTRAINT chk_color_cie_a CHECK (cie_a >= -128 AND cie_a <= 128),
-    CONSTRAINT chk_color_cie_b CHECK (cie_b >= -128 AND cie_b <= 128)
-);
-
-COMMENT ON TABLE color IS 'Catálogo de colores de una marca (HU-CAT-05). Cada color pertenece a la marca que efectivamente lo ofrece (RF-CAT-05-01) y almacena su valor cromático CIELAB obligatorio (RF-CAT-05-02), del que se deriva su muestra visual sin requerir imagen. Diferidos (dependen de otras HU): familias cromáticas administrables (RF-CAT-05-03), uso del color en carta/variantes (RF-CAT-05-04/05/06 → HU-CAT-02/03) y asociación color↔base (RF-CAT-12-04 → CAT-12 flujo 3, además RF-CAT-12-12 sin definir).';
-COMMENT ON COLUMN color.id_marca IS 'Marca dueña del color (RF-CAT-05-01, CA-CAT-05-01)';
-COMMENT ON COLUMN color.codigo IS 'Código del color cuando exista; opcional (RF-CAT-05-01, CA-CAT-05-02)';
-COMMENT ON COLUMN color.cie_l IS 'Componente L* (luminosidad, 0..100) del valor CIELAB (RF-CAT-05-02)';
-COMMENT ON COLUMN color.cie_a IS 'Componente a* (verde↔rojo) del valor CIELAB (RF-CAT-05-02)';
-COMMENT ON COLUMN color.cie_b IS 'Componente b* (azul↔amarillo) del valor CIELAB (RF-CAT-05-02)';
-COMMENT ON CONSTRAINT uq_color_nombre_marca ON color IS 'Impide nombres de color duplicados dentro de la misma marca; admite el mismo nombre entre marcas distintas (RF-CAT-05-01, CA-CAT-05-01)';
-
--- Tabla: tonos
-CREATE TABLE IF NOT EXISTS tonos (
-    id_tono SERIAL PRIMARY KEY,
+-- Tabla: producto_color
+CREATE TABLE IF NOT EXISTS producto_color (
+    id_producto INT NOT NULL,
     id_color INT NOT NULL,
-    nombre VARCHAR(100),
-    hexagesimal VARCHAR(10),
-    precio NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-    CONSTRAINT fk_tonos_color FOREIGN KEY (id_color) 
-        REFERENCES color (id_color) ON UPDATE CASCADE ON DELETE CASCADE,
-    CONSTRAINT chk_tonos_precio CHECK (precio >= 0)
+    PRIMARY KEY (id_producto, id_color),
+    CONSTRAINT fk_prodcolor_producto FOREIGN KEY (id_producto)
+        REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_prodcolor_color FOREIGN KEY (id_color)
+        REFERENCES color (id_color) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE tonos IS 'Tonos y matices derivados de un color con nombre, código hexadecimal y ajuste de precio';
+COMMENT ON TABLE producto_color IS 'Colores exclusivos o de fábrica del producto. En productos entonables solo se destacan; en ICO y aerosoles son sus únicos colores. Deben ser de la marca del producto (servicio).';
 
--- Tabla: presentacion (entidad propia - RF-CAT-03-05)
-CREATE TABLE IF NOT EXISTS presentacion (
-    id_presentacion SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL UNIQUE,
-    volumen NUMERIC(10, 3) NOT NULL,
-    estado enum_estado_general NOT NULL DEFAULT 'activo',
-    CONSTRAINT chk_presentacion_volumen CHECK (volumen > 0)
+-- Tabla: producto_caracteristica
+CREATE TABLE IF NOT EXISTS producto_caracteristica (
+    id_caracteristica SERIAL PRIMARY KEY,
+    id_producto INT NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    valor VARCHAR(255) NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_prodcaract_producto FOREIGN KEY (id_producto)
+        REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_prodcaract_nombre UNIQUE (id_producto, nombre)
 );
 
-COMMENT ON TABLE presentacion IS 'Presentación comercial como entidad propia (RF-CAT-03-05): nombre y volumen numérico para permitir la comparación de precios entre productos. No se elimina físicamente si está referenciada por variantes; solo se desactiva (CA-CAT-03-10).';
+COMMENT ON TABLE producto_caracteristica IS 'Atributos técnicos adicionales nombre/valor (HU-CAT-10), ej. "Tiempo de secado: 1 hora".';
 
+-- ------------------------------------------------------------------------------
+-- 3.6 Variante
+-- ------------------------------------------------------------------------------
 
 -- Tabla: variante
 CREATE TABLE IF NOT EXISTS variante (
     id_variante SERIAL PRIMARY KEY,
     id_producto INT NOT NULL,
-    id_presentacion INT NOT NULL,
-    id_color INT,
-    id_base INT,
+    id_medida INT NOT NULL,
+    sku VARCHAR(60) NOT NULL UNIQUE,
     precio_vigente NUMERIC(12, 2) NOT NULL,
     existencia_referencial INT NOT NULL DEFAULT 0,
     codigo_proveedor VARCHAR(100),
     estado enum_estado_producto NOT NULL DEFAULT 'activo',
     CONSTRAINT fk_variante_producto FOREIGN KEY (id_producto)
-        REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE,
-    CONSTRAINT fk_variante_presentacion FOREIGN KEY (id_presentacion)
-        REFERENCES presentacion (id_presentacion) ON UPDATE CASCADE ON DELETE RESTRICT,
-    CONSTRAINT fk_variante_color FOREIGN KEY (id_color)
-        REFERENCES color (id_color) ON UPDATE CASCADE ON DELETE SET NULL,
-    CONSTRAINT fk_variante_base FOREIGN KEY (id_base)
-        REFERENCES base (id_base) ON UPDATE CASCADE ON DELETE RESTRICT,
+        REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_variante_medida FOREIGN KEY (id_medida)
+        REFERENCES medida (id_medida) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT chk_variante_precio CHECK (precio_vigente >= 0),
     CONSTRAINT chk_variante_existencia CHECK (existencia_referencial >= 0),
     CONSTRAINT uq_variante_codigo_proveedor UNIQUE (codigo_proveedor),
-    CONSTRAINT uq_variante_forma UNIQUE NULLS NOT DISTINCT (id_producto, id_base, id_color, id_presentacion)
+    CONSTRAINT uq_variante_producto_medida UNIQUE (id_producto, id_medida)
 );
 
-COMMENT ON TABLE variante IS 'SKU comercial vendible con precio y existencia sobre la variante física (RF-CAT-03-04). Su forma depende de la clase del producto (RF-CAT-03-02): entonable = producto+base+presentación; colores_fijos = producto+color+presentación; sin_color = producto+presentación.';
-COMMENT ON COLUMN variante.precio_vigente IS 'Precio actual de venta en catálogo antes de congelarse en órdenes';
-COMMENT ON COLUMN variante.existencia_referencial IS 'Existencia referencial (no negativa) sobre la variante física (RF-CAT-03-04, CA-CAT-03-11)';
-COMMENT ON COLUMN variante.codigo_proveedor IS 'Código de proveedor (SAMIT); único cuando existe (RF-CAT-03-06, CA-CAT-03-08)';
-COMMENT ON CONSTRAINT uq_variante_forma ON variante IS 'Impide dos variantes idénticas del mismo producto (RF-CAT-03-03, CA-CAT-03-02); NULLS NOT DISTINCT trata las combinaciones sin base/color como iguales.';
+COMMENT ON TABLE variante IS 'Variante vendible = producto + medida, con su precio (RC-13/RC-20). El color NO es parte de la variante: se elige en la venta y el SKU final se compone (ej. P1-V2-ROJO).';
+COMMENT ON COLUMN variante.sku IS 'SKU de la variante, sin color. El SKU vendido (con color) se guarda en la línea de orden.';
+COMMENT ON COLUMN variante.precio_vigente IS 'Precio actual; se congela en la orden al comprar.';
+COMMENT ON COLUMN variante.existencia_referencial IS 'Existencia solo referencial ("tomador de notas"); no bloquea ventas (M13).';
+COMMENT ON COLUMN variante.codigo_proveedor IS 'Código de SAMIT para la integración futura; único cuando existe.';
 
--- Tabla: caracteristica
-CREATE TABLE IF NOT EXISTS caracteristica (
-    id_caracteristica SERIAL PRIMARY KEY,
-    id_variante INT NOT NULL,
-    nombre VARCHAR(255) NOT NULL,
-    CONSTRAINT fk_caract_variante FOREIGN KEY (id_variante) 
-        REFERENCES variante (id_variante) ON UPDATE CASCADE ON DELETE CASCADE
-);
+-- ------------------------------------------------------------------------------
+-- 3.7 Imágenes y combos
+-- ------------------------------------------------------------------------------
 
-COMMENT ON TABLE caracteristica IS 'Características y propiedades técnicas de una variante';
-
--- Tabla: imagen (HU-CAT-07: imágenes del producto)
+-- Tabla: imagen
 CREATE TABLE IF NOT EXISTS imagen (
     id_imagen SERIAL PRIMARY KEY,
     id_producto INT NOT NULL,
@@ -566,8 +694,7 @@ CREATE TABLE IF NOT EXISTS imagen (
         REFERENCES color (id_color) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
-COMMENT ON TABLE imagen IS 'Imágenes de un producto (HU-CAT-07), almacenadas en la propia infraestructura como BYTEA (RF-CAT-07-03). Pueden asociarse a una variante o a un color (RF-CAT-07-02). La generación de miniaturas optimizadas (RNF-CAT-07-01) queda pendiente.';
-COMMENT ON COLUMN imagen.es_principal IS 'Imagen principal del producto para listados (CA-CAT-07-02); a lo sumo una por producto.';
+COMMENT ON TABLE imagen IS 'Imágenes de un producto (HU-CAT-07) como BYTEA (RF-CAT-07-03). Pueden asociarse a una variante o a un color (RF-CAT-07-02).';
 
 -- Una sola imagen principal por producto (CA-CAT-07-02)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_imagen_principal ON imagen (id_producto) WHERE es_principal;
@@ -576,11 +703,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_imagen_principal ON imagen (id_producto) WH
 CREATE TABLE IF NOT EXISTS combo (
     id_combo SERIAL PRIMARY KEY,
     id_producto INT NOT NULL,
-    CONSTRAINT fk_combo_producto FOREIGN KEY (id_producto) 
+    CONSTRAINT fk_combo_producto FOREIGN KEY (id_producto)
         REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-COMMENT ON TABLE combo IS 'Combos o paquetes comerciales vinculados a un producto';
+COMMENT ON TABLE combo IS 'Combos comerciales vinculados a un producto (HU-CAT-13). Pendiente de rediseño en la entrega de combos.';
 
 -- Tabla: variante_combo
 CREATE TABLE IF NOT EXISTS variante_combo (
@@ -588,15 +715,15 @@ CREATE TABLE IF NOT EXISTS variante_combo (
     id_variante INT NOT NULL,
     id_combo INT NOT NULL,
     cantidad INT NOT NULL DEFAULT 1,
-    CONSTRAINT fk_varcombo_variante FOREIGN KEY (id_variante) 
+    CONSTRAINT fk_varcombo_variante FOREIGN KEY (id_variante)
         REFERENCES variante (id_variante) ON UPDATE CASCADE ON DELETE CASCADE,
-    CONSTRAINT fk_varcombo_combo FOREIGN KEY (id_combo) 
+    CONSTRAINT fk_varcombo_combo FOREIGN KEY (id_combo)
         REFERENCES combo (id_combo) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT chk_varcombo_cantidad CHECK (cantidad > 0),
     CONSTRAINT uq_variante_combo UNIQUE (id_variante, id_combo)
 );
 
-COMMENT ON TABLE variante_combo IS 'Detalle de variantes y cantidades que integran cada combo';
+COMMENT ON TABLE variante_combo IS 'Variantes y cantidades que integran cada combo';
 
 -- ==============================================================================
 -- 4. MÓDULO DE CARRITO DE COMPRAS (VIVO)
@@ -623,17 +750,23 @@ CREATE TABLE IF NOT EXISTS linea_carrito (
     id_linea_carrito SERIAL PRIMARY KEY,
     id_carrito INT NOT NULL,
     id_variante INT NOT NULL,
+    id_color INT,
     ref_viva INT NOT NULL DEFAULT 1,
     cantidad INT NOT NULL DEFAULT 1,
     CONSTRAINT fk_lineacarrito_carrito FOREIGN KEY (id_carrito) 
         REFERENCES carrito (id_carrito) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_lineacarrito_variante FOREIGN KEY (id_variante) 
         REFERENCES variante (id_variante) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_lineacarrito_color FOREIGN KEY (id_color)
+        REFERENCES color (id_color) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT chk_lineacarrito_cantidad CHECK (cantidad > 0),
-    CONSTRAINT uq_carrito_variante UNIQUE (id_carrito, id_variante)
+    CONSTRAINT uq_carrito_variante_color UNIQUE NULLS NOT DISTINCT (id_carrito, id_variante, id_color)
 );
+-- Migración 4.3: en bases anteriores la tabla ya existe sin la columna del color.
+ALTER TABLE linea_carrito ADD COLUMN IF NOT EXISTS id_color INT;
 
 COMMENT ON TABLE linea_carrito IS 'Líneas vivas de ítems en carrito vinculadas a la variante de producto y referencia viva';
+COMMENT ON COLUMN linea_carrito.id_color IS 'Color elegido (si el producto lleva color). Variante + color forman la "variante temporal" de la venta; el SKU compuesto se arma con ambos (RC-21).';
 COMMENT ON COLUMN linea_carrito.ref_viva IS 'Identificador de referencia viva del carrito (M21)';
 
 -- ==============================================================================
@@ -762,6 +895,7 @@ CREATE TABLE IF NOT EXISTS linea_orden (
     id_variante_ref INT,
     es_entonado BOOLEAN NOT NULL DEFAULT false,
     base_consumida VARCHAR(150),
+    sku_vendido VARCHAR(100),
     CONSTRAINT fk_lineaorden_orden FOREIGN KEY (id_orden)
         REFERENCES orden (id_orden) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT chk_lineaorden_precio CHECK (precio_aplicado >= 0),
@@ -779,6 +913,7 @@ ALTER TABLE linea_orden ADD COLUMN IF NOT EXISTS precio_inicial NUMERIC(12, 2);
 ALTER TABLE linea_orden ADD COLUMN IF NOT EXISTS id_variante_ref INT;
 ALTER TABLE linea_orden ADD COLUMN IF NOT EXISTS es_entonado BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE linea_orden ADD COLUMN IF NOT EXISTS base_consumida VARCHAR(150);
+ALTER TABLE linea_orden ADD COLUMN IF NOT EXISTS sku_vendido VARCHAR(100);
 
 DO $$
 BEGIN
@@ -796,6 +931,7 @@ BEGIN
 END $$;
 
 -- Comentarios de las columnas de v3.9 (después de la migración, para que existan también en bases antiguas).
+COMMENT ON COLUMN linea_orden.sku_vendido IS 'Copia del SKU compuesto vendido: SKU de la variante + código del color (RC-21).';
 COMMENT ON COLUMN linea_orden.color_solicitado IS 'Copia del color pedido cuando lo hay (RF-ORD-02-01, CA-ORD-04-02)';
 COMMENT ON COLUMN linea_orden.precio_inicial IS 'Precio unitario de partida antes de descuentos; con linea_orden_descuento reconstruye el cobro (RF-ORD-02-02)';
 COMMENT ON COLUMN linea_orden.id_variante_ref IS 'Referencia informativa a la variante, sin FK a propósito (ADR-05): solo sirve para saber si el producto sigue en el catálogo (RF-ORD-04-03)';
@@ -958,6 +1094,31 @@ CREATE TABLE IF NOT EXISTS reservaciones (
 );
 
 COMMENT ON TABLE reservaciones IS 'Agendamiento de citas y reservaciones de servicios';
+
+-- Migración 4.3: reconecta con el catálogo nuevo las tablas que sobrevivieron al rediseño
+-- (en una base creada desde cero estas sentencias no hacen nada).
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_carrito_variante') THEN
+        ALTER TABLE linea_carrito DROP CONSTRAINT uq_carrito_variante;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_carrito_variante_color') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT uq_carrito_variante_color
+            UNIQUE NULLS NOT DISTINCT (id_carrito, id_variante, id_color);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_lineacarrito_variante') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT fk_lineacarrito_variante FOREIGN KEY (id_variante)
+            REFERENCES variante (id_variante) ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_lineacarrito_color') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT fk_lineacarrito_color FOREIGN KEY (id_color)
+            REFERENCES color (id_color) ON UPDATE CASCADE ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_reservacion_producto') THEN
+        ALTER TABLE reservaciones ADD CONSTRAINT fk_reservacion_producto FOREIGN KEY (id_producto)
+            REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- ==============================================================================
 -- 8. MÓDULO DE PRIVACIDAD, CONSENTIMIENTO Y HABEAS DATA (M20 - HU-SEG-05)
@@ -1321,26 +1482,29 @@ CREATE INDEX IF NOT EXISTS idx_usr_rol_usuario ON usuario_rol(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_usr_rol_rol ON usuario_rol(id_rol);
 
 -- Índices en Jerarquía de Catálogo
-CREATE INDEX IF NOT EXISTS idx_subcat_categoria ON subcategorias(id_categoria);
-CREATE INDEX IF NOT EXISTS idx_subsubcat_subcat ON sub_subcategorias(id_subcategoria);
-CREATE INDEX IF NOT EXISTS idx_linea_subsubcat ON linea(id_sub_subcategoria);
+CREATE INDEX IF NOT EXISTS idx_subcategoria_categoria ON subcategoria(id_categoria);
+CREATE INDEX IF NOT EXISTS idx_linea_marca ON linea(id_marca);
+CREATE INDEX IF NOT EXISTS idx_medida_tipo ON medida(id_tipo_medida);
+CREATE INDEX IF NOT EXISTS idx_color_marca ON color(id_marca);
+CREATE INDEX IF NOT EXISTS idx_color_base_acabado ON color(id_base, id_acabado);
+CREATE INDEX IF NOT EXISTS idx_color_familia ON color(id_familia_color);
+CREATE INDEX IF NOT EXISTS idx_color_nombre_lower ON color(lower(nombre));
 CREATE INDEX IF NOT EXISTS idx_producto_linea ON producto(id_linea);
 CREATE INDEX IF NOT EXISTS idx_producto_marca ON producto(id_marca);
-CREATE INDEX IF NOT EXISTS idx_producto_resina ON producto(id_tipo_resina);
+CREATE INDEX IF NOT EXISTS idx_producto_subcategoria ON producto(id_subcategoria);
 CREATE INDEX IF NOT EXISTS idx_producto_cat_complementaria ON producto(id_categoria_complementaria);
-CREATE INDEX IF NOT EXISTS idx_prodsubcat_subcat ON producto_subcategoria(id_subcategoria);
+CREATE INDEX IF NOT EXISTS idx_ficha_resina ON ficha_recubrimiento(id_tipo_resina);
+CREATE INDEX IF NOT EXISTS idx_prodsup_superficie ON producto_superficie(id_superficie);
+CREATE INDEX IF NOT EXISTS idx_prodacab_acabado ON producto_acabado(id_acabado);
 CREATE INDEX IF NOT EXISTS idx_prodbase_base ON producto_base(id_base);
+CREATE INDEX IF NOT EXISTS idx_prodcolor_color ON producto_color(id_color);
 CREATE INDEX IF NOT EXISTS idx_combo_producto ON combo(id_producto);
-CREATE INDEX IF NOT EXISTS idx_tonos_color ON tonos(id_color);
 CREATE INDEX IF NOT EXISTS idx_variante_producto ON variante(id_producto);
-CREATE INDEX IF NOT EXISTS idx_variante_color ON variante(id_color);
-CREATE INDEX IF NOT EXISTS idx_variante_base ON variante(id_base);
-CREATE INDEX IF NOT EXISTS idx_variante_presentacion ON variante(id_presentacion);
+CREATE INDEX IF NOT EXISTS idx_variante_medida ON variante(id_medida);
+CREATE INDEX IF NOT EXISTS idx_variante_estado ON variante(estado);
 CREATE INDEX IF NOT EXISTS idx_imagen_producto ON imagen(id_producto);
 CREATE INDEX IF NOT EXISTS idx_imagen_variante ON imagen(id_variante);
 CREATE INDEX IF NOT EXISTS idx_imagen_color ON imagen(id_color);
-CREATE INDEX IF NOT EXISTS idx_variante_estado ON variante(estado);
-CREATE INDEX IF NOT EXISTS idx_caract_variante ON caracteristica(id_variante);
 CREATE INDEX IF NOT EXISTS idx_varcombo_variante ON variante_combo(id_variante);
 CREATE INDEX IF NOT EXISTS idx_varcombo_combo ON variante_combo(id_combo);
 
@@ -1349,6 +1513,7 @@ CREATE INDEX IF NOT EXISTS idx_carrito_usuario ON carrito(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_carrito_token ON carrito(token_visitante);
 CREATE INDEX IF NOT EXISTS idx_lineacarrito_carrito ON linea_carrito(id_carrito);
 CREATE INDEX IF NOT EXISTS idx_lineacarrito_variante ON linea_carrito(id_variante);
+CREATE INDEX IF NOT EXISTS idx_lineacarrito_color ON linea_carrito(id_color);
 
 -- Índices en Órdenes, Líneas de Orden, Pagos y Facturación
 CREATE INDEX IF NOT EXISTS idx_orden_codigo ON orden(codigo_visible);
