@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 4.3 (alineado con schema_pintuclic.sql v4.3 - rediseño del catálogo M01)
+-- VERSIÓN: 4.4 (alineado con schema_pintuclic.sql v4.4 - equivalencia en galones)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -203,14 +203,19 @@ INSERT INTO familia_color (id_familia_color, nombre, hexadecimal, orden) VALUES
     (9,  'Tierras y cafés',   '#A67C52', 9)
 ON CONFLICT (id_familia_color) DO NOTHING;
 
-INSERT INTO tipo_medida (id_tipo_medida, nombre, abreviatura) VALUES
-    (1, 'Galón',     'gal'),
-    (2, 'Litro',     'L'),
-    (3, 'Mililitro', 'ml'),
-    (4, 'Pulgada',   'in'),
-    (5, 'Metro',     'm'),
-    (6, 'Unidad',    'und')
+INSERT INTO tipo_medida (id_tipo_medida, nombre, abreviatura, equivalencia_galones) VALUES
+    (1, 'Galón',     'gal', 1.000000000),
+    (2, 'Litro',     'L',   0.264172052),
+    (3, 'Mililitro', 'ml',  0.000264172),
+    (4, 'Pulgada',   'in',  NULL),
+    (5, 'Metro',     'm',   NULL),
+    (6, 'Unidad',    'und', NULL)
 ON CONFLICT (id_tipo_medida) DO NOTHING;
+
+-- Bases creadas con el esquema 4.3: completa la equivalencia sin pisar la que ya fijó el administrador.
+UPDATE tipo_medida SET equivalencia_galones = CASE id_tipo_medida
+        WHEN 1 THEN 1.000000000 WHEN 2 THEN 0.264172052 WHEN 3 THEN 0.000264172 END
+WHERE id_tipo_medida IN (1, 2, 3) AND equivalencia_galones IS NULL;
 
 INSERT INTO medida (id_medida, id_tipo_medida, valor, nombre) VALUES
     (1, 1, 0.250, '1/4 de galón'),
