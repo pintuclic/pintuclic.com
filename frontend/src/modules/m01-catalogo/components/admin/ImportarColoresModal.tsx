@@ -171,24 +171,50 @@ export const ImportarColoresModal: React.FC<ImportarColoresModalProps> = ({
             ...marcas.map((m) => ({ value: String(m.idMarca), label: m.nombre })),
           ]}
         />
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-0 flex-1">
-            <FileInput
-              label="Archivo CSV"
-              accept=".csv,.txt,text/csv,text/plain"
-              value={archivo}
-              onChange={(f) => void cargarArchivo(f)}
-              helperText="Columnas: nombre, código, hexadecimal, base, acabado, familia. La base, el acabado y la familia van por nombre."
-            />
+        <section
+          aria-labelledby="formato-importacion"
+          className="space-y-2 rounded-card border border-neutral-light bg-neutral-lightest p-3"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 id="formato-importacion" className="font-title text-sm font-semibold text-corporate">
+              Plantilla de importación
+            </h3>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Download className="h-4 w-4" aria-hidden="true" />}
+                onClick={descargarPlantilla}
+              >
+                Descargar plantilla
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setTexto(PLANTILLA_COLORES_CSV);
+                  setArchivo(null);
+                  setResumen(null);
+                }}
+              >
+                Usar el ejemplo
+              </Button>
+            </div>
           </div>
-          <Button
-            variant="outline"
-            leftIcon={<Download className="h-4 w-4" aria-hidden="true" />}
-            onClick={descargarPlantilla}
-          >
-            Plantilla
-          </Button>
-        </div>
+          <pre className="overflow-x-auto rounded-input bg-neutral-white p-2 font-mono text-xs text-neutral-dark">
+            {PLANTILLA_COLORES_CSV}
+          </pre>
+          <p className="font-sans text-xs text-neutral-medium">
+            Columnas: nombre, código, hexadecimal, base, acabado y familia. La base, el acabado y la familia van por su
+            nombre. Lo que deje vacío no modifica un color que ya existe; sin acabado se usa Brillante.
+          </p>
+        </section>
+        <FileInput
+          label="Archivo CSV"
+          accept=".csv,.txt,text/csv,text/plain"
+          value={archivo}
+          onChange={(f) => void cargarArchivo(f)}
+        />
         <Textarea
           label="…o pegue las filas aquí"
           rows={5}

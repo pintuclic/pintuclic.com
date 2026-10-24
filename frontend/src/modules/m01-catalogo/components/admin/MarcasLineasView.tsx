@@ -3,11 +3,13 @@
 import React, { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ImagePlus, Layers, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
+import Link from 'next/link';
+import { ImagePlus, Layers, Package, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import { Alert, Button, FileInput, Input, Modal } from '@/core/components';
 import type { Linea, Marca } from '../../dtos/m01-catalogo.dto';
 import { formLineaSchema, formMarcaSchema, type FormLinea, type FormMarca } from '../../dtos/formularios.dto';
 import { useCargar, useRetardo } from '../../hooks/useCargar';
+import { enlaceProductos } from '../../services/enlaces';
 import { leerLogotipo, validarLogotipo } from '../../services/archivos';
 import { lineasApi, marcasApi } from '../../services/catalogo-api';
 import { aCuerpoLinea, aCuerpoLineaNueva } from '../../services/formularios';
@@ -252,6 +254,13 @@ export const MarcasLineasView: React.FC = () => {
               >
                 Líneas
               </Button>
+              <Link
+                href={enlaceProductos({ marca: m.idMarca })}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-btn px-3 py-1.5 font-title text-xs font-medium text-action hover:bg-subaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
+              >
+                <Package className="h-4 w-4" aria-hidden="true" />
+                Ver productos
+              </Link>
               <Button
                 variant="ghost"
                 size="sm"
@@ -328,7 +337,14 @@ export const MarcasLineasView: React.FC = () => {
                   )}{' '}
                   <EstadoBadge estado={l.estado} />
                 </span>
-                <span className="flex gap-1">
+                <span className="flex items-center gap-1">
+                  <Link
+                    href={enlaceProductos({ marca: marcaActiva.idMarca, linea: l.idLinea })}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-btn px-3 py-1.5 font-title text-xs font-medium text-action hover:bg-subaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
+                  >
+                    <Package className="h-4 w-4" aria-hidden="true" />
+                    Ver productos
+                  </Link>
                   <Button
                     variant="ghost"
                     size="sm"

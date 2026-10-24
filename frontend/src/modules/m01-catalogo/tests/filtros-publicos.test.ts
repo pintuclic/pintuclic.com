@@ -11,7 +11,9 @@ import {
 describe('M01 · filtros de la vitrina en la URL', () => {
   it('lee una URL completa', () => {
     const f = filtrosDesdeUrl(
-      new URLSearchParams('q=vinilo&categoria=2&subcategoria=5&marca=3&superficie=7&ambiente=exterior&orden=precio_desc&pagina=3'),
+      new URLSearchParams(
+        'q=vinilo&categoria=2&subcategoria=5&marca=3&superficie=7&ambiente=exterior&orden=precio_desc&pagina=3',
+      ),
     );
     expect(f).toEqual({
       busqueda: 'vinilo',
@@ -26,7 +28,9 @@ describe('M01 · filtros de la vitrina en la URL', () => {
   });
 
   it('ignora valores inválidos, incluidos los enlaces del menú con slugs', () => {
-    const f = filtrosDesdeUrl(new URLSearchParams('categoria=decorativos&marca=-1&ambiente=sotano&orden=azar&pagina=0'));
+    const f = filtrosDesdeUrl(
+      new URLSearchParams('categoria=decorativos&marca=-1&ambiente=sotano&orden=azar&pagina=0'),
+    );
     expect(f).toEqual(FILTROS_INICIALES);
     expect(filtrosDesdeUrl(new URLSearchParams('pagina=2.5&marca=1e3')).pagina).toBe(1);
   });

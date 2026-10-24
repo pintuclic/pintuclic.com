@@ -139,11 +139,26 @@ export interface RelacionesProductoForm {
 function fichaDe(f: FormProducto): unknown {
   if (!f.conFicha) return null;
   return {
-    idTipoResina: f.idTipoResina === '' ? Number.NaN : Number(f.idTipoResina),
+    idTipoResina: Number(f.idTipoResina),
     tipoCalidad: f.tipoCalidad === '' ? null : Number(f.tipoCalidad),
     rendimientoMin: aNumeroONulo(f.rendimientoMin),
     rendimientoMax: aNumeroONulo(f.rendimientoMax),
+    manos: f.manos.trim() === '' ? null : Number(f.manos),
   };
+}
+
+/**
+ * Lo que falta por elegir, dicho con claridad, antes de armar el cuerpo: así nunca llega a la API
+ * (ni al usuario) un error genérico de validación.
+ */
+export function faltantesDeProducto(f: FormProducto, rel: RelacionesProductoForm): string | null {
+  if (f.idMarca === '') return 'Elija la marca.';
+  if (f.idSubcategoria === '') return 'Elija la subcategoría.';
+  if (!f.conFicha) return null;
+  if (f.idTipoResina === '') return 'Elija el tipo de resina.';
+  if (f.idLinea === '') return 'Elija la línea: los recubrimientos la exigen.';
+  if (rel.idsSuperficies.length === 0) return 'Elija al menos una superficie donde se aplica.';
+  return null;
 }
 
 const caracteristicasDe = (filas: FilaCaracteristica[]) =>
@@ -152,6 +167,8 @@ const caracteristicasDe = (filas: FilaCaracteristica[]) =>
     .map((c, indice) => ({ nombre: c.nombre.trim(), valor: c.valor.trim(), orden: indice }));
 
 export function aCuerpoProducto(f: FormProducto, rel: RelacionesProductoForm): Resultado<CrearProductoRequest> {
+  const faltante = faltantesDeProducto(f, rel);
+  if (faltante !== null) return { ok: false, mensaje: faltante };
   const r = crearProductoRequestSchema.safeParse({
     idMarca: Number(f.idMarca),
     idLinea: aIdONulo(f.idLinea),
@@ -174,6 +191,8 @@ export function aCuerpoProducto(f: FormProducto, rel: RelacionesProductoForm): R
 
 /** Al editar se envía todo: las listas reemplazan a las actuales (D11) y la marca no cambia (P1). */
 export function aCuerpoProductoEditado(f: FormProducto, rel: RelacionesProductoForm): Resultado<EditarProductoRequest> {
+  const faltante = faltantesDeProducto(f, rel);
+  if (faltante !== null) return { ok: false, mensaje: faltante };
   const r = editarProductoRequestSchema.safeParse({
     idLinea: aIdONulo(f.idLinea),
     idSubcategoria: Number(f.idSubcategoria),
@@ -199,6 +218,7 @@ export function formDesdeProducto(p: ProductoDetalle): { form: FormProducto; rel
     form: {
       idMarca: String(p.idMarca),
       idLinea: p.idLinea === null ? '' : String(p.idLinea),
+      idCategoria: '',
       idSubcategoria: String(p.idSubcategoria),
       nombre: p.nombre,
       descripcion: p.descripcion ?? '',
@@ -211,6 +231,7 @@ export function formDesdeProducto(p: ProductoDetalle): { form: FormProducto; rel
       tipoCalidad: p.ficha?.tipoCalidad == null ? '' : String(p.ficha.tipoCalidad),
       rendimientoMin: p.ficha?.rendimientoMin == null ? '' : String(p.ficha.rendimientoMin),
       rendimientoMax: p.ficha?.rendimientoMax == null ? '' : String(p.ficha.rendimientoMax),
+      manos: p.ficha?.manos == null ? '' : String(p.ficha.manos),
     },
     relaciones: {
       idsSuperficies: p.superficies.map((r) => r.id),

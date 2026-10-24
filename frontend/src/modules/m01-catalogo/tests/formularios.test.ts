@@ -28,6 +28,7 @@ const colorBase: FormColor = {
 const productoBase: FormProducto = {
   idMarca: '1',
   idLinea: '2',
+  idCategoria: '',
   idSubcategoria: '5',
   nombre: 'Viniltex',
   descripcion: '',
@@ -40,6 +41,7 @@ const productoBase: FormProducto = {
   tipoCalidad: '1',
   rendimientoMin: '20',
   rendimientoMax: '30,5',
+  manos: '',
 };
 const relBase: RelacionesProductoForm = {
   idsSuperficies: [1],
@@ -95,7 +97,14 @@ describe('M01 · formularios → cuerpos del contrato', () => {
   });
 
   it('variante: precio con coma, existencia y SKU opcionales', () => {
-    const f: FormVariante = { idMedida: '4', precio: '98900', sku: '', existenciaReferencial: '', codigoProveedor: '' };
+    const f: FormVariante = {
+      idTipoMedida: '1',
+      idMedida: '4',
+      precio: '98900',
+      sku: '',
+      existenciaReferencial: '',
+      codigoProveedor: '',
+    };
     expect(aCuerpoVariante(f)).toEqual({
       ok: true,
       valor: { idMedida: 4, precio: 98900, existenciaReferencial: 0, codigoProveedor: null },
@@ -136,19 +145,77 @@ describe('M01 · formularios → cuerpos del contrato', () => {
     expect(r).toMatchObject({ ok: true, valor: { ficha: null, idLinea: null, idsAcabados: [], idsBases: [] } });
   });
 
-  it('reporta las reglas del contrato: ficha sin línea (D7), bases sin acabados (P3), rendimiento incompleto', () => {
+  it('dice qué falta por elegir, nunca un error genérico de número (antes: "expected number, received NaN")', () => {
+    expect(aCuerpoProducto({ ...productoBase, idTipoResina: '' }, relBase)).toEqual({
+      ok: false,
+      mensaje: 'Elija el tipo de resina.',
+    });
     expect(aCuerpoProducto({ ...productoBase, idLinea: '' }, relBase)).toEqual({
       ok: false,
-      mensaje: 'Un recubrimiento exige línea',
+      mensaje: 'Elija la línea: los recubrimientos la exigen.',
     });
+    expect(aCuerpoProducto({ ...productoBase, idSubcategoria: '' }, relBase)).toEqual({
+      ok: false,
+      mensaje: 'Elija la subcategoría.',
+    });
+    expect(aCuerpoProducto({ ...productoBase, idMarca: '' }, relBase)).toEqual({
+      ok: false,
+      mensaje: 'Elija la marca.',
+    });
+    expect(aCuerpoProducto(productoBase, { ...relBase, idsSuperficies: [] })).toEqual({
+      ok: false,
+      mensaje: 'Elija al menos una superficie donde se aplica.',
+    });
+    // Un accesorio (sin ficha) no exige resina, línea ni superficie.
+    expect(
+      aCuerpoProducto(
+        { ...productoBase, conFicha: false, idLinea: '', idTipoResina: '' },
+        { ...relBase, idsSuperficies: [] },
+      ).ok,
+    ).toBe(true);
+  });
+
+  it('reporta las reglas del contrato que dependen de varios campos', () => {
     expect(aCuerpoProducto(productoBase, { ...relBase, idsAcabados: [] })).toEqual({
       ok: false,
       mensaje: 'Un producto con bases necesita al menos un acabado',
     });
     expect(aCuerpoProducto({ ...productoBase, rendimientoMax: '' }, relBase).ok).toBe(false);
     expect(aCuerpoProducto({ ...productoBase, rendimientoMin: '40' }, relBase).ok).toBe(false);
-    expect(aCuerpoProducto({ ...productoBase, idTipoResina: '' }, relBase).ok).toBe(false);
     expect(formProductoSchema.safeParse({ ...productoBase, nombre: '' }).success).toBe(false);
+  });
+
+  it('el formulario marca cada campo obligatorio en su sitio', () => {
+    const r = formProductoSchema.safeParse({ ...productoBase, idSubcategoria: '', idTipoResina: '', idLinea: '' });
+    expect(r.success).toBe(false);
+    const mensajes = Object.fromEntries((r.error?.issues ?? []).map((i) => [String(i.path[0]), i.message]));
+    expect(mensajes).toEqual({
+      idSubcategoria: 'Elija la subcategoría',
+      idTipoResina: 'Elija el tipo de resina',
+      idLinea: 'Elija la línea: los recubrimientos la exigen',
+    });
+    // Sin ficha, solo la subcategoría es obligatoria.
+    const sinFicha = formProductoSchema.safeParse({ ...productoBase, conFicha: false, idTipoResina: '', idLinea: '' });
+    expect(sinFicha.success).toBe(true);
+  });
+
+  it('manos: de 1 a 10 y solo junto con el rendimiento', () => {
+    const campo = (extra: Partial<FormProducto>) =>
+      formProductoSchema
+        .safeParse({ ...productoBase, ...extra })
+        .error?.issues.map((i) => `${String(i.path[0])}: ${i.message}`);
+    expect(formProductoSchema.safeParse({ ...productoBase, manos: '2' }).success).toBe(true);
+    expect(campo({ manos: '0' })).toEqual(['manos: Las manos van de 1 a 10']);
+    expect(campo({ manos: '11' })).toEqual(['manos: Las manos van de 1 a 10']);
+    expect(campo({ manos: '1,5' })).toContain('manos: Las manos son un número entero');
+    expect(campo({ manos: '2', rendimientoMin: '', rendimientoMax: '' })).toEqual([
+      'manos: Las manos se indican junto con el rendimiento',
+    ]);
+    expect(aCuerpoProducto({ ...productoBase, manos: '2' }, relBase)).toMatchObject({
+      ok: true,
+      valor: { ficha: { manos: 2 } },
+    });
+    expect(aCuerpoProducto(productoBase, relBase)).toMatchObject({ ok: true, valor: { ficha: { manos: null } } });
   });
 
   it('producto editado no envía la marca y puede retirar la ficha en un solo paso', () => {
@@ -178,16 +245,24 @@ describe('M01 · formularios → cuerpos del contrato', () => {
       variantesActivas: 0,
       descripcion: null,
       idCategoriaComplementaria: null,
-      ficha: { idTipoResina: 4, tipoResina: 'Vinílica', tipoCalidad: 1, rendimientoMin: 20, rendimientoMax: 30.5 },
+      ficha: {
+        idTipoResina: 4,
+        tipoResina: 'Vinílica',
+        tipoCalidad: 1,
+        rendimientoMin: 20,
+        rendimientoMax: 30.5,
+        manos: 2,
+      },
       superficies: [{ id: 1, nombre: 'Muros' }],
       acabados: [{ id: 2, nombre: 'Mate' }],
       bases: [{ id: 3, nombre: 'Tint' }],
       coloresFabrica: [],
       caracteristicas: [{ nombre: 'Secado', valor: '2 h', orden: 0 }],
+      imagenes: [],
       variantes: [],
     };
     const { form, relaciones } = formDesdeProducto(detalle);
-    expect(form).toEqual({ ...productoBase, rendimientoMax: '30.5' });
+    expect(form).toEqual({ ...productoBase, rendimientoMax: '30.5', manos: '2' });
     expect(relaciones.idsBases).toEqual([3]);
     expect(aCuerpoProductoEditado(form, relaciones)).toMatchObject({
       ok: true,

@@ -1,5 +1,6 @@
 import { logotipoArchivoSchema } from '../dtos/formularios.dto';
 import type { ReemplazarLogotipoRequest } from '../dtos/m01-catalogo.dto';
+import type { SubirImagenRequest } from '../dtos/m01-catalogo-productos.dto';
 
 /** "data:image/png;base64,AAAA" → "AAAA". */
 export function base64DeDataUrl(dataUrl: string): string {
@@ -27,4 +28,16 @@ export function leerLogotipo(archivo: File): Promise<ReemplazarLogotipoRequest> 
     };
     lector.readAsDataURL(archivo);
   });
+}
+
+/** Lo mismo que `leerLogotipo`, con los nombres de campo de las imágenes de productos y medidas. */
+export async function leerImagen(archivo: File): Promise<SubirImagenRequest> {
+  const { logotipoBase64, logotipoMimeType } = await leerLogotipo(archivo);
+  return { imagenBase64: logotipoBase64, imagenMimeType: logotipoMimeType };
+}
+
+/** Valida tipo y tamaño de una imagen de producto o de medida; el mensaje habla de "la imagen". */
+export function validarImagen(archivo: { type: string; size: number }): string | null {
+  const error = validarLogotipo(archivo);
+  return error === null ? null : error.replace('El logotipo', 'La imagen');
 }
