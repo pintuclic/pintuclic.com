@@ -14,6 +14,7 @@ export interface CodigosVerificacionRepository {
   buscarUltimoActivoPorCorreo(correo: string, tipo: TipoCodigoOtp, ahora?: Date): Promise<CodigoVerificacion | null>;
   incrementarIntentos(idCodigo: string): Promise<CodigoVerificacion>;
   eliminar(idCodigo: string): Promise<void>;
+  eliminarPorCorreoYTipo(correo: string, tipo: TipoCodigoOtp): Promise<void>;
 }
 
 export class PrismaCodigosVerificacionRepository implements CodigosVerificacionRepository {
@@ -76,6 +77,12 @@ export class PrismaCodigosVerificacionRepository implements CodigosVerificacionR
   async eliminar(idCodigo: string): Promise<void> {
     await prisma.codigoVerificacion.delete({
       where: { idCodigo },
+    });
+  }
+
+  async eliminarPorCorreoYTipo(correo: string, tipo: TipoCodigoOtp): Promise<void> {
+    await prisma.codigoVerificacion.deleteMany({
+      where: { correo: correo.trim().toLowerCase(), tipo },
     });
   }
 }

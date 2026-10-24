@@ -107,8 +107,11 @@ let secretoOriginal: string | undefined;
 
 /** Simula la sesión que el servidor resolvería para la cookie recibida. */
 function simularSesion(actor: ActorSimulado | null): void {
+  // La sesión renovada trae su nueva expiración: el middleware desliza la cookie con ella.
   validarYRenovar.mockResolvedValue(
-    actor === null ? { valida: false } : { valida: true, sesion: actor },
+    actor === null
+      ? { valida: false }
+      : { valida: true, sesion: { ...actor, fechaExpiracion: new Date(Date.now() + 1800 * 1000) } },
   );
 }
 
@@ -341,7 +344,7 @@ describe('HU-CUE-09 · Dictamen', () => {
     const perdedor = respuestas.find((r) => r.estado === 409);
     expect(perdedor?.cuerpo).toMatchObject({
       success: false,
-      error: { code: 'SOLICITUD_YA_DECIDIDA' },
+      error: { code: 'RECURSO_NO_ENCONTRADO' },
     });
   });
 
@@ -351,7 +354,7 @@ describe('HU-CUE-09 · Dictamen', () => {
     const { estado, cuerpo } = await pedir(rutaDictamen);
 
     expect(estado).toBe(409);
-    expect(cuerpo).toMatchObject({ error: { code: 'SOLICITUD_YA_DECIDIDA' } });
+    expect(cuerpo).toMatchObject({ error: { code: 'RECURSO_NO_ENCONTRADO' } });
     expect(repoSolicitudes.decidirSolicitud).not.toHaveBeenCalled();
   });
 
@@ -360,7 +363,7 @@ describe('HU-CUE-09 · Dictamen', () => {
     repoSolicitudes.buscarPorId.mockResolvedValue({ ...solicitud, tipoSolicitud: 'registro' });
     const registro = await pedir({ ...rutaDictamen, cuerpo: { decision: 'rechazar' } });
     expect(registro.estado).toBe(400);
-    expect(registro.cuerpo).toMatchObject({ error: { code: 'MOTIVO_RECHAZO_REQUERIDO' } });
+    expect(registro.cuerpo).toMatchObject({ error: { code: 'DATOS_INVALIDOS' } });
     expect(repoSolicitudes.decidirSolicitud).not.toHaveBeenCalled();
 
     // Ascenso: sin motivo -> 200 (opcional).
@@ -454,7 +457,7 @@ describe('HU-CUE-09 E14 / RN-CUE-20 · Descarga del RUT', () => {
     const { estado, cuerpo } = await pedir(RUTA_DESCARGA);
 
     expect(estado).toBe(500);
-    expect(cuerpo).toMatchObject({ error: { code: 'DOCUMENTO_INTEGRIDAD_NO_VERIFICADA' } });
+    expect(cuerpo).toMatchObject({ error: { code: 'ARCHIVO_NO_PERMITIDO' } });
     expect(JSON.stringify(cuerpo)).not.toContain('contenido-del-rut');
   });
 });

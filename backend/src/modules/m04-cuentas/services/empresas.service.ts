@@ -54,7 +54,7 @@ export class EmpresasService {
 
     const pendienteNit = await this.solicitudesRepo.buscarPendientePorNit(nitNormalizado);
     if (pendienteNit) {
-      throw new EmpresasError('Ya existe una solicitud pendiente de validación para este NIT.', 'SOLICITUD_NIT_PENDIENTE', 409);
+      throw new EmpresasError('Ya existe una solicitud pendiente de validación para este NIT.', 'SOLICITUD_PENDIENTE_EXISTENTE', 409);
     }
 
     // 2. Validar que el correo no esté ocupado
@@ -115,11 +115,11 @@ export class EmpresasService {
   ) {
     const usuario = await this.cuentasRepo.buscarPorId(idUsuario);
     if (!usuario) {
-      throw new EmpresasError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
+      throw new EmpresasError('Usuario no encontrado.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     if (usuario.tipo === 'empresa') {
-      throw new EmpresasError('La cuenta ya es de tipo corporativa (empresa).', 'CUENTA_YA_ES_EMPRESA', 400);
+      throw new EmpresasError('La cuenta ya es de tipo corporativa (empresa).', 'PERMISO_DENEGADO', 400);
     }
 
     // Validar si el usuario ya tiene una solicitud pendiente
@@ -218,7 +218,7 @@ export class EmpresasService {
   async obtenerDetalleSolicitud(idSolicitud: string) {
     const solicitud = await this.solicitudesRepo.buscarPorId(idSolicitud);
     if (!solicitud) {
-      throw new EmpresasError('Solicitud de empresa no encontrada.', 'SOLICITUD_NO_ENCONTRADA', 404);
+      throw new EmpresasError('Solicitud de empresa no encontrada.', 'RECURSO_NO_ENCONTRADO', 404);
     }
     return solicitud;
   }
@@ -238,7 +238,7 @@ export class EmpresasService {
   async obtenerDetalleRenovacion(idSolicitud: string) {
     const renovacion = await this.solicitudesRepo.buscarRenovacionPorId(idSolicitud);
     if (!renovacion) {
-      throw new EmpresasError('Solicitud de renovación de NIT no encontrada.', 'SOLICITUD_NO_ENCONTRADA', 404);
+      throw new EmpresasError('Solicitud de renovación de NIT no encontrada.', 'RECURSO_NO_ENCONTRADO', 404);
     }
     return renovacion;
   }
@@ -251,14 +251,14 @@ export class EmpresasService {
   async obtenerDocumentoRut(idDocumento: string): Promise<EntidadDocumentoSoporte> {
     const documento = await this.almacenDocumentos.obtenerDocumentoCompleto(idDocumento);
     if (documento === null) {
-      throw new EmpresasError('Documento no encontrado.', 'DOCUMENTO_NO_ENCONTRADO', 404);
+      throw new EmpresasError('Documento no encontrado.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     const huella = createHash('sha256').update(documento.contenido).digest('hex');
     if (huella !== documento.sha256) {
       throw new EmpresasError(
         'No fue posible verificar la integridad del documento.',
-        'DOCUMENTO_INTEGRIDAD_NO_VERIFICADA',
+        'ARCHIVO_NO_PERMITIDO',
         500,
       );
     }
@@ -278,7 +278,7 @@ export class EmpresasService {
   ) {
     const solicitud = await this.solicitudesRepo.buscarPorId(idSolicitud);
     if (!solicitud) {
-      throw new EmpresasError('Solicitud de empresa no encontrada.', 'SOLICITUD_NO_ENCONTRADA', 404);
+      throw new EmpresasError('Solicitud de empresa no encontrada.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     if (solicitud.estado !== 'pendiente') {
@@ -298,7 +298,7 @@ export class EmpresasService {
     ) {
       throw new EmpresasError(
         `El motivo de rechazo es obligatorio (mínimo ${MOTIVO_MINIMO_REGISTRO} caracteres) al rechazar un registro de empresa.`,
-        'MOTIVO_RECHAZO_REQUERIDO',
+        'DATOS_INVALIDOS',
         400,
       );
     }
@@ -343,14 +343,14 @@ export class EmpresasService {
   ) {
     const cuentaEmpresa = await this.cuentasRepo.buscarCuentaEmpresaPorIdUsuario(idUsuario);
     if (!cuentaEmpresa) {
-      throw new EmpresasError('La cuenta no tiene un perfil empresarial activo.', 'CUENTA_NO_EMPRESA', 403);
+      throw new EmpresasError('La cuenta no tiene un perfil empresarial activo.', 'PERMISO_DENEGADO', 403);
     }
 
     const nitNuevoNormalizado = input.nitNuevo.trim();
     if (cuentaEmpresa.nit === nitNuevoNormalizado) {
       throw new EmpresasError(
         'El nuevo NIT no puede ser idéntico al NIT actual.',
-        'NIT_IDENTICO',
+        'DATOS_INVALIDOS',
         400,
       );
     }
@@ -360,7 +360,7 @@ export class EmpresasService {
     if (pendiente) {
       throw new EmpresasError(
         'Ya tiene una solicitud de renovación de NIT pendiente de resolución.',
-        'RENOVACION_PENDIENTE_EXISTENTE',
+        'SOLICITUD_PENDIENTE_EXISTENTE',
         400,
       );
     }
@@ -399,7 +399,7 @@ export class EmpresasService {
   ) {
     const solicitud = await this.solicitudesRepo.buscarRenovacionPorId(idSolicitud);
     if (!solicitud) {
-      throw new EmpresasError('Solicitud de renovación de NIT no encontrada.', 'SOLICITUD_NO_ENCONTRADA', 404);
+      throw new EmpresasError('Solicitud de renovación de NIT no encontrada.', 'RECURSO_NO_ENCONTRADO', 404);
     }
 
     if (solicitud.estado !== 'pendiente') {
@@ -438,7 +438,7 @@ export class EmpresasService {
   private errorSolicitudYaDecidida(): EmpresasError {
     return new EmpresasError(
       'La solicitud ya fue decidida y no admite una nueva decisión.',
-      'SOLICITUD_YA_DECIDIDA',
+      'RECURSO_NO_ENCONTRADO',
       409,
     );
   }

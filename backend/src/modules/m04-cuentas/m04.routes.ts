@@ -11,7 +11,7 @@ import { PrismaSolicitudesEmpresaRepository } from './repositories/solicitudes-e
 import { PrismaDireccionesRepository } from './repositories/direcciones.repository';
 import { SistemaDateProviderAdapter } from './adapters/date-provider.adapter';
 import { crearNotificacionesAdapterDesdeEntorno } from './adapters/notificaciones.adapter';
-import { MockGoogleAuthAdapter } from './adapters/google-auth.adapter';
+import { GoogleAuthDeshabilitadoAdapter } from './adapters/google-auth.adapter';
 import { AuthCuentasService } from './services/auth-cuentas.service';
 import { RecuperacionPasswordService } from './services/recuperacion-password.service';
 import { PerfilService } from './services/perfil.service';
@@ -25,6 +25,7 @@ import { EmpresasController } from './controllers/empresas.controller';
 import type { DateProviderPort } from './interfaces/date-provider.port';
 import type { NotificacionesPort } from './interfaces/notificaciones.port';
 import type { GoogleAuthPort } from './interfaces/google-auth.port';
+import type { ParametrosCuentasPort } from './interfaces/parametros-cuentas.port';
 
 /**
  * RN-CUE-18 / HU-ADM-03: decidir sobre solicitudes de empresa exige este permiso
@@ -37,6 +38,8 @@ export interface ModuloM04Config {
   dateProvider?: DateProviderPort;
   notificaciones?: NotificacionesPort;
   googleAuth?: GoogleAuthPort;
+  /** HU-ADM-07: parámetros de autenticación de M17, inyectados desde app.routes.ts. */
+  parametros?: ParametrosCuentasPort;
 }
 
 export function construirModuloM04(
@@ -63,7 +66,8 @@ export function construirModuloM04(
   // Adaptadores (inyección configurable para pruebas desacopladas)
   const dateProvider = config?.dateProvider ?? new SistemaDateProviderAdapter();
   const notificaciones = config?.notificaciones ?? crearNotificacionesAdapterDesdeEntorno();
-  const googleAuth = config?.googleAuth ?? new MockGoogleAuthAdapter();
+  // HU-CUE-02 aplazada: sin un adaptador real inyectado, Google queda deshabilitado.
+  const googleAuth = config?.googleAuth ?? new GoogleAuthDeshabilitadoAdapter();
 
   // Servicios de dominio
   const authService = new AuthCuentasService(
@@ -74,6 +78,7 @@ export function construirModuloM04(
     googleAuth,
     dateProvider,
     sesionService,
+    config?.parametros,
   );
 
   const recuperacionService = new RecuperacionPasswordService(
@@ -82,6 +87,7 @@ export function construirModuloM04(
     notificaciones,
     dateProvider,
     sesionService,
+    config?.parametros,
   );
 
   const perfilService = new PerfilService(
@@ -119,8 +125,11 @@ export function construirModuloM04(
   cuentasRouter.post('/registro/reenviar-otp', authController.reenviarOtp as RequestHandler);
   cuentasRouter.post('/login', authController.login as RequestHandler);
   cuentasRouter.post('/cambio-password-primer-acceso', authController.cambiarPasswordPrimerAcceso as RequestHandler);
-  cuentasRouter.post('/oauth/google', authController.oauthGoogle as RequestHandler);
-  cuentasRouter.post('/oauth/google/completar', authController.completarRegistroGoogle as RequestHandler);
+  // Las rutas de Google solo existen si se inyecta un adaptador que verifique el token.
+  if (config?.googleAuth !== undefined) {
+    cuentasRouter.post('/oauth/google', authController.oauthGoogle as RequestHandler);
+    cuentasRouter.post('/oauth/google/completar', authController.completarRegistroGoogle as RequestHandler);
+  }
   cuentasRouter.post('/recuperar-password/solicitar', recuperacionController.solicitar as RequestHandler);
   cuentasRouter.post('/recuperar-password/confirmar', recuperacionController.confirmar as RequestHandler);
   cuentasRouter.post('/empresas/registro', empresasController.registrarEmpresa as RequestHandler);

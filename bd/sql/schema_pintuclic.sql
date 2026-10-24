@@ -288,6 +288,35 @@ COMMENT ON COLUMN sesion.fecha_expiracion IS 'Último acceso + ventana de inacti
 COMMENT ON COLUMN sesion.motivo_cierre IS 'Causa del cierre; nulo mientras la sesión sigue activa';
 
 -- ==============================================================================
+-- MIGRACIÓN 4.2 → 4.3 (bases creadas antes del rediseño del catálogo, ej. el VPS)
+-- Se activa solo si existe la tabla `tonos` (marca del catálogo anterior) y se ejecuta
+-- una única vez. Borra el catálogo viejo, que solo tenía datos del seed: si encuentra
+-- más filas que las del seed anterior, se detiene sin tocar nada para migrar a mano.
+-- Las líneas de carrito y las reservaciones del seed se borran porque apuntan al
+-- catálogo viejo; el seed nuevo las vuelve a crear.
+-- ==============================================================================
+DO $$
+BEGIN
+    IF to_regclass('public.tonos') IS NULL THEN
+        RETURN;
+    END IF;
+    IF (SELECT count(*) FROM producto) > 3
+       OR (SELECT count(*) FROM variante) > 33
+       OR (SELECT count(*) FROM color) > 30
+       OR (SELECT count(*) FROM linea_carrito) > 2
+       OR (SELECT count(*) FROM reservaciones) > 2 THEN
+        RAISE EXCEPTION 'Migración 4.3: el catálogo tiene datos que no son del seed. Migrar a mano.';
+    END IF;
+    DELETE FROM linea_carrito;
+    DELETE FROM reservaciones;
+    DROP TABLE IF EXISTS variante_combo, combo, imagen, caracteristica, variante, presentacion,
+        tonos, producto_base, producto_subcategoria, producto, color, base, linea,
+        sub_subcategorias, subcategorias, categoria, marca CASCADE;
+    DROP TYPE IF EXISTS enum_clase_color;
+    RAISE NOTICE 'Migración 4.3: catálogo anterior eliminado; se crea el nuevo a continuación.';
+END $$;
+
+-- ==============================================================================
 -- 3. MÓDULO DE CATÁLOGO (M01) — rediseño del esquema 4.3 (2026-10-23)
 -- Reglas de negocio y decisiones del Tech Lead:
 --   docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md
@@ -733,6 +762,8 @@ CREATE TABLE IF NOT EXISTS linea_carrito (
     CONSTRAINT chk_lineacarrito_cantidad CHECK (cantidad > 0),
     CONSTRAINT uq_carrito_variante_color UNIQUE NULLS NOT DISTINCT (id_carrito, id_variante, id_color)
 );
+-- Migración 4.3: en bases anteriores la tabla ya existe sin la columna del color.
+ALTER TABLE linea_carrito ADD COLUMN IF NOT EXISTS id_color INT;
 
 COMMENT ON TABLE linea_carrito IS 'Líneas vivas de ítems en carrito vinculadas a la variante de producto y referencia viva';
 COMMENT ON COLUMN linea_carrito.id_color IS 'Color elegido (si el producto lleva color). Variante + color forman la "variante temporal" de la venta; el SKU compuesto se arma con ambos (RC-21).';
@@ -1063,6 +1094,31 @@ CREATE TABLE IF NOT EXISTS reservaciones (
 );
 
 COMMENT ON TABLE reservaciones IS 'Agendamiento de citas y reservaciones de servicios';
+
+-- Migración 4.3: reconecta con el catálogo nuevo las tablas que sobrevivieron al rediseño
+-- (en una base creada desde cero estas sentencias no hacen nada).
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_carrito_variante') THEN
+        ALTER TABLE linea_carrito DROP CONSTRAINT uq_carrito_variante;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_carrito_variante_color') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT uq_carrito_variante_color
+            UNIQUE NULLS NOT DISTINCT (id_carrito, id_variante, id_color);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_lineacarrito_variante') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT fk_lineacarrito_variante FOREIGN KEY (id_variante)
+            REFERENCES variante (id_variante) ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_lineacarrito_color') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT fk_lineacarrito_color FOREIGN KEY (id_color)
+            REFERENCES color (id_color) ON UPDATE CASCADE ON DELETE RESTRICT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_reservacion_producto') THEN
+        ALTER TABLE reservaciones ADD CONSTRAINT fk_reservacion_producto FOREIGN KEY (id_producto)
+            REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- ==============================================================================
 -- 8. MÓDULO DE PRIVACIDAD, CONSENTIMIENTO Y HABEAS DATA (M20 - HU-SEG-05)

@@ -10,7 +10,11 @@ import {
   type ListarEmpleadosQuery,
   type ResumenEmpleado,
 } from '../dtos/m17-permisos.dto';
-import type { EmpleadosRepositoryPort, EntidadEmpleado } from '../interfaces/empleados.interface';
+import type {
+  ActivacionEmpleadoPort,
+  EmpleadosRepositoryPort,
+  EntidadEmpleado,
+} from '../interfaces/empleados.interface';
 import type { GobernanzaAdminRepositoryPort } from '../interfaces/gobernanza.interface';
 
 export class EmpleadoError extends Error {
@@ -24,11 +28,17 @@ export class EmpleadoError extends Error {
   }
 }
 
+/** Sin adaptador conectado no hay correo: el alta queda con `activacionEnviada: false`. */
+const SIN_ACTIVACION: ActivacionEmpleadoPort = {
+  enviarEnlaceActivacion: () => Promise.reject(new Error('Activación de empleados no configurada')),
+};
+
 export class EmpleadosService {
   constructor(
     private readonly empleadosRepo: EmpleadosRepositoryPort,
     private readonly gobernanzaRepo: GobernanzaAdminRepositoryPort,
     private readonly sesionService: SesionService,
+    private readonly activacion: ActivacionEmpleadoPort = SIN_ACTIVACION,
   ) {}
 
   async listar(query: ListarEmpleadosQuery): Promise<ListarEmpleadosOutput> {
@@ -51,6 +61,7 @@ export class EmpleadosService {
           fechaCreacion: emp.fechaCreacion.toISOString(),
           fechaUltimoAcceso: emp.fechaUltimoAcceso ? emp.fechaUltimoAcceso.toISOString() : null,
           cantidadPermisos,
+          primerAccesoPendiente: emp.primerAccesoPendiente,
         };
       }),
     );
@@ -87,8 +98,8 @@ export class EmpleadosService {
       );
     }
 
-    const credencialTemporal = `Pintu#${crypto.randomBytes(6).toString('hex')}!`;
-    const hashContrasena = await derivarContrasena(credencialTemporal);
+    // Clave aleatoria que nadie conoce: el empleado define la suya con el enlace de activación.
+    const hashContrasena = await derivarContrasena(crypto.randomBytes(32).toString('base64url'));
 
     const creado = await this.empleadosRepo.crear({
       nombre: input.nombre,
@@ -96,6 +107,14 @@ export class EmpleadosService {
       telefono: input.telefono,
       contrasenaHash: hashContrasena,
     });
+
+    let activacionEnviada = true;
+    try {
+      await this.activacion.enviarEnlaceActivacion(creado.idUsuario);
+    } catch {
+      // El alta no se revierte: el admin ve el aviso y reenvía el enlace.
+      activacionEnviada = false;
+    }
 
     return {
       idUsuario: creado.idUsuario,
@@ -105,8 +124,29 @@ export class EmpleadosService {
       estado: creado.estado,
       primerAccesoPendiente: true,
       fechaCreacion: creado.fechaCreacion.toISOString(),
-      credencialTemporal,
+      activacionEnviada,
     };
+  }
+
+  /** HU-ADM-01: enlace de activación nuevo para un empleado que aún no definió su contraseña. */
+  async reenviarActivacion(idUsuario: number): Promise<void> {
+    const empleado = await this.obtenerPorId(idUsuario);
+    if (empleado.estado !== 'activo' || !empleado.primerAccesoPendiente) {
+      throw new EmpleadoError(
+        CODIGOS_ERROR_M17.PARAMETRO_INVALIDO,
+        'El colaborador ya activó su cuenta o está inactivo.',
+        409,
+      );
+    }
+    try {
+      await this.activacion.enviarEnlaceActivacion(idUsuario);
+    } catch {
+      throw new EmpleadoError(
+        CODIGOS_ERROR_M17.ERROR_INTERNO,
+        'No fue posible enviar el correo de activación. Inténtalo de nuevo.',
+        502,
+      );
+    }
   }
 
   async editar(idUsuario: number, input: EditarEmpleadoInput): Promise<EntidadEmpleado> {

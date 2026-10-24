@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { AdminLayout } from '@/modules/m17-permisos/components/AdminLayout';
+import { AdminLayout } from '@/core/components';
 
 export const metadata: Metadata = {
   title: 'Panel Administrativo — Pintu Clic',

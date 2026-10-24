@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ATRIBUTOS_COOKIE_SESION } from '../utils/cookieSesion';
+import { ATRIBUTOS_COOKIE_SESION, opcionesCookieSesion } from '../utils/cookieSesion';
 import { construirError } from '../utils/apiResponse';
-import { leerToken } from '../utils/jwt';
+import { emitirToken, leerToken } from '../utils/jwt';
 import type { SesionService } from '../../modules/m20-seguridad/services/sesion.service';
 
 /**
@@ -41,6 +41,18 @@ export function construirAuthMiddleware(sesiones: SesionService) {
       res.status(401).json(construirError('SESION_EXPIRADA', 'La sesión ha expirado.'));
       return;
     }
+
+    // RF-SEG-02-02: la cookie y el token se deslizan con la sesión renovada, de modo
+    // que caducan con la ventana de inactividad de su tipo y no a una hora fija.
+    const vigenciaSegundos = Math.max(
+      1,
+      Math.floor((resultado.sesion.fechaExpiracion.getTime() - Date.now()) / 1000),
+    );
+    res.cookie(
+      ATRIBUTOS_COOKIE_SESION.nombre,
+      emitirToken(resultado.sesion.idSesion, vigenciaSegundos),
+      opcionesCookieSesion(vigenciaSegundos),
+    );
 
     req.actor = {
       idUsuario: resultado.sesion.idUsuario,

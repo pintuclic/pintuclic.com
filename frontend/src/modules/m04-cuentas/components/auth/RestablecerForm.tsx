@@ -12,12 +12,34 @@ import {
 import { restablecerContrasena } from '../../services/cuentas.service';
 import { aErrorCuentas } from '../../services/errores';
 
+/** Textos que cambian entre recuperar la contraseña y activar una cuenta de colaborador. */
+const TEXTOS = {
+  recuperacion: {
+    enlaceInvalido: 'El enlace no es válido o está incompleto. Solicita uno nuevo para restablecer tu contraseña.',
+    exito:
+      'Tu contraseña fue actualizada. Por seguridad cerramos tus sesiones abiertas: inicia sesión con tu contraseña nueva.',
+  },
+  activacion: {
+    enlaceInvalido: 'El enlace de activación no es válido o venció. Pide al administrador que te envíe uno nuevo.',
+    exito: 'Tu cuenta quedó activada. Inicia sesión con la contraseña que acabas de definir.',
+  },
+} as const;
+
 /**
  * HU-CUE-05 · Restablecer contraseña desde el enlace del correo.
+ * HU-ADM-01 · Con `variante="activacion"`, el colaborador nuevo define su primera
+ * contraseña con el enlace que le envió M17.
  * RN-CUE-09: no inicia sesión automáticamente; el backend invalida las sesiones
  * abiertas y el usuario entra de nuevo con su contraseña nueva.
  */
-export function RestablecerForm({ token }: { token: string | null }) {
+export function RestablecerForm({
+  token,
+  variante = 'recuperacion',
+}: {
+  token: string | null;
+  variante?: keyof typeof TEXTOS;
+}) {
+  const textos = TEXTOS[variante];
   const [listo, setListo] = useState(false);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const {
@@ -32,12 +54,12 @@ export function RestablecerForm({ token }: { token: string | null }) {
   if (!token) {
     return (
       <div className="flex flex-col gap-4">
-        <Alert variant="error">
-          El enlace no es válido o está incompleto. Solicita uno nuevo para restablecer tu contraseña.
-        </Alert>
-        <ButtonLink href="/recuperar-contrasena" fullWidth>
-          Solicitar un enlace nuevo
-        </ButtonLink>
+        <Alert variant="error">{textos.enlaceInvalido}</Alert>
+        {variante === 'recuperacion' && (
+          <ButtonLink href="/recuperar-contrasena" fullWidth>
+            Solicitar un enlace nuevo
+          </ButtonLink>
+        )}
       </div>
     );
   }
@@ -45,10 +67,7 @@ export function RestablecerForm({ token }: { token: string | null }) {
   if (listo) {
     return (
       <div className="flex flex-col gap-4">
-        <Alert variant="success">
-          Tu contraseña fue actualizada. Por seguridad cerramos tus sesiones abiertas: inicia sesión con tu
-          contraseña nueva.
-        </Alert>
+        <Alert variant="success">{textos.exito}</Alert>
         <ButtonLink href="/login" fullWidth>
           Iniciar sesión
         </ButtonLink>
@@ -71,9 +90,13 @@ export function RestablecerForm({ token }: { token: string | null }) {
       {errorServidor && (
         <Alert variant="error">
           {errorServidor}{' '}
-          <Link href="/recuperar-contrasena" className="font-medium underline">
-            Solicitar un enlace nuevo
-          </Link>
+          {variante === 'recuperacion' ? (
+            <Link href="/recuperar-contrasena" className="font-medium underline">
+              Solicitar un enlace nuevo
+            </Link>
+          ) : (
+            'Pide al administrador que te envíe uno nuevo.'
+          )}
         </Alert>
       )}
       <PasswordInput

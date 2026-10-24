@@ -7,6 +7,7 @@ Este documento registra la evolución histórica del modelo de base de datos de 
 ---
 
 ## 📑 Índice de Versiones
+- [Versión 3.1 (Seed: vigencia del enlace de activación de empleados, sin cambios de DDL - 2026-10-23)](#-versión-31-2026-10-23)
 - [Versión 3.0 (M04: unicidad, hash OTP, anti-fuerza bruta y cambio de clave - 2026-10-21)](#-versión-30-2026-10-21)
 - [Versión 2.9 (M17: tabla de parámetros de configuración general - 2026-10-21)](#-versión-29-2026-10-21)
 - [Versión 2.8 (M04: NIT vigente de la cuenta empresa y RUT adjunto almacenado - 2026-10-21)](#-versión-28-2026-10-21)
@@ -19,6 +20,71 @@ Este documento registra la evolución histórica del modelo de base de datos de 
 - [Versión 2.1 (E-Commerce Inmutable, Cotizaciones y Carrito con Variantes)](#-versión-21-2026-09-04)
 - [Versión 2.0 (Página FINAL del ER) - Reestructuración de Catálogo, Variantes y Combos](#-versión-20-2026-09-03)
 - [Versión 1.0 (Esquema Inicial Pre-Final) - Base de 21 Tablas](#-versión-10-2026-09-02)
+
+---
+
+## 📦 Versión 3.1 (2026-10-23)
+
+### 🎯 Resumen Ejecutivo
+Versión de **datos y uso**, sin cambios de DDL ni del modelo Prisma: el esquema sigue en **v4.2 (53 tablas, 21 enums)**. Acompaña a la versión de aplicación v0.7.0, en la que el alta de empleados de M17 deja de usar una clave temporal y envía un enlace de activación por correo.
+- **Total Tablas:** 53 (sin cambios).
+- **Foco de la versión:** parámetro nuevo en el seed y nuevos usos de `codigo_verificacion` y `usuario.cambio_contrasena_pendiente`.
+
+---
+
+### 🛑 1. Tablas Deprecadas / Eliminadas
+Ninguna en esta versión.
+
+---
+
+### ✨ 2. Tablas Nuevas Creadas
+Ninguna en esta versión.
+
+---
+
+### 🔄 3. Tablas Modificadas y Nuevas Relaciones
+Sin cambios de estructura. Cambia el uso de dos tablas:
+- **`codigo_verificacion`:**
+  - **Activación de empleados (`HU-ADM-01`):** `tipo = 'recuperacion_password'`, `codigo_hash` = BCrypt del valor aleatorio del enlace, `max_intentos = 3` y `datos_temporales = { idUsuario }`. La expiración sale del parámetro nuevo. Emitir un enlace nuevo borra los anteriores del mismo correo.
+  - **Recuperación de contraseña (`HU-CUE-05`):** `datos_temporales` guarda solo `{ idUsuario }`; antes incluía el valor plano del enlace.
+  - **Sustitución del correo del admin (M17):** los tokens pasan de un `Map` en memoria a esta tabla, con `tipo = 'cambio_correo'`, `codigo_hash` = SHA-256 del token, `max_intentos = 1` y `datos_temporales = { origen: 'gobernanza_admin', idUsuario, correoActual }`.
+- **`usuario.cambio_contrasena_pendiente`:** `true` al crear un empleado en M17 y `false` cuando define su contraseña con el enlace (o con el primer acceso, en cuentas antiguas con clave temporal).
+
+---
+
+### 🔒 4. Restricciones (CONSTRAINTS) y Tipos ENUM Agregados
+- Ninguna nueva. El rango 1–168 del parámetro nuevo lo imponen las restricciones `ck_parametro_*` de la v2.9.
+- **Catálogo de parámetros (seed):** fila 11 `auth.vigencia_enlace_activacion_horas` (área `autenticacion`, `numero`, valor y defecto `72`, rango 1–168). La secuencia `parametro_sistema_id_parametro_seq` se ajusta en el bloque final del seed.
+
+---
+
+### ⚡ 5. Nuevos Índices de Rendimiento
+Ninguno en esta versión.
+
+---
+
+### 💻 6. Impacto y Acciones Requeridas en Backend y Frontend
+#### Backend (Prisma / Express):
+- **M04** lee la vigencia por `ParametrosCuentasPort` (72 h si falta la fila) y emite el enlace (`RecuperacionPasswordService.emitirEnlaceActivacion`).
+- **M17** crea al empleado con una clave aleatoria que nadie conoce, pide el enlace por `ActivacionEmpleadoPort` y expone `POST /admin/empleados/:id/reenviar-activacion`.
+- **Resuelto (pendiente de la v2.9):** el catálogo se persiste con Prisma (`PrismaConfiguracionRepository`, caché de 30 s), en lugar de `AlmacenConfiguracionMemoria`.
+
+#### Frontend (Vistas / UI):
+- El parámetro aparece en `/admin/configuracion` en cuanto existe la fila.
+
+#### Despliegue en bases existentes:
+- `docker-entrypoint-initdb.d` solo ejecuta el esquema y el seed sobre un volumen vacío. En una base ya creada la fila se inserta a mano (`INSERT ... ON CONFLICT (clave) DO NOTHING`). En el VPS se hizo el 2026-10-23.
+
+#### Verificación (PostgreSQL 18 local sobre un clúster desechable, 2026-10-23):
+| Prueba | Resultado |
+| :--- | :--- |
+| Instalación limpia: esquema y seed, dos pasadas cada uno, `ON_ERROR_STOP=1` | ✅ Código 0; 53 tablas; 21 enums; 11 parámetros; secuencia en 11 |
+| Re-ejecutar el seed con el parámetro modificado por un administrador (24) | ✅ Se conserva 24 |
+| Rango del parámetro en la base | ✅ 0 y 169 rechazados; 1 y 168 aceptados |
+| NIT del seed en `cuenta_empresa`, `solicitud_empresa` y `solicitud_actualizacion_nit` con el formato `^[0-9]{5,15}-[0-9]$` | ✅ Todos cumplen |
+| Prueba de punta a punta del alta de empleados con el backend, la base y un SMTP locales | ✅ 28/28 (alta, correo, reenvío, activación, login, vigencia configurable y permisos) |
+
+> **Nota operativa:** en Git Bash para Windows, `psql -f ... > /dev/null` termina con código 3 aunque el script no falle. Redirige la salida a un archivo para comprobar el código de salida.
 
 ---
 

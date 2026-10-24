@@ -5,15 +5,11 @@ import type {
   EditarEmpleadoFormData,
 } from '../dtos/empleados.dto';
 import type {
+  CrearEmpleadoRespuesta,
   DetalleEmpleado,
   ListarEmpleadosQuery,
   ListarEmpleadosRespuesta,
 } from '../interfaces/empleados.interface';
-
-export interface CrearEmpleadoResultado {
-  empleado: DetalleEmpleado;
-  credencialTemporalGenerada?: string;
-}
 
 /**
  * HU-ADM-01 / HU-ADM-03: Listar colaboradores del sistema.
@@ -39,19 +35,19 @@ export async function obtenerEmpleado(idUsuario: number): Promise<DetalleEmplead
 }
 
 /**
- * HU-ADM-01: Crear nuevo colaborador con credencial temporal generada.
+ * HU-ADM-01: Crear colaborador. El backend le envía por correo el enlace para
+ * definir su contraseña; ninguna clave pasa por el panel.
  */
-export async function crearEmpleado(
-  payload: CrearEmpleadoFormData,
-): Promise<CrearEmpleadoResultado> {
-  const respuesta = await apiClient.post<
-    RespuestaExitosa<DetalleEmpleado> & { meta?: { credencialTemporalGenerada?: string } }
-  >('/admin/empleados', payload);
+export async function crearEmpleado(payload: CrearEmpleadoFormData): Promise<CrearEmpleadoRespuesta> {
+  const { data } = await apiClient.post<RespuestaExitosa<CrearEmpleadoRespuesta>>('/admin/empleados', payload);
+  return data.data;
+}
 
-  return {
-    empleado: respuesta.data.data,
-    credencialTemporalGenerada: respuesta.data.meta?.credencialTemporalGenerada,
-  };
+/**
+ * HU-ADM-01: Enviar un enlace de activación nuevo (invalida los anteriores).
+ */
+export async function reenviarActivacionEmpleado(idUsuario: number): Promise<void> {
+  await apiClient.post(`/admin/empleados/${idUsuario}/reenviar-activacion`, {});
 }
 
 /**
