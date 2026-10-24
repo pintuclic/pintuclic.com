@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.4 (v4.3 + M01: equivalencia en galones de los tipos de medida)
+-- VERSIÓN: 4.5 (v4.4 + M01: manos del rendimiento e imagen de la medida)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 58
@@ -476,14 +476,29 @@ CREATE TABLE IF NOT EXISTS medida (
     valor NUMERIC(12, 3) NOT NULL,
     nombre VARCHAR(60) NOT NULL UNIQUE,
     estado enum_estado_general NOT NULL DEFAULT 'activo',
+    imagen BYTEA,
+    imagen_mime_type VARCHAR(50),
     CONSTRAINT fk_medida_tipo FOREIGN KEY (id_tipo_medida)
         REFERENCES tipo_medida (id_tipo_medida) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT chk_medida_valor CHECK (valor > 0),
     CONSTRAINT uq_medida_valor_tipo UNIQUE (id_tipo_medida, valor)
 );
 
+-- Esquema 4.5: en bases creadas con el 4.4 la tabla ya existe sin las columnas de imagen.
+ALTER TABLE medida ADD COLUMN IF NOT EXISTS imagen BYTEA;
+ALTER TABLE medida ADD COLUMN IF NOT EXISTS imagen_mime_type VARCHAR(50);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_medida_imagen') THEN
+        ALTER TABLE medida ADD CONSTRAINT chk_medida_imagen
+            CHECK ((imagen IS NULL) = (imagen_mime_type IS NULL));
+    END IF;
+END $$;
+
 COMMENT ON TABLE medida IS 'Medida vendible reutilizable entre productos: valor + tipo de medida (ej. 1 galón, 5 galones, 2 pulgadas).';
 COMMENT ON COLUMN medida.nombre IS 'Cómo se muestra al cliente (ej. "1/4 de galón")';
+COMMENT ON COLUMN medida.imagen IS 'Imagen opcional de la medida (ej. la silueta del envase), en bytes. Se muestra junto a la galería del producto.';
+COMMENT ON COLUMN medida.imagen_mime_type IS 'Tipo de la imagen de la medida: image/jpeg, image/png o image/webp. Va siempre junto con imagen.';
 
 -- ------------------------------------------------------------------------------
 -- 3.4 Color
@@ -573,6 +588,7 @@ CREATE TABLE IF NOT EXISTS ficha_recubrimiento (
     tipo_calidad SMALLINT,
     rendimiento_min NUMERIC(8, 2),
     rendimiento_max NUMERIC(8, 2),
+    manos SMALLINT,
     CONSTRAINT fk_ficha_producto FOREIGN KEY (id_producto)
         REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_ficha_resina FOREIGN KEY (id_tipo_resina)
@@ -582,12 +598,23 @@ CREATE TABLE IF NOT EXISTS ficha_recubrimiento (
         (rendimiento_min IS NULL AND rendimiento_max IS NULL)
         OR (rendimiento_min IS NOT NULL AND rendimiento_max IS NOT NULL
             AND rendimiento_min > 0 AND rendimiento_min <= rendimiento_max)
-    )
+    ),
+    CONSTRAINT chk_ficha_manos CHECK (manos IS NULL OR manos BETWEEN 1 AND 10)
 );
+
+-- Esquema 4.5: en bases creadas con el 4.4 la tabla ya existe sin la columna.
+ALTER TABLE ficha_recubrimiento ADD COLUMN IF NOT EXISTS manos SMALLINT;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_ficha_manos') THEN
+        ALTER TABLE ficha_recubrimiento ADD CONSTRAINT chk_ficha_manos CHECK (manos IS NULL OR manos BETWEEN 1 AND 10);
+    END IF;
+END $$;
 
 COMMENT ON TABLE ficha_recubrimiento IS 'Datos técnicos de pinturas, estucos, barnices y demás recubrimientos (HU-CAT-10). Las herramientas no tienen ficha.';
 COMMENT ON COLUMN ficha_recubrimiento.tipo_calidad IS 'Tipo 1, 2 o 3 del fabricante (1 = gama alta, ej. Viniltex Ultralavable). Opcional.';
 COMMENT ON COLUMN ficha_recubrimiento.rendimiento_min IS 'Rendimiento mínimo en m² por galón (RF-CAT-10-02).';
+COMMENT ON COLUMN ficha_recubrimiento.manos IS 'Manos de aplicación con las que se logra el rendimiento (ej. 35 m² por galón a 2 manos). Opcional, de 1 a 10.';
 
 -- Tabla: producto_superficie
 CREATE TABLE IF NOT EXISTS producto_superficie (

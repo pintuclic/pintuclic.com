@@ -10,6 +10,15 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.4] - 2026-10-24
+### Esquema 4.5 (58 Tablas) - M01 Catálogo: manos del rendimiento e imagen de la medida
+- **Alcance General:** Dos cambios aditivos pedidos por el contrato de M01.
+  - **`ficha_recubrimiento.manos SMALLINT`**, opcional, entre 1 y 10: manos de aplicación con las que se logra el rendimiento (ej. 35 m² por galón a 2 manos).
+  - **`medida.imagen BYTEA` y `medida.imagen_mime_type`**, opcionales y siempre juntas (`chk_medida_imagen`): imagen de la medida (ej. la silueta del envase) que se muestra junto a la galería del producto.
+  - **Bases existentes en 4.4:** el DDL agrega las columnas con `ADD COLUMN IF NOT EXISTS`; no requiere seed. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql`.
+
+---
+
 ## [v3.3] - 2026-10-24
 ### Esquema 4.4 (58 Tablas) - M01 Catálogo: equivalencia en galones
 - **Alcance General:** Cambio aditivo pedido por el contrato de M01 (`contracts/m01-catalogo.contract.ts`, decisión D6).
