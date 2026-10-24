@@ -9,7 +9,14 @@ export function construirAppRoutes(): Router {
   const router = Router();
   const m20 = construirModuloM20();
   const auth = construirAuthMiddleware(m20.sesionService);
-  const m17 = construirModuloM17(m20.sesionService, m20.auditoria);
+  const m17 = construirModuloM17(m20.sesionService, m20.auditoria, {
+    // HU-ADM-01: M04 envía el enlace de activación de los empleados que crea M17.
+    // M04 se construye después (usa la autorización de M17); la llamada ocurre por
+    // petición, cuando `m04` ya existe.
+    activacionEmpleado: {
+      enviarEnlaceActivacion: (idUsuario) => m04.recuperacionService.emitirEnlaceActivacion(idUsuario),
+    },
+  });
   const m04 = construirModuloM04(m20.sesionService, m17.autorizacionService, {
     // HU-ADM-07: M04 lee los parámetros de autenticación que el admin edita en M17
     // (caché corta de 30 s en el repositorio de configuración).
