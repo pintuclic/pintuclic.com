@@ -63,7 +63,7 @@ import { z } from 'zod';
 // ============================================================================
 
 export const MENSAJE_RECURSO_NO_DISPONIBLE =
-  'El recurso solicitado no está disponible' as const;
+  'El recurso solicitado no está disponible.' as const;
 
 export const PERMISOS_CONTENIDO = {
   ver: 'configuracion.ver',
