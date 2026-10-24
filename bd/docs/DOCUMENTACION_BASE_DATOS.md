@@ -1,6 +1,6 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.3 — esquema 4.4 (M01 Catálogo: equivalencia en galones de los tipos de medida).  
+> **Versión Actual:** 3.4 — esquema 4.5 (M01 Catálogo: manos del rendimiento e imagen de la medida).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
 > **Total de Tablas:** 58  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.4** (esquema 4.5) | 2026-10-24 | Ninguna | Ninguna | `ficha_recubrimiento.manos` (opcional, 1 a 10): manos con las que se logra el rendimiento. `medida.imagen` e `imagen_mime_type` (opcionales, siempre juntas): imagen de la medida para la galería del producto. Total 58 tablas. | [Ver v3.4](./CHANGELOG_DATABASE.md#v34---2026-10-24) |
 | **v3.3** (esquema 4.4) | 2026-10-24 | Ninguna | Ninguna | `tipo_medida.equivalencia_galones` (opcional, mayor que 0): galones que equivale una unidad (litro = 0,264172052). Permite derivar el rendimiento por medida a partir del rendimiento por galón (`RF-CAT-10-03`). Seed: galón, litro y mililitro. Total 58 tablas. | [Ver v3.3](./CHANGELOG_DATABASE.md#v33---2026-10-24) |
 | **v3.2** (esquema 4.3) | 2026-10-24 | `superficie`, `acabado`, `familia_color`, `tipo_medida`, `medida`, `ficha_recubrimiento`, `producto_superficie`, `producto_acabado`, `producto_color`, `producto_caracteristica` (10) | `sub_subcategorias`, `tonos`, `presentacion`, `caracteristica`, `producto_subcategoria` (5) | M01 Catálogo rediseñado con las reglas del Tech Lead: color con base opcional, acabado y familia; bases globales; variante = producto + medida con su precio; producto en una subcategoría con superficies y ambiente; color en `linea_carrito` y `sku_vendido` en `linea_orden`. Total 58 tablas. | [Ver v3.2](./CHANGELOG_DATABASE.md#v32---2026-10-24) |
 | **v3.1** (esquema 4.2) | 2026-10-23 | Ninguna | Ninguna | Sin cambios de DDL ni de Prisma. Seed: parámetro 11 `auth.vigencia_enlace_activacion_horas` (72 h, rango 1–168). `codigo_verificacion` guarda también el enlace de activación de empleados y los tokens de gobernanza del admin (antes en memoria); la recuperación ya no guarda el valor plano. M17 ya persiste el catálogo con Prisma. | [Ver v3.1](./WALKTHROUGH_DATABASE.md#-versión-31-2026-10-23) |
