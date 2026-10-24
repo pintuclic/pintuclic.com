@@ -23,6 +23,7 @@ const DEPENDENCIAS_CONSULTA: Record<string, string> = {
   'personal.desactivar': 'personal.ver',
   'usuarios.gestionar': 'personal.ver',
   'configuracion.editar': 'configuracion.ver',
+  'notificaciones.editar': 'notificaciones.ver',
 };
 
 export class PermisosService {

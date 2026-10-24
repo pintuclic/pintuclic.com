@@ -128,6 +128,27 @@ enum TipoDatoParametro {
   @@map("enum_tipo_dato_parametro")
 }
 
+/// Catálogo de comunicaciones transaccionales que envía el sistema (M18 · RF-NOT-01-02)
+enum TipoComunicacion {
+  registro_otp
+  recuperacion_password
+  activacion_empleado
+  cambio_correo_otp
+  cambio_correo_confirmado
+  dictamen_empresa
+
+  @@map("enum_tipo_comunicacion")
+}
+
+/// Resultado de un intento de envío transaccional (M18 · RF-NOT-01-03, RF-NOT-01-04)
+enum EstadoEnvioNotificacion {
+  pendiente
+  enviado
+  fallido
+
+  @@map("enum_estado_envio_notificacion")
+}
+
 // =============================================================================
 // MÓDULO M04 — USUARIO
 // =============================================================================
@@ -463,5 +484,57 @@ model ControlIntentoAcceso {
 
   @@index([bloqueadoHasta], map: "idx_control_intento_bloqueo")
   @@map("control_intento_acceso")
+}
+
+// =============================================================================
+// MÓDULO M18 — NOTIFICACIONES Y COMUNICACIONES
+// =============================================================================
+
+/// Contenido editable desde el panel para cada comunicación transaccional (HU-NOT-03)
+model PlantillaNotificacion {
+  idPlantilla           String                @id @default(uuid()) @map("id_plantilla") @db.Uuid
+  tipo                  TipoComunicacion       @unique
+  asunto                String                @db.VarChar(200)
+  contenidoHtml         String                @map("contenido_html")
+  contenidoTexto        String                @map("contenido_texto")
+  variablesDisponibles  Json                  @default("[]") @map("variables_disponibles")
+  variablesObligatorias Json                  @default("[]") @map("variables_obligatorias")
+  fechaActualizacion    DateTime              @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo    Int?                  @map("id_usuario_actualizo")
+
+  @@map("plantilla_notificacion")
+}
+
+/// Registro de envíos transaccionales con su resultado y reintentos (RF-NOT-01-03, RF-NOT-01-04, RT-23)
+model EnvioNotificacion {
+  idEnvio       String                  @id @default(uuid()) @map("id_envio") @db.Uuid
+  tipo          TipoComunicacion
+  destinatario  String                  @db.VarChar(150)
+  estado        EstadoEnvioNotificacion @default(pendiente)
+  intentos      Int                     @default(0)
+  maxIntentos   Int                     @default(3) @map("max_intentos")
+  ultimoError   String?                 @map("ultimo_error")
+  fechaCreacion DateTime                @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaResultado DateTime?              @map("fecha_resultado") @db.Timestamptz(6)
+
+  rebotes RebotesNotificacion[]
+
+  @@index([destinatario, tipo], map: "idx_envio_destinatario_tipo")
+  @@index([estado], map: "idx_envio_estado")
+  @@map("envio_notificacion")
+}
+
+/// Rebotes de entrega de correo para diagnóstico (HU-NOT-04, RF-NOT-04-04)
+model RebotesNotificacion {
+  idRebote      String    @id @default(uuid()) @map("id_rebote") @db.Uuid
+  idEnvio       String?   @map("id_envio") @db.Uuid
+  destinatario  String    @db.VarChar(150)
+  motivo        String?
+  fechaRegistro DateTime  @default(now()) @map("fecha_registro") @db.Timestamptz(6)
+
+  envio EnvioNotificacion? @relation(fields: [idEnvio], references: [idEnvio], onDelete: SetNull)
+
+  @@index([idEnvio], map: "idx_rebote_envio")
+  @@map("rebote_notificacion")
 }
 

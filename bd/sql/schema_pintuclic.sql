@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.2 (v4.1 + M04: RFC-M04-001 C-2 a C-8 - unicidad pendientes, direcciones, hash OTP, control intentos, cambio clave)
+-- VERSIÓN: 4.3 (v4.2 + M18: plantillas, registro de envíos y rebotes de notificaciones)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 53
+-- TOTAL TABLAS: 56
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -126,6 +126,20 @@ BEGIN
     -- Modo de entrega de la orden (M08 - RF-ORD-03-06, RF-ORD-05-05; M10): envío a domicilio o recogida en almacén
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_modo_entrega') THEN
         CREATE TYPE enum_modo_entrega AS ENUM ('domicilio', 'recogida');
+    END IF;
+
+    -- Catálogo de comunicaciones transaccionales que envía el sistema (M18 - RF-NOT-01-02).
+    -- Espejo de NotificacionesPort.EventoNotificacion['tipo'] (m18-notificaciones).
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_comunicacion') THEN
+        CREATE TYPE enum_tipo_comunicacion AS ENUM (
+            'registro_otp', 'recuperacion_password', 'activacion_empleado',
+            'cambio_correo_otp', 'cambio_correo_confirmado', 'dictamen_empresa'
+        );
+    END IF;
+
+    -- Resultado de un intento de envío transaccional (M18 - RF-NOT-01-03, RF-NOT-01-04)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_envio_notificacion') THEN
+        CREATE TYPE enum_estado_envio_notificacion AS ENUM ('pendiente', 'enviado', 'fallido');
     END IF;
 END $$;
 
@@ -1306,6 +1320,65 @@ CREATE TRIGGER trg_parametro_sistema_fecha
     FOR EACH ROW EXECUTE FUNCTION fn_parametro_sistema_fecha();
 
 -- ==============================================================================
+-- 9D. MÓDULO DE NOTIFICACIONES Y COMUNICACIONES (M18)
+-- ==============================================================================
+
+-- Tabla: plantilla_notificacion
+-- Contenido editable desde el panel para cada comunicación transaccional (M18 · HU-NOT-03).
+-- variables_disponibles y variables_obligatorias documentan qué campos admite la plantilla y cuáles
+-- no pueden eliminarse (ej. el enlace de verificación), para que el backend rechace el guardado si faltan.
+CREATE TABLE IF NOT EXISTS plantilla_notificacion (
+    id_plantilla UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tipo enum_tipo_comunicacion NOT NULL UNIQUE,
+    asunto VARCHAR(200) NOT NULL,
+    contenido_html TEXT NOT NULL,
+    contenido_texto TEXT NOT NULL,
+    variables_disponibles JSONB NOT NULL DEFAULT '[]'::jsonb,
+    variables_obligatorias JSONB NOT NULL DEFAULT '[]'::jsonb,
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_plantilla_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+COMMENT ON TABLE plantilla_notificacion IS 'Plantillas de comunicación transaccional editables desde el panel (M18 · HU-NOT-03)';
+COMMENT ON COLUMN plantilla_notificacion.variables_disponibles IS 'Lista de nombres de campo que pueden insertarse en el contenido (ej. nombre_cliente, numero_orden)';
+COMMENT ON COLUMN plantilla_notificacion.variables_obligatorias IS 'Subconjunto de variables_disponibles que no puede eliminarse del contenido (RF-NOT-03-04)';
+
+-- Tabla: envio_notificacion
+-- Registro de cada envío transaccional intentado, con su resultado final, para diagnosticar fallos de
+-- entrega (RF-NOT-01-04, RT-23). Distinto de la auditoría de seguridad (RN-SEG-12): nunca sustituye esa.
+CREATE TABLE IF NOT EXISTS envio_notificacion (
+    id_envio UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tipo enum_tipo_comunicacion NOT NULL,
+    destinatario VARCHAR(150) NOT NULL,
+    estado enum_estado_envio_notificacion NOT NULL DEFAULT 'pendiente',
+    intentos INT NOT NULL DEFAULT 0,
+    max_intentos INT NOT NULL DEFAULT 3,
+    ultimo_error TEXT,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_resultado TIMESTAMPTZ,
+    CONSTRAINT ck_envio_intentos_no_negativo CHECK (intentos >= 0)
+);
+
+COMMENT ON TABLE envio_notificacion IS 'Registro de envíos transaccionales con su resultado y reintentos, para diagnóstico de entregabilidad (M18 · RF-NOT-01-03, RF-NOT-01-04)';
+COMMENT ON COLUMN envio_notificacion.ultimo_error IS 'Mensaje de error genérico del último intento fallido; nunca contenido sensible ni trazas';
+
+-- Tabla: rebote_notificacion
+-- Rebotes de entrega reportados por el proveedor SMTP para un envío ya registrado (M18 · RF-NOT-04-04).
+CREATE TABLE IF NOT EXISTS rebote_notificacion (
+    id_rebote UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_envio UUID,
+    destinatario VARCHAR(150) NOT NULL,
+    motivo TEXT,
+    fecha_registro TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_rebote_envio FOREIGN KEY (id_envio)
+        REFERENCES envio_notificacion (id_envio) ON DELETE SET NULL
+);
+
+COMMENT ON TABLE rebote_notificacion IS 'Rebotes de entrega de correo para diagnóstico (M18 · HU-NOT-04, RF-NOT-04-04)';
+
+-- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
 -- ==============================================================================
 
@@ -1414,6 +1487,11 @@ CREATE INDEX IF NOT EXISTS idx_codigo_expiracion ON codigo_verificacion(expiraci
 
 -- C-6: Control de intentos de acceso y bloqueo
 CREATE INDEX IF NOT EXISTS idx_control_intento_bloqueo ON control_intento_acceso (bloqueado_hasta);
+
+-- M18: diagnóstico de envíos y rebotes de notificaciones
+CREATE INDEX IF NOT EXISTS idx_envio_destinatario_tipo ON envio_notificacion(destinatario, tipo);
+CREATE INDEX IF NOT EXISTS idx_envio_estado ON envio_notificacion(estado);
+CREATE INDEX IF NOT EXISTS idx_rebote_envio ON rebote_notificacion(id_envio);
 
 -- Índices en Analítica de Búsqueda (M02 - HU-BUS-06): filtro por periodo y agrupación por término
 CREATE INDEX IF NOT EXISTS idx_bsr_fecha ON busqueda_sin_resultado(fecha);

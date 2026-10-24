@@ -41,6 +41,8 @@ export const CODIGOS_PERMISO = [
   'configuracion.editar',
   'estadisticas.consultar',
   'empresas.validar',
+  'notificaciones.ver',
+  'notificaciones.editar',
   'productos.crear',
   'productos.eliminar',
   'ordenes.ver',
@@ -57,6 +59,7 @@ export const AREA_FUNCIONAL = [
   'seguridad',
   'configuracion',
   'estadisticas',
+  'notificaciones',
 ] as const;
 export const areaFuncionalSchema = z.enum(AREA_FUNCIONAL);
 export type AreaFuncional = z.infer<typeof areaFuncionalSchema>;

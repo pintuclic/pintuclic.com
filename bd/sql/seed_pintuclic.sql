@@ -58,7 +58,10 @@ INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     -- Analítica de Búsqueda (M02 HU-BUS-06)
     (20, 'estadisticas.consultar',         'Consultar estadísticas de búsqueda sin resultado',  'activo'),
     -- Validación de Cuentas Empresa (M04 HU-CUE-09, RFC-M04-001 C-9)
-    (21, 'empresas.validar',               'Aprobar o rechazar solicitudes de cuenta empresa, ascenso y renovación de NIT', 'activo')
+    (21, 'empresas.validar',               'Aprobar o rechazar solicitudes de cuenta empresa, ascenso y renovación de NIT', 'activo'),
+    -- Notificaciones y Comunicaciones (M18 HU-NOT-03)
+    (22, 'notificaciones.ver',             'Ver plantillas de comunicación y el registro de envíos y rebotes', 'activo'),
+    (23, 'notificaciones.editar',          'Editar el contenido de las plantillas de comunicación',            'activo')
 ON CONFLICT (id_permiso) DO NOTHING;
 
 -- 1.5 Asignación de Permisos a Roles
