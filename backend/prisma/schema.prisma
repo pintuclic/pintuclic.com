@@ -149,6 +149,16 @@ enum EstadoEnvioNotificacion {
   @@map("enum_estado_envio_notificacion")
 }
 
+/// Estado comercial de una variante (M01 · HU-CAT-03)
+enum EstadoProducto {
+  activo
+  inactivo
+  agotado
+  descontinuado
+
+  @@map("enum_estado_producto")
+}
+
 // =============================================================================
 // MÓDULO M04 — USUARIO
 // =============================================================================
@@ -538,3 +548,384 @@ model RebotesNotificacion {
   @@map("rebote_notificacion")
 }
 
+// =============================================================================
+// MÓDULO M01 — CATÁLOGO (esquema 4.3)
+// Reglas: docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md
+// =============================================================================
+
+/// Nivel 1 de la clasificación: qué ES el producto (RF-CAT-01-01)
+model Categoria {
+  idCategoria Int           @id @default(autoincrement()) @map("id_categoria")
+  nombre      String        @unique @db.VarChar(100)
+  orden       Int           @default(0)
+  estado      EstadoGeneral @default(activo)
+
+  subcategorias            Subcategoria[]
+  productosComplementarios Producto[]     @relation("CategoriaComplementaria")
+
+  @@map("categoria")
+}
+
+/// Nivel 2 y último de la clasificación (RF-CAT-01-02)
+model Subcategoria {
+  idSubcategoria Int           @id @default(autoincrement()) @map("id_subcategoria")
+  idCategoria    Int           @map("id_categoria")
+  nombre         String        @db.VarChar(100)
+  orden          Int           @default(0)
+  estado         EstadoGeneral @default(activo)
+
+  categoria Categoria  @relation(fields: [idCategoria], references: [idCategoria], onDelete: Restrict, map: "fk_subcategoria_categoria")
+  productos Producto[]
+
+  @@unique([idCategoria, nombre], map: "uq_subcategoria_nombre_categoria")
+  @@index([idCategoria], map: "idx_subcategoria_categoria")
+  @@map("subcategoria")
+}
+
+/// Dónde se aplica un producto (etiqueta N:M)
+model Superficie {
+  idSuperficie Int           @id @default(autoincrement()) @map("id_superficie")
+  nombre       String        @unique @db.VarChar(100)
+  orden        Int           @default(0)
+  estado       EstadoGeneral @default(activo)
+
+  productos ProductoSuperficie[]
+
+  @@map("superficie")
+}
+
+/// Marca (HU-CAT-04). Logotipo en bytes, máximo 5 MB, jpeg/png/webp
+model Marca {
+  idMarca          Int           @id @default(autoincrement()) @map("id_marca")
+  nombre           String        @unique @db.VarChar(100)
+  logotipo         Bytes
+  logotipoMimeType String        @map("logotipo_mime_type") @db.VarChar(50)
+  estado           EstadoGeneral @default(activo)
+
+  lineas    Linea[]
+  colores   Color[]
+  productos Producto[]
+
+  @@map("marca")
+}
+
+/// Línea comercial de una marca (HU-CAT-11); opcional en el producto
+model Linea {
+  idLinea       Int           @id @default(autoincrement()) @map("id_linea")
+  idMarca       Int           @map("id_marca")
+  nombre        String        @db.VarChar(100)
+  gamaComercial String?       @map("gama_comercial") @db.VarChar(100)
+  estado        EstadoGeneral @default(activo)
+
+  marca     Marca      @relation(fields: [idMarca], references: [idMarca], onDelete: Restrict, map: "fk_linea_marca")
+  productos Producto[]
+
+  @@unique([idMarca, nombre], map: "uq_linea_nombre_marca")
+  @@unique([idLinea, idMarca], map: "uq_linea_id_marca")
+  @@index([idMarca], map: "idx_linea_marca")
+  @@map("linea")
+}
+
+/// Tipo de resina (RF-CAT-02-04)
+model TipoResina {
+  idTipoResina Int           @id @default(autoincrement()) @map("id_tipo_resina")
+  nombre       String        @unique @db.VarChar(100)
+  estado       EstadoGeneral @default(activo)
+
+  fichas FichaRecubrimiento[]
+
+  @@map("tipo_resina")
+}
+
+/// Acabado (Brillante, Mate, Semimate…)
+model Acabado {
+  idAcabado Int           @id @default(autoincrement()) @map("id_acabado")
+  nombre    String        @unique @db.VarChar(50)
+  orden     Int           @default(0)
+  estado    EstadoGeneral @default(activo)
+
+  colores   Color[]
+  productos ProductoAcabado[]
+
+  @@map("acabado")
+}
+
+/// Base de colorimetría (Tint, Deep, Pastel, Accent); global
+model Base {
+  idBase Int           @id @default(autoincrement()) @map("id_base")
+  nombre String        @unique @db.VarChar(50)
+  orden  Int           @default(0)
+  estado EstadoGeneral @default(activo)
+
+  colores   Color[]
+  productos ProductoBase[]
+
+  @@map("base")
+}
+
+/// Familia cromática del selector de color (RF-CAT-05-03)
+model FamiliaColor {
+  idFamiliaColor Int           @id @default(autoincrement()) @map("id_familia_color")
+  nombre         String        @unique @db.VarChar(50)
+  hexadecimal    String        @db.Char(7)
+  orden          Int           @default(0)
+  estado         EstadoGeneral @default(activo)
+
+  colores Color[]
+
+  @@map("familia_color")
+}
+
+/// Unidad de una medida (galón, litro, pulgada…)
+model TipoMedida {
+  idTipoMedida        Int           @id @default(autoincrement()) @map("id_tipo_medida")
+  nombre              String        @unique @db.VarChar(50)
+  abreviatura         String        @unique @db.VarChar(10)
+  /// Galones que equivale una unidad (litro = 0,264172052); null si no es de volumen
+  equivalenciaGalones Decimal?      @map("equivalencia_galones") @db.Decimal(12, 9)
+  estado              EstadoGeneral @default(activo)
+
+  medidas Medida[]
+
+  @@map("tipo_medida")
+}
+
+/// Medida vendible: valor + tipo de medida
+model Medida {
+  idMedida     Int           @id @default(autoincrement()) @map("id_medida")
+  idTipoMedida Int           @map("id_tipo_medida")
+  valor        Decimal       @db.Decimal(12, 3)
+  nombre       String        @unique @db.VarChar(60)
+  estado       EstadoGeneral @default(activo)
+
+  tipoMedida TipoMedida @relation(fields: [idTipoMedida], references: [idTipoMedida], onDelete: Restrict, map: "fk_medida_tipo")
+  variantes  Variante[]
+
+  @@unique([idTipoMedida, valor], map: "uq_medida_valor_tipo")
+  @@index([idTipoMedida], map: "idx_medida_tipo")
+  @@map("medida")
+}
+
+/// Color de una marca (HU-CAT-05). Base opcional pero esencial; acabado obligatorio
+model Color {
+  idColor        Int           @id @default(autoincrement()) @map("id_color")
+  idMarca        Int           @map("id_marca")
+  nombre         String        @db.VarChar(100)
+  codigo         String?       @db.VarChar(60)
+  idBase         Int?          @map("id_base")
+  idAcabado      Int           @map("id_acabado")
+  idFamiliaColor Int?          @map("id_familia_color")
+  hexadecimal    String        @db.Char(7)
+  cieL           Decimal?      @map("cie_l") @db.Decimal(6, 3)
+  cieA           Decimal?      @map("cie_a") @db.Decimal(6, 3)
+  cieB           Decimal?      @map("cie_b") @db.Decimal(6, 3)
+  estado         EstadoGeneral @default(activo)
+
+  marca     Marca           @relation(fields: [idMarca], references: [idMarca], onDelete: Restrict, map: "fk_color_marca")
+  base      Base?           @relation(fields: [idBase], references: [idBase], onDelete: Restrict, map: "fk_color_base")
+  acabado   Acabado         @relation(fields: [idAcabado], references: [idAcabado], onDelete: Restrict, map: "fk_color_acabado")
+  familia   FamiliaColor?   @relation(fields: [idFamiliaColor], references: [idFamiliaColor], onDelete: Restrict, map: "fk_color_familia")
+  productos ProductoColor[]
+  imagenes  Imagen[]
+
+  @@unique([idMarca, nombre, idAcabado], map: "uq_color_nombre_marca_acabado")
+  @@index([idMarca], map: "idx_color_marca")
+  @@index([idBase, idAcabado], map: "idx_color_base_acabado")
+  @@index([idFamiliaColor], map: "idx_color_familia")
+  @@map("color")
+}
+
+/// Producto (HU-CAT-02): marca → línea (opcional) → producto
+model Producto {
+  idProducto                Int           @id @default(autoincrement()) @map("id_producto")
+  idMarca                   Int           @map("id_marca")
+  idLinea                   Int?          @map("id_linea")
+  idSubcategoria            Int           @map("id_subcategoria")
+  nombre                    String        @db.VarChar(150)
+  descripcion               String?
+  usoInterior               Boolean       @default(false) @map("uso_interior")
+  usoExterior               Boolean       @default(false) @map("uso_exterior")
+  estado                    EstadoGeneral @default(activo)
+  publicado                 Boolean       @default(false)
+  idCategoriaComplementaria Int?          @map("id_categoria_complementaria")
+  patrocinado               Boolean       @default(false)
+  fechaCreacion             DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+
+  marca                   Marca        @relation(fields: [idMarca], references: [idMarca], onDelete: Restrict, map: "fk_producto_marca")
+  /// FK compuesta: la línea debe ser de la misma marca (RF-CAT-11-02)
+  linea                   Linea?       @relation(fields: [idLinea, idMarca], references: [idLinea, idMarca], onDelete: Restrict, map: "fk_producto_linea_marca")
+  subcategoria            Subcategoria @relation(fields: [idSubcategoria], references: [idSubcategoria], onDelete: Restrict, map: "fk_producto_subcategoria")
+  categoriaComplementaria Categoria?   @relation("CategoriaComplementaria", fields: [idCategoriaComplementaria], references: [idCategoria], onDelete: SetNull, map: "fk_producto_categoria_complementaria")
+
+  ficha           FichaRecubrimiento?
+  superficies     ProductoSuperficie[]
+  acabados        ProductoAcabado[]
+  bases           ProductoBase[]
+  coloresFabrica  ProductoColor[]
+  caracteristicas ProductoCaracteristica[]
+  variantes       Variante[]
+  imagenes        Imagen[]
+  combos          Combo[]
+
+  @@unique([idMarca, nombre], map: "uq_producto_nombre_marca")
+  @@index([idLinea], map: "idx_producto_linea")
+  @@index([idMarca], map: "idx_producto_marca")
+  @@index([idSubcategoria], map: "idx_producto_subcategoria")
+  @@index([idCategoriaComplementaria], map: "idx_producto_cat_complementaria")
+  @@map("producto")
+}
+
+/// Datos técnicos de recubrimientos (HU-CAT-10); 1:1 opcional con producto
+model FichaRecubrimiento {
+  idProducto     Int      @id @map("id_producto")
+  idTipoResina   Int      @map("id_tipo_resina")
+  /// Tipo 1, 2 o 3 del fabricante (1 = gama alta)
+  tipoCalidad    Int?     @map("tipo_calidad") @db.SmallInt
+  /// m² por galón
+  rendimientoMin Decimal? @map("rendimiento_min") @db.Decimal(8, 2)
+  rendimientoMax Decimal? @map("rendimiento_max") @db.Decimal(8, 2)
+
+  producto   Producto   @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_ficha_producto")
+  tipoResina TipoResina @relation(fields: [idTipoResina], references: [idTipoResina], onDelete: Restrict, map: "fk_ficha_resina")
+
+  @@index([idTipoResina], map: "idx_ficha_resina")
+  @@map("ficha_recubrimiento")
+}
+
+model ProductoSuperficie {
+  idProducto   Int @map("id_producto")
+  idSuperficie Int @map("id_superficie")
+
+  producto   Producto   @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_prodsup_producto")
+  superficie Superficie @relation(fields: [idSuperficie], references: [idSuperficie], onDelete: Restrict, map: "fk_prodsup_superficie")
+
+  @@id([idProducto, idSuperficie])
+  @@index([idSuperficie], map: "idx_prodsup_superficie")
+  @@map("producto_superficie")
+}
+
+/// Acabados del producto: filtran los colores de su carta
+model ProductoAcabado {
+  idProducto Int @map("id_producto")
+  idAcabado  Int @map("id_acabado")
+
+  producto Producto @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_prodacab_producto")
+  acabado  Acabado  @relation(fields: [idAcabado], references: [idAcabado], onDelete: Restrict, map: "fk_prodacab_acabado")
+
+  @@id([idProducto, idAcabado])
+  @@index([idAcabado], map: "idx_prodacab_acabado")
+  @@map("producto_acabado")
+}
+
+/// Bases del producto entonable: definen su carta (RF-CAT-12-02)
+model ProductoBase {
+  idProducto Int @map("id_producto")
+  idBase     Int @map("id_base")
+
+  producto Producto @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_prodbase_producto")
+  base     Base     @relation(fields: [idBase], references: [idBase], onDelete: Restrict, map: "fk_prodbase_base")
+
+  @@id([idProducto, idBase])
+  @@index([idBase], map: "idx_prodbase_base")
+  @@map("producto_base")
+}
+
+/// Colores exclusivos o de fábrica del producto
+model ProductoColor {
+  idProducto Int @map("id_producto")
+  idColor    Int @map("id_color")
+
+  producto Producto @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_prodcolor_producto")
+  color    Color    @relation(fields: [idColor], references: [idColor], onDelete: Restrict, map: "fk_prodcolor_color")
+
+  @@id([idProducto, idColor])
+  @@index([idColor], map: "idx_prodcolor_color")
+  @@map("producto_color")
+}
+
+/// Atributo técnico nombre/valor (HU-CAT-10)
+model ProductoCaracteristica {
+  idCaracteristica Int    @id @default(autoincrement()) @map("id_caracteristica")
+  idProducto       Int    @map("id_producto")
+  nombre           String @db.VarChar(100)
+  valor            String @db.VarChar(255)
+  orden            Int    @default(0)
+
+  producto Producto @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_prodcaract_producto")
+
+  @@unique([idProducto, nombre], map: "uq_prodcaract_nombre")
+  @@map("producto_caracteristica")
+}
+
+/// Variante vendible = producto + medida, con su precio. El color se elige en la venta
+model Variante {
+  idVariante            Int            @id @default(autoincrement()) @map("id_variante")
+  idProducto            Int            @map("id_producto")
+  idMedida              Int            @map("id_medida")
+  sku                   String         @unique @db.VarChar(60)
+  precioVigente         Decimal        @map("precio_vigente") @db.Decimal(12, 2)
+  /// Solo referencial; no bloquea ventas (M13)
+  existenciaReferencial Int            @default(0) @map("existencia_referencial")
+  /// Código de SAMIT para la integración futura
+  codigoProveedor       String?        @unique(map: "uq_variante_codigo_proveedor") @map("codigo_proveedor") @db.VarChar(100)
+  estado                EstadoProducto @default(activo)
+
+  producto Producto        @relation(fields: [idProducto], references: [idProducto], onDelete: Restrict, map: "fk_variante_producto")
+  medida   Medida          @relation(fields: [idMedida], references: [idMedida], onDelete: Restrict, map: "fk_variante_medida")
+  imagenes Imagen[]
+  combos   VarianteCombo[]
+
+  @@unique([idProducto, idMedida], map: "uq_variante_producto_medida")
+  @@index([idProducto], map: "idx_variante_producto")
+  @@index([idMedida], map: "idx_variante_medida")
+  @@index([estado], map: "idx_variante_estado")
+  @@map("variante")
+}
+
+/// Imagen de un producto (HU-CAT-07); opcionalmente de una variante o un color
+model Imagen {
+  idImagen    Int     @id @default(autoincrement()) @map("id_imagen")
+  idProducto  Int     @map("id_producto")
+  idVariante  Int?    @map("id_variante")
+  idColor     Int?    @map("id_color")
+  datos       Bytes
+  mimeType    String  @map("mime_type") @db.VarChar(50)
+  orden       Int     @default(0)
+  esPrincipal Boolean @default(false) @map("es_principal")
+
+  producto Producto  @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_imagen_producto")
+  variante Variante? @relation(fields: [idVariante], references: [idVariante], onDelete: Cascade, map: "fk_imagen_variante")
+  color    Color?    @relation(fields: [idColor], references: [idColor], onDelete: SetNull, map: "fk_imagen_color")
+
+  @@index([idProducto], map: "idx_imagen_producto")
+  @@index([idVariante], map: "idx_imagen_variante")
+  @@index([idColor], map: "idx_imagen_color")
+  @@map("imagen")
+}
+
+/// Combo comercial (HU-CAT-13); pendiente de rediseño
+model Combo {
+  idCombo    Int @id @default(autoincrement()) @map("id_combo")
+  idProducto Int @map("id_producto")
+
+  producto  Producto        @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_combo_producto")
+  variantes VarianteCombo[]
+
+  @@index([idProducto], map: "idx_combo_producto")
+  @@map("combo")
+}
+
+model VarianteCombo {
+  idVarianteCombo Int @id @default(autoincrement()) @map("id_variante_combo")
+  idVariante      Int @map("id_variante")
+  idCombo         Int @map("id_combo")
+  cantidad        Int @default(1)
+
+  variante Variante @relation(fields: [idVariante], references: [idVariante], onDelete: Cascade, map: "fk_varcombo_variante")
+  combo    Combo    @relation(fields: [idCombo], references: [idCombo], onDelete: Cascade, map: "fk_varcombo_combo")
+
+  @@unique([idVariante, idCombo], map: "uq_variante_combo")
+  @@index([idVariante], map: "idx_varcombo_variante")
+  @@index([idCombo], map: "idx_varcombo_combo")
+  @@map("variante_combo")
+}

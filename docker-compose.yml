@@ -68,6 +68,7 @@ services:
     networks:
       - backend_net
       - frontend_net
+      - proxy-network
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3000}:3000"
     healthcheck:
@@ -114,6 +115,7 @@ services:
         condition: service_healthy
     networks:
       - frontend_net
+      - proxy-network
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-8080}:3001"
     healthcheck:
@@ -145,6 +147,8 @@ networks:
   backend_net:
     driver: bridge
     internal: true
+  proxy-network:
+    external: true
 
 volumes:
   pgdata:

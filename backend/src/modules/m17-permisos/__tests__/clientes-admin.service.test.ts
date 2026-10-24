@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import type { ClientesAdminRepositoryPort, EntidadClienteAdmin } from '../interfaces/clientes-admin.interface';
 import type { GobernanzaAdminRepositoryPort } from '../interfaces/gobernanza.interface';
+import { buscarClientesQuerySchema } from '../dtos/m17-permisos.dto';
 import { ClientesAdminService } from '../services/clientes-admin.service';
 import { EmpleadoError } from '../services/empleados.service';
 
@@ -70,6 +71,18 @@ function crearMockClientes(): {
 }
 
 describe('HU-ADM-04 · Gestión de Clientes desde Administración', () => {
+  it('Listado inicial paginado de clientes sin término de búsqueda (termino undefined)', async () => {
+    const parseo = buscarClientesQuerySchema.safeParse({ tipo: 'todos', pagina: '1', limite: '10' });
+    expect(parseo.success).toBe(true);
+    if (!parseo.success) return;
+
+    const { clientesRepo, gobernanzaRepo, sesionService } = crearMockClientes();
+    const servicio = new ClientesAdminService(clientesRepo, gobernanzaRepo, sesionService);
+    const resultado = await servicio.buscar(parseo.data);
+    expect(resultado.clientes).toHaveLength(1);
+    expect(resultado.total).toBe(1);
+  });
+
   it('Búsqueda paginada de clientes por término', async () => {
     const { clientesRepo, gobernanzaRepo, sesionService } = crearMockClientes();
     const servicio = new ClientesAdminService(clientesRepo, gobernanzaRepo, sesionService);
