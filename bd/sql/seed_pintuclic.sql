@@ -474,7 +474,8 @@ INSERT INTO parametro_sistema (id_parametro, clave, area, tipo_dato, descripcion
     (7, 'comms.reintentos_envio_transaccional', 'comunicaciones', 'numero', 'Reintentos automáticos ante fallas transitorias de entrega SMTP', '3'::jsonb, '3'::jsonb, 1, 5),
     (8, 'comercial.iva_porcentaje', 'comercial', 'numero', 'Porcentaje general de impuesto al valor agregado (IVA) aplicable a ventas', '19'::jsonb, '19'::jsonb, 0, 50),
     (9, 'comercial.costo_envio_base', 'comercial', 'numero', 'Tarifa base de despacho estándar a domicilio', '15000'::jsonb, '15000'::jsonb, 0, NULL),
-    (10, 'comercial.umbral_envio_gratis', 'comercial', 'numero', 'Monto mínimo de compra para exoneración de costos de envío', '200000'::jsonb, '200000'::jsonb, 0, NULL)
+    (10, 'comercial.umbral_envio_gratis', 'comercial', 'numero', 'Monto mínimo de compra para exoneración de costos de envío', '200000'::jsonb, '200000'::jsonb, 0, NULL),
+    (11, 'auth.vigencia_enlace_activacion_horas', 'autenticacion', 'numero', 'Vigencia en horas del enlace con el que un colaborador nuevo define su contraseña', '72'::jsonb, '72'::jsonb, 1, 168)
 ON CONFLICT (clave) DO NOTHING;
 
 -- Alineación con el piso de contraseña de M20 (12 caracteres, RN-SEG-01 / RFC-M17-001 D-5).
