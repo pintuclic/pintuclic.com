@@ -83,6 +83,9 @@ En la raíz: `npm run test:contracts`. Es lo mismo que corre el CI.
 - Nunca `push --force` a `main`. Todo entra por PR.
 - PR: título `tipo(scope): descripcion` (sin versión); descripción de máximo 10 líneas (qué hace, qué tocó fuera del módulo, cómo se probó).
 - Un compañero revisa; CI en verde y 1 aprobación para fusionar. El tag de versión lo crea `release.yml`.
+- **Un PR fusionado está terminado.** No se le agregan commits: los PR se fusionan rápido y lo que se empuje después a su
+  rama se pierde. Todo cambio posterior sale de `main` en una rama nueva con su PR nuevo. Antes de dar una rama por
+  entregada, comprueba que `origin/main` ya contiene lo que se prometió.
 - Backend, frontend y QA no editan `.github/workflows/`, `docker-compose.yml`, `Dockerfile*` ni `.env.example`: es dominio del DevOps.
 
 ## Ya no existen
