@@ -605,10 +605,12 @@ model FamiliaColor {
 
 /// Unidad de una medida (galón, litro, pulgada…)
 model TipoMedida {
-  idTipoMedida Int           @id @default(autoincrement()) @map("id_tipo_medida")
-  nombre       String        @unique @db.VarChar(50)
-  abreviatura  String        @unique @db.VarChar(10)
-  estado       EstadoGeneral @default(activo)
+  idTipoMedida        Int           @id @default(autoincrement()) @map("id_tipo_medida")
+  nombre              String        @unique @db.VarChar(50)
+  abreviatura         String        @unique @db.VarChar(10)
+  /// Galones que equivale una unidad (litro = 0,264172052); null si no es de volumen
+  equivalenciaGalones Decimal?      @map("equivalencia_galones") @db.Decimal(12, 9)
+  estado              EstadoGeneral @default(activo)
 
   medidas Medida[]
 
