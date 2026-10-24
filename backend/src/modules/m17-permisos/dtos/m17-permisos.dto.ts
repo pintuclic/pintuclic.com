@@ -223,7 +223,7 @@ export type ActualizarPermisosEmpleadoOutput = z.infer<typeof actualizarPermisos
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export const buscarClientesQuerySchema = z.object({
-  termino: z.string().trim().min(2).max(100),
+  termino: z.string().trim().max(100).optional(),
   tipo: z.enum(['todos', 'normal', 'empresa']).default('todos'),
   pagina: z.coerce.number().int().positive().default(1),
   limite: z.coerce.number().int().min(1).max(100).default(20),
