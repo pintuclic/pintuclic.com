@@ -16,6 +16,8 @@ export interface ResumenEmpleado {
   fechaCreacion: string;
   fechaUltimoAcceso: string | null;
   cantidadPermisos: number;
+  /** Aún no definió su contraseña con el enlace de activación. */
+  primerAccesoPendiente: boolean;
 }
 
 export interface DetalleEmpleado {
@@ -50,4 +52,6 @@ export interface CrearEmpleadoRespuesta {
   estado: EstadoCuentaEmpleado;
   primerAccesoPendiente: boolean;
   fechaCreacion: string;
+  /** `false` si el correo de activación no salió: hay que reenviarlo. */
+  activacionEnviada: boolean;
 }
