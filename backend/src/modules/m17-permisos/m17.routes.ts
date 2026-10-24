@@ -9,6 +9,7 @@ import { ConfiguracionController } from './controllers/configuracion.controller'
 import { EmpleadosController } from './controllers/empleados.controller';
 import { GobernanzaAdminController } from './controllers/gobernanza-admin.controller';
 import { PermisosController } from './controllers/permisos.controller';
+import type { ActivacionEmpleadoPort } from './interfaces/empleados.interface';
 import type { GobernanzaAdminRepositoryPort } from './interfaces/gobernanza.interface';
 import { ClientesAdminRepository } from './repositories/clientes-admin.repository';
 import { PrismaConfiguracionRepository } from './repositories/configuracion.repository';
@@ -39,9 +40,15 @@ function requireAdmin(gobernanzaRepo: GobernanzaAdminRepositoryPort) {
   };
 }
 
+export interface ModuloM17Config {
+  /** HU-ADM-01: enlace de activación de empleados (lo implementa M04). */
+  activacionEmpleado?: ActivacionEmpleadoPort;
+}
+
 export function construirModuloM17(
   sesionService: SesionService,
   auditoria: AuditoriaPort,
+  config?: ModuloM17Config,
 ): {
   router: Router;
   resolutorPermisos: ResolutorPermisosDatabaseAdapter;
@@ -66,7 +73,12 @@ export function construirModuloM17(
     gobernanzaRepo,
   );
   const autorizacionService = new AutorizacionService(resolutorPermisos, auditoria);
-  const empleadosService = new EmpleadosService(empleadosRepo, gobernanzaRepo, sesionService);
+  const empleadosService = new EmpleadosService(
+    empleadosRepo,
+    gobernanzaRepo,
+    sesionService,
+    config?.activacionEmpleado,
+  );
   const permisosService = new PermisosService(permisosRepo, empleadosRepo);
   const clientesService = new ClientesAdminService(clientesRepo, gobernanzaRepo, sesionService);
   const configService = new ConfiguracionService(configRepo);
@@ -113,6 +125,11 @@ export function construirModuloM17(
     '/empleados/:id/reactivar',
     requirePermission(autorizacionService, 'personal.desactivar') as RequestHandler,
     empleadosController.reactivar as RequestHandler,
+  );
+  router.post(
+    '/empleados/:id/reenviar-activacion',
+    requirePermission(autorizacionService, 'personal.editar') as RequestHandler,
+    empleadosController.reenviarActivacion as RequestHandler,
   );
 
   // HU-ADM-02: Asignación Individual de Permisos

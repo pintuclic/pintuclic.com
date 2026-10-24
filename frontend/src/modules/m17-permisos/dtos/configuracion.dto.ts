@@ -4,7 +4,7 @@ import { z } from 'zod';
  * ==============================================================================
  * DTOs de Configuración Global y Parámetros — M17 (Frontend)
  * ==============================================================================
- * 10 Parámetros del Sistema Oficiales (RF-ADM-06-02 / RF-ADM-06-03 / RF-ADM-06-04).
+ * 11 Parámetros del Sistema Oficiales (RF-ADM-06-02 / RF-ADM-06-03 / RF-ADM-06-04).
  */
 
 export const CLAVES_PARAMETROS = [
@@ -14,6 +14,7 @@ export const CLAVES_PARAMETROS = [
   'auth.vigencia_enlace_recuperacion_minutos',
   'auth.intentos_fallidos_bloqueo',
   'auth.duracion_bloqueo_minutos',
+  'auth.vigencia_enlace_activacion_horas',
   'comms.reintentos_envio_transaccional',
   'comercial.iva_porcentaje',
   'comercial.costo_envio_base',

@@ -13,16 +13,18 @@ describe('M17 Frontend — Stores Zustand', () => {
       expect(estado.filtroEstado).toBeUndefined();
       expect(estado.busqueda).toBe('');
       expect(estado.empleadoSeleccionado).toBeNull();
-      expect(estado.credencialTemporalGenerada).toBeNull();
+      expect(estado.activacionCreada).toBeNull();
+      expect(estado.aviso).toBeNull();
     });
 
-    it('actualiza filtros y limpia credencial temporal', () => {
+    it('HU-ADM-01: el alta guarda a quién se envió el enlace, nunca una contraseña', () => {
       const store = useEmpleadosStore.getState();
-      useEmpleadosStore.setState({ credencialTemporalGenerada: 'temp_secret_123' });
-      expect(useEmpleadosStore.getState().credencialTemporalGenerada).toBe('temp_secret_123');
+      useEmpleadosStore.setState({ activacionCreada: { correo: 'laura@pintuclic.com', enviada: true } });
+      expect(useEmpleadosStore.getState().activacionCreada).toEqual({ correo: 'laura@pintuclic.com', enviada: true });
+      expect(Object.keys(useEmpleadosStore.getState())).not.toContain('credencialTemporalGenerada');
 
-      store.limpiarCredencialTemporal();
-      expect(useEmpleadosStore.getState().credencialTemporalGenerada).toBeNull();
+      store.limpiarActivacion();
+      expect(useEmpleadosStore.getState().activacionCreada).toBeNull();
     });
   });
 

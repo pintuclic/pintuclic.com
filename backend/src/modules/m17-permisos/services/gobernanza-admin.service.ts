@@ -1,6 +1,5 @@
 import crypto from 'node:crypto';
 import nodemailer from 'nodemailer';
-import { prisma } from '../../../core/db/client';
 import { derivarContrasena, verificarContrasena } from '../../../core/utils/crypto';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import {
@@ -309,16 +308,13 @@ export class GobernanzaAdminService {
     }
 
     // Verificar credencial actual
-    const usuarioBD = await prisma.usuario.findUnique({
-      where: { idUsuario },
-      select: { contrasena: true },
-    });
+    const hashActual = await this.gobernanzaRepo.obtenerHashContrasena(idUsuario);
 
-    if (!usuarioBD) {
+    if (hashActual === null) {
       throw new EmpleadoError(CODIGOS_ERROR_M17.EMPLEADO_NO_ENCONTRADO, 'Usuario no encontrado.', 404);
     }
 
-    const coincide = await verificarContrasena(input.credencialTemporal, usuarioBD.contrasena);
+    const coincide = await verificarContrasena(input.credencialTemporal, hashActual);
     if (!coincide) {
       throw new EmpleadoError(
         CODIGOS_ERROR_M17.ACCESO_DENEGADO,
@@ -328,10 +324,7 @@ export class GobernanzaAdminService {
     }
 
     const nuevoHash = await derivarContrasena(input.nuevaContrasena);
-    await prisma.usuario.update({
-      where: { idUsuario },
-      data: { contrasena: nuevoHash },
-    });
+    await this.gobernanzaRepo.actualizarContrasena(idUsuario, nuevoHash);
 
     await this.sesionService.invalidarTodas(idUsuario, 'cambio_contrasena');
 

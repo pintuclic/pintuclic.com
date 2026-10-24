@@ -40,6 +40,7 @@ describe('m17.routes · Ensamblaje y registro de rutas administrativas', () => {
     expect(paths).toContain('/empleados/:id');
     expect(paths).toContain('/empleados/:id/desactivar');
     expect(paths).toContain('/empleados/:id/reactivar');
+    expect(paths).toContain('/empleados/:id/reenviar-activacion');
     expect(paths).toContain('/empleados/:id/permisos');
     expect(paths).toContain('/clientes');
     expect(paths).toContain('/clientes/:id');
