@@ -1,10 +1,102 @@
 # Registro de Cambios y Versiones (CHANGELOG) - PINTU CLIC
 
-Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyecto deben registrarse en este archivo siguiendo el estándar [SemVer](https://semver.org/lang/es/) y la [Guía de Versionado y Walkthroughs](./00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_VERSIONADO_Y_WALKTHROUGHS.md).
+Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyecto deben registrarse en este archivo siguiendo el estándar [SemVer](https://semver.org/lang/es/). El número de versión lo calcula `.github/workflows/release.yml` al fusionar en `main` (ver la [Guía de commits y push](./00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_GIT_COMMITS_Y_PUSH.md)).
 
 > **Repositorio oficial:** `pintuclic/pintuclic.com`  
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
+
+## [v0.7.0] - 2026-10-23
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🛡️ **QA combinado de M20, M17 y M04 y activación de empleados por correo.** Se corrigen los hallazgos de seguridad y de conformidad con los contratos de los tres módulos, y el alta de colaboradores deja de usar una clave temporal visible para el administrador. Entra a `main` como cuatro ramas: `feature/m04-cuentas`, `fix/core-rutas-publicas-y-sesion`, `feature/m17-permisos` y `fix/core-parametros-auth`.
+
+### Módulo M04 — Cuentas, Autenticación y Perfil
+- **Google (`HU-CUE-02`, aplazada):** las rutas `/cuentas/oauth/google*` solo se montan con un adaptador real; el de pruebas queda fuera de producción. Se exige correo verificado por Google y el tipo de sesión se calcula igual que en el login.
+- **Recuperación de contraseña:** el código queda atado al usuario del enlace, se compara el hash del valor aleatorio y en la base no se guarda el valor plano. Cualquier fallo responde el mismo `TOKEN_INVALIDO_O_EXPIRADO`.
+- **Anti-enumeración (RF-SEG-06-06):** el login valida la contraseña antes de revelar el estado de la cuenta y ya no devuelve los intentos restantes; la recuperación no espera al SMTP, que delataba por latencia si el correo existía.
+- **Secretos y aleatoriedad:** `JWT_SECRET` es obligatorio (mínimo 32 caracteres, sin valor por defecto en código) y los OTP se generan con `crypto.randomInt`.
+- **Sesión (RF-SEG-02-02):** la cookie `pc_sid` vive lo mismo que la ventana de inactividad de la sesión (admin 30 min, cliente 30 días); antes caducaba a la hora.
+- **Parámetros de autenticación (`HU-ADM-07`):** bloqueo por intentos, vigencia y reintentos del OTP y vigencia del enlace de recuperación se leen de la configuración de M17, con los valores del seed como respaldo.
+- **NIT (decisión del PO, 2026-10-23):** todo NIT lleva guion antes del dígito de verificación; `9005556661` se rechaza en contrato, backend y frontend.
+- **Contrato fiel al frontend:** `idVerificacion` y `tiempoExpiracionSegundos` en registro y reenvío del OTP, respuesta de login con `tokenCambio`, respuestas del cambio de correo, listados paginados del panel y "mis solicitudes"; `details` admite números o `null`. Los códigos de error siguen el contrato y se añade `DATOS_INVALIDOS`.
+- **Corregido:** "Reenviar código" del registro respondía siempre 400 porque el backend pedía `correo` y el frontend envía `idVerificacion`.
+- **Perfil:** la contraseña errónea al cambiar la clave, el correo o desactivar la cuenta responde `CONTRASENA_INCORRECTA` y el frontend muestra "La contraseña actual no es correcta."; el login conserva el mensaje genérico.
+- **Primer acceso:** el `tokenCambio` es de un solo uso y exige cuenta activa; se verifica la clave temporal y la nueva debe ser distinta.
+- **Activación de empleados:** `emitirEnlaceActivacion` envía un enlace de un solo uso (correo de bienvenida y página `/activar-cuenta`); uno nuevo invalida los anteriores.
+
+### Módulo M17 — Administración, Empleados y Permisos
+- **Administrador principal:** se identifica solo como la cuenta activa con rol `administrador`, sin respaldos por correo ni por primer usuario.
+- **Alta de empleados (`HU-ADM-01`):** ya no se genera ni se devuelve una clave temporal; el empleado define su contraseña con el enlace de activación y queda con `cambio_contrasena_pendiente` hasta hacerlo. `POST /admin/empleados/:id/reenviar-activacion` (permiso `personal.editar`) emite un enlace nuevo.
+- **Corregido:** el modal de alta buscaba la clave en `meta.credencialTemporalGenerada`, un campo que el backend nunca envió, así que el administrador nunca la veía y el empleado no podía entrar.
+- **Nuevo parámetro:** `auth.vigencia_enlace_activacion_horas` (72 h por defecto, rango 1–168), editable en Configuración.
+- **Gobernanza:** los tokens de sustitución de correo del admin se guardan en `codigo_verificacion` como hash SHA-256 (antes vivían en memoria) y el servicio deja de usar `prisma` directamente.
+- **⚠️ Cambio de contrato:** `crearEmpleadoOutputSchema` pierde `credencialTemporal` y gana `activacionEnviada`; `resumenEmpleadoSchema` gana `primerAccesoPendiente`.
+
+### Archivos compartidos
+- **`app.routes.ts`:** el aviso de privacidad (`GET /seguridad/privacidad/aviso-vigente`) y la confirmación de correo del admin vuelven a ser públicos (respondían 401); conecta los parámetros de M17 con M04 y la activación de empleados de M04 con M17.
+- **Middleware de sesión:** renueva la cookie con la expiración deslizante de la sesión.
+- **`AGENTS.md`:** sin permiso se responde el 404 opaco `RECURSO_NO_DISPONIBLE` (ADR-003).
+- **Seed:** fila `id_parametro = 11` para `auth.vigencia_enlace_activacion_horas` (`ON CONFLICT DO NOTHING`).
+- **Verificación:** backend **255/255**, frontend **144/144**, ESLint, `lint:a11y`, `tsc`, `check:no-any` y contratos en verde sobre la integración de las cuatro ramas. Prueba de punta a punta con PostgreSQL y SMTP locales: alta, correo, reenvío, activación, inicio de sesión, vigencia configurable y permisos, **28/28**.
+- **Despliegue:** primer despliegue automático con el pipeline de v0.6.9. En el VPS la fila del parámetro nuevo se agrega a mano (el seed no se re-ejecuta sobre una base existente).
+- **Pendiente:** DevOps debe ajustar `02_cd_deploy.yml` (ver v0.6.9); pruebas E2E y de carga (k6) con evidencia; auditoría de decisiones (`HU-SEG-04`) sigue bloqueada.
+
+---
+
+## [v0.6.9] - 2026-10-23
+- **Autor:** one-centavo (Gustavo Cabrera) · PR #12
+- **Hito:** 🚀 **Despliegue continuo al VPS.** Nuevo workflow `.github/workflows/02_cd_deploy.yml`: en cada push a `main` entra por SSH (`appleboy/ssh-action`) a la ruta de `DEPLOY_PATH`, ejecuta `git reset --hard origin/main` y `docker compose -f docker-compose.yml up -d --build --remove-orphans`, muestra el estado y limpia imágenes huérfanas. En el primer despliegue clona el repo, crea el `.env` desde `.env.example` y se detiene hasta que se completen las credenciales. Documentado en `docs/00_SISTEMA/02_GUIAS_Y_ESTANDARES/GUIA_DESPLIEGUE.md`.
+- **Conocido:** al pasar `-f docker-compose.yml`, Docker no carga el `docker-compose.override.yml` del VPS que une los contenedores a `proxy-network`; tras cada despliegue el dominio responde 502 hasta ejecutar `docker compose up -d` sin `-f`. Ajuste a cargo de DevOps.
+
+---
+
+## [v0.6.8] - 2026-10-23
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🎨 **Panel administrativo alineado al diseño oficial.** `AdminLayout`, `AdminPageHeader` y `AdminStatCard` pasan al Core Kit (`core/components`) y los usan todas las páginas de `/admin`; barra lateral a altura completa con el logo oficial y la tarjeta inferior del mockup.
+- **Corregido:** apilamiento vertical en `Button` y en el bloque de perfil del header administrativo.
+- **Verificación:** pruebas de renderizado nuevas para los tres componentes.
+
+---
+
+## [v0.6.7] - 2026-10-23
+- **Autor:** Luices08 · PR #11
+- **Hito:** 🔁 **Flujo de trabajo ágil.** Se retira el flujo SDLC (gates, firmas, roles de agente, `current_state.json` y documentos de proceso por módulo en `.sdlc/`). Lo que usa el CI se conserva y se reubica: verificadores en `tooling/`, contratos Zod en `contracts/` y ADR en `docs/adrs/`.
+- **Alcance:** `AGENTS.md`, `CLAUDE.md` y `GEMINI.md` reescritos (rama por módulo, PR pequeño aparte para archivos compartidos, versión calculada por `release.yml`); el CI deja de ejecutar `verify:state`; se alinean la guía de commits y la arquitectura general.
+
+---
+
+## [v0.6.6] - 2026-10-23
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🧭 **Las cuentas administrativas entran al panel `/admin`.** El login y el perfil devuelven `esAdmin`, calculado con `esUsuarioAdministrativo` (rol directo o asignado, excluidos clientes y empresas); el frontend redirige a `/admin` al iniciar sesión y el header y el `AdminLayout` muestran la sesión.
+- **Alcance:** backend y frontend de M04, contrato de M04, header del Core y layout de M17. Con pruebas en `auth-cuentas.service` y en los componentes de M04.
+
+---
+
+## [v0.6.5] - 2026-10-23
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** ✉️ **Correo real por SMTP.** M04 usa `SmtpNotificacionesAdapter` (nodemailer, elegido según el entorno) para el OTP de registro, el enlace de recuperación, el código de cambio de correo y el dictamen de empresa, y avisa al correo anterior cuando se confirma un cambio (CA-CUE-06-02, pendiente desde v0.6.1; falta volver a mostrar ese aviso en el frontend). M17 envía por SMTP el token de sustitución del correo del admin y una alerta al correo actual.
+- **Robustez:** un fallo del transporte SMTP no cambia la respuesta de la recuperación (RF-SEG-06-06).
+- **DevOps:** `SMTP_HOST` por defecto pasa a `smtp.gmail.com` en `docker-compose.yml`.
+
+---
+
+## [v0.6.4] - 2026-10-23
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔧 **`DATABASE_URL` apunta a `pintuclic-db`.** En la red compartida `proxy-network` el nombre genérico `db` colisionaba con servicios de otros proyectos del VPS.
+
+---
+
+## [v0.6.3] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🩺 **Healthcheck del backend y SQL inicial.** El healthcheck acepta cualquier respuesta menor que 500 (la API no tiene `/api/health` y el 404 marcaba el contenedor como no saludable) y `bd/sql` se monta en `docker-entrypoint-initdb.d` para crear el esquema y el seed en una base nueva.
+
+---
+
+## [v0.6.2] - 2026-10-22
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 📦 **Lockfile del frontend sincronizado.** `frontend/package-lock.json` fija `lucide-react` `^1.58.0` (resuelve 1.61.0), igual que `package.json`. Cierra el pendiente de DevOps de v0.6.0.
+
+---
 
 ## [v0.6.1] - 2026-10-22
 - **Autor:** DanExl24 (@DanExl24)
