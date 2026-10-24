@@ -45,7 +45,11 @@ si falta un predecesor, avisa al usuario y propone una alternativa; decide el Te
 - **Backend:** Prisma tipado (cero SQL concatenado), Zod en `body`, `query` y `params`, repositorios con el singleton de `core/db/client.ts`.
 - **Frontend:** componentes de `frontend/src/core/components/` (Core Kit); colores solo de `frontend/src/core/theme/colors.ts`
   (ver [`GUIA_COLORES.md`](frontend/src/core/theme/GUIA_COLORES.md)); esquemas Zod en `dtos/`, nunca inline en `.tsx`;
-  formularios con React Hook Form + `zodResolver`. Respeta [`ESPECIFICACION_TECNICA_UI_UX.md`](docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md) y los mockups de `docs/assets/mockups/`.
+  formularios con React Hook Form + `zodResolver`. La fuente del diseño es [`ESPECIFICACION_TECNICA_UI_UX.md`](docs/00_SISTEMA/01_ARQUITECTURA/ESPECIFICACION_TECNICA_UI_UX.md)
+  y el Core Kit. Los mockups de `docs/assets/mockups/` son solo una mini guía visual: están hechos a la ligera.
+  **Nunca agregues funciones, botones o secciones porque aparecen en un mockup.** Lo que se construye es lo que
+  el contrato del módulo define; si un mockup muestra algo fuera de él (carrito, calculadora, asesoría de color…),
+  pertenece a otro módulo y se deja fuera.
 - **Datos iniciales:** solo en `bd/sql/seed_pintuclic.sql` (`npm run db:seed`, ver [`GUIA_MOCKS_Y_DATOS_PRUEBA.md`](bd/docs/GUIA_MOCKS_Y_DATOS_PRUEBA.md)). Prohibido sembrar desde código.
 - **Interfaces:** `interfaces/` solo tipos, cero runtime.
 
