@@ -183,6 +183,9 @@ export const SelectorBuscable: React.FC<SelectorBuscableProps> = ({
               aria-selected={o.value === value}
               onPointerDown={(e) => e.preventDefault()}
               onClick={() => elegir(o.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') elegir(o.value);
+              }}
               onMouseEnter={() => setActiva(i)}
               className={`flex min-h-10 cursor-pointer items-center justify-between gap-2 px-3.5 py-2 font-sans text-sm ${
                 i === activa ? 'bg-subaction text-corporate' : 'text-neutral-dark'
