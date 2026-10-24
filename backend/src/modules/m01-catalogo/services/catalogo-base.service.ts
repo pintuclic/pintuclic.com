@@ -50,6 +50,9 @@ export const errores = {
     new CatalogoError('RELACION_INVALIDA', mensaje, 409, { campo }),
   /** Entrega 2 (P7): publicar un producto que no cumple las condiciones. */
   noPublicable: (mensaje: string): CatalogoError => new CatalogoError('NO_PUBLICABLE', mensaje, 409),
+  imagenInvalida: (mensaje: string): CatalogoError => new CatalogoError('IMAGEN_INVALIDA', mensaje, 400),
+  limiteImagenes: (maximo: number): CatalogoError =>
+    new CatalogoError('LIMITE_IMAGENES', `Un producto admite hasta ${maximo} imágenes.`, 409),
   acabadoProtegido: (): CatalogoError =>
     new CatalogoError('ACABADO_PROTEGIDO', 'El acabado por defecto no se puede renombrar ni desactivar.', 409),
 };

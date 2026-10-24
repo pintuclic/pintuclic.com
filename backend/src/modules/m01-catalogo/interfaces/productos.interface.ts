@@ -15,6 +15,7 @@ export interface FichaRecubrimientoDatos {
   tipoCalidad: 1 | 2 | 3 | null;
   rendimientoMin: number | null;
   rendimientoMax: number | null;
+  manos: number | null;
 }
 
 /** Datos finales de un producto nuevo (ya normalizados y validados por el servicio). */
@@ -95,6 +96,7 @@ export interface ProductosRepositoryPort extends RecursoCatalogoPort<
   verificarRelaciones(relaciones: RelacionesAVerificar): Promise<CampoRelacion | null>;
   cambiarPublicacion(id: number, publicado: boolean): Promise<ProductoDetalle>;
   contarVariantesActivas(idProducto: number): Promise<number>;
+  contarImagenes(idProducto: number): Promise<number>;
   /** P5: colores que ofrece el producto, paginados, con las familias presentes. */
   listarColores(idProducto: number, query: ListarColoresProductoRequest): Promise<ColoresDeProducto>;
 }

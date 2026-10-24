@@ -125,6 +125,8 @@ export const medidaSchema = z.object({
   valor: z.number().positive(),
   nombre: z.string(),
   estado: estadoSchema,
+  /** Los bytes se piden aparte: GET /medidas/:idMedida/imagen (entrega 2). */
+  tieneImagen: z.boolean(),
 });
 export type Medida = z.infer<typeof medidaSchema>;
 
@@ -299,9 +301,13 @@ export const crearMedidaRequestSchema = z.object({
   nombre: z.string().trim().min(1).max(60).optional(),
 });
 export type CrearMedidaRequest = z.infer<typeof crearMedidaRequestSchema>;
-/** El tipo no cambia; para otro tipo se crea otra medida. */
+/** Se puede cambiar el tipo (debe estar activo) y el valor; el nombre generado se recalcula (R12). */
 export const editarMedidaRequestSchema = z
-  .object({ valor: z.number().positive().max(9_999_999).optional(), nombre: z.string().trim().min(1).max(60).optional() })
+  .object({
+    idTipoMedida: idSchema.optional(),
+    valor: z.number().positive().max(9_999_999).optional(),
+    nombre: z.string().trim().min(1).max(60).optional(),
+  })
   .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
 export type EditarMedidaRequest = z.infer<typeof editarMedidaRequestSchema>;
 

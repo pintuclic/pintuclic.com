@@ -11,6 +11,7 @@ import {
 import { ClasificacionController } from './controllers/clasificacion.controller';
 import { ColoresController } from './controllers/colores.controller';
 import { ConsultaPublicaController } from './controllers/consulta-publica.controller';
+import { ImagenesController, ImagenMedidaController } from './controllers/imagenes.controller';
 import { ProductosController, VariantesController } from './controllers/productos.controller';
 import {
   crearAcabadoRequestSchema,
@@ -36,6 +37,7 @@ import {
 import { CategoriasRepository, SubcategoriasRepository } from './repositories/clasificacion.repository';
 import { ColoresRepository } from './repositories/colores.repository';
 import { ConsultaPublicaRepository } from './repositories/consulta-publica.repository';
+import { ImagenesRepository } from './repositories/imagenes.repository';
 import { ProductosRepository } from './repositories/productos.repository';
 import { VariantesRepository } from './repositories/variantes.repository';
 import { LineasRepository, MarcasRepository, MedidasRepository } from './repositories/marcas-lineas-medidas.repository';
@@ -43,6 +45,7 @@ import { AcabadosService, CatalogoSimpleService, TiposMedidaService } from './se
 import { ClasificacionService } from './services/clasificacion.service';
 import { ColoresService } from './services/colores.service';
 import { ConsultaPublicaService } from './services/consulta-publica.service';
+import { ImagenesService } from './services/imagenes.service';
 import { LineasService } from './services/lineas.service';
 import { MarcasService } from './services/marcas.service';
 import { MedidasService } from './services/medidas.service';
@@ -72,6 +75,7 @@ export interface ModuloM01 {
   coloresService: ColoresService;
   productosService: ProductosService;
   variantesService: VariantesService;
+  imagenesService: ImagenesService;
 }
 
 /**
@@ -113,6 +117,7 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const medidasService = new MedidasService(medidasRepo, tiposMedidaRepo);
   const productosRepo = new ProductosRepository();
   const productosService = new ProductosService(productosRepo, marcasRepo, lineasRepo, subcategoriasRepo);
+  const imagenesService = new ImagenesService(new ImagenesRepository(), productosRepo);
   const variantesService = new VariantesService(new VariantesRepository(), productosRepo, medidasRepo);
   const coloresService = new ColoresService(new ColoresRepository(), marcasRepo, basesRepo, acabadosRepo, familiasRepo);
 
@@ -124,6 +129,8 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const colores = new ColoresController(coloresService);
   const productos = new ProductosController(productosService);
   const variantes = new VariantesController(variantesService);
+  const imagenes = new ImagenesController(imagenesService);
+  const imagenMedida = new ImagenMedidaController(medidasService);
   const consultaPublica = new ConsultaPublicaController(new ConsultaPublicaService(new ConsultaPublicaRepository()));
   const superficies = controladorSimple({
     servicio: new CatalogoSimpleService(new SuperficiesRepository(), 'una superficie'),
@@ -244,6 +251,17 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   adminRouter.get('/productos/:idProducto/impacto-desactivacion', ver, productos.impacto as RequestHandler);
   adminRouter.get('/productos/:idProducto/colores', ver, productos.colores as RequestHandler);
 
+  // HU-CAT-07: imágenes de productos y de medidas
+  adminRouter.get('/productos/:idProducto/imagenes', ver, imagenes.listar as RequestHandler);
+  adminRouter.post('/productos/:idProducto/imagenes', editar, imagenes.subir as RequestHandler);
+  adminRouter.patch('/productos/:idProducto/imagenes/orden', editar, imagenes.ordenar as RequestHandler);
+  adminRouter.get('/imagenes/:idImagen', ver, imagenes.bytes as RequestHandler);
+  adminRouter.patch('/imagenes/:idImagen/principal', editar, imagenes.marcarPrincipal as RequestHandler);
+  adminRouter.delete('/imagenes/:idImagen', editar, imagenes.eliminar as RequestHandler);
+  adminRouter.get('/medidas/:idMedida/imagen', ver, imagenMedida.bytes as RequestHandler);
+  adminRouter.put('/medidas/:idMedida/imagen', editar, imagenMedida.reemplazar as RequestHandler);
+  adminRouter.delete('/medidas/:idMedida/imagen', editar, imagenMedida.quitar as RequestHandler);
+
   // HU-CAT-03: variantes
   adminRouter.post('/productos/:idProducto/variantes', crear, variantes.crear as RequestHandler);
   adminRouter.put('/variantes/:idVariante', editar, variantes.editar as RequestHandler);
@@ -257,6 +275,8 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   publicRouter.get('/productos', consultaPublica.listar as RequestHandler);
   publicRouter.get('/productos/:idProducto', consultaPublica.ficha as RequestHandler);
   publicRouter.get('/productos/:idProducto/colores', consultaPublica.colores as RequestHandler);
+  publicRouter.get('/imagenes/:idImagen', consultaPublica.imagen as RequestHandler);
+  publicRouter.get('/medidas/:idMedida/imagen', consultaPublica.imagenMedida as RequestHandler);
   publicRouter.get('/marcas/:idMarca/logotipo', consultaPublica.logotipo as RequestHandler);
 
   return {
@@ -269,5 +289,6 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
     coloresService,
     productosService,
     variantesService,
+    imagenesService,
   };
 }
