@@ -1,6 +1,6 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.2 — esquema 4.3 (M01 Catálogo: rediseño de colores, bases, acabados, medidas y variantes).  
+> **Versión Actual:** 3.3 — esquema 4.4 (M01 Catálogo: equivalencia en galones de los tipos de medida).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
 > **Total de Tablas:** 58  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.3** (esquema 4.4) | 2026-10-24 | Ninguna | Ninguna | `tipo_medida.equivalencia_galones` (opcional, mayor que 0): galones que equivale una unidad (litro = 0,264172052). Permite derivar el rendimiento por medida a partir del rendimiento por galón (`RF-CAT-10-03`). Seed: galón, litro y mililitro. Total 58 tablas. | [Ver v3.3](./CHANGELOG_DATABASE.md#v33---2026-10-24) |
 | **v3.2** (esquema 4.3) | 2026-10-24 | `superficie`, `acabado`, `familia_color`, `tipo_medida`, `medida`, `ficha_recubrimiento`, `producto_superficie`, `producto_acabado`, `producto_color`, `producto_caracteristica` (10) | `sub_subcategorias`, `tonos`, `presentacion`, `caracteristica`, `producto_subcategoria` (5) | M01 Catálogo rediseñado con las reglas del Tech Lead: color con base opcional, acabado y familia; bases globales; variante = producto + medida con su precio; producto en una subcategoría con superficies y ambiente; color en `linea_carrito` y `sku_vendido` en `linea_orden`. Total 58 tablas. | [Ver v3.2](./CHANGELOG_DATABASE.md#v32---2026-10-24) |
 | **v3.1** (esquema 4.2) | 2026-10-23 | Ninguna | Ninguna | Sin cambios de DDL ni de Prisma. Seed: parámetro 11 `auth.vigencia_enlace_activacion_horas` (72 h, rango 1–168). `codigo_verificacion` guarda también el enlace de activación de empleados y los tokens de gobernanza del admin (antes en memoria); la recuperación ya no guarda el valor plano. M17 ya persiste el catálogo con Prisma. | [Ver v3.1](./WALKTHROUGH_DATABASE.md#-versión-31-2026-10-23) |
 | **v3.0** (esquema 4.2) | 2026-10-21 | `control_intento_acceso` (1) | Ninguna | M04 Cuentas: aprobados en bloque C-2 y C-4 a C-9 de `RFC-M04-001`. Nueva tabla `control_intento_acceso` (Tabla 53) para control anti-fuerza bruta e indisitnguibilidad (`RN-CUE-06/07`). Unicidad parcial en solicitudes pendientes (`RN-CUE-14/19`). Unicidad y predeterminada única en `direccion_cliente` (`RN-CUE-21`). Hash BCrypt en `codigo_verificacion.codigo_hash` (`RN-CUE-03`). Correo insensible a mayúsculas `uq_usuario_correo_lower` (`RN-CUE-01`). Columna `cambio_contrasena_pendiente` en `usuario`. Permiso 21 `empresas.validar` en el catálogo de permisos. Total 53 tablas. | [Ver v3.0](./WALKTHROUGH_DATABASE.md#-versión-30-2026-10-21) |
@@ -115,6 +116,7 @@ erDiagram
         int id_tipo_medida PK
         string nombre UK "galon, pulgada..."
         string abreviatura UK
+        decimal equivalencia_galones "opcional, mayor que 0"
     }
     Medida {
         int id_medida PK
@@ -591,7 +593,7 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | **`acabado`** | `id_acabado` | Ninguna | Brillante, Mate, Semimate, Satinado, Transparente. |
 | **`base`** | `id_base` | Ninguna | Tint, Deep, Pastel, Accent. Global, no depende de la marca. |
 | **`familia_color`** | `id_familia_color` | Ninguna | Familias del selector de color, con hexadecimal de muestra. |
-| **`tipo_medida`** | `id_tipo_medida` | Ninguna | Galón, litro, mililitro, pulgada, metro, unidad. |
+| **`tipo_medida`** | `id_tipo_medida` | Ninguna | Galón, litro, mililitro, pulgada, metro, unidad. `equivalencia_galones` (> 0, opcional) deriva el rendimiento por medida (RF-CAT-10-03). |
 | **`medida`** | `id_medida` | `id_tipo_medida` (RESTRICT) | Valor + tipo (ej. 1/4 de galón). `UNIQUE (id_tipo_medida, valor)`. |
 | **`color`** | `id_color` | `id_marca`, `id_base` (opcional), `id_acabado`, `id_familia_color` (opcional) | Hexadecimal obligatorio; CIELAB opcional y completo o vacío. `UNIQUE (id_marca, nombre, id_acabado)`; código único por marca. |
 | **`producto`** | `id_producto` | `id_marca`, `(id_linea, id_marca)` → `linea`, `id_subcategoria`, `id_categoria_complementaria` (SET NULL) | Nombre único por marca; ambiente, publicación y patrocinio. La FK compuesta impide una línea de otra marca. |

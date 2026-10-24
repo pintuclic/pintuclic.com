@@ -10,6 +10,15 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.3] - 2026-10-24
+### Esquema 4.4 (58 Tablas) - M01 Catálogo: equivalencia en galones
+- **Alcance General:** Cambio aditivo pedido por el contrato de M01 (`contracts/m01-catalogo.contract.ts`, decisión D6).
+  - **`tipo_medida.equivalencia_galones NUMERIC(12,9)`**, opcional, con `CHECK (> 0)`: cuántos galones equivale una unidad del tipo (galón = 1, litro = 0,264172052, mililitro = 0,000264172; pulgada, metro y unidad quedan en `NULL`). Permite derivar el rendimiento por medida: rendimiento por galón × equivalencia × valor (`RF-CAT-10-03`).
+  - **Bases existentes en 4.3:** el DDL agrega la columna con `ADD COLUMN IF NOT EXISTS` y el seed completa galón, litro y mililitro **sin pisar** un valor ya fijado (`WHERE equivalencia_galones IS NULL`). Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` y `npm run db:seed`.
+  - Probado en PostgreSQL 16: esquema desde cero idéntico al de una base 4.3 actualizada; DDL y seed repetibles.
+
+---
+
 ## [v3.2] - 2026-10-24
 ### Esquema 4.3 (58 Tablas) - M01 Catálogo: rediseño con las reglas del Tech Lead
 - **Alcance General:** Rediseño del catálogo antes de construir M01 (ninguna tabla del catálogo tenía código encima). Reglas en [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md).
