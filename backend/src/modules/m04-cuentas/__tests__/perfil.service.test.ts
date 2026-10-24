@@ -5,7 +5,7 @@ import type { CuentasRepository } from '../repositories/cuentas.repository';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
 import type { NotificacionesPort } from '../interfaces/notificaciones.port';
 import { SimuladoDateProviderAdapter } from '../adapters/date-provider.adapter';
-import { PerfilError, PerfilService } from '../services/perfil.service';
+import { PerfilService } from '../services/perfil.service';
 import { perfilUsuarioResponseSchema } from '../dtos/m04-cuentas.dto';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 
@@ -180,7 +180,24 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
           contrasenaActual: 'ClaveEquivocada123!',
           nuevaContrasena: 'NuevaClaveSegura123!',
         })
-      ).rejects.toThrow(PerfilError);
+      ).rejects.toMatchObject({ codigo: 'CONTRASENA_INCORRECTA' });
+    });
+
+    it('rechaza el cambio de correo si la contraseña es errónea, sin emitir OTP', async () => {
+      const hashActual = await derivarContrasena('ClaveActual123!');
+      vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce({
+        idUsuario: 15,
+        correo: 'actual@pintuclic.com',
+        contrasena: hashActual,
+      } as Usuario);
+
+      await expect(
+        service.solicitarCambioCorreo(15, {
+          nuevoCorreo: 'nuevo@pintuclic.com',
+          contrasena: 'ClaveEquivocada123!',
+        })
+      ).rejects.toMatchObject({ codigo: 'CONTRASENA_INCORRECTA' });
+      expect(codigosRepo.guardarCodigo).not.toHaveBeenCalled();
     });
 
     it('solicita cambio de correo validando contraseña y emitiendo OTP de 15m', async () => {
@@ -259,7 +276,7 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
         service.desactivarCuenta(15, {
           contrasena: 'ClaveMala12345!',
         })
-      ).rejects.toThrow(PerfilError);
+      ).rejects.toMatchObject({ codigo: 'CONTRASENA_INCORRECTA' });
 
       expect(cuentasRepo.desactivarCuenta).not.toHaveBeenCalled();
     });

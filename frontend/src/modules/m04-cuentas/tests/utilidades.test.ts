@@ -1,8 +1,10 @@
+import { AxiosError, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 import { destinoSeguro, enmascararCorreo, minutosDesde } from '../components/auth/utilidades';
 import { formatoTamano, motivoObligatorio } from '../components/admin/formato';
 import { aBase64, RUT_TAMANO_MAXIMO_BYTES, validarArchivoRut } from '../components/perfil/archivo-rut';
 import { esSeccionPerfil } from '../components/perfil/secciones';
+import { aErrorCuentas } from '../services/errores';
 
 describe('M04 Frontend — utilidades de autenticación', () => {
   it('enmascara el correo como en el mockup de verificación (pág. 5)', () => {
@@ -85,5 +87,21 @@ describe('M04 Frontend — panel de empresas y perfil', () => {
     expect(esSeccionPerfil('direcciones')).toBe(true);
     expect(esSeccionPerfil('admin')).toBe(false);
     expect(esSeccionPerfil(['datos'])).toBe(false);
+  });
+});
+
+describe('M04 Frontend — mensajes de error del servidor', () => {
+  const errorConCodigo = (code: string) =>
+    new AxiosError('fallo', 'ERR_BAD_REQUEST', undefined, undefined, {
+      status: 400,
+      data: { success: false, error: { code, message: 'texto del servidor' } },
+    } as AxiosResponse);
+
+  it('la contraseña errónea del perfil no menciona el correo', () => {
+    expect(aErrorCuentas(errorConCodigo('CONTRASENA_INCORRECTA')).mensaje).toBe('La contraseña actual no es correcta.');
+  });
+
+  it('el login sigue sin revelar si el correo existe (RN-CUE-06)', () => {
+    expect(aErrorCuentas(errorConCodigo('CREDENCIALES_INVALIDAS')).mensaje).toBe('El correo o la contraseña no son correctos.');
   });
 });

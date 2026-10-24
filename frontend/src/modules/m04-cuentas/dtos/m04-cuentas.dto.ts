@@ -78,6 +78,8 @@ export type EstadoSolicitudEmpresa = z.infer<typeof estadoSolicitudEmpresaSchema
 
 export const CODIGOS_ERROR_CUENTAS = {
   CREDENCIALES_INVALIDAS: 'CREDENCIALES_INVALIDAS',
+  /** Contraseña errónea en el perfil, con sesión abierta: no revela nada que el usuario no sepa. */
+  CONTRASENA_INCORRECTA: 'CONTRASENA_INCORRECTA',
   CUENTA_BLOQUEADA: 'CUENTA_BLOQUEADA',
   CUENTA_PENDIENTE_ACTIVACION: 'CUENTA_PENDIENTE_ACTIVACION',
   CODIGO_INVALIDO_O_EXPIRADO: 'CODIGO_INVALIDO_O_EXPIRADO',
