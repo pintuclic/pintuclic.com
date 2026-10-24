@@ -94,20 +94,11 @@ export class AuthCuentasController {
       return;
     }
 
-    const idVerificacion = (req.body as { idVerificacion?: string }).idVerificacion;
-    if (!idVerificacion || typeof idVerificacion !== 'string') {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 'DATOS_INVALIDOS',
-          message: 'El identificador de verificación es requerido.',
-        },
-      });
-      return;
-    }
-
     try {
-      const resultado = await this.authService.verificarCodigoRegistro(idVerificacion, parse.data.codigo);
+      const resultado = await this.authService.verificarCodigoRegistro(
+        parse.data.idVerificacion,
+        parse.data.codigo,
+      );
       this.fijarCookie(res, resultado.sesion);
 
       responderExito(
@@ -146,26 +137,14 @@ export class AuthCuentasController {
         success: false,
         error: {
           code: 'DATOS_INVALIDOS',
-          message: parse.error.issues[0]?.message ?? 'Correo no válido',
-        },
-      });
-      return;
-    }
-
-    const idVerificacion = (req.body as { idVerificacion?: string }).idVerificacion;
-    if (!idVerificacion || typeof idVerificacion !== 'string') {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 'DATOS_INVALIDOS',
-          message: 'El identificador de verificación es requerido.',
+          message: parse.error.issues[0]?.message ?? 'Identificador de verificación inválido',
         },
       });
       return;
     }
 
     try {
-      const resultado = await this.authService.reenviarCodigoRegistro(idVerificacion);
+      const resultado = await this.authService.reenviarCodigoRegistro(parse.data.idVerificacion);
       responderExito(
         res,
         {
@@ -266,24 +245,9 @@ export class AuthCuentasController {
       return;
     }
 
-    const tokenCambio =
-      (req.headers['x-token-cambio'] as string | undefined) ??
-      (req.body as { tokenCambio?: string }).tokenCambio;
-
-    if (!tokenCambio) {
-      res.status(401).json({
-        success: false,
-        error: {
-          code: 'TOKEN_INVALIDO_O_EXPIRADO',
-          message: 'Token de primer acceso requerido para cambiar la contraseña.',
-        },
-      });
-      return;
-    }
-
     try {
       const resultado = await this.authService.cambiarContrasenaPrimerAcceso(
-        tokenCambio,
+        parse.data.tokenCambio,
         parse.data.nuevaContrasena,
       );
       this.fijarCookie(res, resultado.sesion);
