@@ -92,9 +92,9 @@ import {
  *  V6  Estados usados: activo e inactivo (D12).
  *
  * ── Reglas de consulta pública ──────────────────────────────────────────────
- *  U1  Sin autenticación. Solo productos activos y publicados cuya marca,
- *      subcategoría y categoría estén activas. Una ficha inactiva responde
- *      "no disponible" (404).
+ *  U1  Sin autenticación. Solo productos activos y publicados cuya marca, línea
+ *      (si tiene), subcategoría y categoría estén activas. Una ficha no disponible responde
+ *      404 RECURSO_NO_DISPONIBLE.
  *  U2  Se ocultan las categorías y subcategorías sin productos visibles.
  *  U3  Todo se pagina y se resuelve bajo demanda: nunca se carga el catálogo ni
  *      la carta completa de colores (RNF-CAT-06-01, RF-CAT-06-03).
@@ -300,7 +300,7 @@ export type ListarColoresResponseEnvelope = z.infer<typeof listarColoresResponse
 export const tipoCalidadSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 
 /** Rendimiento en m² por galón (RF-CAT-10-02, RF-CAT-10-05): mínimo y máximo juntos, mínimo ≤ máximo. */
-const rendimientoCompleto = (v: { rendimientoMin?: number | null; rendimientoMax?: number | null }): boolean => {
+const rendimientoCompleto = (v: { rendimientoMin?: number | null | undefined; rendimientoMax?: number | null | undefined }): boolean => {
   const min = v.rendimientoMin ?? null;
   const max = v.rendimientoMax ?? null;
   return (min === null && max === null) || (min !== null && max !== null && min <= max);
@@ -674,10 +674,14 @@ export type ProductoPublicoResponseEnvelope = z.infer<typeof productoPublicoResp
  * 7. ERRORES
  * ─────────────────────────────────────────────────────────────────────────── */
 
+/**
+ * Mismo envelope global que la entrega 1. Estados HTTP: 400 PARAMETRO_INVALIDO · 404 RECURSO_NO_DISPONIBLE
+ * (también toda denegación y toda ficha pública no disponible) · 409 DUPLICADO, RELACION_INVALIDA,
+ * PADRE_INACTIVO, CONFIRMACION_REQUERIDA, NO_PUBLICABLE.
+ */
 export const CODIGOS_ERROR_PRODUCTOS = [
-  'ACCESO_DENEGADO',
-  'VALIDACION',
-  'NO_ENCONTRADO',
+  'PARAMETRO_INVALIDO',
+  'RECURSO_NO_DISPONIBLE',
   'DUPLICADO',
   'RELACION_INVALIDA',
   'PADRE_INACTIVO',
@@ -688,11 +692,10 @@ export const CODIGOS_ERROR_PRODUCTOS = [
 export const errorProductosEnvelopeSchema = z.object({
   success: z.literal(false),
   error: z.object({
-    codigo: z.enum(CODIGOS_ERROR_PRODUCTOS),
-    mensaje: z.string(),
-    /** Campo que causó el error, cuando aplica (ej. "sku", "idLinea"). */
-    campo: z.string().optional(),
-    impacto: impactoDesactivacionSchema.optional(),
+    code: z.enum(CODIGOS_ERROR_PRODUCTOS),
+    message: z.string(),
+    /** CONFIRMACION_REQUERIDA → el impacto; DUPLICADO y RELACION_INVALIDA → el campo; resto → null. */
+    details: z.union([impactoDesactivacionSchema, z.object({ campo: z.string() })]).nullable(),
   }),
 });
 export type ErrorProductosEnvelope = z.infer<typeof errorProductosEnvelopeSchema>;

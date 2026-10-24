@@ -27,16 +27,17 @@ import { z } from 'zod';
  *      base, familia de color, tipo de medida, medida (nombre y tipo+valor).
  *      Por padre: subcategoría (categoría) y línea (marca).
  *  R4  Nunca hay borrado físico: solo baja lógica. No existe ruta DELETE.
- *  R5  Desactivar en cascada: categoría → sus subcategorías; marca → sus líneas
- *      (y, en la entrega 2, sus colores). Un producto cuya subcategoría o marca
- *      se desactiva sale del catálogo público sin darse de baja.
+ *  R5  Desactivar en cascada: categoría → sus subcategorías; marca → sus líneas y
+ *      sus colores; tipo de medida → sus medidas. Un producto es visible solo si su
+ *      marca, su línea (si tiene), su subcategoría y su categoría están activas; si
+ *      no, sale del catálogo público sin darse de baja.
  *  R6  Antes de desactivar se informa el impacto (GET .../impacto-desactivacion).
  *      Si hay elementos afectados, el servidor exige `confirmar: true`; sin él
  *      responde 409 CONFIRMACION_REQUERIDA con el impacto.
  *  R7  Reactivar NO reactiva a los hijos, pero SÍ verifica que el padre esté
  *      activo (RF-CAT-09-04): si no, 409 PADRE_INACTIVO.
- *  R8  No se crean subcategorías bajo una categoría inactiva ni líneas bajo una
- *      marca inactiva.
+ *  R8  No se crean subcategorías bajo una categoría inactiva, líneas bajo una marca
+ *      inactiva ni medidas bajo un tipo de medida inactivo (PADRE_INACTIVO).
  *  R9  Marca: logotipo obligatorio, jpeg/png/webp, máximo 5 MB (supuesto aprobado
  *      por el Product Owner; el "Anexo B de la Tanda 2" sigue pendiente).
  *  R10 Las bases son globales (Tint, Deep, Pastel, Accent) y no dependen de la
@@ -44,19 +45,21 @@ import { z } from 'zod';
  *      Transparente).
  *  R11 El acabado "Brillante" es el acabado por defecto de los colores: no se
  *      puede desactivar ni renombrar (se identifica por su nombre).
- *  R12 Una medida es valor + tipo de medida (ej. 1 + galón). Su nombre se genera
- *      ("1 galón") si no se envía. Una medida o un tipo de medida con variantes
- *      solo se desactiva.
+ *  R12 Una medida es valor + tipo de medida (ej. 1 + galón). Si no se envía el nombre
+ *      se genera con la abreviatura ("1 gal", "0.25 gal", "2 in"). Una medida o un
+ *      tipo de medida con variantes solo se desactiva.
  *  R13 La familia de color lleva un hexadecimal #RRGGBB para su muestra.
- *  R14 Autorización siempre en servidor; el 403 es el opaco estándar de M17.
+ *  R14 Autorización siempre en servidor. Toda denegación (sin sesión, sin permiso) responde
+ *      404 RECURSO_NO_DISPONIBLE, idéntica a la de un recurso inexistente (ADR-003).
  *
  * ── Decisiones por defecto (el Tech Lead puede vetarlas) ────────────────────
  *  D1  Permisos (la spec habla de «Gestión del catálogo» y «Gestión de
  *      productos», que NO existen en el seed; se usan los `catalogo.*` reales):
  *      leer → catalogo.ver · crear → catalogo.crear · editar y reactivar →
  *      catalogo.editar · desactivar → catalogo.eliminar. Sin tocar el seed.
- *  D2  El logotipo viaja en base64 dentro de JSON, como el RUT de M04. Requiere
- *      subir el límite de JSON solo para esa ruta (archivo compartido → PR aparte).
+ *  D2  El logotipo viaja en base64 dentro de JSON, como el RUT de M04. El límite de JSON sube
+ *      a 7 MB solo en POST /admin/catalogo/marcas y PUT /admin/catalogo/marcas/:idMarca/logotipo
+ *      (core/cuerpoJson.middleware.ts, PR aparte); el resto de rutas conserva 100 KB.
  *  D3  Reactivar un padre no reactiva a los hijos: el administrador decide.
  *  D4  La unicidad de nombres se compara sin distinguir mayúsculas y sin
  *      espacios sobrantes (se normaliza antes de comparar).
@@ -361,7 +364,7 @@ export type EditarTipoMedidaRequest = z.infer<typeof editarTipoMedidaRequestSche
 export const crearMedidaRequestSchema = z.object({
   idTipoMedida: idSchema,
   valor: z.number().positive().max(9_999_999),
-  /** Si se omite se genera: "{valor} {tipo}" (R12). */
+  /** Si se omite se genera: "{valor} {abreviatura}" (R12). */
   nombre: z.string().trim().min(1).max(60).optional(),
 });
 export type CrearMedidaRequest = z.infer<typeof crearMedidaRequestSchema>;
@@ -452,24 +455,30 @@ export type ImpactoDesactivacionResponseEnvelope = z.infer<typeof impactoDesacti
  * 5. ERRORES (opacos donde aplica, HU-SEG-06 / RN-ADM-12)
  * ─────────────────────────────────────────────────────────────────────────── */
 
+/**
+ * Errores con el envelope global del backend: `{ success: false, error: { code, message, details } }`.
+ * Estados HTTP: 400 PARAMETRO_INVALIDO · 400 LOGOTIPO_INVALIDO · 404 RECURSO_NO_DISPONIBLE
+ * (también para toda denegación) · 409 NOMBRE_DUPLICADO, PADRE_INACTIVO, CONFIRMACION_REQUERIDA,
+ * ACABADO_PROTEGIDO · 413 CUERPO_DEMASIADO_GRANDE.
+ */
 export const CODIGOS_ERROR_CATALOGO = [
-  'ACCESO_DENEGADO',
-  'VALIDACION',
-  'NO_ENCONTRADO',
+  'PARAMETRO_INVALIDO',
+  'RECURSO_NO_DISPONIBLE',
   'NOMBRE_DUPLICADO',
   'PADRE_INACTIVO',
   'CONFIRMACION_REQUERIDA',
   'LOGOTIPO_INVALIDO',
   'ACABADO_PROTEGIDO',
+  'CUERPO_DEMASIADO_GRANDE',
 ] as const;
 
 export const errorCatalogoEnvelopeSchema = z.object({
   success: z.literal(false),
   error: z.object({
-    codigo: z.enum(CODIGOS_ERROR_CATALOGO),
-    mensaje: z.string(),
-    /** Solo con CONFIRMACION_REQUERIDA: qué se vería afectado (R6). */
-    impacto: impactoDesactivacionSchema.optional(),
+    code: z.enum(CODIGOS_ERROR_CATALOGO),
+    message: z.string(),
+    /** Solo con CONFIRMACION_REQUERIDA: qué se vería afectado (R6). En el resto, null. */
+    details: impactoDesactivacionSchema.nullable(),
   }),
 });
 export type ErrorCatalogoEnvelope = z.infer<typeof errorCatalogoEnvelopeSchema>;
