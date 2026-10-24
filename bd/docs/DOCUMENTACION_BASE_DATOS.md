@@ -1,6 +1,6 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.0 — esquema 4.2 (M04 Cuentas: unicidad, hash OTP, anti-fuerza bruta y cambio de clave).  
+> **Versión Actual:** 3.1 — esquema 4.2 sin cambios de DDL (seed: vigencia del enlace de activación de empleados).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
 > **Total de Tablas:** 53  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.1** (esquema 4.2) | 2026-10-23 | Ninguna | Ninguna | Sin cambios de DDL ni de Prisma. Seed: parámetro 11 `auth.vigencia_enlace_activacion_horas` (72 h, rango 1–168). `codigo_verificacion` guarda también el enlace de activación de empleados y los tokens de gobernanza del admin (antes en memoria); la recuperación ya no guarda el valor plano. M17 ya persiste el catálogo con Prisma. | [Ver v3.1](./WALKTHROUGH_DATABASE.md#-versión-31-2026-10-23) |
 | **v3.0** (esquema 4.2) | 2026-10-21 | `control_intento_acceso` (1) | Ninguna | M04 Cuentas: aprobados en bloque C-2 y C-4 a C-9 de `RFC-M04-001`. Nueva tabla `control_intento_acceso` (Tabla 53) para control anti-fuerza bruta e indisitnguibilidad (`RN-CUE-06/07`). Unicidad parcial en solicitudes pendientes (`RN-CUE-14/19`). Unicidad y predeterminada única en `direccion_cliente` (`RN-CUE-21`). Hash BCrypt en `codigo_verificacion.codigo_hash` (`RN-CUE-03`). Correo insensible a mayúsculas `uq_usuario_correo_lower` (`RN-CUE-01`). Columna `cambio_contrasena_pendiente` en `usuario`. Permiso 21 `empresas.validar` en el catálogo de permisos. Total 53 tablas. | [Ver v3.0](./WALKTHROUGH_DATABASE.md#-versión-30-2026-10-21) |
 | **v2.9** (esquema 4.1) | 2026-10-21 | `parametro_sistema` (1) | Ninguna | M17 Configuración general: el catálogo de parámetros (`HU-ADM-05`, `HU-ADM-07`) pasa de un `Map` en memoria (`ADR-007`) a una tabla con clave única, valor vigente y por defecto en `JSONB`, rango y último autor. **La base impone el tipo y el rango** (`ck_parametro_*`). Seed con las 10 filas del catálogo actual. Nuevos `enum_area_parametro` y `enum_tipo_dato_parametro`. Total 52 tablas. La fecha de última modificación la mantiene un **disparador** (el primero del esquema) y el rango de la complejidad de contraseña queda alineado con el piso de M20 (12–32). **El código de M17 aún lee de memoria** (RFC-M17-001 §5). | [Ver v2.9](./WALKTHROUGH_DATABASE.md#-versión-29-2026-10-21) |
 | **v2.8** (esquema 4.0) | 2026-10-21 | `cuenta_empresa`, `documento_soporte` (2) | Ninguna (se depreca la columna `solicitud_actualizacion_nit.documento_adjunto_url`) | M04 Cuentas: `cuenta_empresa` guarda el NIT **vigente** de cada cuenta empresa aprobada (1:1 con `usuario`, `nit` UNIQUE) y deja las solicitudes como historial inmutable. `documento_soporte` almacena el RUT adjunto (PDF/JPG/PNG, hasta 5 MB, huella SHA-256) y `solicitud_actualizacion_nit` lo referencia por `id_documento`. Decisiones del Director Humano sobre el RFC-M04-001 (C-1 y C-3, opción A). Total 51 tablas. | [Ver v2.8](./WALKTHROUGH_DATABASE.md#-versión-28-2026-10-21) |
@@ -608,7 +609,7 @@ erDiagram
 | **`solicitud_actualizacion_nit`** | `id_solicitud` (**UUID**) | `id_usuario`, `id_admin_revisor` $\rightarrow$ `usuario`; `id_documento` $\rightarrow$ `documento_soporte` (RESTRICT, v2.8) | Renovación de NIT con el RUT adjunto (HU-CUE-09, HU-CUE-10). `documento_adjunto_url` queda **deprecada** desde v2.8. |
 | **`documento_soporte`** *(v2.8)* | `id_documento` (**UUID**) | Ninguna | RUT adjunto en `BYTEA`: PDF, JPG o PNG de hasta 5 MB, con huella SHA-256 y verificación de tamaño real por `CHECK`. El contenido nunca se selecciona en listados. |
 | **`usuario_identidad_externa`** | `id_identidad` | `id_usuario` $\rightarrow$ `usuario` (CASCADE) | Identidades federadas (Google). `UNIQUE(proveedor, id_proveedor)` y `UNIQUE(id_usuario, proveedor)` (HU-CUE-02). |
-| **`codigo_verificacion`** | `id_codigo` (**UUID**) | Ninguna (se identifica por `correo`) | Códigos OTP efímeros con expiración y contador de intentos: registro, recuperación de contraseña y cambio de correo (HU-CUE-01, 05, 06). |
+| **`codigo_verificacion`** | `id_codigo` (**UUID**) | Ninguna (se identifica por `correo`) | Códigos OTP efímeros con expiración y contador de intentos: registro, recuperación de contraseña y cambio de correo (HU-CUE-01, 05, 06). Desde v3.1 también guarda el enlace de activación de empleados (`recuperacion_password`) y los tokens de sustitución del correo del admin (`cambio_correo`, huella SHA-256). Solo se almacenan hashes, nunca el valor plano. |
 
 ### Módulo 10: Configuración General — M17 (1 Tabla)
 | Tabla | PK | FKs | Descripción |

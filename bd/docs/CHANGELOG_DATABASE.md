@@ -10,6 +10,19 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.1] - 2026-10-23
+### Esquema 4.2 sin cambios (53 Tablas) - Seed: vigencia del enlace de activación de empleados
+- **Alcance General:** Sin cambios de DDL ni del modelo Prisma. Acompaña a la versión de aplicación v0.7.0 ([`docs/CHANGELOG.md`](../../docs/CHANGELOG.md)):
+  - **Nuevo parámetro (seed):** fila `id_parametro = 11`, `auth.vigencia_enlace_activacion_horas` (área `autenticacion`, tipo `numero`, 72 por defecto, rango 1–168). Como previó la v2.9, un parámetro nuevo es una fila nueva, sin DDL. `ON CONFLICT (clave) DO NOTHING`: re-ejecutar el seed no pisa el valor que fije el administrador.
+  - **Nuevos usos de `codigo_verificacion`, sin cambio de esquema:** el enlace de activación de empleados usa `tipo = 'recuperacion_password'`; la recuperación de contraseña ya no guarda el valor plano del enlace en `datos_temporales`; los tokens de sustitución del correo del admin (M17) pasan de memoria a esta tabla, con `tipo = 'cambio_correo'` y la huella SHA-256 en `codigo_hash`.
+  - **`usuario.cambio_contrasena_pendiente`:** los empleados que crea M17 nacen con `true` y pasa a `false` cuando definen su contraseña con el enlace.
+  - **NIT con guion (decisión del PO, 2026-10-23):** la regla vive en el contrato Zod, no en la base. Todos los NIT del seed ya la cumplen.
+  - **Cierra el pendiente de la v2.9:** M17 ya lee y escribe el catálogo con Prisma (`PrismaConfiguracionRepository`, caché de 30 s).
+  - **Bases existentes:** `docker-entrypoint-initdb.d` solo siembra un volumen vacío, así que en una base ya creada la fila se agrega a mano. En el VPS se hizo el 2026-10-23.
+  - 🔗 **Detalle:** [WALKTHROUGH_DATABASE.md#📦-versión-31-2026-10-23](./WALKTHROUGH_DATABASE.md#-versión-31-2026-10-23)
+
+---
+
 ## [v3.0] - 2026-10-21
 ### Esquema 4.2 (53 Tablas) - M04 Cuentas: Unicidad, hash OTP, anti-fuerza bruta y cambio de clave
 - **Alcance General:** Aprobación en bloque del Director Humano sobre los cambios C-2 y C-4 a C-9 de `RFC-M04-001` (`.sdlc/docs/modules/M04/`) para sincronizar DDL y modelo Prisma de M04:
