@@ -380,28 +380,47 @@ export class AuthCuentasService {
 
   /**
    * HU-CUE-04: Cambio obligatorio de contraseña en primer acceso
+   *
+   * El token sirve una sola vez: deja de valer en cuanto la cuenta ya no tiene el
+   * cambio pendiente. Se exige además la clave temporal, y la nueva debe ser distinta.
    */
   async cambiarContrasenaPrimerAcceso(
     tokenCambio: string,
+    contrasenaActual: string,
     nuevaContrasena: string,
   ): Promise<{ usuario: Usuario; sesion: Sesion; esAdmin: boolean }> {
-    let payload: { idUsuario: number; tipo: string };
-    try {
-      payload = jwt.verify(tokenCambio, this.obtenerJwtSecret()) as {
-        idUsuario: number;
-        tipo: string;
-      };
-    } catch {
-      throw new AuthCuentasError('Token de cambio de contraseña inválido o expirado.', 'TOKEN_INVALIDO_O_EXPIRADO', 401);
-    }
+    const tokenInvalido = (): AuthCuentasError =>
+      new AuthCuentasError(
+        'Token de cambio de contraseña inválido o expirado.',
+        'TOKEN_INVALIDO_O_EXPIRADO',
+        401,
+      );
 
-    if (payload.tipo !== 'cambio_primer_acceso') {
-      throw new AuthCuentasError('Tipo de token no autorizado.', 'TOKEN_INVALIDO_O_EXPIRADO', 401);
+    let payload: { idUsuario?: unknown; tipo?: unknown };
+    try {
+      payload = jwt.verify(tokenCambio, this.obtenerJwtSecret(), { algorithms: ['HS256'] }) as typeof payload;
+    } catch {
+      throw tokenInvalido();
+    }
+    if (payload.tipo !== 'cambio_primer_acceso' || typeof payload.idUsuario !== 'number') {
+      throw tokenInvalido();
     }
 
     const usuario = await this.cuentasRepo.buscarPorId(payload.idUsuario);
-    if (!usuario) {
-      throw new AuthCuentasError('Usuario no encontrado.', 'RECURSO_NO_ENCONTRADO', 404);
+    if (!usuario || usuario.estado !== 'activo' || !usuario.cambioContrasenaPendiente) {
+      throw tokenInvalido();
+    }
+
+    const coincideTemporal = await verificarContrasena(contrasenaActual, usuario.contrasena);
+    if (!coincideTemporal) {
+      throw new AuthCuentasError('La contraseña temporal no es correcta.', 'CONTRASENA_INCORRECTA', 400);
+    }
+    if (nuevaContrasena === contrasenaActual) {
+      throw new AuthCuentasError(
+        'La nueva contraseña debe ser distinta de la temporal.',
+        'DATOS_INVALIDOS',
+        400,
+      );
     }
 
     const contrasenaHash = await derivarContrasena(nuevaContrasena);

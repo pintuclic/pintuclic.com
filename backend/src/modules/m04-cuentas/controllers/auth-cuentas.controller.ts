@@ -248,6 +248,7 @@ export class AuthCuentasController {
     try {
       const resultado = await this.authService.cambiarContrasenaPrimerAcceso(
         parse.data.tokenCambio,
+        parse.data.contrasenaActual,
         parse.data.nuevaContrasena,
       );
       this.fijarCookie(res, resultado.sesion);

@@ -180,6 +180,10 @@ export const cambioContrasenaPrimerAccesoFormSchema = z
   .refine((data) => data.nuevaContrasena === data.confirmarNuevaContrasena, {
     message: 'Las contraseñas no coinciden',
     path: ['confirmarNuevaContrasena'],
+  })
+  .refine((data) => data.nuevaContrasena !== data.contrasenaActual, {
+    message: 'La nueva contraseña debe ser distinta de la temporal',
+    path: ['nuevaContrasena'],
   });
 export type CambioContrasenaPrimerAccesoFormData = z.infer<typeof cambioContrasenaPrimerAccesoFormSchema>;
 

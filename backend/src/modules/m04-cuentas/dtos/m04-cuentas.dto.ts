@@ -273,6 +273,11 @@ export const loginResponseSchema = z.discriminatedUnion('cambioContrasenaPendien
 ]);
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
 
+/**
+ * `contrasenaActual` es la clave temporal y se verifica. El servidor rechaza el token si la
+ * cuenta ya no tiene el cambio pendiente (un solo uso) o no está activa, y exige que
+ * `nuevaContrasena` sea distinta de la temporal.
+ */
 export const cambioContrasenaPrimerAccesoRequestSchema = z.object({
   tokenCambio: z.string().min(10, 'El token de primer acceso es requerido'),
   contrasenaActual: z.string().min(1, 'La contraseña actual es requerida'),
