@@ -80,6 +80,11 @@ export interface ListaCompletaPort<E> {
   listar(query: ListarCompletoRequest): Promise<E[]>;
 }
 
+/** Búsqueda por nombre sin distinguir mayúsculas (importación de colores por nombre). */
+export interface BuscablePorNombrePort<E> {
+  buscarPorNombre(nombre: string): Promise<E | null>;
+}
+
 export type SuperficiesRepositoryPort = ListaCompletaPort<Superficie> &
   RecursoCatalogoPort<Superficie, CrearSuperficieRequest, EditarSuperficieRequest, { nombre: string }>;
 
@@ -87,12 +92,15 @@ export type TiposResinaRepositoryPort = ListaCompletaPort<TipoResina> &
   RecursoCatalogoPort<TipoResina, CrearTipoResinaRequest, CrearTipoResinaRequest, { nombre: string }>;
 
 export type AcabadosRepositoryPort = ListaCompletaPort<Acabado> &
+  BuscablePorNombrePort<Acabado> &
   RecursoCatalogoPort<Acabado, CrearAcabadoRequest, EditarAcabadoRequest, { nombre: string }>;
 
 export type BasesRepositoryPort = ListaCompletaPort<Base> &
+  BuscablePorNombrePort<Base> &
   RecursoCatalogoPort<Base, CrearBaseRequest, EditarBaseRequest, { nombre: string }>;
 
 export type FamiliasColorRepositoryPort = ListaCompletaPort<FamiliaColor> &
+  BuscablePorNombrePort<FamiliaColor> &
   RecursoCatalogoPort<FamiliaColor, CrearFamiliaColorRequest, EditarFamiliaColorRequest, { nombre: string }>;
 
 export type TiposMedidaRepositoryPort = ListaCompletaPort<TipoMedida> &

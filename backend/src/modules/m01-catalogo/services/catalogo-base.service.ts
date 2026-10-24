@@ -3,9 +3,16 @@ import type {
   Estado,
   ImpactoDesactivacion,
 } from '../dtos/m01-catalogo.dto';
-import { CODIGOS_ERROR_CATALOGO } from '../dtos/m01-catalogo.dto';
+import type { CODIGOS_ERROR_CATALOGO } from '../dtos/m01-catalogo.dto';
+import type { CODIGOS_ERROR_PRODUCTOS } from '../dtos/m01-catalogo-productos.dto';
 
-export type CodigoErrorCatalogo = (typeof CODIGOS_ERROR_CATALOGO)[number];
+/** Códigos de las dos entregas del contrato; comparten el mismo envelope. */
+export type CodigoErrorCatalogo =
+  | (typeof CODIGOS_ERROR_CATALOGO)[number]
+  | (typeof CODIGOS_ERROR_PRODUCTOS)[number];
+
+/** `details` del envelope: el impacto de una desactivación, o el campo que causó el error. */
+export type DetallesError = ImpactoDesactivacion | { campo: string } | null;
 
 /**
  * Error de dominio de M01. `code` y `status` salen tal cual en el envelope
@@ -16,7 +23,7 @@ export class CatalogoError extends Error {
     public readonly code: CodigoErrorCatalogo,
     message: string,
     public readonly status: number,
-    public readonly details: ImpactoDesactivacion | null = null,
+    public readonly details: DetallesError = null,
   ) {
     super(message);
     this.name = 'CatalogoError';
@@ -41,9 +48,20 @@ export const errores = {
       impacto,
     ),
   logotipoInvalido: (mensaje: string): CatalogoError => new CatalogoError('LOGOTIPO_INVALIDO', mensaje, 400),
+  /** Entrega 2: duplicado en un campo (código de color, SKU, nombre de producto…). */
+  duplicado: (que: string, campo: string): CatalogoError =>
+    new CatalogoError('DUPLICADO', `Ya existe ${que}.`, 409, { campo }),
+  /** Entrega 2: un id enviado en el cuerpo no existe o no es usable (base inactiva, marca ajena…). */
+  relacionInvalida: (mensaje: string, campo: string): CatalogoError =>
+    new CatalogoError('RELACION_INVALIDA', mensaje, 409, { campo }),
   acabadoProtegido: (): CatalogoError =>
     new CatalogoError('ACABADO_PROTEGIDO', 'El acabado por defecto no se puede renombrar ni desactivar.', 409),
 };
+
+/** Violación de una restricción única de la BD (carrera entre dos peticiones): código Prisma P2002. */
+export function esViolacionUnica(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002';
+}
 
 export function totalImpacto(impacto: ImpactoDesactivacion): number {
   return (

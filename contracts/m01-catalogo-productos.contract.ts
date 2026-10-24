@@ -53,7 +53,11 @@ import {
  *      cada producto; no toca variantes ni órdenes.
  *  C8  Importación: bloques de hasta 500 filas; las bases, acabados y familias
  *      se indican por NOMBRE; idempotente (se crea o actualiza por marca +
- *      nombre + acabado); la vista previa no escribe; cada fila es independiente.
+ *      nombre + acabado); la vista previa no escribe; cada fila se evalúa por
+ *      separado y el bloque se aplica completo o no se aplica (transacción).
+ *      Lo que una fila NO indica no se modifica en un color existente (base,
+ *      familia y código vacíos conservan su valor); en uno nuevo, sin base y con
+ *      la familia derivada (C4). Un código ya usado por otro color rechaza la fila.
  *
  * ── Reglas de productos ─────────────────────────────────────────────────────
  *  P1  Marca fija (no se edita). La línea, si existe, es de la misma marca.

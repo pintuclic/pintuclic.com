@@ -191,6 +191,11 @@ export class AcabadosRepository implements AcabadosRepositoryPort {
     return { ...impactoVacio(), colores, productos };
   }
 
+  async buscarPorNombre(nombre: string): Promise<Acabado | null> {
+    const f = await prisma.acabado.findFirst({ where: { nombre: igualSinMayusculas(nombre) } });
+    return f === null ? null : this.aDto(f);
+  }
+
   async existeDuplicado(clave: { nombre: string }, excluirId?: number): Promise<boolean> {
     const f = await prisma.acabado.findFirst({
       where: {
@@ -249,6 +254,11 @@ export class BasesRepository implements BasesRepositoryPort {
       prisma.producto.count({ where: { estado: 'activo', bases: { some: { idBase: id } } } }),
     ]);
     return { ...impactoVacio(), colores, productos };
+  }
+
+  async buscarPorNombre(nombre: string): Promise<Base | null> {
+    const f = await prisma.base.findFirst({ where: { nombre: igualSinMayusculas(nombre) } });
+    return f === null ? null : this.aDto(f);
   }
 
   async existeDuplicado(clave: { nombre: string }, excluirId?: number): Promise<boolean> {
@@ -326,6 +336,11 @@ export class FamiliasColorRepository implements FamiliasColorRepositoryPort {
   async contarImpacto(id: number): Promise<ImpactoDesactivacion> {
     const colores = await prisma.color.count({ where: { idFamiliaColor: id, estado: 'activo' } });
     return { ...impactoVacio(), colores };
+  }
+
+  async buscarPorNombre(nombre: string): Promise<FamiliaColor | null> {
+    const f = await prisma.familiaColor.findFirst({ where: { nombre: igualSinMayusculas(nombre) } });
+    return f === null ? null : this.aDto(f);
   }
 
   async existeDuplicado(clave: { nombre: string }, excluirId?: number): Promise<boolean> {

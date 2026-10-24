@@ -9,6 +9,7 @@ import {
   type ControladorRecurso,
 } from './controllers/catalogos.controller';
 import { ClasificacionController } from './controllers/clasificacion.controller';
+import { ColoresController } from './controllers/colores.controller';
 import {
   crearAcabadoRequestSchema,
   crearBaseRequestSchema,
@@ -31,6 +32,7 @@ import {
   TiposResinaRepository,
 } from './repositories/catalogos-simples.repository';
 import { CategoriasRepository, SubcategoriasRepository } from './repositories/clasificacion.repository';
+import { ColoresRepository } from './repositories/colores.repository';
 import {
   LineasRepository,
   MarcasRepository,
@@ -38,6 +40,7 @@ import {
 } from './repositories/marcas-lineas-medidas.repository';
 import { AcabadosService, CatalogoSimpleService, TiposMedidaService } from './services/catalogo-simple.service';
 import { ClasificacionService } from './services/clasificacion.service';
+import { ColoresService } from './services/colores.service';
 import { LineasService } from './services/lineas.service';
 import { MarcasService } from './services/marcas.service';
 import { MedidasService } from './services/medidas.service';
@@ -60,6 +63,7 @@ export interface ModuloM01 {
   marcasService: MarcasService;
   lineasService: LineasService;
   medidasService: MedidasService;
+  coloresService: ColoresService;
 }
 
 /**
@@ -90,18 +94,23 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const lineasRepo = new LineasRepository();
   const medidasRepo = new MedidasRepository();
   const tiposMedidaRepo = new TiposMedidaRepository();
+  const basesRepo = new BasesRepository();
+  const acabadosRepo = new AcabadosRepository();
+  const familiasRepo = new FamiliasColorRepository();
 
   // Servicios
   const clasificacionService = new ClasificacionService(categoriasRepo, subcategoriasRepo);
   const marcasService = new MarcasService(marcasRepo);
   const lineasService = new LineasService(lineasRepo, marcasRepo);
   const medidasService = new MedidasService(medidasRepo, tiposMedidaRepo);
+  const coloresService = new ColoresService(new ColoresRepository(), marcasRepo, basesRepo, acabadosRepo, familiasRepo);
 
   // Controladores
   const clasificacion = new ClasificacionController(clasificacionService);
   const marcas = new MarcasController(marcasService);
   const lineas = new LineasController(lineasService);
   const medidas = new MedidasController(medidasService);
+  const colores = new ColoresController(coloresService);
   const superficies = controladorSimple({
     servicio: new CatalogoSimpleService(new SuperficiesRepository(), 'una superficie'),
     esquemaCrear: crearSuperficieRequestSchema,
@@ -119,7 +128,7 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
     mensajeCreado: 'Tipo de resina creado',
   });
   const acabados = controladorSimple({
-    servicio: new AcabadosService(new AcabadosRepository()),
+    servicio: new AcabadosService(acabadosRepo),
     esquemaCrear: crearAcabadoRequestSchema,
     esquemaEditar: editarAcabadoRequestSchema,
     parametroId: 'idAcabado',
@@ -127,7 +136,7 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
     mensajeCreado: 'Acabado creado',
   });
   const bases = controladorSimple({
-    servicio: new CatalogoSimpleService(new BasesRepository(), 'una base'),
+    servicio: new CatalogoSimpleService(basesRepo, 'una base'),
     esquemaCrear: crearBaseRequestSchema,
     esquemaEditar: editarBaseRequestSchema,
     parametroId: 'idBase',
@@ -135,7 +144,7 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
     mensajeCreado: 'Base creada',
   });
   const familiasColor = controladorSimple({
-    servicio: new CatalogoSimpleService(new FamiliasColorRepository(), 'una familia de color'),
+    servicio: new CatalogoSimpleService(familiasRepo, 'una familia de color'),
     esquemaCrear: crearFamiliaColorRequestSchema,
     esquemaEditar: editarFamiliaColorRequestSchema,
     parametroId: 'idFamiliaColor',
@@ -201,5 +210,15 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   montarRecurso('tipos-medida', 'idTipoMedida', tiposMedida);
   montarRecurso('medidas', 'idMedida', medidas);
 
-  return { adminRouter, clasificacionService, marcasService, lineasService, medidasService };
+  // HU-CAT-05: colores. Las rutas de importación van antes de `/colores/:idColor`.
+  adminRouter.post('/colores/importar/previsualizar', crear, colores.previsualizarImportacion as RequestHandler);
+  adminRouter.post('/colores/importar/aplicar', crear, colores.aplicarImportacion as RequestHandler);
+  adminRouter.get('/colores', ver, colores.listar as RequestHandler);
+  adminRouter.post('/colores', crear, colores.crear as RequestHandler);
+  adminRouter.get('/colores/:idColor', ver, colores.obtener as RequestHandler);
+  adminRouter.put('/colores/:idColor', editar, colores.editar as RequestHandler);
+  adminRouter.patch('/colores/:idColor/estado', cambiarEstado, colores.cambiarEstado as RequestHandler);
+  adminRouter.get('/colores/:idColor/impacto-desactivacion', ver, colores.impacto as RequestHandler);
+
+  return { adminRouter, clasificacionService, marcasService, lineasService, medidasService, coloresService };
 }
