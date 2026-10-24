@@ -20,6 +20,7 @@ const SIN_CONEXION = 'No pudimos conectar con el servidor. Revisa tu conexión e
  */
 const MENSAJES: Readonly<Record<string, string>> = {
   CREDENCIALES_INVALIDAS: 'El correo o la contraseña no son correctos.',
+  CONTRASENA_INCORRECTA: 'La contraseña actual no es correcta.',
   ACCESO_TEMPORALMENTE_RESTRINGIDO:
     'Por seguridad bloqueamos temporalmente el acceso con este correo. Inténtalo de nuevo en unos minutos.',
   RECURSO_NO_DISPONIBLE: 'El recurso solicitado no está disponible.',

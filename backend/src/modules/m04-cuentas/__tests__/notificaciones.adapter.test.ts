@@ -72,6 +72,20 @@ describe('SmtpNotificacionesAdapter · Envío de correos transaccionales por SMT
     );
   });
 
+  it('envía el enlace de activación a /activar-cuenta con la vigencia en horas y el nombre escapado', async () => {
+    const { transporter, sendMailMock } = crearTransporteMock();
+    const adapter = new SmtpNotificacionesAdapter(configBase, transporter);
+
+    await adapter.enviarEnlaceActivacion('empleado@gmail.com', '<b>Laura</b>', 'jwt.token.456', 72);
+
+    const args = sendMailMock.mock.calls[0]?.[0];
+    expect(args.to).toBe('empleado@gmail.com');
+    expect(args.text).toContain('https://pintuclic-dev.adsoproject.dev/activar-cuenta?token=jwt.token.456');
+    expect(args.text).toContain('72 horas');
+    expect(args.html).toContain('&lt;b&gt;Laura&lt;/b&gt;');
+    expect(args.html).not.toContain('<b>Laura</b>');
+  });
+
   it('envía el código OTP de cambio de correo y el aviso de seguridad al correo anterior', async () => {
     const { transporter, sendMailMock } = crearTransporteMock();
     const adapter = new SmtpNotificacionesAdapter(configBase, transporter);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cambioContrasenaPrimerAccesoFormSchema,
   dictamenRegistroEmpresaFormSchema,
   dictamenSolicitudEmpresaFormSchema,
 } from '../dtos/m04-cuentas.dto';
@@ -57,5 +58,19 @@ describe('M04 Frontend — DTO de dictamen (RN-CUE-17)', () => {
     it('no exige motivo al aprobar', () => {
       expect(dictamenRegistroEmpresaFormSchema.safeParse({ decision: 'aprobar' }).success).toBe(true);
     });
+  });
+});
+
+describe('M04 Frontend — formulario de primer acceso (HU-CUE-04)', () => {
+  const datos = { contrasenaActual: 'Pintu#a1b2c3d4e5f6!', nuevaContrasena: 'ClaveDefinitiva2026!', confirmarNuevaContrasena: 'ClaveDefinitiva2026!' };
+
+  it('acepta una clave nueva distinta de la temporal', () => {
+    expect(cambioContrasenaPrimerAccesoFormSchema.safeParse(datos).success).toBe(true);
+  });
+
+  it('rechaza reutilizar la clave temporal como definitiva', () => {
+    const r = cambioContrasenaPrimerAccesoFormSchema.safeParse({ ...datos, nuevaContrasena: datos.contrasenaActual, confirmarNuevaContrasena: datos.contrasenaActual });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues.map((i) => i.path.join('.'))).toContain('nuevaContrasena');
   });
 });

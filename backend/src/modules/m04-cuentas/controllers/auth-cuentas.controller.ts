@@ -14,7 +14,6 @@ import {
 import { AuthCuentasError, type AuthCuentasService } from '../services/auth-cuentas.service';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 
-const VIGENCIA_COOKIE_SEGUNDOS = 60 * 60; // 1 hora deslizante
 
 export class AuthCuentasController {
   constructor(
@@ -22,9 +21,14 @@ export class AuthCuentasController {
     private readonly sesionService: SesionService,
   ) {}
 
-  private fijarCookie(res: Response, idSesion: string): void {
-    const token = emitirToken(idSesion, VIGENCIA_COOKIE_SEGUNDOS);
-    res.cookie(ATRIBUTOS_COOKIE_SESION.nombre, token, opcionesCookieSesion(VIGENCIA_COOKIE_SEGUNDOS));
+  /** RF-SEG-02-02: la cookie vive lo mismo que la ventana de inactividad de la sesión creada. */
+  private fijarCookie(res: Response, sesion: { idSesion: string; fechaExpiracion: Date }): void {
+    const vigenciaSegundos = Math.max(
+      1,
+      Math.floor((sesion.fechaExpiracion.getTime() - Date.now()) / 1000),
+    );
+    const token = emitirToken(sesion.idSesion, vigenciaSegundos);
+    res.cookie(ATRIBUTOS_COOKIE_SESION.nombre, token, opcionesCookieSesion(vigenciaSegundos));
   }
 
   private limpiarCookie(res: Response): void {
@@ -90,21 +94,12 @@ export class AuthCuentasController {
       return;
     }
 
-    const idVerificacion = (req.body as { idVerificacion?: string }).idVerificacion;
-    if (!idVerificacion || typeof idVerificacion !== 'string') {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 'DATOS_INVALIDOS',
-          message: 'El identificador de verificación es requerido.',
-        },
-      });
-      return;
-    }
-
     try {
-      const resultado = await this.authService.verificarCodigoRegistro(idVerificacion, parse.data.codigo);
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      const resultado = await this.authService.verificarCodigoRegistro(
+        parse.data.idVerificacion,
+        parse.data.codigo,
+      );
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
@@ -142,26 +137,14 @@ export class AuthCuentasController {
         success: false,
         error: {
           code: 'DATOS_INVALIDOS',
-          message: parse.error.issues[0]?.message ?? 'Correo no válido',
-        },
-      });
-      return;
-    }
-
-    const idVerificacion = (req.body as { idVerificacion?: string }).idVerificacion;
-    if (!idVerificacion || typeof idVerificacion !== 'string') {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 'DATOS_INVALIDOS',
-          message: 'El identificador de verificación es requerido.',
+          message: parse.error.issues[0]?.message ?? 'Identificador de verificación inválido',
         },
       });
       return;
     }
 
     try {
-      const resultado = await this.authService.reenviarCodigoRegistro(idVerificacion);
+      const resultado = await this.authService.reenviarCodigoRegistro(parse.data.idVerificacion);
       responderExito(
         res,
         {
@@ -217,7 +200,7 @@ export class AuthCuentasController {
         return;
       }
 
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
@@ -262,27 +245,13 @@ export class AuthCuentasController {
       return;
     }
 
-    const tokenCambio =
-      (req.headers['x-token-cambio'] as string | undefined) ??
-      (req.body as { tokenCambio?: string }).tokenCambio;
-
-    if (!tokenCambio) {
-      res.status(401).json({
-        success: false,
-        error: {
-          code: 'TOKEN_INVALIDO',
-          message: 'Token de primer acceso requerido para cambiar la contraseña.',
-        },
-      });
-      return;
-    }
-
     try {
       const resultado = await this.authService.cambiarContrasenaPrimerAcceso(
-        tokenCambio,
+        parse.data.tokenCambio,
+        parse.data.contrasenaActual,
         parse.data.nuevaContrasena,
       );
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
@@ -342,7 +311,7 @@ export class AuthCuentasController {
         return;
       }
 
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
@@ -388,7 +357,7 @@ export class AuthCuentasController {
 
     try {
       const resultado = await this.authService.completarRegistroGoogle(parse.data);
-      this.fijarCookie(res, resultado.sesion.idSesion);
+      this.fijarCookie(res, resultado.sesion);
 
       responderExito(
         res,
