@@ -6,6 +6,7 @@ import {
 import type { ConsultaPublicaService } from '../services/consulta-publica.service';
 import { leerId, manejar, responderParametroInvalido, validar } from './catalogo-http';
 import { responderPagina } from './catalogos.controller';
+import { enviarImagen } from './imagenes.controller';
 import { responderColores } from './productos.controller';
 
 /** Consulta pública del catálogo: sin sesión, solo lectura. */
@@ -44,6 +45,24 @@ export class ConsultaPublicaController {
     const query = validar(res, listarColoresProductoRequestSchema, req.query);
     if (query === null) return;
     responderColores(res, await this.servicio.colores(id, query), query.pagina, query.limite);
+  });
+
+  imagen = manejar(async (req, res) => {
+    const id = leerId(req, 'idImagen');
+    if (id === null) {
+      responderParametroInvalido(res, 'El identificador de la imagen no es válido.');
+      return;
+    }
+    enviarImagen(res, await this.servicio.imagen(id), true);
+  });
+
+  imagenMedida = manejar(async (req, res) => {
+    const id = leerId(req, 'idMedida');
+    if (id === null) {
+      responderParametroInvalido(res, 'El identificador de la medida no es válido.');
+      return;
+    }
+    enviarImagen(res, await this.servicio.imagenMedida(id), true);
   });
 
   logotipo = manejar(async (req, res) => {

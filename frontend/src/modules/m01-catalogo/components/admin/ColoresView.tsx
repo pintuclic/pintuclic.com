@@ -162,6 +162,89 @@ const ModalColor: React.FC<ModalColorProps> = ({ color, referencias, idMarcaInic
   );
 };
 
+const Dato: React.FC<{ etiqueta: string; children: React.ReactNode }> = ({ etiqueta, children }) => (
+  <div className="rounded-input bg-neutral-lightest px-3 py-2">
+    <dt className="font-sans text-xs text-neutral-medium">{etiqueta}</dt>
+    <dd className="font-title text-sm font-medium text-neutral-black">{children}</dd>
+  </div>
+);
+
+/** Ficha de un color: todo lo que no cabe en la tarjeta, con sus acciones. */
+const DetalleColorModal: React.FC<{
+  color: Color;
+  onClose: () => void;
+  onEditar: () => void;
+  onDesactivar: () => void;
+  onReactivar: () => void;
+}> = ({ color, onClose, onEditar, onDesactivar, onReactivar }) => (
+  <Modal
+    isOpen
+    onClose={onClose}
+    title={color.nombre}
+    subtitle={color.codigo === null ? 'Sin código' : `Código ${color.codigo}`}
+    size="md"
+  >
+    <div className="space-y-4 py-2">
+      <span
+        role="img"
+        aria-label={`Muestra de ${color.nombre}`}
+        className="block h-28 w-full rounded-card border border-neutral-light"
+        style={{ backgroundColor: color.hexadecimal }}
+      />
+      <dl className="grid grid-cols-2 gap-2">
+        <Dato etiqueta="Hexadecimal">{color.hexadecimal}</Dato>
+        <Dato etiqueta="Estado">
+          <EstadoBadge estado={color.estado} />
+        </Dato>
+        <Dato etiqueta="Marca">{color.marca}</Dato>
+        <Dato etiqueta="Acabado">{color.acabado}</Dato>
+        <Dato etiqueta="Base">{color.base ?? 'Sin base'}</Dato>
+        <Dato etiqueta="Familia">{color.familia ?? 'Sin familia'}</Dato>
+        {color.cielab !== null && (
+          <Dato etiqueta="CIELAB">
+            L {color.cielab.l} · a {color.cielab.a} · b {color.cielab.b}
+          </Dato>
+        )}
+      </dl>
+      {color.base === null && (
+        <p className="font-sans text-xs text-neutral-medium">
+          Sin base, este color solo se ofrece como color de fábrica de un producto. Asígnele una base para que salga en
+          los productos entonables.
+        </p>
+      )}
+      <div className="flex flex-wrap justify-end gap-2 border-t border-neutral-light pt-4">
+        <Button variant="outline" onClick={onClose}>
+          Cerrar
+        </Button>
+        {color.estado === 'activo' ? (
+          <Button
+            variant="outline"
+            leftIcon={<Power className="h-4 w-4 text-danger" aria-hidden="true" />}
+            onClick={onDesactivar}
+          >
+            Desactivar
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            leftIcon={<RotateCcw className="h-4 w-4 text-conversion" aria-hidden="true" />}
+            onClick={onReactivar}
+          >
+            Reactivar
+          </Button>
+        )}
+        <Button
+          variant="primary-action"
+          leftIcon={<Pencil className="h-4 w-4" aria-hidden="true" />}
+          onClick={onEditar}
+        >
+          Editar
+        </Button>
+      </div>
+    </div>
+  </Modal>
+);
+
 /** HU-CAT-05: colores de cada marca, con importación por bloques. */
 export const ColoresView: React.FC = () => {
   const { referencias, error: errorRef } = useReferencias();
@@ -188,6 +271,7 @@ export const ColoresView: React.FC = () => {
   const lista = useCargar(cargador, 'No se pudieron cargar los colores.');
   const [modal, setModal] = useState<{ color: Color | null } | null>(null);
   const [importando, setImportando] = useState(false);
+  const [detalle, setDetalle] = useState<Color | null>(null);
   const [aDesactivar, setADesactivar] = useState<Color | null>(null);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const cerrarAviso = useCallback(() => setAviso(null), []);
@@ -285,104 +369,71 @@ export const ColoresView: React.FC = () => {
         <MensajeVacio>No hay colores con esos filtros.</MensajeVacio>
       )}
       {lista.datos !== null && lista.datos.items.length > 0 && (
-        <div className="overflow-x-auto rounded-card border border-neutral-light bg-neutral-white">
-          <table className="w-full min-w-[720px] text-left font-sans text-sm">
-            <caption className="sr-only">Colores</caption>
-            <thead className="bg-neutral-lightest text-xs uppercase tracking-wide text-neutral-medium">
-              <tr>
-                <th scope="col" className="px-4 py-3">
-                  Color
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  Marca
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  Base
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  Acabado
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  Familia
-                </th>
-                <th scope="col" className="px-4 py-3">
-                  Estado
-                </th>
-                <th scope="col" className="px-4 py-3 text-right">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-light">
-              {lista.datos.items.map((c) => (
-                <tr key={c.idColor}>
-                  <td className="px-4 py-3">
-                    <span className="flex items-center gap-2">
-                      <Muestra hexadecimal={c.hexadecimal} etiqueta={`Muestra de ${c.nombre}`} />
-                      <span>
-                        <span className="block text-neutral-black">{c.nombre}</span>
-                        <span className="block text-xs text-neutral-medium">
-                          {c.hexadecimal}
-                          {c.codigo !== null && ` · ${c.codigo}`}
-                        </span>
-                      </span>
+        <ul
+          aria-label="Colores"
+          className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] overflow-hidden rounded-card border-l border-t border-neutral-light bg-neutral-white"
+        >
+          {lista.datos.items.map((c) => (
+            <li key={c.idColor} className="min-w-0">
+              <button
+                type="button"
+                onClick={() => setDetalle(c)}
+                aria-label={`Ver ${c.nombre}${c.codigo === null ? '' : `, código ${c.codigo}`}${c.estado === 'inactivo' ? ', inactivo' : ''}`}
+                className="group block w-full border-b border-r border-neutral-light text-left focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action"
+              >
+                <span
+                  className={`relative block h-20 ${c.estado === 'inactivo' ? 'opacity-40' : ''}`}
+                  style={{ backgroundColor: c.hexadecimal }}
+                >
+                  {c.idBase === null && (
+                    <span className="absolute right-1 top-1 rounded-full bg-neutral-white px-1.5 py-0.5 font-sans text-[10px] font-medium text-neutral-dark">
+                      Sin base
                     </span>
-                  </td>
-                  <td className="px-4 py-3">{c.marca}</td>
-                  <td className="px-4 py-3">{c.base ?? <span className="text-neutral-medium">Sin base</span>}</td>
-                  <td className="px-4 py-3">{c.acabado}</td>
-                  <td className="px-4 py-3">{c.familia ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <EstadoBadge estado={c.estado} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Editar ${c.nombre}`}
-                        onClick={() => setModal({ color: c })}
-                      >
-                        <Pencil className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                      {c.estado === 'activo' ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Desactivar ${c.nombre}`}
-                          onClick={() => setADesactivar(c)}
-                        >
-                          <Power className="h-4 w-4 text-danger" aria-hidden="true" />
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Reactivar ${c.nombre}`}
-                          onClick={() =>
-                            void reactivar(
-                              () => coloresApi.cambiarEstado(c.idColor, { estado: 'activo', confirmar: false }),
-                              () => {
-                                exito(`Se reactivó ${c.nombre}.`);
-                                lista.recargar();
-                              },
-                              (texto) => setAviso({ tipo: 'error', texto }),
-                            )
-                          }
-                        >
-                          <RotateCcw className="h-4 w-4 text-conversion" aria-hidden="true" />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  )}
+                </span>
+                <span className="block px-2 py-1.5">
+                  <span className="block truncate font-title text-xs font-semibold text-neutral-black group-hover:text-action">
+                    {c.nombre}
+                  </span>
+                  <span className="block truncate font-sans text-[11px] text-neutral-medium">
+                    {c.codigo ?? 'Sin código'}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
       {lista.datos !== null && <Paginador paginacion={lista.datos.paginacion} onCambiar={setPagina} />}
 
+      {detalle !== null && (
+        <DetalleColorModal
+          color={detalle}
+          onClose={() => setDetalle(null)}
+          onEditar={() => {
+            setModal({ color: detalle });
+            setDetalle(null);
+          }}
+          onDesactivar={() => {
+            setADesactivar(detalle);
+            setDetalle(null);
+          }}
+          onReactivar={() =>
+            void reactivar(
+              () => coloresApi.cambiarEstado(detalle.idColor, { estado: 'activo', confirmar: false }),
+              () => {
+                exito(`Se reactivó ${detalle.nombre}.`);
+                setDetalle(null);
+                lista.recargar();
+              },
+              (texto) => {
+                setAviso({ tipo: 'error', texto });
+                setDetalle(null);
+              },
+            )
+          }
+        />
+      )}
       {modal !== null && referencias !== null && (
         <ModalColor
           color={modal.color}

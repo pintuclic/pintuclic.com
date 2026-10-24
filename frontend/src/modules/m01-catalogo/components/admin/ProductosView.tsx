@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Eye, EyeOff, ListPlus, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Eye, EyeOff, Images, ListPlus, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import { Alert, Badge, Button, Input, Select } from '@/core/components';
 import type { ClaseColor, ProductoResumen } from '../../dtos/m01-catalogo-productos.dto';
 import { useCargar, useRetardo } from '../../hooks/useCargar';
 import { useReferencias } from '../../hooks/useReferencias';
-import { productosApi } from '../../services/catalogo-api';
+import { lineasApi, productosApi } from '../../services/catalogo-api';
+import { filtrosProductosDesdeUrl } from '../../services/enlaces';
 import { leerErrorCatalogo } from '../../services/mensaje-error';
 import {
   AvisoAccion,
@@ -18,6 +20,8 @@ import {
   reactivar,
   type Aviso,
 } from './comunes';
+import { SelectorBuscable } from './campos';
+import { ImagenesModal } from './ImagenesModal';
 import { ProductoFormModal } from './ProductoFormModal';
 import { VariantesModal } from './VariantesModal';
 
@@ -30,8 +34,12 @@ const CLASES: Record<ClaseColor, string> = {
 /** HU-CAT-02, HU-CAT-03, HU-CAT-09: listado de productos con publicación, variantes y estado. */
 export const ProductosView: React.FC = () => {
   const { referencias, error: errorRef } = useReferencias();
-  const [idMarca, setIdMarca] = useState('');
-  const [idSubcategoria, setIdSubcategoria] = useState('');
+  const parametros = useSearchParams();
+  // Otras pantallas abren esta lista ya filtrada ("Ver productos").
+  const desdeUrl = filtrosProductosDesdeUrl(new URLSearchParams(parametros.toString()));
+  const [idMarca, setIdMarca] = useState(desdeUrl.marca);
+  const [idLinea, setIdLinea] = useState(desdeUrl.linea);
+  const [idSubcategoria, setIdSubcategoria] = useState(desdeUrl.subcategoria);
   const [clase, setClase] = useState('');
   const [estado, setEstado] = useState('activo');
   const [publicado, setPublicado] = useState('');
@@ -42,6 +50,7 @@ export const ProductosView: React.FC = () => {
     () =>
       productosApi.listar({
         idMarca: idMarca === '' ? undefined : Number(idMarca),
+        idLinea: idLinea === '' ? undefined : Number(idLinea),
         idSubcategoria: idSubcategoria === '' ? undefined : Number(idSubcategoria),
         claseColor: clase,
         estado,
@@ -50,10 +59,16 @@ export const ProductosView: React.FC = () => {
         pagina,
         limite: 15,
       }),
-    [idMarca, idSubcategoria, clase, estado, publicado, termino, pagina],
+    [idMarca, idLinea, idSubcategoria, clase, estado, publicado, termino, pagina],
   );
   const lista = useCargar(cargador, 'No se pudieron cargar los productos.');
+  const cargarLineas = useCallback(
+    () => (idMarca === '' ? Promise.resolve(null) : lineasApi.listar({ idMarca: Number(idMarca), limite: 100 })),
+    [idMarca],
+  );
+  const lineasFiltro = useCargar(cargarLineas, 'No se pudieron cargar las líneas.');
   const [formulario, setFormulario] = useState<{ idProducto: number | null } | null>(null);
+  const [imagenes, setImagenes] = useState<{ idProducto: number; seguir: boolean } | null>(null);
   const [variantes, setVariantes] = useState<number | null>(null);
   const [aDesactivar, setADesactivar] = useState<ProductoResumen | null>(null);
   const [aviso, setAviso] = useState<Aviso | null>(null);
@@ -109,11 +124,23 @@ export const ProductosView: React.FC = () => {
         <Select
           label="Marca"
           value={idMarca}
-          onChange={(e) => filtro(setIdMarca)(e.target.value)}
+          onChange={(e) => {
+            filtro(setIdMarca)(e.target.value);
+            setIdLinea('');
+          }}
           options={[
             { value: '', label: 'Todas' },
             ...(referencias?.marcas ?? []).map((m) => ({ value: String(m.idMarca), label: m.nombre })),
           ]}
+        />
+        <SelectorBuscable
+          label="Línea"
+          value={idLinea}
+          onChange={filtro(setIdLinea)}
+          options={(lineasFiltro.datos?.items ?? []).map((l) => ({ value: String(l.idLinea), label: l.nombre }))}
+          placeholder={idMarca === '' ? 'Elija primero la marca' : 'Todas'}
+          disabled={idMarca === ''}
+          textoSinElegir="Todas"
         />
         <Select
           label="Subcategoría"
@@ -211,6 +238,14 @@ export const ProductosView: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
+                        aria-label={`Imágenes de ${p.nombre}`}
+                        onClick={() => setImagenes({ idProducto: p.idProducto, seguir: false })}
+                      >
+                        <Images className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         aria-label={`Variantes de ${p.nombre}`}
                         onClick={() => setVariantes(p.idProducto)}
                       >
@@ -283,8 +318,24 @@ export const ProductosView: React.FC = () => {
           onGuardado={(texto, idNuevo) => {
             exito(texto);
             lista.recargar();
-            if (formulario.idProducto === null) setVariantes(idNuevo);
+            if (formulario.idProducto === null) setImagenes({ idProducto: idNuevo, seguir: true });
           }}
+        />
+      )}
+      {imagenes !== null && (
+        <ImagenesModal
+          idProducto={imagenes.idProducto}
+          onClose={() => setImagenes(null)}
+          onCambio={lista.recargar}
+          {...(imagenes.seguir
+            ? {
+                textoSiguiente: 'Siguiente: variantes',
+                onSiguiente: () => {
+                  setVariantes(imagenes.idProducto);
+                  setImagenes(null);
+                },
+              }
+            : {})}
         />
       )}
       {variantes !== null && referencias !== null && (

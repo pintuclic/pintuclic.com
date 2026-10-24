@@ -12,13 +12,16 @@ import {
   respuestaUno,
   paginacionSchema,
   impactoDesactivacionSchema,
+  LOGOTIPO_MAXIMO_BASE64,
+  tipoMimeLogotipoSchema,
+  medidaSchema,
 } from './m01-catalogo.contract';
 
 /**
  * ============================================================================
  * CONTRATO DE API REST — M01. Catálogo · ENTREGA 2: COLORES, PRODUCTOS Y VARIANTES
  * ============================================================================
- * Scope: m01-catalogo · Ola 2 · Base de datos: esquema 4.3 (PR #14)
+ * Scope: m01-catalogo · Ola 2 · Base de datos: esquema 4.5
  * Depende de la entrega 1 (m01-catalogo.contract.ts). Esta entrega es la que
  * desbloquea M13, M02, M05, M06, M03 y M14.
  *
@@ -27,7 +30,8 @@ import {
  * docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md
  *
  * ── Qué incluye ─────────────────────────────────────────────────────────────
- *  Colores con importación por bloques (HU-CAT-05) · productos con ficha de
+ *  Colores con importación por bloques (HU-CAT-05) · imágenes de productos y de
+ *  medidas (HU-CAT-07) · productos con ficha de
  *  recubrimiento, superficies, acabados, bases y colores de fábrica (HU-CAT-02,
  *  HU-CAT-10, HU-CAT-12) · variantes = producto + medida con precio (HU-CAT-03)
  *  · colores que ofrece cada producto · consulta pública (HU-CAT-06) · estado y
@@ -73,8 +77,8 @@ import {
  *      una de sus bases Y cuyo acabado es uno de sus acabados, MÁS sus colores de
  *      fábrica. Una base inactiva retira sus colores (RF-CAT-12-06).
  *  P6  Los colores de fábrica deben ser de la marca del producto.
- *  P7  Publicar exige producto activo y al menos una variante activa. La imagen
- *      se exigirá en la entrega 3 (RF-CAT-02-05).
+ *  P7  Publicar exige producto activo, al menos una variante activa y al menos una
+ *      imagen (RF-CAT-02-05).
  *  P8  Desactivar la última variante activa de un producto publicado exige
  *      `confirmar: true` y lo despublica (el producto no se desactiva).
  *  P9  Desactivar un producto lo saca del público y no afecta órdenes (RF-CAT-09-02).
@@ -95,6 +99,19 @@ import {
  *      otra medida se crea otra variante.
  *  V6  Estados usados: activo e inactivo (D12).
  *
+ * ── Reglas de imágenes ──────────────────────────────────────────────────────
+ *  I1  Un producto tiene hasta 12 imágenes (jpeg, png o webp, máximo 5 MB cada una,
+ *      validadas por su firma de archivo, no por lo que declare el cliente).
+ *  I2  La primera imagen que se sube es la principal. Hay una sola principal; si se
+ *      elimina, la siguiente en el orden pasa a serlo.
+ *  I3  El orden es el de la galería. Reordenar exige enviar todas las imágenes del
+ *      producto, sin repetir ni agregar otras.
+ *  I4  Una medida puede tener su propia imagen (por ejemplo la silueta del envase),
+ *      con las mismas reglas de tipo y tamaño. Se pide aparte y se puede quitar.
+ *  I5  Eliminar una imagen es físico (no hay estado): el archivo deja de existir. No se
+ *      puede eliminar la única imagen de un producto publicado (409 NO_PUBLICABLE):
+ *      primero se despublica.
+ *
  * ── Reglas de consulta pública ──────────────────────────────────────────────
  *  U1  Sin autenticación. Solo productos activos y publicados cuya marca, línea
  *      (si tiene), subcategoría y categoría estén activas. Una ficha no disponible responde
@@ -113,13 +130,14 @@ import {
  *  Igual que la entrega 1 (D1): GET → catalogo.ver · POST → catalogo.crear ·
  *  PUT → catalogo.editar · PATCH estado: activar → catalogo.editar, desactivar →
  *  catalogo.eliminar. Publicar → catalogo.editar. Importar colores → catalogo.crear.
+ *  Subir, ordenar, marcar principal y eliminar imágenes (de producto y de medida) → catalogo.editar.
  *
  * ── Decisiones por defecto (el Tech Lead puede vetarlas) ────────────────────
  *  D7  Con ficha de recubrimiento la línea es obligatoria; sin ficha es opcional.
  *  D8  La familia de color se deriva del hexadecimal cuando no se envía (matiz y
  *      luminosidad); el algoritmo es del servicio. Quien administra puede corregirla.
- *  D9  Sin imágenes en esta entrega: publicar no las exige y las tarjetas llevan
- *      `imagenPrincipalUrl: null` hasta la entrega 3.
+ *  D9  Publicar exige al menos una imagen (RF-CAT-02-05); los productos ya publicados
+ *      sin imagen siguen visibles hasta que se despublican.
  *  D10 La existencia se edita aquí mientras M13 no exista; después, solo por M13.
  *  D11 Las relaciones del producto se reemplazan completas al editarlas.
  *  D12 Los estados `agotado` y `descontinuado` del enum de la BD no se usan.
@@ -318,8 +336,13 @@ export const fichaRecubrimientoRequestSchema = z
     tipoCalidad: tipoCalidadSchema.nullable().optional(),
     rendimientoMin: z.number().positive().max(99_999).nullable().optional(),
     rendimientoMax: z.number().positive().max(99_999).nullable().optional(),
+    /** Manos con las que se logra el rendimiento ("35 m² por galón a 2 manos"). Exige rendimiento. */
+    manos: z.number().int().min(1).max(10).nullable().optional(),
   })
-  .refine(rendimientoCompleto, MENSAJE_RENDIMIENTO);
+  .refine(rendimientoCompleto, MENSAJE_RENDIMIENTO)
+  .refine((v) => (v.manos ?? null) === null || ((v.rendimientoMin ?? null) !== null && (v.rendimientoMax ?? null) !== null), {
+    message: 'Las manos se indican junto con el rendimiento',
+  });
 export type FichaRecubrimientoRequest = z.infer<typeof fichaRecubrimientoRequestSchema>;
 
 export const caracteristicaRequestSchema = z.object({
@@ -433,6 +456,7 @@ export const fichaRecubrimientoSchema = z.object({
   /** m² por galón (RF-CAT-10-02). */
   rendimientoMin: z.number().nullable(),
   rendimientoMax: z.number().nullable(),
+  manos: z.number().int().nullable(),
 });
 export type FichaRecubrimiento = z.infer<typeof fichaRecubrimientoSchema>;
 
@@ -479,6 +503,41 @@ export const productoResumenSchema = z.object({
 });
 export type ProductoResumen = z.infer<typeof productoResumenSchema>;
 
+export const MAXIMO_IMAGENES_PRODUCTO = 12;
+
+/** POST /productos/:idProducto/imagenes y PUT /medidas/:idMedida/imagen (I1, I4) */
+export const subirImagenRequestSchema = z.object({
+  imagenBase64: z.string().min(1, 'Elija una imagen').max(LOGOTIPO_MAXIMO_BASE64, 'La imagen no puede superar 5 MB'),
+  imagenMimeType: tipoMimeLogotipoSchema,
+});
+export type SubirImagenRequest = z.infer<typeof subirImagenRequestSchema>;
+
+/** Los bytes se piden aparte: GET /imagenes/:idImagen. */
+export const imagenProductoSchema = z.object({
+  idImagen: idSchema,
+  orden: z.number().int().nonnegative(),
+  esPrincipal: z.boolean(),
+  mimeType: tipoMimeLogotipoSchema,
+});
+export type ImagenProducto = z.infer<typeof imagenProductoSchema>;
+
+/** PATCH /productos/:idProducto/imagenes/orden (I3) */
+export const ordenarImagenesRequestSchema = z.object({
+  idsOrdenados: z
+    .array(idSchema)
+    .min(1)
+    .max(MAXIMO_IMAGENES_PRODUCTO)
+    .refine((ids) => new Set(ids).size === ids.length, { message: 'Hay ids repetidos' }),
+});
+export type OrdenarImagenesRequest = z.infer<typeof ordenarImagenesRequestSchema>;
+
+export const imagenResponseEnvelopeSchema = respuestaUno(imagenProductoSchema);
+export type ImagenResponseEnvelope = z.infer<typeof imagenResponseEnvelopeSchema>;
+export const imagenesResponseEnvelopeSchema = respuestaLista(imagenProductoSchema);
+export type ImagenesResponseEnvelope = z.infer<typeof imagenesResponseEnvelopeSchema>;
+export const medidaImagenResponseEnvelopeSchema = respuestaUno(medidaSchema);
+export type MedidaImagenResponseEnvelope = z.infer<typeof medidaImagenResponseEnvelopeSchema>;
+
 export const productoDetalleSchema = productoResumenSchema.extend({
   descripcion: z.string().nullable(),
   idCategoriaComplementaria: idSchema.nullable(),
@@ -488,6 +547,7 @@ export const productoDetalleSchema = productoResumenSchema.extend({
   bases: z.array(referenciaSchema),
   coloresFabrica: z.array(referenciaSchema),
   caracteristicas: z.array(caracteristicaSchema),
+  imagenes: z.array(imagenProductoSchema),
   variantes: z.array(varianteSchema),
 });
 export type ProductoDetalle = z.infer<typeof productoDetalleSchema>;
@@ -624,8 +684,8 @@ export const productoPublicoTarjetaSchema = z.object({
   precioDesde: z.number().nonnegative().nullable(),
   tieneColor: z.boolean(),
   disponibilidad: disponibilidadSchema,
-  /** Siempre null hasta la entrega 3 (D9). */
-  imagenPrincipalUrl: z.string().nullable(),
+  /** GET /catalogo/imagenes/:idImagen */
+  idImagenPrincipal: idSchema.nullable(),
 });
 export type ProductoPublicoTarjeta = z.infer<typeof productoPublicoTarjetaSchema>;
 export const listarProductosPublicosResponseEnvelopeSchema = respuestaPaginada(productoPublicoTarjetaSchema);
@@ -648,6 +708,8 @@ export const variantePublicaSchema = z.object({
   precio: z.number().nonnegative(),
   disponibilidad: disponibilidadSchema,
   rendimiento: rendimientoAproximadoSchema.nullable(),
+  /** GET /catalogo/medidas/:idMedida/imagen */
+  tieneImagenMedida: z.boolean(),
 });
 export type VariantePublica = z.infer<typeof variantePublicaSchema>;
 
@@ -664,11 +726,14 @@ export const productoPublicoFichaSchema = z.object({
   claseColor: claseColorSchema,
   tipoResina: z.string().nullable(),
   tipoCalidad: tipoCalidadSchema.nullable(),
+  /** Manos con las que se logra el rendimiento de la ficha. */
+  manos: z.number().int().nullable(),
   superficies: z.array(z.string()),
   acabados: z.array(referenciaSchema),
   caracteristicas: z.array(caracteristicaSchema),
   variantes: z.array(variantePublicaSchema),
-  imagenPrincipalUrl: z.string().nullable(),
+  /** Galería en orden; la primera es la principal. GET /catalogo/imagenes/:idImagen */
+  imagenes: z.array(z.object({ idImagen: idSchema })),
 });
 export type ProductoPublicoFicha = z.infer<typeof productoPublicoFichaSchema>;
 export const productoPublicoResponseEnvelopeSchema = respuestaUno(productoPublicoFichaSchema);
@@ -681,7 +746,7 @@ export type ProductoPublicoResponseEnvelope = z.infer<typeof productoPublicoResp
 /**
  * Mismo envelope global que la entrega 1. Estados HTTP: 400 PARAMETRO_INVALIDO · 404 RECURSO_NO_DISPONIBLE
  * (también toda denegación y toda ficha pública no disponible) · 409 DUPLICADO, RELACION_INVALIDA,
- * PADRE_INACTIVO, CONFIRMACION_REQUERIDA, NO_PUBLICABLE.
+ * PADRE_INACTIVO, CONFIRMACION_REQUERIDA, NO_PUBLICABLE, LIMITE_IMAGENES · 400 IMAGEN_INVALIDA.
  */
 export const CODIGOS_ERROR_PRODUCTOS = [
   'PARAMETRO_INVALIDO',
@@ -691,6 +756,8 @@ export const CODIGOS_ERROR_PRODUCTOS = [
   'PADRE_INACTIVO',
   'CONFIRMACION_REQUERIDA',
   'NO_PUBLICABLE',
+  'IMAGEN_INVALIDA',
+  'LIMITE_IMAGENES',
 ] as const;
 
 export const errorProductosEnvelopeSchema = z.object({
@@ -721,6 +788,12 @@ export type ErrorProductosEnvelope = z.infer<typeof errorProductosEnvelopeSchema
  *  GET /productos/:idProducto/impacto-desactivacion
  *  GET /productos/:idProducto/colores                      (P5, paginado)
  *
+ *  Imágenes (POST y PUT/DELETE de medidas con límite JSON de 7 MB)
+ *  GET /productos/:idProducto/imagenes · POST /productos/:idProducto/imagenes
+ *  PATCH /productos/:idProducto/imagenes/orden
+ *  GET /imagenes/:idImagen (bytes) · PATCH /imagenes/:idImagen/principal · DELETE /imagenes/:idImagen
+ *  GET /medidas/:idMedida/imagen (bytes) · PUT /medidas/:idMedida/imagen · DELETE /medidas/:idMedida/imagen
+ *
  *  Variantes
  *  POST /productos/:idProducto/variantes
  *  PUT /variantes/:idVariante · PATCH /variantes/:idVariante/estado
@@ -733,4 +806,6 @@ export type ErrorProductosEnvelope = z.infer<typeof errorProductosEnvelopeSchema
  *  GET /productos/:idProducto    ficha con variantes (404 si no está disponible, U1)
  *  GET /productos/:idProducto/colores   carta paginada por familia (U3, U4)
  *  GET /marcas/:idMarca/logotipo bytes del logotipo
+ *  GET /imagenes/:idImagen       bytes de una imagen de producto visible
+ *  GET /medidas/:idMedida/imagen bytes de la imagen de una medida
  * ─────────────────────────────────────────────────────────────────────────── */
