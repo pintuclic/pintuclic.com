@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.7 (v4.6 + M13: historial de ajustes de inventario referencial)
+-- VERSIÓN: 4.8 (v4.7 + M16: páginas institucionales y preguntas frecuentes FAQ)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 62
+-- TOTAL TABLAS: 64
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -143,6 +143,11 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_origen_ajuste_inventario') THEN
         CREATE TYPE enum_origen_ajuste_inventario AS ENUM ('manual', 'carga_masiva', 'samit');
+    END IF;
+
+    -- Estado editorial de una página institucional (M16 - HU-CON-01 / HU-CON-03)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_contenido') THEN
+        CREATE TYPE enum_estado_contenido AS ENUM ('borrador', 'publicado', 'archivado');
     END IF;
 END $$;
 
@@ -1613,6 +1618,58 @@ COMMENT ON COLUMN ajuste_inventario.id_carga IS 'Identificador generado por el c
 COMMENT ON COLUMN ajuste_inventario.origen IS 'manual = ajuste en pantalla; carga_masiva = plantilla CSV; samit = integración futura';
 
 -- ==============================================================================
+-- 9E. MÓDULO DE CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (M16 - HU-CON-01 a HU-CON-04)
+-- ==============================================================================
+
+-- Tabla: pagina_institucional
+-- Páginas estáticas e institucionales administrables (Sobre Nosotros, Términos, Privacidad, Envíos).
+-- Separada de aviso_privacidad (M20 Habeas Data) para respetar fronteras de módulo.
+CREATE TABLE IF NOT EXISTS pagina_institucional (
+    id_pagina SERIAL PRIMARY KEY,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    titulo VARCHAR(160) NOT NULL,
+    resumen VARCHAR(300),
+    cuerpo_markdown TEXT NOT NULL,
+    estado enum_estado_contenido NOT NULL DEFAULT 'borrador',
+    id_autor INT,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_pagina_institucional_autor FOREIGN KEY (id_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_pagina_slug_formato CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+    CONSTRAINT ck_pagina_titulo_no_vacio CHECK (length(trim(titulo)) >= 3),
+    CONSTRAINT ck_pagina_cuerpo_no_vacio CHECK (length(trim(cuerpo_markdown)) >= 10)
+);
+
+COMMENT ON TABLE pagina_institucional IS 'Páginas de contenido institucional y políticas informativas de vitrina (M16 - HU-CON-01, HU-CON-03)';
+COMMENT ON COLUMN pagina_institucional.slug IS 'Identificador URL único en formato kebab-case (ej. sobre-nosotros, terminos-y-condiciones)';
+COMMENT ON COLUMN pagina_institucional.estado IS 'Ciclo de vida editorial: borrador, publicado o archivado. Solo publicado es visible en rutas públicas';
+COMMENT ON COLUMN pagina_institucional.id_autor IS 'Último usuario administrador/empleado que creó o editó la página';
+
+-- Tabla: faq_entrada
+-- Preguntas frecuentes del Centro de Ayuda público (HU-CON-02, HU-CON-04) y puerto hacia M15.
+CREATE TABLE IF NOT EXISTS faq_entrada (
+    id_faq SERIAL PRIMARY KEY,
+    pregunta VARCHAR(240) NOT NULL,
+    respuesta_markdown TEXT NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    id_autor INT,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_faq_entrada_autor FOREIGN KEY (id_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_faq_pregunta_no_vacia CHECK (length(trim(pregunta)) >= 5),
+    CONSTRAINT ck_faq_respuesta_no_vacia CHECK (length(trim(respuesta_markdown)) >= 5),
+    CONSTRAINT ck_faq_orden_no_negativo CHECK (orden >= 0)
+);
+
+COMMENT ON TABLE faq_entrada IS 'Entradas del catálogo de preguntas frecuentes (FAQ) para el Centro de Ayuda y puerto hacia M15 (M16 - HU-CON-02, HU-CON-04)';
+COMMENT ON COLUMN faq_entrada.orden IS 'Posición de visualización ascendente en el Centro de Ayuda público';
+COMMENT ON COLUMN faq_entrada.estado IS 'Visibilidad pública de la entrada: activo o inactivo';
+COMMENT ON COLUMN faq_entrada.id_autor IS 'Último usuario administrador/empleado que creó o modificó la entrada';
+
+-- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
 -- ==============================================================================
 
@@ -1739,6 +1796,12 @@ CREATE INDEX IF NOT EXISTS idx_ajuste_usuario ON ajuste_inventario(id_usuario);
 -- Índices en Analítica de Búsqueda (M02 - HU-BUS-06): filtro por periodo y agrupación por término
 CREATE INDEX IF NOT EXISTS idx_bsr_fecha ON busqueda_sin_resultado(fecha);
 CREATE INDEX IF NOT EXISTS idx_bsr_termino ON busqueda_sin_resultado(termino);
+
+-- Índices en Contenido Institucional y FAQ (M16 - HU-CON-01 a HU-CON-04)
+CREATE INDEX IF NOT EXISTS idx_pagina_institucional_estado ON pagina_institucional(estado);
+CREATE INDEX IF NOT EXISTS idx_pagina_institucional_autor ON pagina_institucional(id_autor);
+CREATE INDEX IF NOT EXISTS idx_faq_entrada_estado_orden ON faq_entrada(estado, orden, id_faq);
+CREATE INDEX IF NOT EXISTS idx_faq_entrada_autor ON faq_entrada(id_autor);
 
 -- ==============================================================================
 -- FIN DEL SCRIPT DDL (53 TABLAS - v4.2)

@@ -1,8 +1,8 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.5 — esquema 4.7 (M13 Inventario referencial: historial de ajustes; incluye las tablas de M18 del esquema 4.6).  
+> **Versión Actual:** 3.6 — esquema 4.8 (M16 Contenido institucional y Centro de Ayuda / FAQ: páginas institucionales y preguntas frecuentes).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
-> **Total de Tablas:** 62  
+> **Total de Tablas:** 64  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script de Mocks / Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Guía Oficial de Mocks y Datos de Prueba:** [`./GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./GUIA_MOCKS_Y_DATOS_PRUEBA.md)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.6** (esquema 4.8) | 2026-10-25 | `pagina_institucional`, `faq_entrada` (2) | Ninguna | M16: páginas institucionales administrables (`sobre-nosotros`, `terminos-y-condiciones`, `politica-de-privacidad`, `politicas-de-envio`) con ciclo editorial (`enum_estado_contenido`) y catálogo de preguntas frecuentes (FAQ) ordenadas para el Centro de Ayuda y puerto hacia M15. Total 64 tablas. | [Ver v3.6](./CHANGELOG_DATABASE.md#v36---2026-10-25) |
 | **v3.5** (esquema 4.7) | 2026-10-25 | `ajuste_inventario` (+ `envio_notificacion`, `rebote_notificacion`, `plantilla_notificacion` de M18, esquema 4.6) | Ninguna | M13: historial inmutable de cada cambio de la existencia referencial de una variante, con motivo, origen, nota, usuario y `id_carga` para agrupar cargas masivas. Dos ENUMs nuevos. Total 62 tablas. | [Ver v3.5](./CHANGELOG_DATABASE.md#v35---2026-10-25) |
 | **v3.4** (esquema 4.5) | 2026-10-24 | Ninguna | Ninguna | `ficha_recubrimiento.manos` (opcional, 1 a 10): manos con las que se logra el rendimiento. `medida.imagen` e `imagen_mime_type` (opcionales, siempre juntas): imagen de la medida para la galería del producto. Total 58 tablas. | [Ver v3.4](./CHANGELOG_DATABASE.md#v34---2026-10-24) |
 | **v3.3** (esquema 4.4) | 2026-10-24 | Ninguna | Ninguna | `tipo_medida.equivalencia_galones` (opcional, mayor que 0): galones que equivale una unidad (litro = 0,264172052). Permite derivar el rendimiento por medida a partir del rendimiento por galón (`RF-CAT-10-03`). Seed: galón, litro y mililitro. Total 58 tablas. | [Ver v3.3](./CHANGELOG_DATABASE.md#v33---2026-10-24) |
