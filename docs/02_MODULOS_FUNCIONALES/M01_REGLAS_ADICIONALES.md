@@ -6,7 +6,9 @@ El detalle técnico de cada entrega está en `contracts/m01-catalogo.contract.ts
 > Cómo se mantiene este archivo: cuando el Tech Lead cuenta una regla del cliente, se anota aquí (sección 3)
 > y, si cambia el comportamiento de la API, también en el contrato.
 
-## 1. Decisiones ya tomadas que están en el DDL (`bd/sql/schema_pintuclic.sql`)
+## 1. Decisiones que traía el DDL anterior (esquema 4.2)
+
+> Historia: así estaba el DDL antes del rediseño. Lo que el esquema 4.3 cambia está en la sección 5.
 
 | Tema | Qué dice el DDL | Diferencia con la spec |
 | :--- | :--- | :--- |
@@ -21,9 +23,9 @@ El detalle técnico de cada entrega está en `contracts/m01-catalogo.contract.ts
 
 | Id | Pendiente | Impacto |
 | :--- | :--- | :--- |
-| `RF-CAT-12-11` | Cuántas bases tiene cada marca y cómo se llaman. | Se cargan después como datos; el sistema no fija la cantidad. |
-| `RF-CAT-12-12` | Qué determina la base que exige un color. | Bloquea la asociación color↔base (entrega con colores). |
-| `RF-CAT-05-20` | De dónde sale el valor cromático CIELAB de los colores. | Bloquea la carga masiva de colores. |
+| `RF-CAT-12-11` | Cuántas bases tiene cada marca y cómo se llaman. | ✅ **Resuelto** (RC-17): Tint, Deep, Pastel y Accent; globales. |
+| `RF-CAT-12-12` | Qué determina la base que exige un color. | ✅ **Resuelto** (RC-07, RC-24): cada color tiene una base opcional. |
+| `RF-CAT-05-20` | De dónde sale el valor cromático CIELAB de los colores. | ✅ **Resuelto** (RC-25): el hexadecimal es obligatorio y el CIELAB opcional. |
 | Permisos | La spec habla de «Gestión del catálogo» y «Gestión de productos»; el seed solo tiene `catalogo.ver/crear/editar/eliminar`. | Se usan los del seed (decisión D1 del contrato). |
 
 ## 3. Reglas del cliente (dadas por el Tech Lead)
@@ -54,44 +56,63 @@ Cada regla con su fecha y quién la dio. Las marcadas ❓ tienen una pregunta ab
 | RC-20 | 2026-10-23 | El **precio es de la variante** (medida), nunca del producto ni del color, por ahora. A futuro podría existir precio por color. | Tech Lead |
 | RC-21 | 2026-10-23 | En el carrito, el producto con color es una **variante temporal** identificada por un SKU compuesto, ej. `P1-V2-Rojo` (producto, variante, color). | Tech Lead |
 | RC-22 | 2026-10-23 | La tabla `tonos` **se elimina**. | Tech Lead |
-| RC-23 | 2026-10-23 ❓ | Para M06: evento **"Miércoles de color"**: descuento semanal en algunas líneas de Pintuco; el descuento "no afecta exclusivamente al blanco". | Tech Lead |
+| RC-23 | 2026-10-24 | Para M06: evento **"Miércoles de color"**: descuento semanal en algunas líneas de Pintuco. **El blanco queda excluido** del descuento. (El blanco se identifica por la familia de color "Blancos".) | Tech Lead |
+| RC-24 | 2026-10-24 | La base de un color es **opcional pero muy esencial**: no la tienen el transparente, los colores de ICO ni los aerosoles. Los colores de fábrica sin base se agregan a la tabla de colores sin base. | Tech Lead |
+| RC-25 | 2026-10-24 | El hexadecimal del color es obligatorio y el CIELAB es opcional. | Tech Lead |
+| RC-26 | 2026-10-24 | El cliente "tomador de notas": el inventario es referencial; SAMIT, a futuro, con importación aparte. El precio de una pintura es por variante (medida). | Tech Lead |
 
-## 4. Modelo de dominio propuesto (versión 2, pendiente de confirmar)
+## 4. Modelo de dominio (versión 3, implementado en el esquema 4.3 — PR #14)
 
 ```
 marca ── linea (opcional en el producto)
-categoria ── subcategoria                 (dos niveles; ver pregunta 1)
-producto ─ N:M ─ subcategoria
-producto ── ambiente: interior / exterior (puede tener ambos)
+categoria ── subcategoria                 (dos niveles)
+producto ── UNA subcategoria · superficies N:M · ambiente (usoInterior / usoExterior)
 producto ── ficha de recubrimiento (opcional; no la tienen las herramientas):
-            tipo de resina · tipo 1/2/3 · rendimiento m²
+            tipo de resina · tipo 1/2/3 · rendimiento m² por galón
 producto ─ N:M ─ acabado                  (Brillante, Mate, Semimate, Satinado, Transparente…)
-producto ─ N:M ─ base                     (entonables; ICO no tiene)
-producto ─ N:M ─ color "exclusivo"        (colores de fábrica; solo visual, salvo en ICO)
+producto ─ N:M ─ base                     (entonables; ICO y herramientas no tienen)
+producto ─ N:M ─ color de fábrica         (ICO, aerosoles, transparente, exclusivos)
 
 base   = Tint · Deep · Pastel · Accent     (global, no depende de la marca)
-color  = marca · nombre · código · base (obligatoria) · acabado (obligatorio, Brillante)
+color  = marca · nombre · código · base (opcional pero esencial) · acabado (Brillante por defecto)
          · familia (Blancos, Rojos…) · hexadecimal (obligatorio) · CIELAB (opcional)
 
-variante = producto + medida + precio + SKU base + existencia referencial
+variante = producto + medida + precio + SKU + existencia referencial
 medida   = valor + tipo de medida (galón, litro, pulgada, metro, unidad…)
 
-Línea de carrito / orden = variante + color (si aplica) → SKU compuesto P1-V2-Rojo
-                           → la base que se consume sale del color
+Línea de carrito / orden = variante + color (si aplica) → SKU compuesto P1-V2-ROJO
 ```
 
-**Colores que ofrece un producto** =
-(colores cuya base está entre las bases del producto **y** cuyo acabado está entre los acabados del producto)
-**más** sus colores exclusivos. Un producto sin bases ni colores exclusivos no lleva color (herramientas, barnices transparentes).
+**Colores que ofrece un producto** = colores activos de su marca cuya base es una de sus bases **y** cuyo
+acabado es uno de sus acabados, **más** sus colores de fábrica. Un producto sin bases ni colores de fábrica
+no lleva color (herramientas).
 
-**Cambios al DDL actual:** se eliminan `tonos`, `sub_subcategorias`, `linea.id_sub_subcategoria`, `presentacion`,
-`base.id_marca` y la forma actual de `variante` (producto + base + color + presentación). Se agregan `acabado`,
-`familia_color`, `tipo_medida`, `medida`, `producto_acabado`, `producto_color` y el color en la línea del carrito.
+**Clase derivada del producto** (ya no se guarda): `entonable` si tiene bases; `colores_fijos` si no tiene bases
+pero sí colores de fábrica; `sin_color` si no tiene ninguno.
 
-## 5. Preguntas abiertas
+## 5. Requisitos de la spec que este modelo reemplaza
 
-1. ❓ **Categorías.** El Excel `bd/script/Pintuco_Categorias_y_Subcategorias.xlsx` (9 categorías, 53 subcategorías) clasifica por **uso** (Paredes y techos, Maderas, Metales, Pisos, Automotriz…) y lleva interior/exterior dentro de la subcategoría. Ahí "ambiente" como categoría no funciona para Pisos, Automotriz o Industrial. Propuesta: categorías del Excel y **ambiente como dato del producto**, que alimenta las pestañas "Pintura Interior / Exterior" de la web.
-2. ❓ **Colores de ICO** (RC-16): si no se consigue la base de esos colores, no se podrían registrar con la base obligatoria.
-3. ❓ **Miércoles de color** (RC-23): ¿significa que el blanco queda **excluido** del descuento?
-4. ❓ **Hexadecimal obligatorio y CIELAB opcional** (ver explicación en el chat del 2026-10-23).
-5. Mayúsculas en nombres (D4) y reactivación sin cascada (D3), del contrato de la entrega 1.
+| Requisito | Qué decía | Qué rige ahora |
+| :--- | :--- | :--- |
+| `RF-CAT-02-02` | Exige al menos una subcategoría. | **Una** subcategoría; el uso en varios sitios va en superficies y ambiente. |
+| `RF-CAT-02-02` | Línea y resina obligatorias a pinturas. | Con ficha de recubrimiento, línea y resina obligatorias; sin ficha, opcionales (decisión D7). |
+| `RF-CAT-02-03` | Clase declarada y no cambiable con variantes. | Clase **derivada** de bases y colores de fábrica. |
+| `RF-CAT-03-02` | Forma de la variante según la clase (con base/color). | Variante = producto + medida. El color se elige en la venta. |
+| `RF-CAT-03-05` | Presentación con nombre y volumen. | Medida = valor + tipo de medida. |
+| `RF-CAT-05-02` | CIELAB obligatorio. | Hexadecimal obligatorio, CIELAB opcional. |
+| `RF-CAT-05-04`, `RF-CAT-05-05`, `CA-CAT-05-08` | El color identifica variantes de colores fijos y las desactiva. | Los colores de fábrica no forman variantes: desactivar un color solo lo retira de la oferta del producto. |
+| `RF-CAT-12-01`, `CA-CAT-12-02` | La base exige tipo de resina. | La base no lleva resina (DDL, decisión del PO). La resina está en la ficha del producto. |
+| `RF-CAT-12-04`, `RF-CAT-12-12` | Color asociado a una o varias bases; sin definir de dónde sale. | **Un color, una base opcional** (RC-07, RC-24). Resuelto. |
+| `RF-CAT-12-05` | Registrar variante de base consumida en la compra. | La base se deduce del color (`base_consumida` en la línea de orden); M05/M08 la resuelven. |
+| `CA-CAT-01-06` | Producto en tres subcategorías. | Una subcategoría (ver arriba). |
+| `RF-CAT-02-05` | Publicar exige variante activa e imagen. | En la entrega 2 solo variante activa; la imagen llega con la entrega 3. |
+
+## 6. Preguntas abiertas
+
+1. ❓ **Equivalencia en galones** (D6): para calcular el rendimiento por medida hace falta la columna `equivalencia_galones` en `tipo_medida` (galón = 1, litro = 0,264172, mililitro = 0,000264172). No existe en el PR #14. ¿Se agrega?
+2. ❓ **Línea obligatoria con ficha** (D7): las pinturas deben tener línea. ¿Hay productos de recubrimiento sin línea (ej. un estuco genérico)?
+3. ❓ **Imágenes antes de publicar** (D9): en la entrega 2 se puede publicar sin imagen. ¿Aceptable mientras llega la entrega 3?
+4. ❓ **Familia derivada del hexadecimal** (D8): ¿basta con que el servidor la calcule o la importación del cliente ya trae la familia?
+5. ❓ **Colores de ICO y aerosoles**: el cliente no supo precisar cuáles son. El modelo ya los admite sin base; falta la lista.
+6. ❓ **Un acabado por color**: el modelo permite un solo acabado por color. ¿Existe un color con el mismo nombre en dos acabados que deba contarse como el mismo?
+7. Mayúsculas en nombres (D4) y reactivación sin cascada pero verificando el padre (D3 y R7), del contrato de la entrega 1.

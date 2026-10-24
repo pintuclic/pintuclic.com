@@ -2,46 +2,53 @@ import { z } from 'zod';
 
 /**
  * ============================================================================
- * CONTRATO DE API REST — M01. Catálogo de Productos · ENTREGA 1: CATÁLOGOS BASE
+ * CONTRATO DE API REST — M01. Catálogo · ENTREGA 1: CATÁLOGOS BASE
  * ============================================================================
- * Scope: m01-catalogo · Ola 2
+ * Scope: m01-catalogo · Ola 2 · Base de datos: esquema 4.3 (PR #14)
  *
  * Este contrato ES la especificación de la entrega y lo que el Tech Lead revisa
  * antes de que se escriba el backend. Todo lo que cambie aquí cambia el módulo.
- * Reglas adicionales y decisiones heredadas del DDL: docs/02_MODULOS_FUNCIONALES/
- * M01_REGLAS_ADICIONALES.md. Spec base: M01_ESPECIFICACION_CATALOGO.md.
+ * Reglas del cliente y modelo: docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md
+ * Spec base: M01_ESPECIFICACION_CATALOGO.md · Entrega 2: m01-catalogo-productos.contract.ts
  *
- * ── Entrega 1 (este contrato) ───────────────────────────────────────────────
- *  HU-CAT-01 categorías y subcategorías · HU-CAT-04 marcas · HU-CAT-11 líneas
- *  HU-CAT-12 bases (solo su administración) · tipos de resina · presentaciones.
+ * ── Qué incluye ─────────────────────────────────────────────────────────────
+ *  Categorías y subcategorías (HU-CAT-01) · marcas (HU-CAT-04) · líneas
+ *  (HU-CAT-11) · superficies · tipos de resina · acabados · bases · familias de
+ *  color · tipos de medida y medidas.
  *
- * ── Fuera de esta entrega ───────────────────────────────────────────────────
- *  Colores (HU-CAT-05), productos (HU-CAT-02), atributos técnicos (HU-CAT-10),
- *  variantes con precio y existencia (HU-CAT-03), combos (HU-CAT-13), consulta
- *  pública (HU-CAT-06), imágenes (HU-CAT-07), complementarios (HU-CAT-08).
- *  Asociaciones base↔producto y color↔base llegan con productos y colores.
+ * ── Qué NO incluye (entrega 2) ──────────────────────────────────────────────
+ *  Colores, productos, variantes, consulta pública. Imágenes y combos: entrega 3.
  *
  * ── Reglas clave ────────────────────────────────────────────────────────────
- *  R1  Solo dos niveles: categoría y subcategoría. La tabla `sub_subcategorias`
- *      del DDL NO se usa.
- *  R2  Nombres obligatorios, con trim y máximo 100 caracteres.
- *  R3  Unicidad: categoría, marca, tipo de resina y presentación → global;
- *      subcategoría → por categoría; línea y base → por marca.
+ *  R1  Solo dos niveles de clasificación: categoría → subcategoría.
+ *  R2  Nombres obligatorios, con trim y máximo 100 caracteres (50 en acabado,
+ *      base, familia, tipo de medida; 60 en medida).
+ *  R3  Unicidad global: categoría, marca, tipo de resina, superficie, acabado,
+ *      base, familia de color, tipo de medida, medida (nombre y tipo+valor).
+ *      Por padre: subcategoría (categoría) y línea (marca).
  *  R4  Nunca hay borrado físico: solo baja lógica. No existe ruta DELETE.
  *  R5  Desactivar en cascada: categoría → sus subcategorías; marca → sus líneas
- *      y bases (colores, productos y campañas se sumarán cuando existan).
+ *      (y, en la entrega 2, sus colores). Un producto cuya subcategoría o marca
+ *      se desactiva sale del catálogo público sin darse de baja.
  *  R6  Antes de desactivar se informa el impacto (GET .../impacto-desactivacion).
  *      Si hay elementos afectados, el servidor exige `confirmar: true`; sin él
  *      responde 409 CONFIRMACION_REQUERIDA con el impacto.
- *  R7  Reactivar NO reactiva en cascada a los hijos (decisión D3).
- *  R8  No se crean líneas ni bases bajo una marca inactiva, ni subcategorías
- *      bajo una categoría inactiva.
+ *  R7  Reactivar NO reactiva a los hijos, pero SÍ verifica que el padre esté
+ *      activo (RF-CAT-09-04): si no, 409 PADRE_INACTIVO.
+ *  R8  No se crean subcategorías bajo una categoría inactiva ni líneas bajo una
+ *      marca inactiva.
  *  R9  Marca: logotipo obligatorio, jpeg/png/webp, máximo 5 MB (supuesto aprobado
  *      por el Product Owner; el "Anexo B de la Tanda 2" sigue pendiente).
- *  R10 Base: SIN tipo de resina, por petición explícita del Product Owner
- *      (contradice RF-CAT-12-01; ver M01_REGLAS_ADICIONALES.md).
- *  R11 Presentación: nombre único y volumen > 0.
- *  R12 Autorización siempre en servidor; el 403 es el opaco estándar de M17.
+ *  R10 Las bases son globales (Tint, Deep, Pastel, Accent) y no dependen de la
+ *      marca. Los acabados también (Brillante, Mate, Semimate, Satinado,
+ *      Transparente).
+ *  R11 El acabado "Brillante" es el acabado por defecto de los colores: no se
+ *      puede desactivar ni renombrar (se identifica por su nombre).
+ *  R12 Una medida es valor + tipo de medida (ej. 1 + galón). Su nombre se genera
+ *      ("1 galón") si no se envía. Una medida o un tipo de medida con variantes
+ *      solo se desactiva.
+ *  R13 La familia de color lleva un hexadecimal #RRGGBB para su muestra.
+ *  R14 Autorización siempre en servidor; el 403 es el opaco estándar de M17.
  *
  * ── Decisiones por defecto (el Tech Lead puede vetarlas) ────────────────────
  *  D1  Permisos (la spec habla de «Gestión del catálogo» y «Gestión de
@@ -53,6 +60,14 @@ import { z } from 'zod';
  *  D3  Reactivar un padre no reactiva a los hijos: el administrador decide.
  *  D4  La unicidad de nombres se compara sin distinguir mayúsculas y sin
  *      espacios sobrantes (se normaliza antes de comparar).
+ *  D5  Los catálogos pequeños (superficies, resinas, acabados, bases, familias,
+ *      tipos de medida) se devuelven completos, sin paginar. Marcas, líneas y
+ *      medidas van paginadas; las categorías, como árbol completo.
+ *  D6  `equivalenciaGalones` en el tipo de medida (galón = 1, litro = 0,264172,
+ *      mililitro = 0,000264172) permite derivar el rendimiento por presentación
+ *      (RF-CAT-10-03). REQUIERE agregar la columna `equivalencia_galones` a
+ *      `tipo_medida` en el esquema 4.3 (PR #14). Si se veta, el rendimiento por
+ *      medida no se calcula y solo se muestra el rendimiento por galón.
  *
  * Regla de Oro #1: Cero código sin contrato previo.
  * Regla de Oro #11: Tolerancia Cero al tipo `any`.
@@ -67,10 +82,13 @@ export const LOGOTIPO_MAXIMO_BYTES = 5 * 1024 * 1024;
 /** Largo máximo del texto base64 de un archivo de 5 MB (4/3 del tamaño + relleno). */
 export const LOGOTIPO_MAXIMO_BASE64 = 6_990_508;
 export const TIPOS_MIME_LOGOTIPO = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export const ACABADO_POR_DEFECTO = 'Brillante';
 
 export const idSchema = z.number().int().positive();
 export const nombreSchema = z.string().trim().min(1).max(100);
+export const nombreCortoSchema = z.string().trim().min(1).max(50);
 export const ordenSchema = z.number().int().min(0).max(100_000);
+export const hexadecimalSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Use el formato #RRGGBB');
 
 export const estadoSchema = z.enum(['activo', 'inactivo']);
 export type Estado = z.infer<typeof estadoSchema>;
@@ -99,6 +117,14 @@ export const categoriaSchema = z.object({
 });
 export type Categoria = z.infer<typeof categoriaSchema>;
 
+export const superficieSchema = z.object({
+  idSuperficie: idSchema,
+  nombre: z.string(),
+  orden: ordenSchema,
+  estado: estadoSchema,
+});
+export type Superficie = z.infer<typeof superficieSchema>;
+
 export const marcaSchema = z.object({
   idMarca: idSchema,
   nombre: z.string(),
@@ -117,15 +143,6 @@ export const lineaSchema = z.object({
 });
 export type Linea = z.infer<typeof lineaSchema>;
 
-/** Sin tipo de resina (R10). */
-export const baseSchema = z.object({
-  idBase: idSchema,
-  idMarca: idSchema,
-  nombre: z.string(),
-  estado: estadoSchema,
-});
-export type Base = z.infer<typeof baseSchema>;
-
 export const tipoResinaSchema = z.object({
   idTipoResina: idSchema,
   nombre: z.string(),
@@ -133,21 +150,60 @@ export const tipoResinaSchema = z.object({
 });
 export type TipoResina = z.infer<typeof tipoResinaSchema>;
 
-export const presentacionSchema = z.object({
-  idPresentacion: idSchema,
+export const acabadoSchema = z.object({
+  idAcabado: idSchema,
   nombre: z.string(),
-  /** Volumen numérico para comparar precios entre productos. Unidad: ver Q1. */
-  volumen: z.number().positive(),
+  orden: ordenSchema,
   estado: estadoSchema,
 });
-export type Presentacion = z.infer<typeof presentacionSchema>;
+export type Acabado = z.infer<typeof acabadoSchema>;
 
-/** Efecto de una desactivación (R6). Los contadores de M06 valen 0 hasta que exista. */
+export const baseSchema = z.object({
+  idBase: idSchema,
+  nombre: z.string(),
+  orden: ordenSchema,
+  estado: estadoSchema,
+});
+export type Base = z.infer<typeof baseSchema>;
+
+export const familiaColorSchema = z.object({
+  idFamiliaColor: idSchema,
+  nombre: z.string(),
+  hexadecimal: z.string(),
+  orden: ordenSchema,
+  estado: estadoSchema,
+});
+export type FamiliaColor = z.infer<typeof familiaColorSchema>;
+
+export const tipoMedidaSchema = z.object({
+  idTipoMedida: idSchema,
+  nombre: z.string(),
+  abreviatura: z.string(),
+  /** Cuántos galones equivale una unidad de este tipo; null si no es de volumen (D6). */
+  equivalenciaGalones: z.number().positive().nullable(),
+  estado: estadoSchema,
+});
+export type TipoMedida = z.infer<typeof tipoMedidaSchema>;
+
+export const medidaSchema = z.object({
+  idMedida: idSchema,
+  idTipoMedida: idSchema,
+  valor: z.number().positive(),
+  nombre: z.string(),
+  estado: estadoSchema,
+});
+export type Medida = z.infer<typeof medidaSchema>;
+
+/**
+ * Efecto de una desactivación (R6). Cada recurso llena solo lo que le aplica; el
+ * resto vale 0. `reglasComerciales` es de M06 y vale 0 hasta que exista.
+ */
 export const impactoDesactivacionSchema = z.object({
   productos: z.number().int().nonnegative(),
   subcategorias: z.number().int().nonnegative(),
   lineas: z.number().int().nonnegative(),
-  bases: z.number().int().nonnegative(),
+  colores: z.number().int().nonnegative(),
+  variantes: z.number().int().nonnegative(),
   reglasComerciales: z.number().int().nonnegative(),
 });
 export type ImpactoDesactivacion = z.infer<typeof impactoDesactivacionSchema>;
@@ -167,17 +223,23 @@ export const listarBaseRequestSchema = paginacionQuerySchema.extend({
 });
 export type ListarBaseRequest = z.infer<typeof listarBaseRequestSchema>;
 
-/** GET /categorias — devuelve el árbol completo, sin paginar. */
-export const listarCategoriasRequestSchema = z.object({
+/** GET en catálogos pequeños y en categorías (D5): sin paginar. */
+export const listarCompletoRequestSchema = z.object({
   estado: estadoSchema.optional(),
 });
-export type ListarCategoriasRequest = z.infer<typeof listarCategoriasRequestSchema>;
+export type ListarCompletoRequest = z.infer<typeof listarCompletoRequestSchema>;
 
-/** GET /lineas y GET /bases — filtro opcional por marca. */
-export const listarPorMarcaRequestSchema = listarBaseRequestSchema.extend({
+/** GET /lineas — filtro opcional por marca. */
+export const listarLineasRequestSchema = listarBaseRequestSchema.extend({
   idMarca: z.coerce.number().int().positive().optional(),
 });
-export type ListarPorMarcaRequest = z.infer<typeof listarPorMarcaRequestSchema>;
+export type ListarLineasRequest = z.infer<typeof listarLineasRequestSchema>;
+
+/** GET /medidas — filtro opcional por tipo de medida. */
+export const listarMedidasRequestSchema = listarBaseRequestSchema.extend({
+  idTipoMedida: z.coerce.number().int().positive().optional(),
+});
+export type ListarMedidasRequest = z.infer<typeof listarMedidasRequestSchema>;
 
 /** PATCH .../estado en cualquier recurso. */
 export const cambiarEstadoRequestSchema = z.object({
@@ -187,17 +249,19 @@ export const cambiarEstadoRequestSchema = z.object({
 });
 export type CambiarEstadoRequest = z.infer<typeof cambiarEstadoRequestSchema>;
 
+/** Edición parcial: al menos un campo. Sin `default`, para no reiniciar valores. */
+const alMenosUnCampo = (v: Record<string, unknown>): boolean =>
+  Object.values(v).some((valor) => valor !== undefined);
+const MENSAJE_SIN_CAMPOS = { message: 'Debe enviarse al menos un campo' };
+
 export const crearCategoriaRequestSchema = z.object({
   nombre: nombreSchema,
   orden: ordenSchema.default(0),
 });
 export type CrearCategoriaRequest = z.infer<typeof crearCategoriaRequestSchema>;
-/** Sin `default` en `orden`: editar con un cuerpo vacío no debe reiniciarlo a 0. */
 export const editarCategoriaRequestSchema = z
   .object({ nombre: nombreSchema.optional(), orden: ordenSchema.optional() })
-  .refine((v) => v.nombre !== undefined || v.orden !== undefined, {
-    message: 'Debe enviarse al menos un campo',
-  });
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
 export type EditarCategoriaRequest = z.infer<typeof editarCategoriaRequestSchema>;
 
 /** POST /categorias/:idCategoria/subcategorias — el padre va en la ruta. */
@@ -205,6 +269,28 @@ export const crearSubcategoriaRequestSchema = crearCategoriaRequestSchema;
 export type CrearSubcategoriaRequest = z.infer<typeof crearSubcategoriaRequestSchema>;
 export const editarSubcategoriaRequestSchema = editarCategoriaRequestSchema;
 export type EditarSubcategoriaRequest = z.infer<typeof editarSubcategoriaRequestSchema>;
+
+/** Superficies, acabados y bases comparten forma: nombre corto y orden. */
+export const crearSuperficieRequestSchema = z.object({ nombre: nombreSchema, orden: ordenSchema.default(0) });
+export type CrearSuperficieRequest = z.infer<typeof crearSuperficieRequestSchema>;
+export const editarSuperficieRequestSchema = z
+  .object({ nombre: nombreSchema.optional(), orden: ordenSchema.optional() })
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
+export type EditarSuperficieRequest = z.infer<typeof editarSuperficieRequestSchema>;
+
+export const crearAcabadoRequestSchema = z.object({ nombre: nombreCortoSchema, orden: ordenSchema.default(0) });
+export type CrearAcabadoRequest = z.infer<typeof crearAcabadoRequestSchema>;
+export const editarAcabadoRequestSchema = z
+  .object({ nombre: nombreCortoSchema.optional(), orden: ordenSchema.optional() })
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
+export type EditarAcabadoRequest = z.infer<typeof editarAcabadoRequestSchema>;
+
+export const crearBaseRequestSchema = z.object({ nombre: nombreCortoSchema, orden: ordenSchema.default(0) });
+export type CrearBaseRequest = z.infer<typeof crearBaseRequestSchema>;
+export const editarBaseRequestSchema = z
+  .object({ nombre: nombreCortoSchema.optional(), orden: ordenSchema.optional() })
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
+export type EditarBaseRequest = z.infer<typeof editarBaseRequestSchema>;
 
 /** POST /marcas — el logotipo es obligatorio (R9). */
 export const crearMarcaRequestSchema = z.object({
@@ -229,32 +315,61 @@ export const crearLineaRequestSchema = z.object({
 });
 export type CrearLineaRequest = z.infer<typeof crearLineaRequestSchema>;
 /** La marca de una línea no cambia: editar solo toca nombre y gama. */
-export const editarLineaRequestSchema = crearLineaRequestSchema.omit({ idMarca: true }).partial().refine(
-  (v) => Object.keys(v).length > 0,
-  { message: 'Debe enviarse al menos un campo' },
-);
+export const editarLineaRequestSchema = z
+  .object({
+    nombre: nombreSchema.optional(),
+    gamaComercial: z.string().trim().max(100).nullable().optional(),
+  })
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
 export type EditarLineaRequest = z.infer<typeof editarLineaRequestSchema>;
-
-export const crearBaseRequestSchema = z.object({ idMarca: idSchema, nombre: nombreSchema });
-export type CrearBaseRequest = z.infer<typeof crearBaseRequestSchema>;
-export const editarBaseRequestSchema = z.object({ nombre: nombreSchema });
-export type EditarBaseRequest = z.infer<typeof editarBaseRequestSchema>;
 
 export const crearTipoResinaRequestSchema = z.object({ nombre: nombreSchema });
 export type CrearTipoResinaRequest = z.infer<typeof crearTipoResinaRequestSchema>;
 export const editarTipoResinaRequestSchema = crearTipoResinaRequestSchema;
 export type EditarTipoResinaRequest = z.infer<typeof editarTipoResinaRequestSchema>;
 
-export const crearPresentacionRequestSchema = z.object({
-  nombre: nombreSchema,
-  volumen: z.number().positive().max(9_999_999),
+export const crearFamiliaColorRequestSchema = z.object({
+  nombre: nombreCortoSchema,
+  hexadecimal: hexadecimalSchema,
+  orden: ordenSchema.default(0),
 });
-export type CrearPresentacionRequest = z.infer<typeof crearPresentacionRequestSchema>;
-export const editarPresentacionRequestSchema = crearPresentacionRequestSchema.partial().refine(
-  (v) => Object.keys(v).length > 0,
-  { message: 'Debe enviarse al menos un campo' },
-);
-export type EditarPresentacionRequest = z.infer<typeof editarPresentacionRequestSchema>;
+export type CrearFamiliaColorRequest = z.infer<typeof crearFamiliaColorRequestSchema>;
+export const editarFamiliaColorRequestSchema = z
+  .object({
+    nombre: nombreCortoSchema.optional(),
+    hexadecimal: hexadecimalSchema.optional(),
+    orden: ordenSchema.optional(),
+  })
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
+export type EditarFamiliaColorRequest = z.infer<typeof editarFamiliaColorRequestSchema>;
+
+export const crearTipoMedidaRequestSchema = z.object({
+  nombre: nombreCortoSchema,
+  abreviatura: z.string().trim().min(1).max(10),
+  equivalenciaGalones: z.number().positive().max(1_000_000).nullable().optional(),
+});
+export type CrearTipoMedidaRequest = z.infer<typeof crearTipoMedidaRequestSchema>;
+export const editarTipoMedidaRequestSchema = z
+  .object({
+    nombre: nombreCortoSchema.optional(),
+    abreviatura: z.string().trim().min(1).max(10).optional(),
+    equivalenciaGalones: z.number().positive().max(1_000_000).nullable().optional(),
+  })
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
+export type EditarTipoMedidaRequest = z.infer<typeof editarTipoMedidaRequestSchema>;
+
+export const crearMedidaRequestSchema = z.object({
+  idTipoMedida: idSchema,
+  valor: z.number().positive().max(9_999_999),
+  /** Si se omite se genera: "{valor} {tipo}" (R12). */
+  nombre: z.string().trim().min(1).max(60).optional(),
+});
+export type CrearMedidaRequest = z.infer<typeof crearMedidaRequestSchema>;
+/** El tipo no cambia; para otro tipo se crea otra medida. */
+export const editarMedidaRequestSchema = z
+  .object({ valor: z.number().positive().max(9_999_999).optional(), nombre: z.string().trim().min(1).max(60).optional() })
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
+export type EditarMedidaRequest = z.infer<typeof editarMedidaRequestSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 4. RESPUESTAS (ENVELOPES CANÓNICOS)
@@ -266,84 +381,92 @@ export const paginacionSchema = z.object({
   total: z.number().int().nonnegative(),
   totalPaginas: z.number().int().nonnegative(),
 });
+export type Paginacion = z.infer<typeof paginacionSchema>;
 
-export const categoriaResponseEnvelopeSchema = z.object({ success: z.literal(true), data: categoriaSchema });
+/** Respuesta de un solo elemento. */
+export const respuestaUno = <T extends z.ZodType>(item: T) =>
+  z.object({ success: z.literal(true), data: item });
+/** Respuesta de una lista completa, sin paginar (D5). */
+export const respuestaLista = <T extends z.ZodType>(item: T) =>
+  z.object({ success: z.literal(true), data: z.array(item) });
+/** Respuesta paginada. */
+export const respuestaPaginada = <T extends z.ZodType>(item: T) =>
+  z.object({ success: z.literal(true), data: z.array(item), pagination: paginacionSchema });
+
+export const categoriaResponseEnvelopeSchema = respuestaUno(categoriaSchema);
 export type CategoriaResponseEnvelope = z.infer<typeof categoriaResponseEnvelopeSchema>;
-export const listarCategoriasResponseEnvelopeSchema = z.object({
-  success: z.literal(true),
-  data: z.array(categoriaSchema),
-});
+export const listarCategoriasResponseEnvelopeSchema = respuestaLista(categoriaSchema);
 export type ListarCategoriasResponseEnvelope = z.infer<typeof listarCategoriasResponseEnvelopeSchema>;
-export const subcategoriaResponseEnvelopeSchema = z.object({ success: z.literal(true), data: subcategoriaSchema });
+export const subcategoriaResponseEnvelopeSchema = respuestaUno(subcategoriaSchema);
 export type SubcategoriaResponseEnvelope = z.infer<typeof subcategoriaResponseEnvelopeSchema>;
 
-export const marcaResponseEnvelopeSchema = z.object({ success: z.literal(true), data: marcaSchema });
+export const superficieResponseEnvelopeSchema = respuestaUno(superficieSchema);
+export type SuperficieResponseEnvelope = z.infer<typeof superficieResponseEnvelopeSchema>;
+export const listarSuperficiesResponseEnvelopeSchema = respuestaLista(superficieSchema);
+export type ListarSuperficiesResponseEnvelope = z.infer<typeof listarSuperficiesResponseEnvelopeSchema>;
+
+export const marcaResponseEnvelopeSchema = respuestaUno(marcaSchema);
 export type MarcaResponseEnvelope = z.infer<typeof marcaResponseEnvelopeSchema>;
-export const listarMarcasResponseEnvelopeSchema = z.object({
-  success: z.literal(true),
-  data: z.array(marcaSchema),
-  pagination: paginacionSchema,
-});
+export const listarMarcasResponseEnvelopeSchema = respuestaPaginada(marcaSchema);
 export type ListarMarcasResponseEnvelope = z.infer<typeof listarMarcasResponseEnvelopeSchema>;
 
-export const lineaResponseEnvelopeSchema = z.object({ success: z.literal(true), data: lineaSchema });
+export const lineaResponseEnvelopeSchema = respuestaUno(lineaSchema);
 export type LineaResponseEnvelope = z.infer<typeof lineaResponseEnvelopeSchema>;
-export const listarLineasResponseEnvelopeSchema = z.object({
-  success: z.literal(true),
-  data: z.array(lineaSchema),
-  pagination: paginacionSchema,
-});
+export const listarLineasResponseEnvelopeSchema = respuestaPaginada(lineaSchema);
 export type ListarLineasResponseEnvelope = z.infer<typeof listarLineasResponseEnvelopeSchema>;
 
-export const baseResponseEnvelopeSchema = z.object({ success: z.literal(true), data: baseSchema });
-export type BaseResponseEnvelope = z.infer<typeof baseResponseEnvelopeSchema>;
-export const listarBasesResponseEnvelopeSchema = z.object({
-  success: z.literal(true),
-  data: z.array(baseSchema),
-  pagination: paginacionSchema,
-});
-export type ListarBasesResponseEnvelope = z.infer<typeof listarBasesResponseEnvelopeSchema>;
-
-export const tipoResinaResponseEnvelopeSchema = z.object({ success: z.literal(true), data: tipoResinaSchema });
+export const tipoResinaResponseEnvelopeSchema = respuestaUno(tipoResinaSchema);
 export type TipoResinaResponseEnvelope = z.infer<typeof tipoResinaResponseEnvelopeSchema>;
-export const listarTiposResinaResponseEnvelopeSchema = z.object({
-  success: z.literal(true),
-  data: z.array(tipoResinaSchema),
-  pagination: paginacionSchema,
-});
+export const listarTiposResinaResponseEnvelopeSchema = respuestaLista(tipoResinaSchema);
 export type ListarTiposResinaResponseEnvelope = z.infer<typeof listarTiposResinaResponseEnvelopeSchema>;
 
-export const presentacionResponseEnvelopeSchema = z.object({ success: z.literal(true), data: presentacionSchema });
-export type PresentacionResponseEnvelope = z.infer<typeof presentacionResponseEnvelopeSchema>;
-export const listarPresentacionesResponseEnvelopeSchema = z.object({
-  success: z.literal(true),
-  data: z.array(presentacionSchema),
-  pagination: paginacionSchema,
-});
-export type ListarPresentacionesResponseEnvelope = z.infer<typeof listarPresentacionesResponseEnvelopeSchema>;
+export const acabadoResponseEnvelopeSchema = respuestaUno(acabadoSchema);
+export type AcabadoResponseEnvelope = z.infer<typeof acabadoResponseEnvelopeSchema>;
+export const listarAcabadosResponseEnvelopeSchema = respuestaLista(acabadoSchema);
+export type ListarAcabadosResponseEnvelope = z.infer<typeof listarAcabadosResponseEnvelopeSchema>;
 
-export const impactoDesactivacionResponseEnvelopeSchema = z.object({
-  success: z.literal(true),
-  data: impactoDesactivacionSchema,
-});
+export const baseResponseEnvelopeSchema = respuestaUno(baseSchema);
+export type BaseResponseEnvelope = z.infer<typeof baseResponseEnvelopeSchema>;
+export const listarBasesResponseEnvelopeSchema = respuestaLista(baseSchema);
+export type ListarBasesResponseEnvelope = z.infer<typeof listarBasesResponseEnvelopeSchema>;
+
+export const familiaColorResponseEnvelopeSchema = respuestaUno(familiaColorSchema);
+export type FamiliaColorResponseEnvelope = z.infer<typeof familiaColorResponseEnvelopeSchema>;
+export const listarFamiliasColorResponseEnvelopeSchema = respuestaLista(familiaColorSchema);
+export type ListarFamiliasColorResponseEnvelope = z.infer<typeof listarFamiliasColorResponseEnvelopeSchema>;
+
+export const tipoMedidaResponseEnvelopeSchema = respuestaUno(tipoMedidaSchema);
+export type TipoMedidaResponseEnvelope = z.infer<typeof tipoMedidaResponseEnvelopeSchema>;
+export const listarTiposMedidaResponseEnvelopeSchema = respuestaLista(tipoMedidaSchema);
+export type ListarTiposMedidaResponseEnvelope = z.infer<typeof listarTiposMedidaResponseEnvelopeSchema>;
+
+export const medidaResponseEnvelopeSchema = respuestaUno(medidaSchema);
+export type MedidaResponseEnvelope = z.infer<typeof medidaResponseEnvelopeSchema>;
+export const listarMedidasResponseEnvelopeSchema = respuestaPaginada(medidaSchema);
+export type ListarMedidasResponseEnvelope = z.infer<typeof listarMedidasResponseEnvelopeSchema>;
+
+export const impactoDesactivacionResponseEnvelopeSchema = respuestaUno(impactoDesactivacionSchema);
 export type ImpactoDesactivacionResponseEnvelope = z.infer<typeof impactoDesactivacionResponseEnvelopeSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 5. ERRORES (opacos donde aplica, HU-SEG-06 / RN-ADM-12)
  * ─────────────────────────────────────────────────────────────────────────── */
 
+export const CODIGOS_ERROR_CATALOGO = [
+  'ACCESO_DENEGADO',
+  'VALIDACION',
+  'NO_ENCONTRADO',
+  'NOMBRE_DUPLICADO',
+  'PADRE_INACTIVO',
+  'CONFIRMACION_REQUERIDA',
+  'LOGOTIPO_INVALIDO',
+  'ACABADO_PROTEGIDO',
+] as const;
+
 export const errorCatalogoEnvelopeSchema = z.object({
   success: z.literal(false),
   error: z.object({
-    codigo: z.enum([
-      'ACCESO_DENEGADO',
-      'VALIDACION',
-      'NO_ENCONTRADO',
-      'NOMBRE_DUPLICADO',
-      'PADRE_INACTIVO',
-      'CONFIRMACION_REQUERIDA',
-      'LOGOTIPO_INVALIDO',
-    ]),
+    codigo: z.enum(CODIGOS_ERROR_CATALOGO),
     mensaje: z.string(),
     /** Solo con CONFIRMACION_REQUERIDA: qué se vería afectado (R6). */
     impacto: impactoDesactivacionSchema.optional(),
@@ -354,26 +477,31 @@ export type ErrorCatalogoEnvelope = z.infer<typeof errorCatalogoEnvelopeSchema>;
 /* ───────────────────────────────────────────────────────────────────────────
  * 6. MAPA DE RUTAS (montaje: /api/v1/admin/catalogo)
  * ───────────────────────────────────────────────────────────────────────────
+ *  Permisos (D1): GET → catalogo.ver · POST → catalogo.crear · PUT → catalogo.editar ·
+ *  PATCH estado: activar → catalogo.editar, desactivar → catalogo.eliminar.
+ *
  *  Categorías y subcategorías
- *  GET   /categorias                                  catalogo.ver
- *  POST  /categorias                                  catalogo.crear
- *  PUT   /categorias/:idCategoria                     catalogo.editar
- *  PATCH /categorias/:idCategoria/estado              editar | eliminar (D1)
- *  GET   /categorias/:idCategoria/impacto-desactivacion  catalogo.ver
- *  POST  /categorias/:idCategoria/subcategorias       catalogo.crear
- *  PUT   /subcategorias/:idSubcategoria               catalogo.editar
- *  PATCH /subcategorias/:idSubcategoria/estado        editar | eliminar
- *  GET   /subcategorias/:idSubcategoria/impacto-desactivacion  catalogo.ver
+ *  GET   /categorias                                           (árbol completo)
+ *  POST  /categorias · PUT /categorias/:idCategoria
+ *  PATCH /categorias/:idCategoria/estado
+ *  GET   /categorias/:idCategoria/impacto-desactivacion
+ *  POST  /categorias/:idCategoria/subcategorias
+ *  PUT   /subcategorias/:idSubcategoria
+ *  PATCH /subcategorias/:idSubcategoria/estado
+ *  GET   /subcategorias/:idSubcategoria/impacto-desactivacion
  *
  *  Marcas
- *  GET   /marcas · POST /marcas · GET /marcas/:idMarca · PUT /marcas/:idMarca
- *  PUT   /marcas/:idMarca/logotipo · GET /marcas/:idMarca/logotipo (bytes)
+ *  GET /marcas · POST /marcas · GET /marcas/:idMarca · PUT /marcas/:idMarca
+ *  PUT /marcas/:idMarca/logotipo · GET /marcas/:idMarca/logotipo (bytes)
  *  PATCH /marcas/:idMarca/estado · GET /marcas/:idMarca/impacto-desactivacion
  *
- *  Líneas · Bases (?idMarca opcional)
- *  GET · POST · PUT /:id · PATCH /:id/estado · GET /:id/impacto-desactivacion
- *  en /lineas y /bases
+ *  Líneas (?idMarca opcional)
+ *  GET · POST · PUT /:id · PATCH /:id/estado · GET /:id/impacto-desactivacion   en /lineas
  *
- *  Tipos de resina · Presentaciones
- *  GET · POST · PUT /:id · PATCH /:id/estado   en /tipos-resina y /presentaciones
+ *  Catálogos pequeños (sin paginar)
+ *  GET · POST · PUT /:id · PATCH /:id/estado · GET /:id/impacto-desactivacion
+ *  en /superficies, /tipos-resina, /acabados, /bases, /familias-color, /tipos-medida
+ *
+ *  Medidas (?idTipoMedida opcional)
+ *  GET · POST · PUT /:id · PATCH /:id/estado · GET /:id/impacto-desactivacion   en /medidas
  * ─────────────────────────────────────────────────────────────────────────── */
