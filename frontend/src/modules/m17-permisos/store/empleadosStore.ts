@@ -14,6 +14,7 @@ import {
   editarEmpleado,
   listarEmpleados,
   reactivarEmpleado,
+  reenviarActivacionEmpleado,
 } from '../services/empleados.service';
 import { mensajeDeError } from '../services/mensaje-error';
 
@@ -28,7 +29,10 @@ interface EmpleadosState {
   filtroEstado: EstadoCuentaEmpleado | undefined;
   busqueda: string;
   empleadoSeleccionado: DetalleEmpleado | null;
-  credencialTemporalGenerada: string | null;
+  /** Resultado del último alta: a quién se envió el enlace y si salió el correo. */
+  activacionCreada: { correo: string; enviada: boolean } | null;
+  /** Confirmación breve de una acción exitosa (p. ej. enlace reenviado). */
+  aviso: string | null;
 
   // Acciones
   cargarEmpleados: () => Promise<void>;
@@ -37,7 +41,8 @@ interface EmpleadosState {
   establecerPagina: (pagina: number) => void;
   limpiarFiltros: () => void;
   seleccionarEmpleado: (empleado: DetalleEmpleado | null) => void;
-  limpiarCredencialTemporal: () => void;
+  limpiarActivacion: () => void;
+  reenviarActivacion: (id: number, correo: string) => Promise<boolean>;
   crearNuevoEmpleado: (datos: CrearEmpleadoFormData) => Promise<boolean>;
   actualizarEmpleado: (id: number, datos: EditarEmpleadoFormData) => Promise<boolean>;
   desactivar: (id: number) => Promise<boolean>;
@@ -65,7 +70,8 @@ export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
   filtroEstado: undefined,
   busqueda: '',
   empleadoSeleccionado: null,
-  credencialTemporalGenerada: null,
+  activacionCreada: null,
+  aviso: null,
 
   cargarEmpleados: async () => {
     const idPeticion = ++peticionListadoActiva;
@@ -116,14 +122,26 @@ export const useEmpleadosStore = create<EmpleadosState>((set, get) => ({
 
   seleccionarEmpleado: (empleado) => set({ empleadoSeleccionado: empleado }),
 
-  limpiarCredencialTemporal: () => set({ credencialTemporalGenerada: null }),
+  limpiarActivacion: () => set({ activacionCreada: null }),
+
+  reenviarActivacion: async (id, correo) => {
+    set({ error: null, aviso: null });
+    try {
+      await reenviarActivacionEmpleado(id);
+      set({ aviso: `Enviamos un enlace de activación nuevo a ${correo}.` });
+      return true;
+    } catch (err: unknown) {
+      set({ error: mensajeDeError(err, 'No fue posible reenviar el enlace de activación') });
+      return false;
+    }
+  },
 
   crearNuevoEmpleado: async (datos) => {
-    set({ cargando: true, error: null });
+    set({ cargando: true, error: null, aviso: null });
     try {
       const res = await crearEmpleado(datos);
       set({
-        credencialTemporalGenerada: res.credencialTemporalGenerada ?? null,
+        activacionCreada: { correo: res.correo, enviada: res.activacionEnviada },
         cargando: false,
       });
       await get().cargarEmpleados();

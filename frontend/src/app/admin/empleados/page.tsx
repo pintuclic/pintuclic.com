@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { KeyRound, ShieldAlert, UserCheck, Users } from 'lucide-react';
-import { AdminStatCard } from '@/modules/m17-permisos/components/AdminStatCard';
+import { AdminPageHeader, AdminStatCard } from '@/core/components';
 import { EmpleadosTable } from '@/modules/m17-permisos/components/empleados/EmpleadosTable';
 import { useEmpleadosStore } from '@/modules/m17-permisos/store/empleadosStore';
 
@@ -14,59 +14,53 @@ export default function EmpleadosPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header de la Vista */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="font-title font-bold text-2xl sm:text-3xl text-neutral-black tracking-tight">
-            Gestión de Colaboradores
-          </h1>
-          <p className="font-sans text-xs sm:text-sm text-neutral-medium mt-1">
-            Administra las cuentas del equipo, asignación atómica de permisos y control de acceso en
-            servidor (HU-ADM-01 a HU-ADM-04).
-          </p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Gestión de Colaboradores"
+        subtitle="Administra las cuentas del equipo, asignación atómica de permisos y control de acceso en servidor (HU-ADM-01 a HU-ADM-04)."
+      />
 
-      {/* Tarjetas de Estadísticas KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <AdminStatCard
-          label="Total Colaboradores"
+          label="Total colaboradores"
           value={total}
-          trendText="Registrados en la plataforma"
+          trendText="Registrados"
+          trendSubtext="en la plataforma"
           trendType="neutral"
           icon={<Users className="w-5 h-5" />}
           iconBgColor="bg-subaction text-action"
         />
 
         <AdminStatCard
-          label="Cuentas Activas"
+          label="Cuentas activas"
           value={activos}
-          trendText="Acceso verificado en tiempo real"
+          trendText="Activas"
+          trendSubtext="en página actual"
           trendType="positive"
           icon={<UserCheck className="w-5 h-5" />}
-          iconBgColor="bg-conversion/10 text-conversion"
+          iconBgColor="bg-conversion/15 text-conversion"
         />
 
         <AdminStatCard
-          label="Cuentas Inactivas"
+          label="Cuentas inactivas"
           value={inactivos}
-          trendText="Sesiones revocadas en 0ms"
+          trendText="Suspendidas"
+          trendSubtext="sin acceso"
           trendType={inactivos > 0 ? 'negative' : 'neutral'}
           icon={<ShieldAlert className="w-5 h-5" />}
           iconBgColor="bg-danger/10 text-danger"
         />
 
         <AdminStatCard
-          label="Catálogo de Permisos"
+          label="Catálogo de permisos"
           value="20"
-          trendText="Atómicos sin roles fijos"
+          trendText="Atómicos"
+          trendSubtext="sin roles fijos"
           trendType="positive"
           icon={<KeyRound className="w-5 h-5" />}
-          iconBgColor="bg-highlight/15 text-neutral-black"
+          iconBgColor="bg-highlight/20 text-neutral-black"
         />
       </div>
 
-      {/* Tabla Principal */}
       <EmpleadosTable />
     </div>
   );

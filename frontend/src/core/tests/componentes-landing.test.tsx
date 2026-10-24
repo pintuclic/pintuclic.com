@@ -6,6 +6,9 @@ import { ProductCard } from '../components/data-display/ProductCard';
 import { SearchBar } from '../components/forms/SearchBar';
 import { Footer, type FooterProps } from '../components/layout/Footer';
 import { Header, type HeaderProps } from '../components/layout/Header';
+import { AdminLayout } from '../components/layout/AdminLayout';
+import { AdminPageHeader } from '../components/layout/AdminPageHeader';
+import { AdminStatCard } from '../components/data-display/AdminStatCard';
 import { Carousel } from '../components/navigation/Carousel';
 import { formatCOP } from '../utils/moneda';
 
@@ -175,5 +178,46 @@ describe('Footer', () => {
   it('cada columna de enlaces es un landmark de navegación', () => {
     expect(html).toContain('aria-label="Servicios"');
     expect(html).toContain('aria-label="Legal"');
+  });
+});
+
+describe('Admin Core Kit (AdminLayout, AdminPageHeader, AdminStatCard)', () => {
+  it('AdminLayout renderiza el sidebar full-height, el logo oficial, el menú sin jerga interna y el widget inferior', () => {
+    const html = renderToStaticMarkup(
+      <AdminLayout>
+        <AdminPageHeader
+          title="¡Hola, Carlos!"
+          subtitle="Resumen del panel"
+          metaPrimary="Viernes, 23 de octubre de 2026"
+          metaSecondary="Pintu Clic Admin"
+        />
+      </AdminLayout>
+    );
+
+    expect(html).toContain('aria-label="Navegación administrativa"');
+    expect(html).toContain('Hacemos crecer tu negocio');
+    expect(html).not.toContain('Módulos M17');
+    expect(html).toContain('Buscar productos, marcas, categorías o pedidos...');
+    expect(html).toContain('¡Hola, Carlos!');
+    expect(html).toContain('Pintu Clic Admin');
+  });
+
+  it('AdminStatCard muestra etiqueta, valor en color corporativo e indicador de tendencia', () => {
+    const html = renderToStaticMarkup(
+      <AdminStatCard
+        label="Colaboradores activos"
+        value="12"
+        trendText="+100%"
+        trendSubtext="en el equipo"
+        trendType="positive"
+        icon={<span>Icon</span>}
+      />
+    );
+
+    expect(html).toContain('Colaboradores activos');
+    expect(html).toContain('12');
+    expect(html).toContain('+100%');
+    expect(html).toContain('en el equipo');
+    expect(html).toContain('text-corporate');
   });
 });

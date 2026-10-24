@@ -7,9 +7,11 @@ import type { NotificacionesPort } from '../interfaces/notificaciones.port';
 import type { DateProviderPort } from '../interfaces/date-provider.port';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import type { RestablecerPasswordRequest } from '../dtos/m04-cuentas.dto';
+import { obtenerSecretoJwt } from './secreto-jwt';
+import { leerParametroCuentas } from './parametros-cuentas';
+import type { ParametrosCuentasPort } from '../interfaces/parametros-cuentas.port';
 
 const DERIVACION_SENUELO = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.JustAPlaceholderHashForTimingXXXXXXXXXX';
-const MINUTOS_VIGENCIA_RECUPERACION = 30;
 
 export class RecuperacionPasswordError extends Error {
   constructor(
@@ -29,10 +31,12 @@ export class RecuperacionPasswordService {
     private readonly notificaciones: NotificacionesPort,
     private readonly dateProvider: DateProviderPort,
     private readonly sesionService: SesionService,
+    /** HU-ADM-07: vigencia del enlace editable por el admin en M17. */
+    private readonly parametros?: ParametrosCuentasPort,
   ) {}
 
   private obtenerJwtSecret(): string {
-    return process.env.JWT_SECRET ?? 'clave-secreta-predeterminada-para-desarrollo-minimo-32-caracteres';
+    return obtenerSecretoJwt();
   }
 
   /**
@@ -51,47 +55,18 @@ export class RecuperacionPasswordService {
       };
     }
 
-    // Generar token criptográfico seguro
-    const tokenAleatorio = crypto.randomBytes(32).toString('hex');
-    const tokenHash = await derivarContrasena(tokenAleatorio);
-    const expiracion = new Date(
-      this.dateProvider.ahora().getTime() + MINUTOS_VIGENCIA_RECUPERACION * 60 * 1000,
+    const minutosVigencia = await leerParametroCuentas(
+      this.parametros,
+      'auth.vigencia_enlace_recuperacion_minutos',
     );
+    const tokenJwt = await this.emitirEnlace(usuario.idUsuario, correoNormalizado, minutosVigencia);
 
-    const guardado = await this.codigosRepo.guardarCodigo({
-      correo: correoNormalizado,
-      codigoHash: tokenHash,
-      tipo: 'recuperacion_password',
-      expiracion,
-      maxIntentos: 3,
-      datosTemporales: {
-        idUsuario: usuario.idUsuario,
-        tokenPlano: tokenAleatorio,
-      },
-    });
-
-    // Token firmado con payload identificador para consumo stateless
-    const tokenJwt = jwt.sign(
-      {
-        idCodigo: guardado.idCodigo,
-        idUsuario: usuario.idUsuario,
-        correo: correoNormalizado,
-        rnd: tokenAleatorio,
-        tipo: 'recuperacion_password',
-      },
-      this.obtenerJwtSecret(),
-      { expiresIn: `${MINUTOS_VIGENCIA_RECUPERACION}m` },
-    );
-
-    try {
-      await this.notificaciones.enviarEnlaceRecuperacion(
-        correoNormalizado,
-        tokenJwt,
-        MINUTOS_VIGENCIA_RECUPERACION,
-      );
-    } catch {
-      // RF-SEG-06-06: preservar respuesta indistinguible ante fallos transitorios de transporte SMTP
-    }
+    // RF-SEG-06-06: el envío no se espera. Esperarlo haría que un correo registrado
+    // tarde lo que tarda el SMTP y delataría su existencia; un fallo de transporte
+    // tampoco cambia la respuesta.
+    this.notificaciones
+      .enviarEnlaceRecuperacion(correoNormalizado, tokenJwt, minutosVigencia)
+      .catch(() => undefined);
 
     return {
       mensaje:
@@ -100,63 +75,126 @@ export class RecuperacionPasswordService {
   }
 
   /**
+   * HU-ADM-01: enlace de activación para un empleado creado en M17. Sustituye la
+   * clave temporal: el empleado fija su contraseña y el admin nunca la conoce.
+   * Un enlace nuevo invalida los anteriores. Si el correo falla, el error se
+   * propaga para que M17 avise al admin y le permita reenviarlo.
+   */
+  async emitirEnlaceActivacion(idUsuario: number): Promise<void> {
+    const usuario = await this.cuentasRepo.buscarPorId(idUsuario);
+    if (!usuario || usuario.estado !== 'activo' || !usuario.cambioContrasenaPendiente) {
+      throw new RecuperacionPasswordError(
+        'La cuenta no tiene una activación pendiente.',
+        'RECURSO_NO_ENCONTRADO',
+        404,
+      );
+    }
+
+    const horasVigencia = await leerParametroCuentas(
+      this.parametros,
+      'auth.vigencia_enlace_activacion_horas',
+    );
+    const correo = usuario.correo.trim().toLowerCase();
+    await this.codigosRepo.eliminarPorCorreoYTipo(correo, 'recuperacion_password');
+    const tokenJwt = await this.emitirEnlace(usuario.idUsuario, correo, horasVigencia * 60);
+    await this.notificaciones.enviarEnlaceActivacion(correo, usuario.nombre, tokenJwt, horasVigencia);
+  }
+
+  /**
+   * Enlace de un solo uso para fijar contraseña. En BD queda solo el hash del valor
+   * aleatorio; el valor plano viaja únicamente dentro del token del enlace.
+   */
+  private async emitirEnlace(idUsuario: number, correo: string, minutosVigencia: number): Promise<string> {
+    const tokenAleatorio = crypto.randomBytes(32).toString('hex');
+    const tokenHash = await derivarContrasena(tokenAleatorio);
+    const expiracion = new Date(
+      this.dateProvider.ahora().getTime() + minutosVigencia * 60 * 1000,
+    );
+
+    const guardado = await this.codigosRepo.guardarCodigo({
+      correo,
+      codigoHash: tokenHash,
+      tipo: 'recuperacion_password',
+      expiracion,
+      maxIntentos: 3,
+      datosTemporales: { idUsuario },
+    });
+
+    return jwt.sign(
+      {
+        idCodigo: guardado.idCodigo,
+        idUsuario,
+        correo,
+        rnd: tokenAleatorio,
+        tipo: 'recuperacion_password',
+      },
+      this.obtenerJwtSecret(),
+      { expiresIn: `${minutosVigencia}m` },
+    );
+  }
+
+  /**
    * HU-CUE-05: Restablecer contraseña consumiendo token válido
    */
   async restablecerPassword(input: RestablecerPasswordRequest): Promise<{ mensaje: string }> {
     const ahora = this.dateProvider.ahora();
+    // Toda causa de rechazo responde igual: no se revela qué parte del enlace falló.
+    const enlaceInvalido = (): RecuperacionPasswordError =>
+      new RecuperacionPasswordError(
+        'El enlace de recuperación es inválido o ha expirado.',
+        'TOKEN_INVALIDO_O_EXPIRADO',
+        400,
+      );
 
-    let idCodigo: string | null = null;
-    let idUsuario: number | null = null;
-
+    let payload: { idCodigo?: unknown; idUsuario?: unknown; rnd?: unknown; tipo?: unknown };
     try {
-      const payload = jwt.verify(input.token, this.obtenerJwtSecret()) as {
-        idCodigo: string;
-        idUsuario: number;
-        tipo: string;
-      };
-      if (payload.tipo === 'recuperacion_password') {
-        idCodigo = payload.idCodigo;
-        idUsuario = payload.idUsuario;
-      }
+      payload = jwt.verify(input.token, this.obtenerJwtSecret(), { algorithms: ['HS256'] }) as typeof payload;
     } catch {
-      // Si no es un JWT válido, se rechaza
-      throw new RecuperacionPasswordError(
-        'El enlace de recuperación es inválido o ha expirado.',
-        'TOKEN_INVALIDO_O_EXPIRADO',
-        400,
-      );
+      throw enlaceInvalido();
     }
 
-    if (!idCodigo || !idUsuario) {
-      throw new RecuperacionPasswordError(
-        'El enlace de recuperación es inválido o ha expirado.',
-        'TOKEN_INVALIDO_O_EXPIRADO',
-        400,
-      );
+    const { idCodigo, idUsuario, rnd } = payload;
+    if (
+      payload.tipo !== 'recuperacion_password' ||
+      typeof idCodigo !== 'string' ||
+      typeof idUsuario !== 'number' ||
+      typeof rnd !== 'string'
+    ) {
+      throw enlaceInvalido();
     }
 
+    // El código debe pertenecer al mismo usuario que nombra el token.
     const codigoRegistro = await this.codigosRepo.buscarPorId(idCodigo);
-    if (!codigoRegistro || codigoRegistro.tipo !== 'recuperacion_password') {
-      throw new RecuperacionPasswordError(
-        'El enlace de recuperación es inválido o ha expirado.',
-        'TOKEN_INVALIDO_O_EXPIRADO',
-        400,
-      );
+    const datos = codigoRegistro?.datosTemporales;
+    const idUsuarioDelCodigo =
+      typeof datos === 'object' && datos !== null && !Array.isArray(datos) ? datos.idUsuario : undefined;
+    if (
+      !codigoRegistro ||
+      codigoRegistro.tipo !== 'recuperacion_password' ||
+      idUsuarioDelCodigo !== idUsuario
+    ) {
+      throw enlaceInvalido();
     }
 
-    // Validar expiración (RN-CUE-05: BVA 29:59 vs 30:01)
-    if (ahora.getTime() > codigoRegistro.expiracion.getTime()) {
+    // Validar expiración (RN-CUE-05: BVA 29:59 vs 30:01) y agotamiento de intentos.
+    if (
+      ahora.getTime() > codigoRegistro.expiracion.getTime() ||
+      codigoRegistro.intentos >= codigoRegistro.maxIntentos
+    ) {
       await this.codigosRepo.eliminar(codigoRegistro.idCodigo);
-      throw new RecuperacionPasswordError(
-        'El enlace de recuperación ha expirado.',
-        'TOKEN_EXPIRADO',
-        400,
-      );
+      throw enlaceInvalido();
+    }
+
+    // El valor aleatorio del enlace se compara contra el hash almacenado.
+    const coincide = await verificarContrasena(rnd, codigoRegistro.codigoHash);
+    if (!coincide) {
+      await this.codigosRepo.incrementarIntentos(codigoRegistro.idCodigo);
+      throw enlaceInvalido();
     }
 
     const usuario = await this.cuentasRepo.buscarPorId(idUsuario);
-    if (!usuario) {
-      throw new RecuperacionPasswordError('Usuario no encontrado.', 'USUARIO_NO_ENCONTRADO', 404);
+    if (!usuario || usuario.estado !== 'activo') {
+      throw enlaceInvalido();
     }
 
     // 1. Derivar nueva contraseña con BCrypt costo 12

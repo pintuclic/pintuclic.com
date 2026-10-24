@@ -132,7 +132,8 @@ export const crearEmpleadoOutputSchema = z.object({
   estado: estadoCuentaEmpleadoSchema,
   primerAccesoPendiente: z.boolean(),
   fechaCreacion: z.string(),
-  credencialTemporal: z.string().optional(),
+  /** Enlace de activación enviado por correo (ver contrato). */
+  activacionEnviada: z.boolean(),
 });
 export type CrearEmpleadoOutput = z.infer<typeof crearEmpleadoOutputSchema>;
 
@@ -159,8 +160,14 @@ export const resumenEmpleadoSchema = z.object({
   fechaCreacion: z.string(),
   fechaUltimoAcceso: z.string().nullable(),
   cantidadPermisos: z.number().int().nonnegative(),
+  primerAccesoPendiente: z.boolean(),
 });
 export type ResumenEmpleado = z.infer<typeof resumenEmpleadoSchema>;
+
+export const reenviarActivacionEmpleadoOutputSchema = z.object({
+  enviado: z.literal(true),
+});
+export type ReenviarActivacionEmpleadoOutput = z.infer<typeof reenviarActivacionEmpleadoOutputSchema>;
 
 export const listarEmpleadosOutputSchema = z.object({
   empleados: z.array(resumenEmpleadoSchema),
@@ -269,6 +276,7 @@ export const CLAVES_PARAMETROS = [
   'auth.vigencia_enlace_recuperacion_minutos',
   'auth.intentos_fallidos_bloqueo',
   'auth.duracion_bloqueo_minutos',
+  'auth.vigencia_enlace_activacion_horas',
   'comms.reintentos_envio_transaccional',
   'comercial.iva_porcentaje',
   'comercial.costo_envio_base',

@@ -1,8 +1,8 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.0 — esquema 4.2 (M04 Cuentas: unicidad, hash OTP, anti-fuerza bruta y cambio de clave).  
+> **Versión Actual:** 3.2 — esquema 4.3 (M01 Catálogo: rediseño de colores, bases, acabados, medidas y variantes).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
-> **Total de Tablas:** 53  
+> **Total de Tablas:** 58  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script de Mocks / Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Guía Oficial de Mocks y Datos de Prueba:** [`./GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./GUIA_MOCKS_Y_DATOS_PRUEBA.md)  
@@ -14,6 +14,8 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.2** (esquema 4.3) | 2026-10-24 | `superficie`, `acabado`, `familia_color`, `tipo_medida`, `medida`, `ficha_recubrimiento`, `producto_superficie`, `producto_acabado`, `producto_color`, `producto_caracteristica` (10) | `sub_subcategorias`, `tonos`, `presentacion`, `caracteristica`, `producto_subcategoria` (5) | M01 Catálogo rediseñado con las reglas del Tech Lead: color con base opcional, acabado y familia; bases globales; variante = producto + medida con su precio; producto en una subcategoría con superficies y ambiente; color en `linea_carrito` y `sku_vendido` en `linea_orden`. Total 58 tablas. | [Ver v3.2](./CHANGELOG_DATABASE.md#v32---2026-10-24) |
+| **v3.1** (esquema 4.2) | 2026-10-23 | Ninguna | Ninguna | Sin cambios de DDL ni de Prisma. Seed: parámetro 11 `auth.vigencia_enlace_activacion_horas` (72 h, rango 1–168). `codigo_verificacion` guarda también el enlace de activación de empleados y los tokens de gobernanza del admin (antes en memoria); la recuperación ya no guarda el valor plano. M17 ya persiste el catálogo con Prisma. | [Ver v3.1](./WALKTHROUGH_DATABASE.md#-versión-31-2026-10-23) |
 | **v3.0** (esquema 4.2) | 2026-10-21 | `control_intento_acceso` (1) | Ninguna | M04 Cuentas: aprobados en bloque C-2 y C-4 a C-9 de `RFC-M04-001`. Nueva tabla `control_intento_acceso` (Tabla 53) para control anti-fuerza bruta e indisitnguibilidad (`RN-CUE-06/07`). Unicidad parcial en solicitudes pendientes (`RN-CUE-14/19`). Unicidad y predeterminada única en `direccion_cliente` (`RN-CUE-21`). Hash BCrypt en `codigo_verificacion.codigo_hash` (`RN-CUE-03`). Correo insensible a mayúsculas `uq_usuario_correo_lower` (`RN-CUE-01`). Columna `cambio_contrasena_pendiente` en `usuario`. Permiso 21 `empresas.validar` en el catálogo de permisos. Total 53 tablas. | [Ver v3.0](./WALKTHROUGH_DATABASE.md#-versión-30-2026-10-21) |
 | **v2.9** (esquema 4.1) | 2026-10-21 | `parametro_sistema` (1) | Ninguna | M17 Configuración general: el catálogo de parámetros (`HU-ADM-05`, `HU-ADM-07`) pasa de un `Map` en memoria (`ADR-007`) a una tabla con clave única, valor vigente y por defecto en `JSONB`, rango y último autor. **La base impone el tipo y el rango** (`ck_parametro_*`). Seed con las 10 filas del catálogo actual. Nuevos `enum_area_parametro` y `enum_tipo_dato_parametro`. Total 52 tablas. La fecha de última modificación la mantiene un **disparador** (el primero del esquema) y el rango de la complejidad de contraseña queda alineado con el piso de M20 (12–32). **El código de M17 aún lee de memoria** (RFC-M17-001 §5). | [Ver v2.9](./WALKTHROUGH_DATABASE.md#-versión-29-2026-10-21) |
 | **v2.8** (esquema 4.0) | 2026-10-21 | `cuenta_empresa`, `documento_soporte` (2) | Ninguna (se depreca la columna `solicitud_actualizacion_nit.documento_adjunto_url`) | M04 Cuentas: `cuenta_empresa` guarda el NIT **vigente** de cada cuenta empresa aprobada (1:1 con `usuario`, `nit` UNIQUE) y deja las solicitudes como historial inmutable. `documento_soporte` almacena el RUT adjunto (PDF/JPG/PNG, hasta 5 MB, huella SHA-256) y `solicitud_actualizacion_nit` lo referencia por `id_documento`. Decisiones del Director Humano sobre el RFC-M04-001 (C-1 y C-3, opción A). Total 51 tablas. | [Ver v2.8](./WALKTHROUGH_DATABASE.md#-versión-28-2026-10-21) |
@@ -31,15 +33,15 @@
 
 ## 🎯 1. Visión General del Sistema
 
-El esquema de base de datos de **Pintuclic** soporta las operaciones integrales de comercio electrónico B2B y B2C, cotizaciones comerciales, catálogo multinivel, inventario de colores/tonos/variantes, carritos vivos, órdenes inmutables, facturación, pagos y reservación de servicios.
+El esquema de base de datos de **Pintuclic** soporta las operaciones integrales de comercio electrónico B2B y B2C, cotizaciones comerciales, catálogo multinivel, colores con base y acabado, variantes por medida, carritos vivos, órdenes inmutables, facturación, pagos y reservación de servicios.
 
 ### 🌟 Pilares Arquitectónicos del Modelo:
-1. **Reestructuración Completa del Catálogo (v2.0):**  
-   Jerarquía precisa de 4 niveles: `categoria` $\rightarrow$ `subcategorias` $\rightarrow$ `sub_subcategorias` $\rightarrow$ `linea` $\rightarrow$ `producto`.
-2. **Desglose de Colores, Tonos y Variantes (v2.0):**  
-   - `color` $\rightarrow$ `tonos` (con variación de precios por matiz).
-   - `producto` $\rightarrow$ `variante` (asociado a un color y precio vigente propio).
-   - `variante` $\rightarrow$ `caracteristica` (atributos técnicos de la variante).
+1. **Catálogo (v3.1):**
+   `marca` → `linea` (opcional) → `producto`. El producto pertenece a una `subcategoria` (dos niveles) y se etiqueta con `superficie` y ambiente (`uso_interior`, `uso_exterior`).
+2. **Colores, bases y variantes (v3.1):**
+   - `color` tiene acabado (por defecto Brillante), familia, hexadecimal y base opcional pero esencial (Tint, Deep, Pastel, Accent, globales).
+   - Colores que ofrece un producto = colores de sus bases con un acabado que el producto tiene, más sus colores de fábrica (`producto_color`).
+   - `variante` = `producto` + `medida` (valor + `tipo_medida`), con su precio. El color se elige en la venta.
 3. **Módulo de Combos y Paquetes Promocionales (v2.0):**  
    `producto` $\rightarrow$ `combo` + `variante` $\rightarrow$ `variante_combo` (especifica variantes y cantidades exactas incluidas en cada combo).
 4. **Patrón de E-Commerce Inmutable y Cotizaciones (v2.1):**  
@@ -62,74 +64,137 @@ El esquema de base de datos de **Pintuclic** soporta las operaciones integrales 
 
 ```mermaid
 erDiagram
-    %% ==== Catálogo / Jerarquía de producto ====
+    %% ==== Catálogo M01 (esquema 4.3) ====
     Categoria {
-        int UniqueID PK
-        string nombre
+        int id_categoria PK
+        string nombre UK
+        int orden
+        enum estado
     }
-    Subcategorias {
-        int UniqueID PK
+    Subcategoria {
+        int id_subcategoria PK
         int id_categoria FK
-        string nombre
+        string nombre "UK por categoria"
+        int orden
+        enum estado
     }
-    Sub_Subcategorias {
-        int UniqueID PK
-        int id_subcategoria FK
-        string nombre
+    Superficie {
+        int id_superficie PK
+        string nombre UK
     }
     Marca {
-        int UniqueID PK
-        string nombre
+        int id_marca PK
+        string nombre UK
+        bytea logotipo
+        enum estado
     }
     Linea {
-        int UniqueID PK
-        int id_sub_subcategoria FK
-        string nombre
-        string marca
+        int id_linea PK
+        int id_marca FK
+        string nombre "UK por marca"
+        string gama_comercial
     }
-    Producto {
-        int UniqueID PK
-        int id_linea FK
-        string nombre
+    tipo_resina {
+        int id_tipo_resina PK
+        string nombre UK
     }
-
-    %% ==== Bloque fusionado (diagrama 1: Variante -> Bases -> Color -> tonos) ====
-    Variante {
-        int UniqueID PK
-        int id_producto FK
-        float precio_vigente
-        string estado
+    Acabado {
+        int id_acabado PK
+        string nombre UK "Brillante, Mate..."
     }
-    Bases {
+    Base {
         int id_base PK
-        string nombre
-        int id_variante FK
-        string prefijo
+        string nombre UK "Tint, Deep, Pastel, Accent"
+    }
+    FamiliaColor {
+        int id_familia_color PK
+        string nombre UK
+        char hexadecimal
+    }
+    TipoMedida {
+        int id_tipo_medida PK
+        string nombre UK "galon, pulgada..."
+        string abreviatura UK
+    }
+    Medida {
+        int id_medida PK
+        int id_tipo_medida FK
+        decimal valor
+        string nombre UK "1 galon"
     }
     Color {
-        int UniqueID PK
+        int id_color PK
+        int id_marca FK
         string nombre
-        int id_base FK
+        string codigo "UK por marca"
+        int id_base FK "opcional pero esencial"
+        int id_acabado FK "por defecto Brillante"
+        int id_familia_color FK
+        char hexadecimal
+        decimal cie_l_a_b "opcional"
     }
-    tonos {
-        int UniqueID PK
-        int id_color FK
-        string nombre
-        string hexagesimal
-        float precio
+    Producto {
+        int id_producto PK
+        int id_marca FK
+        int id_linea FK "opcional, misma marca"
+        int id_subcategoria FK
+        string nombre "UK por marca"
+        boolean uso_interior
+        boolean uso_exterior
+        boolean publicado
     }
-
-    Caracteristica {
-        int UniqueID PK
-        int id_variante FK
+    ficha_recubrimiento {
+        int id_producto PK, FK
+        int id_tipo_resina FK
+        smallint tipo_calidad "1, 2 o 3"
+        decimal rendimiento_min_max "m2 por galon"
+    }
+    producto_superficie {
+        int id_producto PK, FK
+        int id_superficie PK, FK
+    }
+    producto_acabado {
+        int id_producto PK, FK
+        int id_acabado PK, FK
+    }
+    producto_base {
+        int id_producto PK, FK
+        int id_base PK, FK
+    }
+    producto_color {
+        int id_producto PK, FK
+        int id_color PK, FK
+    }
+    producto_caracteristica {
+        int id_caracteristica PK
+        int id_producto FK
         string nombre
+        string valor
+    }
+    Variante {
+        int id_variante PK
+        int id_producto FK
+        int id_medida FK "UK con producto"
+        string sku UK
+        decimal precio_vigente
+        int existencia_referencial
+        string codigo_proveedor UK "SAMIT futuro"
+        enum estado
+    }
+    imagen {
+        int id_imagen PK
+        int id_producto FK
+        int id_variante FK "nullable"
+        int id_color FK "nullable"
+        bytea datos
+        boolean es_principal "unica por producto"
     }
     Combo {
-        int UniqueID PK
+        int id_combo PK
         int id_producto FK
     }
     variante_Combo {
-        int UniqueID PK
+        int id_variante_combo PK
         int id_variante FK
         int id_combo FK
         int cantidad
@@ -200,37 +265,6 @@ erDiagram
         int id_usuario FK
         int id_aviso_privacidad FK
         date fecha
-    }
-
-    %% ==== Catálogo: marca, resina, presentación, imágenes y relaciones N:M (M01) ====
-    tipo_resina {
-        int id_tipo_resina PK
-        string nombre UK
-        enum estado
-    }
-    presentacion {
-        int id_presentacion PK
-        string nombre UK
-        decimal volumen "mayor que 0"
-        enum estado
-    }
-    imagen {
-        int id_imagen PK
-        int id_producto FK
-        int id_variante FK "nullable"
-        int id_color FK "nullable"
-        bytea datos
-        string mime_type
-        int orden
-        boolean es_principal "unica por producto"
-    }
-    producto_base {
-        int id_producto PK, FK
-        int id_base PK, FK
-    }
-    producto_subcategoria {
-        int id_producto PK, FK
-        int id_subcategoria PK, FK
     }
 
     %% ==== Búsqueda: analítica sin identidad de usuario (M02) ====
@@ -328,6 +362,7 @@ erDiagram
         int id PK
         int carrito_id FK
         int variante_id FK
+        int id_color FK "nullable; UK con carrito y variante"
         int ref_viva
         int cantidad
     }
@@ -436,23 +471,38 @@ erDiagram
 
     %% ================== RELACIONES ==================
 
-    %% Jerarquía de catálogo
-    Categoria         ||--o{ Subcategorias        : "divide_en"
-    Subcategorias      ||--o{ Sub_Subcategorias     : "subdivide_en"
-    Sub_Subcategorias  ||--o{ Linea                 : "agrupa"
-    Marca               ||--o{ Linea                 : "agrupa"
-    Linea               ||--o{ Producto              : "clasifica"
-    Producto            ||--o{ Combo                 : "es_un"
-
-    %% Bloque fusionado: Variante -> Bases -> Color -> tonos
-    Producto  ||--o{ Variante          : "tiene"
-    Variante  ||--o{ Bases             : "tiene"
-    Bases     ||--o{ Color             : "clasifica"
-    Color     ||--o{ tonos             : "desglosa_en"
-    Variante  ||--o{ Caracteristica    : "describe"
-    Combo     ||--o{ variante_Combo    : "compuesto_por"
-    Variante  ||--o{ variante_Combo    : "incluida_en"
-    Variante  ||--o{ LineaCarrito      : "referencia (ref_viva)"
+    %% Catálogo M01 (esquema 4.3)
+    Categoria           ||--o{ Subcategoria            : "divide_en"
+    Subcategoria        ||--o{ Producto                : "clasifica"
+    Marca               ||--o{ Linea                   : "agrupa"
+    Marca               ||--o{ Producto                : "fabrica"
+    Linea               |o--o{ Producto                : "agrupa"
+    Marca               ||--o{ Color                   : "ofrece"
+    Base                |o--o{ Color                   : "prepara"
+    Acabado             ||--o{ Color                   : "acaba"
+    FamiliaColor        |o--o{ Color                   : "agrupa"
+    TipoMedida          ||--o{ Medida                  : "mide"
+    Producto            ||--o| ficha_recubrimiento     : "describe"
+    tipo_resina         ||--o{ ficha_recubrimiento     : "clasifica"
+    Producto            ||--o{ producto_superficie     : "se_aplica_en"
+    Superficie          ||--o{ producto_superficie     : "recibe"
+    Producto            ||--o{ producto_acabado        : "ofrece"
+    Acabado             ||--o{ producto_acabado        : "ofrecido_en"
+    Producto            ||--o{ producto_base           : "admite"
+    Base                ||--o{ producto_base           : "admitida_en"
+    Producto            ||--o{ producto_color          : "trae_de_fabrica"
+    Color               ||--o{ producto_color          : "exclusivo_de"
+    Producto            ||--o{ producto_caracteristica : "describe"
+    Producto            ||--o{ Variante                : "tiene"
+    Medida              ||--o{ Variante                : "dimensiona"
+    Producto            ||--o{ imagen                  : "tiene"
+    Variante            |o--o{ imagen                  : "ilustra"
+    Color               |o--o{ imagen                  : "ilustra"
+    Producto            ||--o{ Combo                   : "es_un"
+    Combo               ||--o{ variante_Combo          : "compuesto_por"
+    Variante            ||--o{ variante_Combo          : "incluida_en"
+    Variante            ||--o{ LineaCarrito            : "referencia (ref_viva)"
+    Color               |o--o{ LineaCarrito            : "elegido_en"
 
     %% Roles / permisos / descuentos
     descuento          ||--o{ sub_roll_empresa   : "aplica_a"
@@ -467,19 +517,6 @@ erDiagram
     usuario                 ||--o{ solicitud_supresion    : "solicita"
     usuario                 ||--o{ consentimiento_usuario : "puede_tener"
     aviso_privacidad        ||--o{ consentimiento_usuario : "puede_aceptar"
-
-    %% Catálogo: marca, resina, presentación, imágenes y relaciones N:M
-    Marca                        ||--o{ Producto                    : "fabrica"
-    tipo_resina                  |o--o{ Producto                    : "clasifica"
-    presentacion                 ||--o{ Variante                    : "presenta"
-    Producto                     ||--o{ imagen                      : "tiene"
-    Variante                     |o--o{ imagen                      : "ilustra"
-    Color                        |o--o{ imagen                      : "ilustra"
-    Producto                     ||--o{ producto_subcategoria       : "pertenece_a"
-    Subcategorias                ||--o{ producto_subcategoria       : "agrupa"
-    Producto                     ||--o{ producto_base               : "ofrece"
-    Bases                        ||--o{ producto_base               : "ofrecida_en"
-
 
     %% M04: cuentas, empresa y verificación
     usuario                      ||--o{ direccion_cliente            : "guarda"
@@ -522,7 +559,7 @@ erDiagram
 
 ---
 
-## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (52 Tablas)
+## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (58 Tablas)
 
 ### Módulo 1: Seguridad, Roles y Descuentos (5 Tablas)
 | Tabla | PK | FKs | Descripción |
@@ -540,33 +577,39 @@ erDiagram
 | **`usuario_rol`** | `id_usuario_rol` | `id_usuario`, `id_rol` | Asignación con restricción `UNIQUE(id_usuario)` (máximo 1 rol por usuario). |
 | **`sesion`** | `id_sesion` (**UUID**) | `id_usuario` $\rightarrow$ `usuario` (CASCADE) | Sesiones abiertas por dispositivo (M20 / HU-SEG-02). Guarda último acceso y expiración. |
 
-### Módulo 3: Catálogo Multinivel, Colores, Bases y Variantes (18 Tablas)
+### Módulo 3: Catálogo — M01 (23 Tablas, esquema 4.3)
+Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md).
+
 | Tabla | PK | FKs | Descripción |
 | :--- | :--- | :--- | :--- |
-| **`categoria`** | `id_categoria` | Ninguna | Nivel 1 del catálogo (e.g. Pinturas Arquitectónicas, Esmaltes). |
-| **`subcategorias`** | `id_subcategoria` | `id_categoria` $\rightarrow$ `categoria` | Nivel 2 de agrupación. |
-| **`sub_subcategorias`** | `id_sub_subcategoria` | `id_subcategoria` $\rightarrow$ `subcategorias` | Nivel 3 de agrupación. |
-| **`linea`** | `id_linea` | `id_sub_subcategoria` $\rightarrow$ `sub_subcategorias` | Nivel 4: Línea de marca (e.g. Viniltex, Koraza). |
-| **`producto`** | `id_producto` | `id_marca` $\rightarrow$ `marca` (RESTRICT), `id_linea` $\rightarrow$ `linea`, `id_tipo_resina` $\rightarrow$ `tipo_resina`, `id_categoria_complementaria` $\rightarrow$ `categoria` (SET NULL) | Entidad base del producto, con su clase de color (`enum_clase_color`), rendimiento, indicador de publicación y de patrocinio. |
-| **`variante`** | `id_variante` | `id_producto` $\rightarrow$ `producto` (CASCADE), `id_presentacion` $\rightarrow$ `presentacion` (RESTRICT), `id_color` $\rightarrow$ `color` (SET NULL), `id_base` $\rightarrow$ `base` (RESTRICT) | SKU vendible con `precio_vigente`, existencia referencial, código de proveedor y `estado` comercial. |
-| **`base`** | `id_base` | `id_variante` $\rightarrow$ `variante` | Base vinculada a variante con `prefijo` y nombre. |
-| **`color`** | `id_color` | `id_base` $\rightarrow$ `base` | Catálogo de colores clasificados por base (`id_base`). |
-| **`tonos`** | `id_tono` | `id_color` $\rightarrow$ `color` | Tonos/matices derivados con `nombre`, `hexagesimal` y precio adicional. |
-| **`caracteristica`** | `id_caracteristica` | `id_variante` $\rightarrow$ `variante` | Ficha técnica o especificaciones de la variante. |
-| **`combo`** | `id_combo` | `id_producto` $\rightarrow$ `producto` | Paquete comercial ligado a un producto. |
-| **`variante_combo`** | `id_variante_combo` | `id_variante`, `id_combo` | Detalle N:M de las variantes y `cantidad` que componen el combo. |
-| **`marca`** | `id_marca` | Ninguna | Catálogo maestro de marcas (HU-CAT-04): `nombre` UNIQUE, logotipo en `BYTEA` con su tipo MIME (máx. 5 MB; jpeg, png o webp validados en el servicio; el límite exacto del Anexo B de la Tanda 2 sigue pendiente de confirmar) y `estado`. |
-| **`tipo_resina`** | `id_tipo_resina` | Ninguna | Catálogo administrable de tipos de resina (RF-CAT-02-04); reemplaza cualquier lista fija en el código. `nombre` UNIQUE. |
-| **`presentacion`** | `id_presentacion` | Ninguna | Presentación comercial como entidad propia (RF-CAT-03-05): `nombre` UNIQUE y `volumen` (mayor que 0) para comparar precios entre productos. Si tiene variantes no se elimina, solo se desactiva (CA-CAT-03-10). |
-| **`producto_base`** | `(id_producto, id_base)` | `id_producto` $\rightarrow$ `producto` (CASCADE), `id_base` $\rightarrow$ `base` (RESTRICT) | Bases que ofrece un producto entonable (HU-CAT-12, RF-CAT-12-02). Una variante entonable solo puede usar una base declarada aquí. |
-| **`producto_subcategoria`** | `(id_producto, id_subcategoria)` | `id_producto` $\rightarrow$ `producto` (CASCADE), `id_subcategoria` $\rightarrow$ `subcategorias` (RESTRICT) | Relación N:M producto↔subcategoría (RF-CAT-02-02: al menos una). Reemplaza el remanente `linea.id_sub_subcategoria` del árbol previo. |
-| **`imagen`** | `id_imagen` | `id_producto` $\rightarrow$ `producto` (CASCADE), `id_variante` $\rightarrow$ `variante` (CASCADE), `id_color` $\rightarrow$ `color` (SET NULL) | Imágenes del producto en `BYTEA` (HU-CAT-07, RF-CAT-07-03), asociables a una variante o a un color. A lo sumo una principal por producto (índice único parcial `uq_imagen_principal`). Las miniaturas (RNF-CAT-07-01) siguen pendientes. |
+| **`categoria`** | `id_categoria` | Ninguna | Qué ES el producto (Pinturas, Maderas, Herramientas…). `nombre` UNIQUE, `orden`, `estado`. |
+| **`subcategoria`** | `id_subcategoria` | `id_categoria` (RESTRICT) | Segundo y último nivel. Nombre único por categoría. |
+| **`superficie`** | `id_superficie` | Ninguna | Dónde se aplica (Paredes y techos, Madera, Metal…). Etiqueta N:M. |
+| **`marca`** | `id_marca` | Ninguna | Marca con logotipo `BYTEA` (máx. 5 MB, jpeg/png/webp). |
+| **`linea`** | `id_linea` | `id_marca` (RESTRICT) | Línea comercial; nombre único por marca. `UNIQUE (id_linea, id_marca)` soporta la FK compuesta de producto. |
+| **`tipo_resina`** | `id_tipo_resina` | Ninguna | Base agua, base aceite… |
+| **`acabado`** | `id_acabado` | Ninguna | Brillante, Mate, Semimate, Satinado, Transparente. |
+| **`base`** | `id_base` | Ninguna | Tint, Deep, Pastel, Accent. Global, no depende de la marca. |
+| **`familia_color`** | `id_familia_color` | Ninguna | Familias del selector de color, con hexadecimal de muestra. |
+| **`tipo_medida`** | `id_tipo_medida` | Ninguna | Galón, litro, mililitro, pulgada, metro, unidad. |
+| **`medida`** | `id_medida` | `id_tipo_medida` (RESTRICT) | Valor + tipo (ej. 1/4 de galón). `UNIQUE (id_tipo_medida, valor)`. |
+| **`color`** | `id_color` | `id_marca`, `id_base` (opcional), `id_acabado`, `id_familia_color` (opcional) | Hexadecimal obligatorio; CIELAB opcional y completo o vacío. `UNIQUE (id_marca, nombre, id_acabado)`; código único por marca. |
+| **`producto`** | `id_producto` | `id_marca`, `(id_linea, id_marca)` → `linea`, `id_subcategoria`, `id_categoria_complementaria` (SET NULL) | Nombre único por marca; ambiente, publicación y patrocinio. La FK compuesta impide una línea de otra marca. |
+| **`ficha_recubrimiento`** | `id_producto` | `id_producto` (CASCADE), `id_tipo_resina` | 1:1 opcional: resina, tipo 1/2/3, rendimiento m²/galón. Las herramientas no tienen. |
+| **`producto_superficie`** | `(id_producto, id_superficie)` | ambos | Superficies del producto. |
+| **`producto_acabado`** | `(id_producto, id_acabado)` | ambos | Acabados del producto; filtran su carta. |
+| **`producto_base`** | `(id_producto, id_base)` | ambos | Bases admitidas: definen la carta del producto. |
+| **`producto_color`** | `(id_producto, id_color)` | ambos | Colores de fábrica / exclusivos del producto. |
+| **`producto_caracteristica`** | `id_caracteristica` | `id_producto` (CASCADE) | Atributos técnicos nombre/valor. |
+| **`variante`** | `id_variante` | `id_producto` (RESTRICT), `id_medida` (RESTRICT) | Producto + medida, `sku` UNIQUE, `precio_vigente`, existencia referencial, `codigo_proveedor` (SAMIT futuro). |
+| **`imagen`** | `id_imagen` | `id_producto`, `id_variante`, `id_color` | Imágenes `BYTEA`; una principal por producto. |
+| **`combo`** / **`variante_combo`** | `id_combo` / `id_variante_combo` | — | Combos; pendientes de rediseño en su entrega. |
 
 ### Módulo 4: Carrito Vivo de Compras (2 Tablas)
 | Tabla | PK | FKs | Descripción |
 | :--- | :--- | :--- | :--- |
 | **`carrito`** | `id_carrito` | `id_usuario` $\rightarrow$ `usuario` (opcional) | Carrito vivo con `token_visitante` para usuarios anónimos y fecha de actividad. |
-| **`linea_carrito`** | `id_linea_carrito` | `id_carrito`, `id_variante` | Ítems agregados vivos vinculados a variante con `ref_viva` y `cantidad`. |
+| **`linea_carrito`** | `id_linea_carrito` | `id_carrito`, `id_variante`, `id_color` (opcional) | Ítem vivo = variante + color elegido ("variante temporal"); `UNIQUE NULLS NOT DISTINCT (id_carrito, id_variante, id_color)`. |
 
 ### Módulo 5: Cotizaciones y Órdenes Inmutables (8 Tablas)
 | Tabla | PK | FKs | Descripción |
@@ -608,7 +651,7 @@ erDiagram
 | **`solicitud_actualizacion_nit`** | `id_solicitud` (**UUID**) | `id_usuario`, `id_admin_revisor` $\rightarrow$ `usuario`; `id_documento` $\rightarrow$ `documento_soporte` (RESTRICT, v2.8) | Renovación de NIT con el RUT adjunto (HU-CUE-09, HU-CUE-10). `documento_adjunto_url` queda **deprecada** desde v2.8. |
 | **`documento_soporte`** *(v2.8)* | `id_documento` (**UUID**) | Ninguna | RUT adjunto en `BYTEA`: PDF, JPG o PNG de hasta 5 MB, con huella SHA-256 y verificación de tamaño real por `CHECK`. El contenido nunca se selecciona en listados. |
 | **`usuario_identidad_externa`** | `id_identidad` | `id_usuario` $\rightarrow$ `usuario` (CASCADE) | Identidades federadas (Google). `UNIQUE(proveedor, id_proveedor)` y `UNIQUE(id_usuario, proveedor)` (HU-CUE-02). |
-| **`codigo_verificacion`** | `id_codigo` (**UUID**) | Ninguna (se identifica por `correo`) | Códigos OTP efímeros con expiración y contador de intentos: registro, recuperación de contraseña y cambio de correo (HU-CUE-01, 05, 06). |
+| **`codigo_verificacion`** | `id_codigo` (**UUID**) | Ninguna (se identifica por `correo`) | Códigos OTP efímeros con expiración y contador de intentos: registro, recuperación de contraseña y cambio de correo (HU-CUE-01, 05, 06). Desde v3.1 también guarda el enlace de activación de empleados (`recuperacion_password`) y los tokens de sustitución del correo del admin (`cambio_correo`, huella SHA-256). Solo se almacenan hashes, nunca el valor plano. |
 
 ### Módulo 10: Configuración General — M17 (1 Tabla)
 | Tabla | PK | FKs | Descripción |

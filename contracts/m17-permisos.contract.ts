@@ -131,8 +131,12 @@ export type ErrorResponseEnvelope = z.infer<typeof errorResponseEnvelopeSchema>;
 
 /**
  * RN-ADM-12 / CA-ADM-03-03: OPACIDAD ABSOLUTA ANTE ACCESOS NO AUTORIZADOS.
- * Objeto canónico exacto que el middleware devuelve ante cualquier rechazo 403,
- * sin revelar si el recurso existía ni qué permiso faltaba.
+ *
+ * Norma del equipo (2026-10-23): la falta de permiso NO responde 403. El
+ * middleware de autorización devuelve el 404 opaco de M20
+ * (`RESPUESTA_RECURSO_NO_DISPONIBLE`, ADR-003), idéntico al de un recurso
+ * inexistente. Este objeto queda solo para reglas de negocio de la gobernanza
+ * del admin (p. ej. RN-ADM-18), nunca para la comprobación de permisos.
  */
 export const RESPUESTA_ACCESO_DENEGADO_OPACA: ErrorResponseEnvelope = {
   success: false,
@@ -163,6 +167,13 @@ export const crearEmpleadoOutputSchema = z.object({
   estado: estadoCuentaEmpleadoSchema,
   primerAccesoPendiente: z.boolean(),
   fechaCreacion: z.string().datetime(),
+  /**
+   * HU-ADM-01: el empleado recibe por correo un enlace de un solo uso para definir
+   * su contraseña; nadie más la conoce. La vigencia la fija el parámetro
+   * `auth.vigencia_enlace_activacion_horas`. `false` si el correo no salió: el
+   * admin puede reenviarlo con POST /admin/empleados/:id/reenviar-activacion.
+   */
+  activacionEnviada: z.boolean(),
 });
 export type CrearEmpleadoOutput = z.infer<typeof crearEmpleadoOutputSchema>;
 
@@ -189,8 +200,16 @@ export const resumenEmpleadoSchema = z.object({
   fechaCreacion: z.string().datetime(),
   fechaUltimoAcceso: z.string().datetime().nullable(),
   cantidadPermisos: z.number().int().nonnegative(),
+  /** Todavía no definió su contraseña con el enlace de activación. */
+  primerAccesoPendiente: z.boolean(),
 });
 export type ResumenEmpleado = z.infer<typeof resumenEmpleadoSchema>;
+
+/** POST /admin/empleados/:id/reenviar-activacion: emite un enlace nuevo e invalida los anteriores. */
+export const reenviarActivacionEmpleadoOutputSchema = z.object({
+  enviado: z.literal(true),
+});
+export type ReenviarActivacionEmpleadoOutput = z.infer<typeof reenviarActivacionEmpleadoOutputSchema>;
 
 export const listarEmpleadosOutputSchema = z.object({
   empleados: z.array(resumenEmpleadoSchema),
@@ -300,6 +319,7 @@ export const CLAVES_PARAMETROS = [
   'auth.vigencia_enlace_recuperacion_minutos',
   'auth.intentos_fallidos_bloqueo',
   'auth.duracion_bloqueo_minutos',
+  'auth.vigencia_enlace_activacion_horas',
   // Comunicaciones (RF-ADM-07-03)
   'comms.reintentos_envio_transaccional',
   // Comercial básico (RF-ADM-07-04)

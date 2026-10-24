@@ -10,7 +10,7 @@ export function enmascararCorreo(correo: string): string {
 }
 
 /** Rutas del propio flujo de acceso: volver a ellas tras autenticarse sería un bucle. */
-const RUTAS_DE_ACCESO = ['/login', '/registro', '/recuperar-contrasena', '/restablecer-contrasena'];
+const RUTAS_DE_ACCESO = ['/login', '/registro', '/recuperar-contrasena', '/restablecer-contrasena', '/activar-cuenta'];
 
 /**
  * Destino de retorno tras autenticarse (CA-SEG-02-06). Solo rutas internas

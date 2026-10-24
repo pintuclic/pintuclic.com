@@ -1,0 +1,81 @@
+name: CD - Despliegue a VPS (Docker Compose)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Despliegue via SSH al VPS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ejecutar despliegue en servidor remoto
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST || secrets.SSH_HOST }}
+          username: ${{ secrets.VPS_USER || secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+
+            # 1. Definicion de rutas y repositorio
+            TARGET_DIR="${{ secrets.DEPLOY_PATH || format('/home/{0}/pintuclic', secrets.VPS_USER || secrets.SSH_USER) }}"
+            REPO_URL="https://github.com/pintuclic/pintuclic.com.git"
+
+            echo "Ruta de despliegue: $TARGET_DIR"
+
+            # 2. Preparacion: Verificar si el repositorio ya existe en el disco
+            if [ ! -d "$TARGET_DIR/.git" ]; then
+              echo "Primer despliegue: Creando directorio y clonando repositorio..."
+              mkdir -p "$TARGET_DIR"
+              git clone "$REPO_URL" "$TARGET_DIR"
+              cd "$TARGET_DIR"
+
+              if [ -f ".env.example" ]; then
+                cp .env.example .env
+                echo "Archivo .env creado a partir de .env.example."
+              else
+                touch .env
+                echo "Archivo .env vacio creado."
+              fi
+
+              chmod 600 .env
+              echo "BLOQUEO DE SEGURIDAD: Se ha detenido el despliegue."
+              echo "Entra por SSH a tu VPS, edita el archivo '$TARGET_DIR/.env' con tus credenciales reales y vuelve a ejecutar el pipeline."
+              exit 1
+            else
+              echo "Actualizando repositorio en el servidor..."
+              cd "$TARGET_DIR"
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+
+            # 3. Control de seguridad: Verificar que el .env no este vacio antes de compilar
+            if [ ! -s ".env" ]; then
+              echo "ERROR: El archivo .env de produccion esta vacio o no existe. Abortando despliegue."
+              exit 1
+            fi
+
+            # 4. Validacion de configuracion de Docker Compose
+            echo "Validando configuracion de docker-compose..."
+            docker compose -f docker-compose.yml config --quiet
+
+            # 5. Accion principal: Compilar y levantar la infraestructura
+            echo "Compilando y levantando contenedores en produccion..."
+            docker compose -f docker-compose.yml up -d --build --remove-orphans
+
+            # 6. Verificacion de servicios
+            echo "Estado de los servicios activos:"
+            docker compose -f docker-compose.yml ps
+
+            # 7. Limpieza de imagenes huerfanas
+            docker image prune -f
+
+            echo "Despliegue completado con exito."

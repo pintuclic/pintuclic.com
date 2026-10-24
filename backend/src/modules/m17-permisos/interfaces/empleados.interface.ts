@@ -9,6 +9,16 @@ export interface EntidadEmpleado {
   idRol: number | null;
   fechaCreacion: Date;
   fechaUltimoAcceso: Date | null;
+  /** Aún no definió su contraseña (cambio_contrasena_pendiente). */
+  primerAccesoPendiente: boolean;
+}
+
+/**
+ * HU-ADM-01: envía al empleado el enlace para definir su contraseña. Lo implementa
+ * M04 y lo conecta la composición raíz (app.routes.ts); M17 no importa M04.
+ */
+export interface ActivacionEmpleadoPort {
+  enviarEnlaceActivacion(idUsuario: number): Promise<void>;
 }
 
 export interface FiltrosListadoEmpleados {

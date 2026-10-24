@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 4.2 (alineado con schema_pintuclic.sql v4.2 - RFC-M04-001)
+-- VERSIÓN: 4.3 (alineado con schema_pintuclic.sql v4.3 - rediseño del catálogo M01)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -104,179 +104,218 @@ INSERT INTO sesion (id_sesion, id_usuario, tipo_sesion, fecha_inicio, fecha_ulti
 ON CONFLICT (id_sesion) DO NOTHING;
 
 -- ==============================================================================
--- 3. MÓDULO DE CATÁLOGO, VARIANTES Y COMBOS (13 Tablas)
+-- 3. MÓDULO DE CATÁLOGO (M01) — esquema 4.3 (19 Tablas)
+-- Clasificación propuesta por el equipo (editable desde el panel):
+--   categoría = qué ES el producto · subcategoría = su especialidad
+--   superficie y ambiente (interior/exterior) = etiquetas del producto
 -- ==============================================================================
 
--- 3.1 Categoría
-INSERT INTO categoria (id_categoria, nombre) VALUES
-    (1, 'Pinturas Arquitectónicas'),
-    (2, 'Preparación y Protección de Superficies')
+-- 3.1 Categorías
+INSERT INTO categoria (id_categoria, nombre, orden) VALUES
+    (1, 'Pinturas',                   1),
+    (2, 'Preparación de superficies', 2),
+    (3, 'Maderas',                    3),
+    (4, 'Impermeabilizantes',         4),
+    (5, 'Aerosoles',                  5),
+    (6, 'Herramientas y accesorios',  6)
 ON CONFLICT (id_categoria) DO NOTHING;
 
 -- 3.2 Subcategorías
-INSERT INTO subcategorias (id_subcategoria, id_categoria, nombre) VALUES
-    (1, 1, 'Interiores y Exteriores'),
-    (2, 2, 'Anticorrosivos e Imprimantes')
+INSERT INTO subcategoria (id_subcategoria, id_categoria, nombre, orden) VALUES
+    (1,  1, 'Vinilos para muros',             1),
+    (2,  1, 'Pinturas para fachadas',         2),
+    (3,  1, 'Esmaltes',                       3),
+    (4,  1, 'Anticorrosivos',                 4),
+    (5,  1, 'Pinturas para pisos',            5),
+    (6,  1, 'Pinturas especiales',            6),
+    (7,  2, 'Estucos y masillas',             1),
+    (8,  2, 'Selladores e imprimantes',       2),
+    (9,  2, 'Removedores y limpiadores',      3),
+    (10, 3, 'Barnices',                       1),
+    (11, 3, 'Lacas',                          2),
+    (12, 3, 'Tintes e inmunizantes',          3),
+    (13, 4, 'Muros y fachadas',               1),
+    (14, 4, 'Techos y cubiertas',             2),
+    (15, 4, 'Siliconas y sellos de juntas',   3),
+    (16, 5, 'Aerosoles multisuperficie',      1),
+    (17, 5, 'Aerosoles especiales',           2),
+    (18, 6, 'Brochas',                        1),
+    (19, 6, 'Rodillos',                       2),
+    (20, 6, 'Bandejas y extensiones',         3),
+    (21, 6, 'Cintas y protección',            4),
+    (22, 6, 'Lijas y espátulas',              5)
 ON CONFLICT (id_subcategoria) DO NOTHING;
 
--- 3.3 Sub-Subcategorías
-INSERT INTO sub_subcategorias (id_sub_subcategoria, id_subcategoria, nombre) VALUES
-    (1, 1, 'Vinilos Base Agua'),
-    (2, 2, 'Bases Sintéticas')
-ON CONFLICT (id_sub_subcategoria) DO NOTHING;
+-- 3.3 Superficies (etiqueta N:M del producto)
+INSERT INTO superficie (id_superficie, nombre, orden) VALUES
+    (1, 'Paredes y techos',      1),
+    (2, 'Madera',                2),
+    (3, 'Metal',                 3),
+    (4, 'Pisos',                 4),
+    (5, 'Cubiertas y terrazas',  5),
+    (6, 'Otras superficies',     6)
+ON CONFLICT (id_superficie) DO NOTHING;
 
--- 3.4 Marca (HU-CAT-04 / prerrequisito de HU-CAT-11)
+-- 3.4 Marcas (logotipo: PNG de 1x1 como marcador)
 INSERT INTO marca (id_marca, nombre, logotipo, logotipo_mime_type) VALUES
     (1, 'Pintuco', decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'), 'image/png'),
-    (2, 'Interpinturas', decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'), 'image/png')
+    (2, 'Goya',    decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'), 'image/png')
 ON CONFLICT (id_marca) DO NOTHING;
 
--- 3.5 Línea
-INSERT INTO linea (id_linea, id_sub_subcategoria, id_marca, nombre) VALUES
-    (1, 1, 1, 'Viniltex Avanzado'),
-    (2, 2, 2, 'Pintulux Anticorrosivo')
+-- 3.5 Líneas
+INSERT INTO linea (id_linea, id_marca, nombre, gama_comercial) VALUES
+    (1, 1, 'Viniltex', 'Interiores'),
+    (2, 1, 'Koraza',   'Exteriores'),
+    (3, 1, 'Pintulux', 'Esmaltes'),
+    (4, 1, 'ICO',      'Esmaltes de fábrica')
 ON CONFLICT (id_linea) DO NOTHING;
 
--- 3.6 Base
-INSERT INTO base (id_base, id_marca, nombre) VALUES
-    (1, 1, 'Base A'),
-    (2, 1, 'Base B')
-ON CONFLICT (id_base) DO NOTHING;
-
--- 3.6b Tipo de resina (catálogo administrable - RF-CAT-02-04)
+-- 3.6 Catálogos técnicos
 INSERT INTO tipo_resina (id_tipo_resina, nombre) VALUES
-    (1, 'Base Agua'),
-    (2, 'Base Aceite')
+    (1, 'Base agua'),
+    (2, 'Base aceite')
 ON CONFLICT (id_tipo_resina) DO NOTHING;
 
--- 3.7 Producto (HU-CAT-02): marca obligatoria, clase de color, y línea/resina en pinturas
--- rendimiento en m2 por galón (HU-CAT-10) solo aplica a pinturas
-INSERT INTO producto (id_producto, id_marca, id_linea, id_tipo_resina, nombre, descripcion, clase_color, estado, publicado, rendimiento_min, rendimiento_max, id_categoria_complementaria, patrocinado) VALUES
-    (1, 1, 1, 1,    'Viniltex Máxima Protección Antibacterial', 'Pintura interior y exterior de alta lavabilidad con acabado mate.', 'colores_fijos', 'activo', true, 40.00, 45.00, 2,    false),
-    (2, 1, 1, NULL, 'Kit Renovación Hogar Premium',             'Kit práctico para renovar espacios interiores con acabado uniforme.', 'sin_color',     'activo', true, NULL,  NULL,  NULL, false),
-    (3, 2, 2, 2,    'Esmalte Anticorrosivo Secado Rápido',      'Esmalte de alta resistencia para proteger superficies metálicas.', 'colores_fijos', 'activo', true, 15.00, 20.00, NULL, true)
-ON CONFLICT (id_producto) DO NOTHING;
+INSERT INTO acabado (id_acabado, nombre, orden) VALUES
+    (1, 'Brillante',    1),
+    (2, 'Mate',         2),
+    (3, 'Semimate',     3),
+    (4, 'Satinado',     4),
+    (5, 'Transparente', 5)
+ON CONFLICT (id_acabado) DO NOTHING;
 
--- Habilita los registros históricos del seed para el storefront público.
--- UPDATE es idempotente y permite actualizar bases creadas con versiones previas.
-UPDATE producto
-SET descripcion = CASE id_producto
-        WHEN 1 THEN 'Pintura interior y exterior de alta lavabilidad con acabado mate.'
-        WHEN 2 THEN 'Kit práctico para renovar espacios interiores con acabado uniforme.'
-        WHEN 3 THEN 'Esmalte de alta resistencia para proteger superficies metálicas.'
-    END,
-    estado = 'activo',
-    publicado = true
-WHERE id_producto IN (1, 2, 3);
+INSERT INTO base (id_base, nombre, orden) VALUES
+    (1, 'Pastel', 1),
+    (2, 'Tint',   2),
+    (3, 'Deep',   3),
+    (4, 'Accent', 4)
+ON CONFLICT (id_base) DO NOTHING;
 
--- 3.7b Producto ↔ Subcategoría (RF-CAT-02-02: al menos una subcategoría)
-INSERT INTO producto_subcategoria (id_producto, id_subcategoria) VALUES
-    (1, 1),
-    (2, 1),
-    (3, 2)
-ON CONFLICT (id_producto, id_subcategoria) DO NOTHING;
+INSERT INTO familia_color (id_familia_color, nombre, hexadecimal, orden) VALUES
+    (1,  'Blancos',           '#F5F1EA', 1),
+    (2,  'Grises y negros',   '#8E9295', 2),
+    (3,  'Amarillos',         '#F5D430', 3),
+    (4,  'Naranjas',          '#F08A24', 4),
+    (5,  'Rojos',             '#D7263D', 5),
+    (6,  'Rosados y morados', '#8E5A9B', 6),
+    (7,  'Azules',            '#3B6EA5', 7),
+    (8,  'Verdes',            '#1FA34A', 8),
+    (9,  'Tierras y cafés',   '#A67C52', 9)
+ON CONFLICT (id_familia_color) DO NOTHING;
 
--- 3.8 Colores por marca (HU-CAT-05): nombre + código opcional + valor CIELAB obligatorio
-INSERT INTO color (id_color, id_marca, nombre, codigo, cie_l, cie_a, cie_b) VALUES
-    (1, 1, 'Blanco Puro',  'PIN-BLA-01', 96.000,  0.000,   0.500),
-    (2, 1, 'Azul Océano',  'PIN-AZU-07', 45.000, -5.000, -35.000),
-    (3, 2, 'Gris Titanio', NULL,         60.000,  0.000,   0.000),
-    (4, 1, 'Amarillo Sol',      'PIN-AMA-01', 85.000,   5.000,  80.000),
-    (5, 1, 'Amarillo Maíz',     'PIN-AMA-02', 78.000,   8.000,  68.000),
-    (6, 1, 'Amarillo Arena',    'PIN-AMA-03', 82.000,   4.000,  35.000),
-    (7, 1, 'Amarillo Mostaza',  'PIN-AMA-04', 65.000,  12.000,  55.000),
-    (8, 1, 'Amarillo Vainilla', 'PIN-AMA-05', 90.000,   1.000,  25.000),
-    (9, 1, 'Amarillo Dorado',   'PIN-AMA-06', 74.000,  15.000,  70.000),
-    (10, 1, 'Azul Marino',      'PIN-AZU-01', 30.000,   5.000, -35.000),
-    (11, 1, 'Azul Cielo',       'PIN-AZU-02', 75.000, -15.000, -25.000),
-    (12, 1, 'Azul Turquesa',    'PIN-AZU-03', 68.000, -28.000, -18.000),
-    (13, 1, 'Azul Noche',       'PIN-AZU-04', 22.000,   2.000, -25.000),
-    (14, 1, 'Azul Índigo',      'PIN-AZU-05', 38.000,  18.000, -42.000),
-    (15, 1, 'Verde Bosque',     'PIN-VER-01', 42.000, -40.000,  22.000),
-    (16, 1, 'Verde Menta',      'PIN-VER-02', 80.000, -34.000,  15.000),
-    (17, 1, 'Verde Oliva',      'PIN-VER-03', 55.000, -24.000,  14.000),
-    (18, 1, 'Verde Esmeralda',  'PIN-VER-04', 58.000, -52.000,  25.000),
-    (19, 1, 'Verde Salvia',     'PIN-VER-05', 72.000, -22.000,  18.000),
-    (20, 1, 'Verde Pino',       'PIN-VER-06', 34.000, -32.000,  16.000),
-    (21, 1, 'Rojo Coral',       'PIN-ROJ-01', 58.000,  55.000,  35.000),
-    (22, 1, 'Rojo Carmesí',     'PIN-ROJ-02', 42.000,  58.000,  25.000),
-    (23, 1, 'Rojo Terracota',   'PIN-ROJ-03', 50.000,  45.000,  35.000),
-    (24, 1, 'Rojo Rubí',        'PIN-ROJ-04', 40.000,  58.000,  18.000),
-    (25, 1, 'Rojo Cereza',      'PIN-ROJ-05', 48.000,  62.000,  28.000),
-    (26, 1, 'Rojo Arcilla',     'PIN-ROJ-06', 56.000,  38.000,  32.000),
-    (27, 1, 'Gris Niebla',      'PIN-GRI-01', 78.000,   0.000,   0.000),
-    (28, 1, 'Gris Plata',       'PIN-GRI-02', 68.000,  -1.000,  -1.000),
-    (29, 1, 'Gris Cemento',     'PIN-GRI-03', 52.000,   1.000,   2.000),
-    (30, 1, 'Gris Carbón',      'PIN-GRI-04', 28.000,   0.000,   0.000)
+INSERT INTO tipo_medida (id_tipo_medida, nombre, abreviatura) VALUES
+    (1, 'Galón',     'gal'),
+    (2, 'Litro',     'L'),
+    (3, 'Mililitro', 'ml'),
+    (4, 'Pulgada',   'in'),
+    (5, 'Metro',     'm'),
+    (6, 'Unidad',    'und')
+ON CONFLICT (id_tipo_medida) DO NOTHING;
+
+INSERT INTO medida (id_medida, id_tipo_medida, valor, nombre) VALUES
+    (1, 1, 0.250, '1/4 de galón'),
+    (2, 1, 1.000, '1 galón'),
+    (3, 1, 5.000, '5 galones'),
+    (4, 3, 300.000, '300 ml'),
+    (5, 4, 2.000, '2 pulgadas'),
+    (6, 4, 9.000, '9 pulgadas')
+ON CONFLICT (id_medida) DO NOTHING;
+
+-- 3.7 Colores (marca Pintuco). Base opcional: solo la omiten los colores de fábrica
+-- sin preparación (ICO) y el transparente. Acabado por defecto: Brillante.
+INSERT INTO color (id_color, id_marca, nombre, codigo, id_base, id_acabado, id_familia_color, hexadecimal) VALUES
+    (1,  1, 'Blanco Puro',       'PIN-BLA-01', 1, 1, 1, '#F7F5EF'),
+    (2,  1, 'Blanco Hueso',      'PIN-BLA-02', 1, 1, 1, '#EFE8D8'),
+    (3,  1, 'Blanco',            'PIN-BLA-03', 1, 2, 1, '#F4F2EC'),
+    (4,  1, 'Negro',             'PIN-NEG-01', 3, 2, 2, '#1E1E1E'),
+    (5,  1, 'Gris Niebla',       'PIN-GRI-01', 1, 1, 2, '#C9CBCB'),
+    (6,  1, 'Gris Carbón',       'PIN-GRI-04', 3, 1, 2, '#3B3D3F'),
+    (7,  1, 'Amarillo Vainilla', 'PIN-AMA-05', 1, 1, 3, '#F3E3A6'),
+    (8,  1, 'Amarillo Sol',      'PIN-AMA-01', 4, 1, 3, '#F7C600'),
+    (9,  1, 'Naranja Mandarina', 'PIN-NAR-01', 4, 1, 4, '#F28C28'),
+    (10, 1, 'Rojo Coral',        'PIN-ROJ-01', 2, 1, 5, '#E0654F'),
+    (11, 1, 'Rojo Carmesí',      'PIN-ROJ-02', 4, 1, 5, '#A3161E'),
+    (12, 1, 'Lila Suave',        'PIN-LIL-01', 1, 1, 6, '#D9C7E3'),
+    (13, 1, 'Azul Cielo',        'PIN-AZU-02', 1, 1, 7, '#9CC9E8'),
+    (14, 1, 'Azul Océano',       'PIN-AZU-07', 2, 1, 7, '#2F6E9E'),
+    (15, 1, 'Azul Marino',       'PIN-AZU-01', 3, 1, 7, '#1F2F55'),
+    (16, 1, 'Verde Menta',       'PIN-VER-02', 1, 1, 8, '#B8E2C8'),
+    (17, 1, 'Verde Bosque',      'PIN-VER-01', 3, 1, 8, '#2E5E3A'),
+    (18, 1, 'Terracota',         'PIN-TIE-01', 2, 1, 9, '#B5573B'),
+    (19, 1, 'Maní',              'PIN-TIE-02', 2, 1, 9, '#C9A16A'),
+    (20, 1, 'Negro ICO',         'ICO-NEG-01', NULL, 1, 2, '#111111'),
+    (21, 1, 'Rojo ICO',          'ICO-ROJ-01', NULL, 1, 5, '#B01E23'),
+    (22, 1, 'Transparente',      NULL,         NULL, 5, NULL, '#FFFFFF')
 ON CONFLICT (id_color) DO NOTHING;
 
--- 3.9 Tonos Derivados con recargo de precio
-INSERT INTO tonos (id_tono, id_color, precio) VALUES
-    (1, 2, 15000.00),
-    (2, 3, 12000.00)
-ON CONFLICT (id_tono) DO NOTHING;
+-- 3.8 Productos (marca → línea opcional → producto)
+INSERT INTO producto (id_producto, id_marca, id_linea, id_subcategoria, nombre, descripcion, uso_interior, uso_exterior, estado, publicado, id_categoria_complementaria, patrocinado) VALUES
+    (1, 1, 1,    1,  'Viniltex Ultralavable',      'Vinilo tipo 1 de alta lavabilidad para muros interiores.',          true,  false, 'activo', true, 6,    false),
+    (2, 1, 2,    2,  'Koraza Sol & Lluvia',        'Pintura para fachadas con protección contra sol y lluvia.',         false, true,  'activo', true, 6,    true),
+    (3, 1, 3,    3,  'Pintulux 3 en 1',            'Esmalte que prepara, protege y decora metal y madera.',             true,  true,  'activo', true, 6,    false),
+    (4, 1, 4,    3,  'Esmalte ICO',                'Esmalte de colores de fábrica, sin preparación por colorimetría.',  true,  true,  'activo', true, NULL, false),
+    (5, 1, NULL, 10, 'Barniz Transparente',        'Barniz para proteger y realzar la madera.',                         true,  true,  'activo', true, 6,    false),
+    (6, 2, NULL, 18, 'Brocha de cerda natural',    'Brocha para pinturas base agua y base aceite.',                    false, false, 'activo', true, NULL, false)
+ON CONFLICT (id_producto) DO NOTHING;
 
--- 3.9b Presentaciones (HU-CAT-03, RF-CAT-03-05): entidad propia con volumen numérico
-INSERT INTO presentacion (id_presentacion, nombre, volumen) VALUES
-    (1, 'Galón',           3.785),
-    (2, 'Cuarto de Galón', 0.946),
-    (3, 'Litro',           1.000)
-ON CONFLICT (id_presentacion) DO NOTHING;
+INSERT INTO ficha_recubrimiento (id_producto, id_tipo_resina, tipo_calidad, rendimiento_min, rendimiento_max) VALUES
+    (1, 1, 1,    40.00, 45.00),
+    (2, 1, 1,    35.00, 40.00),
+    (3, 2, NULL, 30.00, 35.00),
+    (4, 2, NULL, 30.00, 35.00),
+    (5, 1, NULL, 25.00, 30.00)
+ON CONFLICT (id_producto) DO NOTHING;
 
--- 3.10 Variantes Vendibles (SKU) — producto + presentación (+ color si es de colores fijos)
-INSERT INTO variante (id_variante, id_producto, id_presentacion, id_color, precio_vigente, existencia_referencial, estado) VALUES
-    (1, 1, 1, 1, 85900.00,  50, 'activo'),
-    (2, 1, 1, 2, 95900.00,  30, 'activo'),
-    (3, 3, 1, 3, 115000.00, 20, 'activo'),
-    (4, 2, 3, NULL, 129900.00, 12, 'activo'),
-    (5, 1, 1, 4,  95900.00, 20, 'activo'),
-    (6, 1, 1, 5,  95900.00, 20, 'activo'),
-    (7, 1, 1, 6,  95900.00, 20, 'activo'),
-    (8, 1, 1, 7,  95900.00, 20, 'activo'),
-    (9, 1, 1, 8,  95900.00, 20, 'activo'),
-    (10, 1, 1, 9, 95900.00, 20, 'activo'),
-    (11, 1, 1, 10, 95900.00, 20, 'activo'),
-    (12, 1, 1, 11, 95900.00, 20, 'activo'),
-    (13, 1, 1, 12, 95900.00, 20, 'activo'),
-    (14, 1, 1, 13, 95900.00, 20, 'activo'),
-    (15, 1, 1, 14, 95900.00, 20, 'activo'),
-    (16, 1, 1, 15, 95900.00, 20, 'activo'),
-    (17, 1, 1, 16, 95900.00, 20, 'activo'),
-    (18, 1, 1, 17, 95900.00, 20, 'activo'),
-    (19, 1, 1, 18, 95900.00, 20, 'activo'),
-    (20, 1, 1, 19, 95900.00, 20, 'activo'),
-    (21, 1, 1, 20, 95900.00, 20, 'activo'),
-    (22, 1, 1, 21, 95900.00, 20, 'activo'),
-    (23, 1, 1, 22, 95900.00, 20, 'activo'),
-    (24, 1, 1, 23, 95900.00, 20, 'activo'),
-    (25, 1, 1, 24, 95900.00, 20, 'activo'),
-    (26, 1, 1, 25, 95900.00, 20, 'activo'),
-    (27, 1, 1, 26, 95900.00, 20, 'activo'),
-    (28, 1, 1, 27, 95900.00, 20, 'activo'),
-    (29, 1, 1, 28, 95900.00, 20, 'activo'),
-    (30, 1, 1, 29, 95900.00, 20, 'activo'),
-    (31, 1, 1, 30, 95900.00, 20, 'activo'),
-    (32, 1, 2, 1,  28900.00, 30, 'activo'),
-    (33, 1, 2, 2,  31900.00, 25, 'activo')
-ON CONFLICT (id_variante) DO NOTHING;
+INSERT INTO producto_superficie (id_producto, id_superficie) VALUES
+    (1, 1), (2, 1), (2, 5), (3, 2), (3, 3), (4, 3), (5, 2)
+ON CONFLICT (id_producto, id_superficie) DO NOTHING;
 
--- 3.11 Características Técnicas
-INSERT INTO caracteristica (id_caracteristica, id_variante, nombre) VALUES
-    (1, 1, 'Rendimiento: 40-45 m2 por galón a dos manos'),
-    (2, 1, 'Acabado: Mate de alta lavabilidad sin olor'),
-    (3, 2, 'Resistencia a la intemperie: Filtro UV grado superior'),
-    (4, 3, 'Protección catódica contra óxido para metales')
+-- Acabados: Viniltex ofrece brillante y mate (por eso ve los colores mate)
+INSERT INTO producto_acabado (id_producto, id_acabado) VALUES
+    (1, 1), (1, 2), (2, 1), (3, 1), (4, 1), (5, 5)
+ON CONFLICT (id_producto, id_acabado) DO NOTHING;
+
+-- Bases (carta): ICO, el barniz y la brocha no tienen
+INSERT INTO producto_base (id_producto, id_base) VALUES
+    (1, 1), (1, 2), (1, 3), (1, 4),
+    (2, 1), (2, 2), (2, 3),
+    (3, 1), (3, 2), (3, 3), (3, 4)
+ON CONFLICT (id_producto, id_base) DO NOTHING;
+
+-- Colores exclusivos / de fábrica
+INSERT INTO producto_color (id_producto, id_color) VALUES
+    (1, 1), (1, 19),
+    (4, 20), (4, 21),
+    (5, 22)
+ON CONFLICT (id_producto, id_color) DO NOTHING;
+
+INSERT INTO producto_caracteristica (id_caracteristica, id_producto, nombre, valor, orden) VALUES
+    (1, 1, 'Tiempo de secado', '1 hora al tacto', 1),
+    (2, 1, 'Lavabilidad',      'Alta',            2),
+    (3, 3, 'Uso',              'Anticorrosivo y esmalte en un solo producto', 1)
 ON CONFLICT (id_caracteristica) DO NOTHING;
 
--- 3.12 Combo Cabecera
+-- 3.9 Variantes = producto + medida, con su precio
+INSERT INTO variante (id_variante, id_producto, id_medida, sku, precio_vigente, existencia_referencial, estado) VALUES
+    (1, 1, 2, 'VIN-ULT-GAL',   85900.00, 50, 'activo'),
+    (2, 1, 1, 'VIN-ULT-QT',    28900.00, 30, 'activo'),
+    (3, 1, 3, 'VIN-ULT-CUN',  389000.00, 10, 'activo'),
+    (4, 2, 2, 'KOR-SYL-GAL',   99900.00, 20, 'activo'),
+    (5, 3, 1, 'PLX-3EN1-QT',   31900.00, 25, 'activo'),
+    (6, 3, 2, 'PLX-3EN1-GAL', 109900.00, 15, 'activo'),
+    (7, 4, 1, 'ICO-ESM-QT',    27900.00, 40, 'activo'),
+    (8, 5, 1, 'BAR-TRA-QT',    34900.00, 12, 'activo'),
+    (9, 6, 5, 'GOY-BRO-2',      8900.00, 60, 'activo')
+ON CONFLICT (id_variante) DO NOTHING;
+
+-- 3.10 Combos (pendiente de rediseño en la entrega de combos)
 INSERT INTO combo (id_combo, id_producto) VALUES
-    (1, 2)
+    (1, 1)
 ON CONFLICT (id_combo) DO NOTHING;
 
--- 3.13 Detalle de Variantes en Combo
 INSERT INTO variante_combo (id_variante_combo, id_variante, id_combo, cantidad) VALUES
-    (1, 1, 1, 2),
-    (2, 2, 1, 1)
+    (1, 1, 1, 1),
+    (2, 9, 1, 2)
 ON CONFLICT (id_variante, id_combo) DO NOTHING;
 
 -- ==============================================================================
@@ -290,10 +329,12 @@ INSERT INTO carrito (id_carrito, token_visitante, id_usuario, fecha_ultima_activ
 ON CONFLICT (id_carrito) DO NOTHING;
 
 -- 4.2 Líneas de Carrito
-INSERT INTO linea_carrito (id_linea_carrito, id_carrito, id_variante, ref_viva, cantidad) VALUES
-    (1, 1, 1, 1, 2),
-    (2, 2, 2, 1, 1)
-ON CONFLICT (id_carrito, id_variante) DO NOTHING;
+-- Mismo Viniltex de 1 galón en dos colores: dos líneas distintas (variante + color, RC-21)
+INSERT INTO linea_carrito (id_linea_carrito, id_carrito, id_variante, id_color, ref_viva, cantidad) VALUES
+    (1, 1, 1, 13, 1, 2),
+    (2, 2, 2, 19, 1, 1),
+    (3, 1, 1, 14, 1, 1)
+ON CONFLICT (id_linea_carrito) DO NOTHING;
 
 -- ==============================================================================
 -- 5. MÓDULO DE COTIZACIONES Y ÓRDENES (HISTÓRICO INMUTABLE) (7 Tablas; consecutivo no lleva datos de prueba)
@@ -474,7 +515,8 @@ INSERT INTO parametro_sistema (id_parametro, clave, area, tipo_dato, descripcion
     (7, 'comms.reintentos_envio_transaccional', 'comunicaciones', 'numero', 'Reintentos automáticos ante fallas transitorias de entrega SMTP', '3'::jsonb, '3'::jsonb, 1, 5),
     (8, 'comercial.iva_porcentaje', 'comercial', 'numero', 'Porcentaje general de impuesto al valor agregado (IVA) aplicable a ventas', '19'::jsonb, '19'::jsonb, 0, 50),
     (9, 'comercial.costo_envio_base', 'comercial', 'numero', 'Tarifa base de despacho estándar a domicilio', '15000'::jsonb, '15000'::jsonb, 0, NULL),
-    (10, 'comercial.umbral_envio_gratis', 'comercial', 'numero', 'Monto mínimo de compra para exoneración de costos de envío', '200000'::jsonb, '200000'::jsonb, 0, NULL)
+    (10, 'comercial.umbral_envio_gratis', 'comercial', 'numero', 'Monto mínimo de compra para exoneración de costos de envío', '200000'::jsonb, '200000'::jsonb, 0, NULL),
+    (11, 'auth.vigencia_enlace_activacion_horas', 'autenticacion', 'numero', 'Vigencia en horas del enlace con el que un colaborador nuevo define su contraseña', '72'::jsonb, '72'::jsonb, 1, 168)
 ON CONFLICT (clave) DO NOTHING;
 
 -- Alineación con el piso de contraseña de M20 (12 caracteres, RN-SEG-01 / RFC-M17-001 D-5).
@@ -496,18 +538,20 @@ SELECT setval('asignacion_permiso_id_asignacion_permiso_seq',    COALESCE((SELEC
 SELECT setval('usuario_id_usuario_seq',                          COALESCE((SELECT MAX(id_usuario) FROM usuario), 1));
 SELECT setval('usuario_rol_id_usuario_rol_seq',                  COALESCE((SELECT MAX(id_usuario_rol) FROM usuario_rol), 1));
 SELECT setval('categoria_id_categoria_seq',                      COALESCE((SELECT MAX(id_categoria) FROM categoria), 1));
-SELECT setval('subcategorias_id_subcategoria_seq',              COALESCE((SELECT MAX(id_subcategoria) FROM subcategorias), 1));
-SELECT setval('sub_subcategorias_id_sub_subcategoria_seq',       COALESCE((SELECT MAX(id_sub_subcategoria) FROM sub_subcategorias), 1));
+SELECT setval('subcategoria_id_subcategoria_seq',               COALESCE((SELECT MAX(id_subcategoria) FROM subcategoria), 1));
+SELECT setval('superficie_id_superficie_seq',                    COALESCE((SELECT MAX(id_superficie) FROM superficie), 1));
 SELECT setval('marca_id_marca_seq',                              COALESCE((SELECT MAX(id_marca) FROM marca), 1));
 SELECT setval('linea_id_linea_seq',                              COALESCE((SELECT MAX(id_linea) FROM linea), 1));
 SELECT setval('base_id_base_seq',                                COALESCE((SELECT MAX(id_base) FROM base), 1));
 SELECT setval('producto_id_producto_seq',                        COALESCE((SELECT MAX(id_producto) FROM producto), 1));
 SELECT setval('tipo_resina_id_tipo_resina_seq',                  COALESCE((SELECT MAX(id_tipo_resina) FROM tipo_resina), 1));
 SELECT setval('color_id_color_seq',                              COALESCE((SELECT MAX(id_color) FROM color), 1));
-SELECT setval('tonos_id_tono_seq',                               COALESCE((SELECT MAX(id_tono) FROM tonos), 1));
-SELECT setval('presentacion_id_presentacion_seq',                COALESCE((SELECT MAX(id_presentacion) FROM presentacion), 1));
+SELECT setval('acabado_id_acabado_seq',                          COALESCE((SELECT MAX(id_acabado) FROM acabado), 1));
+SELECT setval('familia_color_id_familia_color_seq',              COALESCE((SELECT MAX(id_familia_color) FROM familia_color), 1));
+SELECT setval('tipo_medida_id_tipo_medida_seq',                  COALESCE((SELECT MAX(id_tipo_medida) FROM tipo_medida), 1));
+SELECT setval('medida_id_medida_seq',                            COALESCE((SELECT MAX(id_medida) FROM medida), 1));
 SELECT setval('variante_id_variante_seq',                        COALESCE((SELECT MAX(id_variante) FROM variante), 1));
-SELECT setval('caracteristica_id_caracteristica_seq',            COALESCE((SELECT MAX(id_caracteristica) FROM caracteristica), 1));
+SELECT setval('producto_caracteristica_id_caracteristica_seq',   COALESCE((SELECT MAX(id_caracteristica) FROM producto_caracteristica), 1));
 SELECT setval('combo_id_combo_seq',                              COALESCE((SELECT MAX(id_combo) FROM combo), 1));
 SELECT setval('variante_combo_id_variante_combo_seq',            COALESCE((SELECT MAX(id_variante_combo) FROM variante_combo), 1));
 SELECT setval('carrito_id_carrito_seq',                          COALESCE((SELECT MAX(id_carrito) FROM carrito), 1));

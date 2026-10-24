@@ -42,14 +42,14 @@ Todos los usuarios de prueba comparten la misma contraseña para facilitar las p
 
 ---
 
-## 📦 4. Resumen de Entidades Precargadas en las 31 Tablas
+## 📦 4. Resumen de Entidades Precargadas
 
-El script `seed_pintuclic.sql` garantiza que **todas las 31 tablas** cuenten con relaciones válidas y consistentes:
+El script `seed_pintuclic.sql` llena **48 de las 53 tablas** con relaciones válidas y consistentes (v3.1). Quedan vacías a propósito `busqueda_sin_resultado`, `consecutivo`, `control_intento_acceso`, `imagen` y `producto_base`, que se llenan con el uso:
 
 ```text
 [Descuentos & Roles]
   descuento (15% y 10%) ──> sub_rol_empresa (Distribuidor, Contratista) ──> rol (admin, cliente, empresa_vip)
-  permisos (5 atómicos) ──> asignacion_permiso (matriz N:M)
+  permisos (21 atómicos, incluido empresas.validar) ──> asignacion_permiso (matriz N:M)
 
 [Usuarios & Sesiones]
   usuario (4 cuentas) ──> usuario_rol (1:1)
@@ -80,6 +80,17 @@ El script `seed_pintuclic.sql` garantiza que **todas las 31 tablas** cuenten con
 
 [Servicios & Citas]
   reservaciones (agendamiento de servicio técnico de aplicación)
+
+[Cuentas y Empresas - M04]
+  direccion_cliente (3 direcciones)
+  solicitud_empresa (registro aprobado y ascenso pendiente) ──> cuenta_empresa (NIT vigente 900555666-1)
+  solicitud_actualizacion_nit (renovación pendiente) ──> documento_soporte (RUT de ejemplo)
+  usuario_identidad_externa (1 identidad Google)
+  codigo_verificacion (1 OTP de registro)
+  Todo NIT lleva guion antes del dígito de verificación (decisión del PO, 2026-10-23).
+
+[Configuración General - M17]
+  parametro_sistema (11 parámetros: 7 de autenticación, 1 de comunicaciones y 3 comerciales)
 
 [Privacidad y Habeas Data - M20]
   aviso_privacidad (v1.0-2026 vigente, v0.9-2025 histórica)

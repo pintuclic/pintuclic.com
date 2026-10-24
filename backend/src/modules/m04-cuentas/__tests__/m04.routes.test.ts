@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AutorizacionService } from '../../m20-seguridad/services/autorizacion.service';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
+import { MockGoogleAuthAdapter } from '../adapters/google-auth.adapter';
 import { construirModuloM04 } from '../m04.routes';
 
 /** El ensamblaje no ejecuta autorización: solo exige que exista el colaborador. */
@@ -40,8 +41,6 @@ describe('m04.routes · Ensamblaje y registro de rutas de cuentas y perfiles', (
     expect(paths).toContain('/registro/reenviar-otp');
     expect(paths).toContain('/login');
     expect(paths).toContain('/cambio-password-primer-acceso');
-    expect(paths).toContain('/oauth/google');
-    expect(paths).toContain('/oauth/google/completar');
     expect(paths).toContain('/recuperar-password/solicitar');
     expect(paths).toContain('/recuperar-password/confirmar');
     expect(paths).toContain('/empresas/registro');
@@ -58,6 +57,21 @@ describe('m04.routes · Ensamblaje y registro de rutas de cuentas y perfiles', (
     expect(paths).toContain('/direcciones/:idDireccion/predeterminada');
     expect(paths).toContain('/empresas/ascenso');
     expect(paths).toContain('/empresas/renovacion-nit');
+  });
+
+  it('HU-CUE-02 aplazada: sin adaptador de Google inyectado no monta las rutas OAuth', () => {
+    const sesionService = {} as unknown as SesionService;
+    const rutasOauth = (m04: ReturnType<typeof construirModuloM04>): (string | undefined)[] =>
+      m04.cuentasRouter.stack
+        .map((layer) => layer.route?.path)
+        .filter((path) => path?.startsWith('/oauth'));
+
+    expect(rutasOauth(construirModuloM04(sesionService, autorizacion))).toEqual([]);
+    expect(
+      rutasOauth(
+        construirModuloM04(sesionService, autorizacion, { googleAuth: new MockGoogleAuthAdapter() }),
+      ),
+    ).toEqual(['/oauth/google', '/oauth/google/completar']);
   });
 
   it('el router de administración de empresas registra las rutas de gestión de solicitudes', () => {

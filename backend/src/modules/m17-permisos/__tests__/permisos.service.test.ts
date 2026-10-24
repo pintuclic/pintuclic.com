@@ -46,6 +46,7 @@ function crearMockPermisos(): {
           idRol: 10,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          primerAccesoPendiente: false,
         });
       }
       return Promise.resolve(null);
@@ -61,6 +62,7 @@ function crearMockPermisos(): {
         idRol: 10,
         fechaCreacion: new Date(),
         fechaUltimoAcceso: null,
+        primerAccesoPendiente: false,
       }),
     ),
     actualizarContacto: vi.fn().mockImplementation((id, datos) =>
@@ -73,6 +75,7 @@ function crearMockPermisos(): {
         idRol: 10,
         fechaCreacion: new Date(),
         fechaUltimoAcceso: null,
+        primerAccesoPendiente: false,
       }),
     ),
     actualizarEstado: vi.fn().mockResolvedValue(undefined),
