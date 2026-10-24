@@ -33,7 +33,13 @@ export function construirModuloM18(
   // Adaptador de envío (inyección configurable para pruebas desacopladas)
   const notificaciones =
     config?.notificaciones ??
-    crearNotificacionesAdapterDesdeEntorno(process.env, undefined, registroEnviosRepo, config?.parametros);
+    crearNotificacionesAdapterDesdeEntorno(
+      process.env,
+      undefined,
+      registroEnviosRepo,
+      config?.parametros,
+      plantillasRepo,
+    );
 
   // Servicios de dominio
   const plantillasService = new PlantillasService(plantillasRepo);

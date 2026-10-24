@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { PlantillasRepositoryPort } from '../interfaces/plantillas.port';
 import type { RegistroEnviosRepositoryPort } from '../interfaces/registro-envios.port';
 import {
   crearNotificacionesAdapterDesdeEntorno,
@@ -215,6 +216,55 @@ describe('SmtpNotificacionesAdapter · Envío de correos transaccionales por SMT
       expect(registrarResultadoMock).toHaveBeenCalledWith(
         expect.objectContaining({ estado: 'fallido', intentos: 1, maxIntentos: 1 }),
       );
+    });
+  });
+
+  describe('HU-NOT-03 · El envío real usa el contenido editado en plantilla_notificacion', () => {
+    function crearPlantillasMock(plantilla: Awaited<ReturnType<PlantillasRepositoryPort['obtenerPorTipo']>>): {
+      plantillas: PlantillasRepositoryPort;
+    } {
+      return {
+        plantillas: {
+          listar: vi.fn().mockResolvedValue([]),
+          obtenerPorTipo: vi.fn().mockResolvedValue(plantilla),
+          actualizar: vi.fn(),
+        },
+      };
+    }
+
+    it('sustituye los placeholders {{variable}} del contenido editado por el admin, en vez del texto hardcodeado', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      const { plantillas } = crearPlantillasMock({
+        idPlantilla: 'p-1',
+        tipo: 'registro_otp',
+        asunto: 'Tu código Pintu Clic: {{codigo_otp}}',
+        contenidoTexto: 'Código: {{codigo_otp}} (vence en {{minutos_vigencia}} min)',
+        contenidoHtml: '<p>Código: {{codigo_otp}}</p>',
+        variablesDisponibles: ['codigo_otp', 'minutos_vigencia'],
+        variablesObligatorias: ['codigo_otp'],
+        fechaActualizacion: new Date(),
+        idUsuarioActualizo: 1,
+      });
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter, undefined, undefined, plantillas);
+
+      await adapter.enviarCodigoRegistro('cliente@gmail.com', '777888', 20);
+
+      const args = sendMailMock.mock.calls[0]?.[0];
+      expect(args.subject).toBe('Tu código Pintu Clic: 777888');
+      expect(args.text).toBe('Código: 777888 (vence en 20 min)');
+      expect(args.html).toBe('<p>Código: 777888</p>');
+    });
+
+    it('cae en el contenido de respaldo si no hay plantilla para ese tipo', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      const { plantillas } = crearPlantillasMock(null);
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter, undefined, undefined, plantillas);
+
+      await adapter.enviarCodigoRegistro('cliente@gmail.com', '999000', 10);
+
+      const args = sendMailMock.mock.calls[0]?.[0];
+      expect(args.subject).toContain('Código de verificación');
+      expect(args.text).toContain('999000');
     });
   });
 });
