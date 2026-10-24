@@ -251,6 +251,9 @@ export const CatalogoPublicoView: React.FC = () => {
                     description={`${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
                     price={p.precioDesde ?? 0}
                     href={`/productos/${p.idProducto}`}
+                    {...(p.idImagenPrincipal === null
+                      ? {}
+                      : { imageUrl: catalogoPublicoApi.urlImagen(p.idImagenPrincipal) })}
                     className="w-full"
                   />
                 </li>
