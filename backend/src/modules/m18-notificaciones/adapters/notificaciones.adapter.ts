@@ -1,5 +1,11 @@
 import nodemailer from 'nodemailer';
 import type { EventoNotificacion, NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { ParametrosComunicacionesPort } from '../interfaces/parametros-comunicaciones.port';
+import type {
+  EstadoEnvio,
+  RegistroEnviosRepositoryPort,
+  TipoComunicacion,
+} from '../interfaces/registro-envios.port';
 
 export interface OpcionesEnvioCorreo {
   from: string;
@@ -23,6 +29,9 @@ export interface ConfiguracionSmtp {
   frontendBaseUrl: string;
 }
 
+const MAX_INTENTOS_POR_DEFECTO = 3;
+const BACKOFF_BASE_MS = 200;
+
 export function escaparHtml(texto: string): string {
   return texto
     .replace(/&/g, '&amp;')
@@ -45,6 +54,42 @@ export function resolverRemitenteSmtp(host: string, user: string, fromConfigurad
     return `"${nombreVisible}" <${user}>`;
   }
   return limpio;
+}
+
+/** Repositorio no-op para construir el adapter SMTP sin M18 persistente (ej. tests de M04). */
+export class RegistroEnviosEnMemoria implements RegistroEnviosRepositoryPort {
+  public registros: Array<{
+    tipo: TipoComunicacion;
+    destinatario: string;
+    estado: EstadoEnvio;
+    intentos: number;
+    maxIntentos: number;
+    ultimoError?: string;
+  }> = [];
+
+  async registrarResultado(datos: {
+    tipo: TipoComunicacion;
+    destinatario: string;
+    estado: EstadoEnvio;
+    intentos: number;
+    maxIntentos: number;
+    ultimoError?: string;
+  }): Promise<string> {
+    this.registros.push(datos);
+    return `memoria-${this.registros.length}`;
+  }
+
+  async registrarRebote(): Promise<void> {
+    // No-op: sin persistencia real en memoria.
+  }
+
+  async listarEnvios(): Promise<{ envios: never[]; total: number }> {
+    return { envios: [], total: 0 };
+  }
+
+  async listarRebotes(): Promise<{ rebotes: never[]; total: number }> {
+    return { rebotes: [], total: 0 };
+  }
 }
 
 export class MemoriaNotificacionesAdapter implements NotificacionesPort {
@@ -154,12 +199,23 @@ export class NoOpNotificacionesAdapter implements NotificacionesPort {
   }
 }
 
+function esperar(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class SmtpNotificacionesAdapter implements NotificacionesPort {
   private readonly transporter: TransporteCorreoPort;
   private readonly from: string;
   private readonly frontendBaseUrl: string;
+  private readonly registroEnvios: RegistroEnviosRepositoryPort;
+  private readonly parametros: ParametrosComunicacionesPort | undefined;
 
-  constructor(config: ConfiguracionSmtp, transporter?: TransporteCorreoPort) {
+  constructor(
+    config: ConfiguracionSmtp,
+    transporter?: TransporteCorreoPort,
+    registroEnvios?: RegistroEnviosRepositoryPort,
+    parametros?: ParametrosComunicacionesPort,
+  ) {
     this.from = resolverRemitenteSmtp(config.host, config.user, config.from);
     this.frontendBaseUrl = config.frontendBaseUrl.replace(/\/+$/, '');
     this.transporter =
@@ -176,11 +232,63 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
         greetingTimeout: 10_000,
         socketTimeout: 15_000,
       });
+    this.registroEnvios = registroEnvios ?? new RegistroEnviosEnMemoria();
+    this.parametros = parametros;
+  }
+
+  /**
+   * RF-NOT-01-03: reintenta un número limitado de veces antes de dar el envío por
+   * fallido. RF-NOT-01-04: registra el resultado final (éxito o fallo), nunca el
+   * contenido del correo ni datos sensibles.
+   */
+  private async enviarConRegistro(
+    tipo: TipoComunicacion,
+    destinatario: string,
+    construirMensaje: () => OpcionesEnvioCorreo,
+  ): Promise<void> {
+    const maxIntentos = await this.resolverMaxIntentos();
+    let intentos = 0;
+    let ultimoError: string | undefined;
+
+    while (intentos < maxIntentos) {
+      intentos += 1;
+      try {
+        await this.transporter.sendMail(construirMensaje());
+        await this.registroEnvios.registrarResultado({
+          tipo,
+          destinatario,
+          estado: 'enviado',
+          intentos,
+          maxIntentos,
+        });
+        return;
+      } catch (err: unknown) {
+        ultimoError = err instanceof Error ? err.message : 'Error desconocido al enviar el correo';
+        if (intentos < maxIntentos) {
+          await esperar(BACKOFF_BASE_MS * intentos);
+        }
+      }
+    }
+
+    await this.registroEnvios.registrarResultado({
+      tipo,
+      destinatario,
+      estado: 'fallido',
+      intentos,
+      maxIntentos,
+      ...(ultimoError !== undefined ? { ultimoError } : {}),
+    });
+  }
+
+  private async resolverMaxIntentos(): Promise<number> {
+    if (!this.parametros) return MAX_INTENTOS_POR_DEFECTO;
+    const valor = await this.parametros.obtenerNumero('comms.reintentos_envio_transaccional');
+    return valor !== null && valor > 0 ? valor : MAX_INTENTOS_POR_DEFECTO;
   }
 
   async enviarCodigoRegistro(correo: string, codigoOtp: string, minutosVigencia: number): Promise<void> {
     const otpSeguro = escaparHtml(codigoOtp);
-    await this.transporter.sendMail({
+    await this.enviarConRegistro('registro_otp', correo, () => ({
       from: this.from,
       to: correo,
       subject: 'Código de verificación de tu cuenta · Pintu Clic',
@@ -203,13 +311,13 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
           <p style="font-size: 12px; color: #6B7280; margin-top: 24px;">Si no solicitaste este código, ignora este correo.</p>
         </div>
       `.trim(),
-    });
+    }));
   }
 
   async enviarEnlaceRecuperacion(correo: string, token: string, minutosVigencia: number): Promise<void> {
     const enlace = `${this.frontendBaseUrl}/restablecer-contrasena?token=${encodeURIComponent(token)}`;
     const enlaceSeguro = escaparHtml(enlace);
-    await this.transporter.sendMail({
+    await this.enviarConRegistro('recuperacion_password', correo, () => ({
       from: this.from,
       to: correo,
       subject: 'Restablecimiento de contraseña · Pintu Clic',
@@ -234,14 +342,14 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
           <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
         </div>
       `.trim(),
-    });
+    }));
   }
 
   async enviarEnlaceActivacion(correo: string, nombre: string, token: string, horasVigencia: number): Promise<void> {
     const enlace = `${this.frontendBaseUrl}/activar-cuenta?token=${encodeURIComponent(token)}`;
     const enlaceSeguro = escaparHtml(enlace);
     const nombreSeguro = escaparHtml(nombre);
-    await this.transporter.sendMail({
+    await this.enviarConRegistro('activacion_empleado', correo, () => ({
       from: this.from,
       to: correo,
       subject: 'Activa tu cuenta de colaborador · Pintu Clic',
@@ -267,12 +375,12 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
           <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
         </div>
       `.trim(),
-    });
+    }));
   }
 
   async enviarCodigoCambioCorreo(correoNuevo: string, codigoOtp: string, minutosVigencia: number): Promise<void> {
     const otpSeguro = escaparHtml(codigoOtp);
-    await this.transporter.sendMail({
+    await this.enviarConRegistro('cambio_correo_otp', correoNuevo, () => ({
       from: this.from,
       to: correoNuevo,
       subject: 'Confirma tu nuevo correo electrónico · Pintu Clic',
@@ -294,12 +402,12 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
           <p style="font-size: 13px; color: #4B5563;">Este código tiene una vigencia de <strong>${minutosVigencia} minutos</strong>.</p>
         </div>
       `.trim(),
-    });
+    }));
   }
 
   async notificarCambioCorreoConfirmado(correoAnterior: string, nuevoCorreo: string): Promise<void> {
     const nuevoSeguro = escaparHtml(nuevoCorreo);
-    await this.transporter.sendMail({
+    await this.enviarConRegistro('cambio_correo_confirmado', correoAnterior, () => ({
       from: this.from,
       to: correoAnterior,
       subject: 'Aviso de seguridad: cambio de correo electrónico · Pintu Clic',
@@ -317,7 +425,7 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
           <p style="font-size: 13px; color: #4B5563;">Si no autorizaste este cambio, comunícate de inmediato con nuestro equipo de soporte.</p>
         </div>
       `.trim(),
-    });
+    }));
   }
 
   async notificarDictamenEmpresa(
@@ -331,7 +439,7 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
       ? `<p style="font-size: 14px; color: #991B1B; background: #FEF2F2; padding: 12px; border-radius: 6px;"><strong>Motivo:</strong> ${escaparHtml(motivoLimpio)}</p>`
       : '';
 
-    await this.transporter.sendMail({
+    await this.enviarConRegistro('dictamen_empresa', correo, () => ({
       from: this.from,
       to: correo,
       subject: aprobada
@@ -358,13 +466,15 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
           ${motivoHtml}
         </div>
       `.trim(),
-    });
+    }));
   }
 }
 
 export function crearNotificacionesAdapterDesdeEntorno(
   env: NodeJS.ProcessEnv = process.env,
   transporter?: TransporteCorreoPort,
+  registroEnvios?: RegistroEnviosRepositoryPort,
+  parametros?: ParametrosComunicacionesPort,
 ): NotificacionesPort {
   if (env.NODE_ENV === 'test') {
     return new MemoriaNotificacionesAdapter();
@@ -392,6 +502,8 @@ export function crearNotificacionesAdapterDesdeEntorno(
         frontendBaseUrl,
       },
       transporter,
+      registroEnvios,
+      parametros,
     );
   }
 

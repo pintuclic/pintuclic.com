@@ -1,7 +1,7 @@
 import { derivarContrasena, verificarContrasena } from '../../../core/utils/crypto';
 import { esUsuarioAdministrativo, type CuentasRepository } from '../repositories/cuentas.repository';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
-import type { NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import type { DateProviderPort } from '../interfaces/date-provider.port';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import { generarCodigoOtp } from './codigo-otp';

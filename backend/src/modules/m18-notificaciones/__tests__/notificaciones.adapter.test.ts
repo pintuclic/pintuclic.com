@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { RegistroEnviosRepositoryPort } from '../interfaces/registro-envios.port';
 import {
   crearNotificacionesAdapterDesdeEntorno,
   MemoriaNotificacionesAdapter,
@@ -28,6 +29,20 @@ function crearTransporteMock(): {
     transporter: { sendMail: sendMailMock },
     sendMailMock,
   };
+}
+
+function crearRegistroMock(): {
+  registro: RegistroEnviosRepositoryPort;
+  registrarResultadoMock: ReturnType<typeof vi.fn>;
+} {
+  const registrarResultadoMock = vi.fn().mockResolvedValue('envio-1');
+  const registro: RegistroEnviosRepositoryPort = {
+    registrarResultado: registrarResultadoMock,
+    registrarRebote: vi.fn().mockResolvedValue(undefined),
+    listarEnvios: vi.fn().mockResolvedValue({ envios: [], total: 0 }),
+    listarRebotes: vi.fn().mockResolvedValue({ rebotes: [], total: 0 }),
+  };
+  return { registro, registrarResultadoMock };
 }
 
 describe('SmtpNotificacionesAdapter · Envío de correos transaccionales por SMTP', () => {
@@ -141,5 +156,65 @@ describe('SmtpNotificacionesAdapter · Envío de correos transaccionales por SMT
       transporter,
     );
     expect(sinSmtp).toBeInstanceOf(NoOpNotificacionesAdapter);
+  });
+
+  describe('RF-NOT-01-03 / RF-NOT-01-04 · Reintentos y registro de envíos', () => {
+    it('reintenta tras un fallo transitorio y registra el envío como exitoso', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      sendMailMock.mockRejectedValueOnce(new Error('ECONNRESET')).mockResolvedValueOnce({ messageId: '<ok>' });
+      const { registro, registrarResultadoMock } = crearRegistroMock();
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter, registro);
+
+      await adapter.enviarCodigoRegistro('cliente@gmail.com', '111222', 15);
+
+      expect(sendMailMock).toHaveBeenCalledTimes(2);
+      expect(registrarResultadoMock).toHaveBeenCalledOnce();
+      expect(registrarResultadoMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: 'registro_otp',
+          destinatario: 'cliente@gmail.com',
+          estado: 'enviado',
+          intentos: 2,
+          maxIntentos: 3,
+        }),
+      );
+    });
+
+    it('agota los reintentos configurados y registra el envío como fallido sin exponer el contenido', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      sendMailMock.mockRejectedValue(new Error('SMTP timeout'));
+      const { registro, registrarResultadoMock } = crearRegistroMock();
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter, registro);
+
+      await adapter.enviarCodigoRegistro('cliente@gmail.com', '333444', 15);
+
+      expect(sendMailMock).toHaveBeenCalledTimes(3);
+      expect(registrarResultadoMock).toHaveBeenCalledOnce();
+      const llamada = registrarResultadoMock.mock.calls[0]?.[0];
+      expect(llamada).toMatchObject({
+        tipo: 'registro_otp',
+        destinatario: 'cliente@gmail.com',
+        estado: 'fallido',
+        intentos: 3,
+        maxIntentos: 3,
+        ultimoError: 'SMTP timeout',
+      });
+      expect(JSON.stringify(llamada)).not.toContain('333444');
+    });
+
+    it('usa el límite de reintentos del puerto de parámetros cuando se inyecta', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      sendMailMock.mockRejectedValue(new Error('fallo persistente'));
+      const { registro, registrarResultadoMock } = crearRegistroMock();
+      const parametros = { obtenerNumero: vi.fn().mockResolvedValue(1) };
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter, registro, parametros);
+
+      await adapter.enviarCodigoRegistro('cliente@gmail.com', '555666', 15);
+
+      expect(sendMailMock).toHaveBeenCalledTimes(1);
+      expect(registrarResultadoMock).toHaveBeenCalledWith(
+        expect.objectContaining({ estado: 'fallido', intentos: 1, maxIntentos: 1 }),
+      );
+    });
   });
 });

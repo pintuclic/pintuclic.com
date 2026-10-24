@@ -1,8 +1,8 @@
 /**
  * ============================================================================
- * PUERTO DE NOTIFICACIONES — M04 (ADR-009)
+ * PUERTO DE NOTIFICACIONES — M18 (ADR-009, migrado desde m04-cuentas)
  * ============================================================================
- * Desacopla la lógica de cuentas de la implementación de correo SMTP (M18).
+ * Desacopla cualquier módulo de negocio de la implementación SMTP real.
  * En tests se sustituye por MemoriaNotificacionesAdapter.
  * ============================================================================
  */
@@ -32,4 +32,17 @@ export interface NotificacionesPort {
     motivoRechazo?: string
   ): Promise<void>;
   notificarCambioCorreoConfirmado?(correoAnterior: string, nuevoCorreo: string): Promise<void>;
+}
+
+/**
+ * HU-NOT-02 (pendiente de M08): forma del aviso que M08 emitirá cuando cambie el
+ * estado de una orden. Tipo exportado solo como contrato — sin método en
+ * `NotificacionesPort` ni wiring, hasta que M08 exista (RF-NOT-02-01, RF-NOT-02-04).
+ */
+export interface EventoCambioEstadoOrden {
+  idOrden: number;
+  correoCliente: string;
+  estadoAnterior: string;
+  estadoNuevo: string;
+  timestamp: Date;
 }
