@@ -68,6 +68,15 @@ export class MemoriaNotificacionesAdapter implements NotificacionesPort {
     });
   }
 
+  async enviarEnlaceActivacion(correo: string, nombre: string, token: string, horasVigencia: number): Promise<void> {
+    this.eventos.push({
+      tipo: 'activacion_empleado',
+      destinatario: correo,
+      timestamp: new Date(),
+      metadatos: { nombre, token, horasVigencia },
+    });
+  }
+
   async enviarCodigoCambioCorreo(correoNuevo: string, codigoOtp: string, minutosVigencia: number): Promise<void> {
     this.eventos.push({
       tipo: 'cambio_correo_otp',
@@ -125,6 +134,10 @@ export class NoOpNotificacionesAdapter implements NotificacionesPort {
   }
 
   async enviarEnlaceRecuperacion(): Promise<void> {
+    // No-op
+  }
+
+  async enviarEnlaceActivacion(): Promise<void> {
     // No-op
   }
 
@@ -218,6 +231,39 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
             </a>
           </p>
           <p style="font-size: 13px; color: #4B5563;">Este enlace expirará en <strong>${minutosVigencia} minutos</strong>.</p>
+          <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
+        </div>
+      `.trim(),
+    });
+  }
+
+  async enviarEnlaceActivacion(correo: string, nombre: string, token: string, horasVigencia: number): Promise<void> {
+    const enlace = `${this.frontendBaseUrl}/activar-cuenta?token=${encodeURIComponent(token)}`;
+    const enlaceSeguro = escaparHtml(enlace);
+    const nombreSeguro = escaparHtml(nombre);
+    await this.transporter.sendMail({
+      from: this.from,
+      to: correo,
+      subject: 'Activa tu cuenta de colaborador · Pintu Clic',
+      text: [
+        `Hola, ${nombre}.`,
+        '',
+        'Te crearon una cuenta de colaborador en Pintu Clic.',
+        `Abre el siguiente enlace para definir tu contraseña (válido por ${horasVigencia} horas):`,
+        enlace,
+        '',
+        'Si el enlace vence, pide al administrador que te envíe uno nuevo.',
+      ].join('\n'),
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
+          <h2 style="color: #0B2D6B; margin-top: 0;">Bienvenido a Pintu Clic, ${nombreSeguro}</h2>
+          <p>Te crearon una cuenta de colaborador. Define tu contraseña para empezar.</p>
+          <p style="margin: 24px 0;">
+            <a href="${enlaceSeguro}" style="background: #F47B20; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 20px; border-radius: 6px; display: inline-block;">
+              Definir mi contraseña
+            </a>
+          </p>
+          <p style="font-size: 13px; color: #4B5563;">Este enlace expirará en <strong>${horasVigencia} horas</strong> y solo puede usarse una vez.</p>
           <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
         </div>
       `.trim(),

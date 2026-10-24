@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cambioContrasenaPrimerAccesoRequestSchema,
+  loginResponseSchema,
   nitSchema,
   normalizarNit,
+  reenviarCodigoOtpRequestSchema,
   registroEmpresaRequestSchema,
   solicitarAscensoEmpresaRequestSchema,
   solicitarRenovacionNitRequestSchema,
+  verificarCodigoOtpRequestSchema,
 } from '../dtos/m04-cuentas.dto';
 
 /**
@@ -85,5 +89,39 @@ describe('esquemas con NIT normalizado', () => {
         contenidoBase64: 'QQ==',
       }).success,
     ).toBe(false);
+  });
+});
+
+/**
+ * El contrato describe lo que el frontend envía y recibe. Antes pedía `correo` para
+ * reenviar el OTP, el frontend envía `idVerificacion` y el reenvío fallaba siempre.
+ */
+describe('payloads de registro y primer acceso que envía el frontend', () => {
+  const idVerificacion = '44444444-4444-4444-8444-444444444444';
+
+  it('reenviar OTP acepta { idVerificacion } y rechaza el payload anterior { correo }', () => {
+    expect(reenviarCodigoOtpRequestSchema.safeParse({ idVerificacion }).success).toBe(true);
+    expect(reenviarCodigoOtpRequestSchema.safeParse({ correo: 'ana@pintuclic.com' }).success).toBe(false);
+  });
+
+  it('verificar OTP exige idVerificacion además de correo y código', () => {
+    const base = { correo: 'ana@pintuclic.com', codigo: '123456' };
+    expect(verificarCodigoOtpRequestSchema.safeParse({ ...base, idVerificacion }).success).toBe(true);
+    expect(verificarCodigoOtpRequestSchema.safeParse(base).success).toBe(false);
+  });
+
+  it('el cambio de clave de primer acceso exige el tokenCambio en el cuerpo', () => {
+    const base = { contrasenaActual: 'Temporal2026!', nuevaContrasena: 'ClaveSegura2026!' };
+    expect(cambioContrasenaPrimerAccesoRequestSchema.safeParse({ ...base, tokenCambio: 'x'.repeat(20) }).success).toBe(true);
+    expect(cambioContrasenaPrimerAccesoRequestSchema.safeParse(base).success).toBe(false);
+  });
+
+  it('el login describe las dos respuestas: sesión abierta o cambio de clave obligatorio', () => {
+    const usuario = { idUsuario: 7, nombre: 'Ana Pérez', correo: 'ana@pintuclic.com', tipo: 'normal' };
+    expect(loginResponseSchema.safeParse({ usuario, cambioContrasenaPendiente: false }).success).toBe(true);
+    expect(
+      loginResponseSchema.safeParse({ usuario: { idUsuario: 7 }, cambioContrasenaPendiente: true, tokenCambio: 'x'.repeat(20) }).success,
+    ).toBe(true);
+    expect(loginResponseSchema.safeParse({ usuario: { idUsuario: 7 }, cambioContrasenaPendiente: true }).success).toBe(false);
   });
 });

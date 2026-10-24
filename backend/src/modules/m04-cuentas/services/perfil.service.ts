@@ -99,7 +99,7 @@ export class PerfilService {
 
     const coincideActual = await verificarContrasena(input.contrasenaActual, usuario.contrasena);
     if (!coincideActual) {
-      throw new PerfilError('La contraseña actual es incorrecta.', 'CREDENCIALES_INVALIDAS', 400);
+      throw new PerfilError('La contraseña actual es incorrecta.', 'CONTRASENA_INCORRECTA', 400);
     }
 
     const nuevoHash = await derivarContrasena(input.nuevaContrasena);
@@ -125,7 +125,7 @@ export class PerfilService {
     // Validar contraseña antes de emitir cambio
     const coincide = await verificarContrasena(input.contrasena, usuario.contrasena);
     if (!coincide) {
-      throw new PerfilError('La contraseña es incorrecta.', 'CREDENCIALES_INVALIDAS', 400);
+      throw new PerfilError('La contraseña es incorrecta.', 'CONTRASENA_INCORRECTA', 400);
     }
 
     const nuevoCorreoNormalizado = input.nuevoCorreo.trim().toLowerCase();
@@ -246,7 +246,7 @@ export class PerfilService {
 
     const coincide = await verificarContrasena(input.contrasena, usuario.contrasena);
     if (!coincide) {
-      throw new PerfilError('Contraseña incorrecta.', 'CREDENCIALES_INVALIDAS', 400);
+      throw new PerfilError('Contraseña incorrecta.', 'CONTRASENA_INCORRECTA', 400);
     }
 
     await this.cuentasRepo.desactivarCuenta(idUsuario);

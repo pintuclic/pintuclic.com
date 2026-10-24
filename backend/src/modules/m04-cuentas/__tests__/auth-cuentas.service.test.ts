@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import jwt from 'jsonwebtoken';
 import type { CodigoVerificacion, Sesion, Usuario, UsuarioIdentidadExterna } from '@prisma/client';
 import { derivarContrasena } from '../../../core/utils/crypto';
 import type { CuentasRepository } from '../repositories/cuentas.repository';
@@ -122,6 +123,7 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
         } as CodigoVerificacion)
       ),
       eliminar: vi.fn().mockResolvedValue(undefined),
+      eliminarPorCorreoYTipo: vi.fn(),
     };
 
     controlIntentosRepo = {
@@ -142,6 +144,7 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
       enviarCodigoRegistro: vi.fn().mockResolvedValue(undefined),
       enviarCodigoCambioCorreo: vi.fn().mockResolvedValue(undefined),
       enviarEnlaceRecuperacion: vi.fn().mockResolvedValue(undefined),
+      enviarEnlaceActivacion: vi.fn(),
       notificarDictamenEmpresa: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -632,6 +635,7 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
 
       const cambioRes = await authService.cambiarContrasenaPrimerAcceso(
         loginRes.tokenCambio,
+        'ClaveInicial123!',
         'NuevaPasswordDefinitiva123!',
       );
 
@@ -642,6 +646,63 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
         false, // cambioContrasenaPendiente = false
       );
       expect(cambioRes.sesion.idSesion).toBe('sesion-activa-uuid');
+    });
+
+    describe('primer acceso: el token no basta por sí solo', () => {
+      const empleado = (cambios: Partial<Usuario>, hash: string): Usuario =>
+        ({
+          idUsuario: 8,
+          correo: 'primero@pintuclic.com',
+          contrasena: hash,
+          estado: 'activo',
+          tipo: 'normal',
+          idRol: 3,
+          cambioContrasenaPendiente: true,
+          ...cambios,
+        }) as Usuario;
+      const tokenPara = (idUsuario: number) =>
+        jwt.sign({ idUsuario, tipo: 'cambio_primer_acceso' }, process.env.JWT_SECRET ?? '', { expiresIn: '15m' });
+
+      it('un token ya usado no vuelve a cambiar la clave ni abre sesión', async () => {
+        const hash = await derivarContrasena('ClaveInicial123!');
+        vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce(empleado({ cambioContrasenaPendiente: false }, hash));
+
+        await expect(
+          authService.cambiarContrasenaPrimerAcceso(tokenPara(8), 'ClaveInicial123!', 'OtraClaveDefinitiva123!'),
+        ).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO_O_EXPIRADO' });
+        expect(cuentasRepo.actualizarContrasena).not.toHaveBeenCalled();
+        expect(sesionService.crear).not.toHaveBeenCalled();
+      });
+
+      it('rechaza el token de una cuenta que ya no está activa', async () => {
+        const hash = await derivarContrasena('ClaveInicial123!');
+        vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce(empleado({ estado: 'bloqueado' }, hash));
+
+        await expect(
+          authService.cambiarContrasenaPrimerAcceso(tokenPara(8), 'ClaveInicial123!', 'OtraClaveDefinitiva123!'),
+        ).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO_O_EXPIRADO' });
+        expect(cuentasRepo.actualizarContrasena).not.toHaveBeenCalled();
+      });
+
+      it('exige la clave temporal correcta', async () => {
+        const hash = await derivarContrasena('ClaveInicial123!');
+        vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce(empleado({}, hash));
+
+        await expect(
+          authService.cambiarContrasenaPrimerAcceso(tokenPara(8), 'ClaveEquivocada123!', 'OtraClaveDefinitiva123!'),
+        ).rejects.toMatchObject({ codigo: 'CONTRASENA_INCORRECTA' });
+        expect(cuentasRepo.actualizarContrasena).not.toHaveBeenCalled();
+      });
+
+      it('no acepta como definitiva la misma clave temporal', async () => {
+        const hash = await derivarContrasena('ClaveInicial123!');
+        vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce(empleado({}, hash));
+
+        await expect(
+          authService.cambiarContrasenaPrimerAcceso(tokenPara(8), 'ClaveInicial123!', 'ClaveInicial123!'),
+        ).rejects.toMatchObject({ codigo: 'DATOS_INVALIDOS' });
+        expect(cuentasRepo.actualizarContrasena).not.toHaveBeenCalled();
+      });
     });
   });
 });

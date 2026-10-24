@@ -90,6 +90,8 @@ export type EstadoSolicitudEmpresa = z.infer<typeof estadoSolicitudEmpresaSchema
 
 export const CODIGOS_ERROR_CUENTAS = {
   CREDENCIALES_INVALIDAS: 'CREDENCIALES_INVALIDAS',
+  /** Contraseña errónea en el perfil, con sesión abierta: no revela nada que el usuario no sepa. */
+  CONTRASENA_INCORRECTA: 'CONTRASENA_INCORRECTA',
   CUENTA_BLOQUEADA: 'CUENTA_BLOQUEADA',
   CUENTA_PENDIENTE_ACTIVACION: 'CUENTA_PENDIENTE_ACTIVACION',
   CODIGO_INVALIDO_O_EXPIRADO: 'CODIGO_INVALIDO_O_EXPIRADO',
@@ -111,6 +113,7 @@ export const CODIGOS_ERROR_CUENTAS = {
 
 export const codigoErrorCuentasSchema = z.enum([
   CODIGOS_ERROR_CUENTAS.CREDENCIALES_INVALIDAS,
+  CODIGOS_ERROR_CUENTAS.CONTRASENA_INCORRECTA,
   CODIGOS_ERROR_CUENTAS.CUENTA_BLOQUEADA,
   CODIGOS_ERROR_CUENTAS.CUENTA_PENDIENTE_ACTIVACION,
   CODIGOS_ERROR_CUENTAS.CODIGO_INVALIDO_O_EXPIRADO,
@@ -135,7 +138,8 @@ export const errorResponseEnvelopeSchema = z.object({
   error: z.object({
     code: codigoErrorCuentasSchema,
     message: z.string(),
-    details: z.record(z.string(), z.string()).optional(),
+    /** Datos accionables del error (p. ej. `intentosRestantes`, `reintentarEnSegundos`). */
+    details: z.record(z.string(), z.union([z.string(), z.number()])).nullable().optional(),
   }),
 });
 export type ErrorResponseEnvelope = z.infer<typeof errorResponseEnvelopeSchema>;
@@ -152,27 +156,51 @@ export const registroClienteRequestSchema = z.object({
 });
 export type RegistroClienteRequest = z.infer<typeof registroClienteRequestSchema>;
 
-export const registroClienteResponseSchema = z.object({
-  mensaje: z.string(),
+/** Usuario que el frontend guarda en su store tras abrir sesión. */
+export const usuarioResumenSchema = z.object({
+  idUsuario: idUsuarioSchema,
+  nombre: nombreSchema,
   correo: correoSchema,
+  tipo: tipoUsuarioSchema,
+  esAdmin: z.boolean().optional(),
+});
+export type UsuarioResumen = z.infer<typeof usuarioResumenSchema>;
+
+/**
+ * Verificación OTP en curso. `idVerificacion` identifica el código emitido: el
+ * frontend lo reenvía para verificar o pedir otro código.
+ */
+export const verificacionIniciadaSchema = z.object({
+  idVerificacion: idUuidSchema,
+  correo: correoSchema,
+  tiempoExpiracionSegundos: z.number().int().positive(),
+});
+export type VerificacionIniciada = z.infer<typeof verificacionIniciadaSchema>;
+
+export const registroClienteResponseSchema = verificacionIniciadaSchema.extend({
   requiereVerificacion: z.literal(true),
 });
 export type RegistroClienteResponse = z.infer<typeof registroClienteResponseSchema>;
 
 export const verificarCodigoOtpRequestSchema = z.object({
+  idVerificacion: idUuidSchema,
   correo: correoSchema,
   codigo: codigoOtpSchema,
 });
 export type VerificarCodigoOtpRequest = z.infer<typeof verificarCodigoOtpRequestSchema>;
 
 export const reenviarCodigoOtpRequestSchema = z.object({
-  correo: correoSchema,
+  idVerificacion: idUuidSchema,
 });
 export type ReenviarCodigoOtpRequest = z.infer<typeof reenviarCodigoOtpRequestSchema>;
 
+export const reenviarCodigoOtpResponseSchema = verificacionIniciadaSchema;
+export type ReenviarCodigoOtpResponse = z.infer<typeof reenviarCodigoOtpResponseSchema>;
+
+/** La activación abre la sesión (cookie `pc_sid`) y devuelve el usuario. */
 export const activacionCuentaResponseSchema = z.object({
-  mensaje: z.string(),
   activado: z.literal(true),
+  usuario: usuarioResumenSchema.omit({ esAdmin: true }),
 });
 export type ActivacionCuentaResponse = z.infer<typeof activacionCuentaResponseSchema>;
 
@@ -222,7 +250,6 @@ export type RegistroEmpresaRequest = z.infer<typeof registroEmpresaRequestSchema
 
 export const registroEmpresaResponseSchema = z.object({
   idSolicitud: idUuidSchema,
-  mensaje: z.string(),
   estado: z.literal('pendiente'),
 });
 export type RegistroEmpresaResponse = z.infer<typeof registroEmpresaResponseSchema>;
@@ -237,23 +264,39 @@ export const loginRequestSchema = z.object({
 });
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
-export const loginResponseSchema = z.object({
-  usuario: z.object({
-    idUsuario: idUsuarioSchema,
-    nombre: nombreSchema,
-    correo: correoSchema,
-    tipo: tipoUsuarioSchema,
-    esAdmin: z.boolean().optional(),
+/**
+ * Con cambio de clave obligatorio (primer acceso) no se abre sesión: solo viaja
+ * `tokenCambio`, que autoriza `POST /cuentas/cambio-password-primer-acceso`.
+ */
+export const loginResponseSchema = z.discriminatedUnion('cambioContrasenaPendiente', [
+  z.object({
+    usuario: usuarioResumenSchema,
+    cambioContrasenaPendiente: z.literal(false),
   }),
-  cambioContrasenaPendiente: z.boolean(),
-});
+  z.object({
+    usuario: z.object({ idUsuario: idUsuarioSchema }),
+    cambioContrasenaPendiente: z.literal(true),
+    tokenCambio: z.string().min(10),
+  }),
+]);
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
 
+/**
+ * `contrasenaActual` es la clave temporal y se verifica. El servidor rechaza el token si la
+ * cuenta ya no tiene el cambio pendiente (un solo uso) o no está activa, y exige que
+ * `nuevaContrasena` sea distinta de la temporal.
+ */
 export const cambioContrasenaPrimerAccesoRequestSchema = z.object({
+  tokenCambio: z.string().min(10, 'El token de primer acceso es requerido'),
   contrasenaActual: z.string().min(1, 'La contraseña actual es requerida'),
   nuevaContrasena: contrasenaSchema,
 });
 export type CambioContrasenaPrimerAccesoRequest = z.infer<typeof cambioContrasenaPrimerAccesoRequestSchema>;
+
+export const cambioContrasenaPrimerAccesoResponseSchema = z.object({
+  usuario: usuarioResumenSchema,
+});
+export type CambioContrasenaPrimerAccesoResponse = z.infer<typeof cambioContrasenaPrimerAccesoResponseSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 7. SCHEMAS: HU-CUE-05 RECUPERACIÓN DE CONTRASEÑA
@@ -292,11 +335,23 @@ export const solicitarCambioCorreoRequestSchema = z.object({
 });
 export type SolicitarCambioCorreoRequest = z.infer<typeof solicitarCambioCorreoRequestSchema>;
 
+export const solicitarCambioCorreoResponseSchema = z.object({
+  idVerificacion: idUuidSchema,
+  nuevoCorreo: correoSchema,
+  tiempoExpiracionSegundos: z.number().int().positive(),
+});
+export type SolicitarCambioCorreoResponse = z.infer<typeof solicitarCambioCorreoResponseSchema>;
+
 export const confirmarCambioCorreoRequestSchema = z.object({
   nuevoCorreo: correoSchema,
   codigo: codigoOtpSchema,
 });
 export type ConfirmarCambioCorreoRequest = z.infer<typeof confirmarCambioCorreoRequestSchema>;
+
+export const confirmarCambioCorreoResponseSchema = z.object({
+  nuevoCorreo: correoSchema,
+});
+export type ConfirmarCambioCorreoResponse = z.infer<typeof confirmarCambioCorreoResponseSchema>;
 
 export const solicitarAscensoEmpresaRequestSchema = z.object({
   nombreEmpresa: nombreSchema,
@@ -393,6 +448,12 @@ export const solicitudEmpresaItemSchema = z.object({
 });
 export type SolicitudEmpresaItem = z.infer<typeof solicitudEmpresaItemSchema>;
 
+export const listarSolicitudesEmpresaResponseSchema = z.object({
+  items: z.array(solicitudEmpresaItemSchema),
+  total: z.number().int().nonnegative(),
+});
+export type ListarSolicitudesEmpresaResponse = z.infer<typeof listarSolicitudesEmpresaResponseSchema>;
+
 /**
  * Dictamen administrativo (aprobar o rechazar).
  *
@@ -441,9 +502,44 @@ export const solicitudActualizacionNitItemSchema = z.object({
   motivoRechazo: z.string().nullable().optional(),
   fechaSolicitud: z.string().datetime(),
   fechaRevision: z.string().datetime().nullable().optional(),
-  documento: documentoSoporteMetaSchema.optional(),
+  documento: documentoSoporteMetaSchema.nullable().optional(),
 });
 export type SolicitudActualizacionNitItem = z.infer<typeof solicitudActualizacionNitItemSchema>;
+
+export const listarRenovacionesNitResponseSchema = z.object({
+  items: z.array(solicitudActualizacionNitItemSchema),
+  total: z.number().int().nonnegative(),
+});
+export type ListarRenovacionesNitResponse = z.infer<typeof listarRenovacionesNitResponseSchema>;
+
+/**
+ * HU-CUE-03 E6 / HU-CUE-10 E3: estado de las solicitudes propias del cliente
+ * (GET /cuentas/empresas/solicitudes/mias). El motivo solo viaja si fue rechazada.
+ */
+export const misSolicitudesEmpresaResponseSchema = z.object({
+  solicitudEmpresa: z
+    .object({
+      idSolicitud: idUuidSchema,
+      tipoSolicitud: tipoSolicitudEmpresaSchema,
+      estado: estadoSolicitudEmpresaSchema,
+      motivoRechazo: z.string().nullable(),
+      fechaSolicitud: z.string().datetime(),
+      fechaRevision: z.string().datetime().nullable(),
+    })
+    .nullable(),
+  renovacionNit: z
+    .object({
+      idSolicitud: idUuidSchema,
+      nitVigente: nitSchema,
+      nitSolicitado: nitSchema,
+      estado: estadoSolicitudEmpresaSchema,
+      motivoRechazo: z.string().nullable(),
+      fechaSolicitud: z.string().datetime(),
+      fechaRevision: z.string().datetime().nullable(),
+    })
+    .nullable(),
+});
+export type MisSolicitudesEmpresaResponse = z.infer<typeof misSolicitudesEmpresaResponseSchema>;
 
 export const listarSolicitudesEmpresaQuerySchema = z.object({
   estado: estadoSolicitudEmpresaSchema.optional(),

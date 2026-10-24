@@ -72,12 +72,14 @@ describe('RecuperacionPasswordService (HU-CUE-05)', () => {
       buscarUltimoActivoPorCorreo: vi.fn().mockResolvedValue(null),
       incrementarIntentos: vi.fn(),
       eliminar: vi.fn().mockResolvedValue(undefined),
+      eliminarPorCorreoYTipo: vi.fn().mockResolvedValue(undefined),
     };
 
     notificaciones = {
       enviarCodigoRegistro: vi.fn(),
       enviarCodigoCambioCorreo: vi.fn(),
       enviarEnlaceRecuperacion: vi.fn().mockResolvedValue(undefined),
+      enviarEnlaceActivacion: vi.fn().mockResolvedValue(undefined),
       notificarDictamenEmpresa: vi.fn(),
     };
 
@@ -251,5 +253,110 @@ describe('RecuperacionPasswordService (HU-CUE-05)', () => {
         nuevaContrasena: 'NuevaPasswordSegura123!',
       })
     ).rejects.toThrow(RecuperacionPasswordError);
+  });
+});
+
+describe('RecuperacionPasswordService · enlace de activación de empleados (HU-ADM-01)', () => {
+  const fechaBase = new Date('2026-10-21T12:00:00Z');
+  const empleado = {
+    idUsuario: 30,
+    nombre: 'Laura Gómez',
+    correo: 'laura@pintuclic.com',
+    estado: 'activo',
+    cambioContrasenaPendiente: true,
+  } as Usuario;
+
+  const construir = (horasConfiguradas: number | null = null) => {
+    vi.stubEnv('JWT_SECRET', 'secreto-de-pruebas-m04-con-mas-de-32-caracteres');
+    const cuentasRepo = {
+      buscarPorId: vi.fn().mockResolvedValue(empleado),
+      actualizarContrasena: vi.fn().mockResolvedValue({ ...empleado, cambioContrasenaPendiente: false }),
+    } as unknown as CuentasRepository;
+    const codigosRepo = {
+      guardarCodigo: vi.fn().mockImplementation((datos) =>
+        Promise.resolve({ idCodigo: 'activ-uuid-1', intentos: 0, maxIntentos: 3, fechaCreacion: fechaBase, ...datos }),
+      ),
+      buscarPorId: vi.fn(),
+      eliminar: vi.fn().mockResolvedValue(undefined),
+      eliminarPorCorreoYTipo: vi.fn().mockResolvedValue(undefined),
+      incrementarIntentos: vi.fn(),
+    } as unknown as CodigosVerificacionRepository;
+    const notificaciones = {
+      enviarEnlaceActivacion: vi.fn().mockResolvedValue(undefined),
+    } as unknown as NotificacionesPort;
+    const sesionService = { invalidarTodas: vi.fn().mockResolvedValue(0) } as unknown as SesionService;
+    const service = new RecuperacionPasswordService(
+      cuentasRepo,
+      codigosRepo,
+      notificaciones,
+      new SimuladoDateProviderAdapter(fechaBase),
+      sesionService,
+      { obtenerNumero: vi.fn().mockResolvedValue(horasConfiguradas) },
+    );
+    return { service, cuentasRepo, codigosRepo, notificaciones };
+  };
+
+  it('envía un enlace de 72 h por defecto e invalida los enlaces anteriores', async () => {
+    const { service, codigosRepo, notificaciones } = construir();
+
+    await service.emitirEnlaceActivacion(30);
+
+    expect(codigosRepo.eliminarPorCorreoYTipo).toHaveBeenCalledWith('laura@pintuclic.com', 'recuperacion_password');
+    const guardado = vi.mocked(codigosRepo.guardarCodigo).mock.calls[0]![0];
+    expect(guardado.expiracion.getTime() - fechaBase.getTime()).toBe(72 * 3600 * 1000);
+    expect(guardado.datosTemporales).toEqual({ idUsuario: 30 });
+    expect(notificaciones.enviarEnlaceActivacion).toHaveBeenCalledWith(
+      'laura@pintuclic.com',
+      'Laura Gómez',
+      expect.any(String),
+      72,
+    );
+  });
+
+  it('usa la vigencia que el admin configuró en M17', async () => {
+    const { service, codigosRepo, notificaciones } = construir(24);
+
+    await service.emitirEnlaceActivacion(30);
+
+    const guardado = vi.mocked(codigosRepo.guardarCodigo).mock.calls[0]![0];
+    expect(guardado.expiracion.getTime() - fechaBase.getTime()).toBe(24 * 3600 * 1000);
+    expect(vi.mocked(notificaciones.enviarEnlaceActivacion).mock.calls[0]![3]).toBe(24);
+  });
+
+  it('el enlace fija la contraseña y quita el cambio pendiente', async () => {
+    const { service, cuentasRepo, codigosRepo, notificaciones } = construir();
+    await service.emitirEnlaceActivacion(30);
+    const token = vi.mocked(notificaciones.enviarEnlaceActivacion).mock.calls[0]![2];
+    const guardado = vi.mocked(codigosRepo.guardarCodigo).mock.calls[0]![0];
+    vi.mocked(codigosRepo.buscarPorId).mockResolvedValueOnce({
+      idCodigo: 'activ-uuid-1',
+      correo: 'laura@pintuclic.com',
+      codigoHash: guardado.codigoHash,
+      tipo: 'recuperacion_password',
+      intentos: 0,
+      maxIntentos: 3,
+      expiracion: guardado.expiracion,
+      datosTemporales: { idUsuario: 30 },
+      fechaCreacion: fechaBase,
+    } as CodigoVerificacion);
+
+    await service.restablecerPassword({ token, nuevaContrasena: 'ClaveDeLaura2026!' });
+
+    expect(cuentasRepo.actualizarContrasena).toHaveBeenCalledWith(30, expect.any(String), false);
+  });
+
+  it('no emite enlace si la cuenta ya fijó su contraseña', async () => {
+    const { service, cuentasRepo, notificaciones } = construir();
+    vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce({ ...empleado, cambioContrasenaPendiente: false });
+
+    await expect(service.emitirEnlaceActivacion(30)).rejects.toMatchObject({ codigo: 'RECURSO_NO_ENCONTRADO' });
+    expect(notificaciones.enviarEnlaceActivacion).not.toHaveBeenCalled();
+  });
+
+  it('propaga el fallo del correo para que M17 avise al admin', async () => {
+    const { service, notificaciones } = construir();
+    vi.mocked(notificaciones.enviarEnlaceActivacion).mockRejectedValueOnce(new Error('SMTP caído'));
+
+    await expect(service.emitirEnlaceActivacion(30)).rejects.toThrow('SMTP caído');
   });
 });
