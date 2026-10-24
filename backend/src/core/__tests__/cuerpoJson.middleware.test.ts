@@ -16,9 +16,9 @@ function cuerpoDe(bytes: number): string {
   return JSON.stringify({ contenidoBase64: 'A'.repeat(bytes) });
 }
 
-async function enviar(ruta: string, cuerpo: string) {
+async function enviar(ruta: string, cuerpo: string, metodo: 'POST' | 'PUT' = 'POST') {
   const respuesta = await fetch(`${base}${ruta}`, {
-    method: 'POST',
+    method: metodo,
     headers: { 'Content-Type': 'application/json' },
     body: cuerpo,
   });
@@ -33,6 +33,10 @@ beforeAll(async () => {
   };
   app.post(RUTA_RUT, eco);
   app.post('/api/v1/cuentas/perfil', eco);
+  app.post('/api/v1/admin/catalogo/marcas', eco);
+  app.put('/api/v1/admin/catalogo/marcas/:idMarca/logotipo', eco);
+  app.put('/api/v1/admin/catalogo/marcas/:idMarca', eco);
+  app.post('/api/v1/admin/catalogo/categorias', eco);
   app.use((_error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(500).json({ manejadorGlobal: true });
   });
@@ -89,5 +93,44 @@ describe('construirParserJson — otros errores', () => {
     const { status, json } = await enviar('/api/v1/cuentas/perfil', '{"roto":');
     expect(status).toBe(500);
     expect(json).toEqual({ manejadorGlobal: true });
+  });
+});
+
+describe('construirParserJson — logotipo de marca de M01 (HU-CAT-04)', () => {
+  const base64DeCincoMb = Math.ceil((5 * MB) / 3) * 4;
+
+  it('crear una marca acepta el base64 de un logotipo de 5 MB exactos', async () => {
+    const { status } = await enviar('/api/v1/admin/catalogo/marcas', cuerpoDe(base64DeCincoMb));
+    expect(status).toBe(200);
+  });
+
+  it('reemplazar el logotipo de una marca acepta 5 MB (PUT)', async () => {
+    const { status } = await enviar('/api/v1/admin/catalogo/marcas/12/logotipo', cuerpoDe(base64DeCincoMb), 'PUT');
+    expect(status).toBe(200);
+  });
+
+  it('por encima de 7 MB responde 413 CUERPO_DEMASIADO_GRANDE con mensaje del logotipo', async () => {
+    const { status, json } = await enviar('/api/v1/admin/catalogo/marcas', cuerpoDe(7 * MB + 1));
+    expect(status).toBe(413);
+    expect(json).toEqual({
+      success: false,
+      error: { code: 'CUERPO_DEMASIADO_GRANDE', message: 'El logotipo no puede superar 5 MB.' },
+    });
+  });
+
+  it('el resto del catálogo conserva el límite de 100 kb', async () => {
+    expect((await enviar('/api/v1/admin/catalogo/categorias', cuerpoDe(200 * 1024))).status).toBe(413);
+    expect((await enviar('/api/v1/admin/catalogo/marcas/12', cuerpoDe(200 * 1024), 'PUT')).status).toBe(413);
+  });
+
+  it('un id que no es numérico no recibe el límite mayor', async () => {
+    const { status } = await enviar('/api/v1/admin/catalogo/marcas/abc/logotipo', cuerpoDe(1 * MB), 'PUT');
+    expect(status).toBe(413);
+  });
+
+  it('el límite mayor no se extiende a otros métodos de la ruta de marcas', async () => {
+    // PUT /marcas (sin id) y POST /marcas/:id/logotipo no son rutas con logotipo.
+    expect((await enviar('/api/v1/admin/catalogo/marcas', cuerpoDe(1 * MB), 'PUT')).status).toBe(413);
+    expect((await enviar('/api/v1/admin/catalogo/marcas/12/logotipo', cuerpoDe(1 * MB), 'POST')).status).toBe(413);
   });
 });

@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.3 (v4.2 + M01: rediseño del catálogo — colores con base y acabado, medidas, variante = producto + medida)
+-- VERSIÓN: 4.4 (v4.3 + M01: equivalencia en galones de los tipos de medida)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 58
@@ -451,10 +451,23 @@ CREATE TABLE IF NOT EXISTS tipo_medida (
     id_tipo_medida SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL UNIQUE,
     abreviatura VARCHAR(10) NOT NULL UNIQUE,
-    estado enum_estado_general NOT NULL DEFAULT 'activo'
+    equivalencia_galones NUMERIC(12, 9),
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    CONSTRAINT chk_tipo_medida_equivalencia CHECK (equivalencia_galones IS NULL OR equivalencia_galones > 0)
 );
 
+-- Esquema 4.4: en bases creadas con el 4.3 la tabla ya existe sin la columna.
+ALTER TABLE tipo_medida ADD COLUMN IF NOT EXISTS equivalencia_galones NUMERIC(12, 9);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_tipo_medida_equivalencia') THEN
+        ALTER TABLE tipo_medida ADD CONSTRAINT chk_tipo_medida_equivalencia
+            CHECK (equivalencia_galones IS NULL OR equivalencia_galones > 0);
+    END IF;
+END $$;
+
 COMMENT ON TABLE tipo_medida IS 'Unidad de una medida (galón, litro, pulgada, metro, unidad…). Referencial.';
+COMMENT ON COLUMN tipo_medida.equivalencia_galones IS 'Cuántos galones equivale una unidad de este tipo (galón = 1, litro = 0,264172052). Permite derivar el rendimiento por medida a partir del rendimiento por galón (RF-CAT-10-03). NULL si el tipo no es de volumen (pulgada, metro, unidad).';
 
 -- Tabla: medida
 CREATE TABLE IF NOT EXISTS medida (
