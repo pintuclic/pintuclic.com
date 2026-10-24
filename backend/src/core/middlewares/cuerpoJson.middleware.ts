@@ -12,6 +12,16 @@ export const LIMITE_JSON_GENERAL = '100kb';
 export const LIMITE_JSON_CON_DOCUMENTO = '7mb';
 export const RUTAS_CON_DOCUMENTO: ReadonlySet<string> = new Set(['/api/v1/cuentas/empresas/renovacion-nit']);
 
+/**
+ * M01 · HU-CAT-04 (D2 del contrato): el logotipo de una marca (hasta 5 MB) viaja en base64
+ * dentro del JSON. Solo crear una marca y reemplazar su logotipo reciben el límite mayor;
+ * el tamaño exacto lo valida el servicio (≤ 5 MB, tipo por firma de archivo).
+ */
+const RUTAS_CON_LOGOTIPO: ReadonlyArray<{ metodo: string; ruta: RegExp }> = [
+  { metodo: 'POST', ruta: /^\/api\/v1\/admin\/catalogo\/marcas$/ },
+  { metodo: 'PUT', ruta: /^\/api\/v1\/admin\/catalogo\/marcas\/\d+\/logotipo$/ },
+];
+
 interface ErrorDeCuerpo {
   type?: unknown;
 }
@@ -31,7 +41,8 @@ export function construirParserJson(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
     const ruta = req.path.replace(/\/+$/, '');
     const llevaDocumento = req.method === 'POST' && RUTAS_CON_DOCUMENTO.has(ruta);
-    const parser = llevaDocumento ? conDocumento : general;
+    const llevaLogotipo = RUTAS_CON_LOGOTIPO.some((r) => r.metodo === req.method && r.ruta.test(ruta));
+    const parser = llevaDocumento || llevaLogotipo ? conDocumento : general;
 
     parser(req, res, (error?: unknown) => {
       if (error && esCuerpoDemasiadoGrande(error)) {
@@ -39,7 +50,9 @@ export function construirParserJson(): RequestHandler {
           success: false,
           error: llevaDocumento
             ? { code: 'DOCUMENTO_RUT_INVALIDO', message: 'El documento RUT no puede superar 5 MB.' }
-            : { code: 'CUERPO_DEMASIADO_GRANDE', message: 'La solicitud supera el tamaño permitido.' },
+            : llevaLogotipo
+              ? { code: 'CUERPO_DEMASIADO_GRANDE', message: 'El logotipo no puede superar 5 MB.' }
+              : { code: 'CUERPO_DEMASIADO_GRANDE', message: 'La solicitud supera el tamaño permitido.' },
         });
         return;
       }
