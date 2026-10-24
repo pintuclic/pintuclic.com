@@ -13,13 +13,15 @@ export const LIMITE_JSON_CON_DOCUMENTO = '7mb';
 export const RUTAS_CON_DOCUMENTO: ReadonlySet<string> = new Set(['/api/v1/cuentas/empresas/renovacion-nit']);
 
 /**
- * M01 · HU-CAT-04 (D2 del contrato): el logotipo de una marca (hasta 5 MB) viaja en base64
- * dentro del JSON. Solo crear una marca y reemplazar su logotipo reciben el límite mayor;
- * el tamaño exacto lo valida el servicio (≤ 5 MB, tipo por firma de archivo).
+ * M01 (D2 del contrato): los logotipos de marca, las imágenes de producto y las imágenes de
+ * medida (hasta 5 MB) viajan en base64 dentro del JSON. Solo estas rutas reciben el límite
+ * mayor; el tamaño exacto lo valida el servicio (≤ 5 MB, tipo por firma de archivo).
  */
-const RUTAS_CON_LOGOTIPO: ReadonlyArray<{ metodo: string; ruta: RegExp }> = [
+const RUTAS_CON_IMAGEN: ReadonlyArray<{ metodo: string; ruta: RegExp }> = [
   { metodo: 'POST', ruta: /^\/api\/v1\/admin\/catalogo\/marcas$/ },
   { metodo: 'PUT', ruta: /^\/api\/v1\/admin\/catalogo\/marcas\/\d+\/logotipo$/ },
+  { metodo: 'POST', ruta: /^\/api\/v1\/admin\/catalogo\/productos\/\d+\/imagenes$/ },
+  { metodo: 'PUT', ruta: /^\/api\/v1\/admin\/catalogo\/medidas\/\d+\/imagen$/ },
 ];
 
 interface ErrorDeCuerpo {
@@ -41,8 +43,8 @@ export function construirParserJson(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
     const ruta = req.path.replace(/\/+$/, '');
     const llevaDocumento = req.method === 'POST' && RUTAS_CON_DOCUMENTO.has(ruta);
-    const llevaLogotipo = RUTAS_CON_LOGOTIPO.some((r) => r.metodo === req.method && r.ruta.test(ruta));
-    const parser = llevaDocumento || llevaLogotipo ? conDocumento : general;
+    const llevaImagen = RUTAS_CON_IMAGEN.some((r) => r.metodo === req.method && r.ruta.test(ruta));
+    const parser = llevaDocumento || llevaImagen ? conDocumento : general;
 
     parser(req, res, (error?: unknown) => {
       if (error && esCuerpoDemasiadoGrande(error)) {
@@ -50,8 +52,8 @@ export function construirParserJson(): RequestHandler {
           success: false,
           error: llevaDocumento
             ? { code: 'DOCUMENTO_RUT_INVALIDO', message: 'El documento RUT no puede superar 5 MB.' }
-            : llevaLogotipo
-              ? { code: 'CUERPO_DEMASIADO_GRANDE', message: 'El logotipo no puede superar 5 MB.' }
+            : llevaImagen
+              ? { code: 'CUERPO_DEMASIADO_GRANDE', message: 'La imagen no puede superar 5 MB.' }
               : { code: 'CUERPO_DEMASIADO_GRANDE', message: 'La solicitud supera el tamaño permitido.' },
         });
         return;
