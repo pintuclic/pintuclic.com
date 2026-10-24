@@ -58,7 +58,13 @@ const ModalTipo: React.FC<{ tipo: TipoMedida | null; onClose: () => void; onGuar
     }
   });
   return (
-    <Modal isOpen onClose={onClose} title={tipo === null ? 'Nuevo tipo de medida' : 'Editar tipo de medida'} size="md">
+    <Modal
+      isOpen
+      closeOnOutsideClick={false}
+      onClose={onClose}
+      title={tipo === null ? 'Nuevo tipo de medida' : 'Editar tipo de medida'}
+      size="md"
+    >
       <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-4 py-2">
         {error !== null && <Alert variant="error">{error}</Alert>}
         <Input label="Nombre" {...register('nombre')} error={errors.nombre?.message} autoFocus />
@@ -119,7 +125,13 @@ const ModalMedida: React.FC<{
     }
   });
   return (
-    <Modal isOpen onClose={onClose} title={medida === null ? 'Nueva medida' : `Editar ${medida.nombre}`} size="md">
+    <Modal
+      isOpen
+      closeOnOutsideClick={false}
+      onClose={onClose}
+      title={medida === null ? 'Nueva medida' : `Editar ${medida.nombre}`}
+      size="md"
+    >
       <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-4 py-2">
         {error !== null && <Alert variant="error">{error}</Alert>}
         <Select

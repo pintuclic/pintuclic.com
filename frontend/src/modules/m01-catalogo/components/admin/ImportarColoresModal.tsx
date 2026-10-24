@@ -152,6 +152,7 @@ export const ImportarColoresModal: React.FC<ImportarColoresModalProps> = ({
   return (
     <Modal
       isOpen
+      closeOnOutsideClick={false}
       onClose={onClose}
       title="Importar colores"
       subtitle="Cree o actualice colores de una marca a partir de un archivo."

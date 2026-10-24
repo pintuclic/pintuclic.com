@@ -70,7 +70,13 @@ const ModalMarca: React.FC<ModalMarcaProps> = ({ marca, onClose, onGuardada }) =
   });
 
   return (
-    <Modal isOpen onClose={onClose} title={marca === null ? 'Nueva marca' : 'Editar marca'} size="md">
+    <Modal
+      isOpen
+      closeOnOutsideClick={false}
+      onClose={onClose}
+      title={marca === null ? 'Nueva marca' : 'Editar marca'}
+      size="md"
+    >
       <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-4 py-2">
         {error !== null && <Alert variant="error">{error}</Alert>}
         <Input label="Nombre" {...register('nombre')} error={errors.nombre?.message} autoFocus />
@@ -128,6 +134,7 @@ const ModalLinea: React.FC<ModalLineaProps> = ({ marca, linea, onClose, onGuarda
   return (
     <Modal
       isOpen
+      closeOnOutsideClick={false}
       onClose={onClose}
       title={linea === null ? `Nueva línea de ${marca.nombre}` : 'Editar línea'}
       size="md"

@@ -327,7 +327,13 @@ export const ProductoFormModal: React.FC<ProductoFormModalProps> = ({
   }, [idProducto]);
 
   return (
-    <Modal isOpen onClose={onClose} title={idProducto === null ? 'Nuevo producto' : 'Editar producto'} size="xl">
+    <Modal
+      isOpen
+      closeOnOutsideClick={false}
+      onClose={onClose}
+      title={idProducto === null ? 'Nuevo producto' : 'Editar producto'}
+      size="xl"
+    >
       {error !== null && <Alert variant="error">{error}</Alert>}
       {inicial === null && error === null && <Cargando />}
       {inicial !== null && (

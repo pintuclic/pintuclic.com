@@ -88,7 +88,7 @@ export const FormularioSimple: React.FC<FormularioSimpleProps> = ({
   });
 
   return (
-    <Modal isOpen onClose={onClose} title={titulo} size="md">
+    <Modal isOpen closeOnOutsideClick={false} onClose={onClose} title={titulo} size="md">
       <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-4 py-2">
         {error !== null && <Alert variant="error">{error}</Alert>}
         <Input label="Nombre" {...register('nombre')} error={errors.nombre?.message} autoFocus />

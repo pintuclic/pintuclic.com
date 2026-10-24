@@ -81,7 +81,13 @@ const ModalColor: React.FC<ModalColorProps> = ({ color, referencias, idMarcaInic
   });
 
   return (
-    <Modal isOpen onClose={onClose} title={color === null ? 'Nuevo color' : `Editar ${color.nombre}`} size="lg">
+    <Modal
+      isOpen
+      closeOnOutsideClick={false}
+      onClose={onClose}
+      title={color === null ? 'Nuevo color' : `Editar ${color.nombre}`}
+      size="lg"
+    >
       <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-4 py-2">
         {error !== null && <Alert variant="error">{error}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">

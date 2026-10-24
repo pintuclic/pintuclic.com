@@ -73,6 +73,7 @@ const FormularioVariante: React.FC<FormularioVarianteProps> = ({
   return (
     <Modal
       isOpen
+      closeOnOutsideClick={false}
       onClose={onClose}
       title={variante === null ? 'Nueva variante' : `Editar ${variante.medida}`}
       size="md"
@@ -157,7 +158,15 @@ export const VariantesModal: React.FC<VariantesModalProps> = ({ idProducto, refe
 
   return (
     <>
-      <Modal isOpen onClose={onClose} title="Variantes" subtitle={datos?.nombre} size="lg">
+      {/* El Modal del Core Kit no sabe apilarse (cualquier clic fuera o Escape cierra todos), así que mientras
+          se edita una variante o se confirma una baja, la lista queda oculta y solo hay un diálogo abierto. */}
+      <Modal
+        isOpen={formulario === null && aDesactivar === null}
+        onClose={onClose}
+        title="Variantes"
+        subtitle={datos?.nombre}
+        size="lg"
+      >
         <div className="space-y-4 py-2">
           <div className="flex items-center justify-between gap-3">
             <p className="font-sans text-sm text-neutral-medium">
