@@ -16,8 +16,8 @@ describe.skipIf(URL_BD === undefined)('M01 · categorías y subcategorías (HTTP
 
   beforeAll(async () => {
     process.env.DATABASE_URL = URL_BD ?? '';
-    const { levantarServidor } = await import('./helpers/servidor-prueba');
-    ({ prisma } = await import('../../../core/db/client'));
+    const { levantarServidor } = await import('./helpers/servidor-prueba.js');
+    ({ prisma } = await import('../../../core/db/client.js'));
     servidor = await levantarServidor(auditoria);
   });
 
