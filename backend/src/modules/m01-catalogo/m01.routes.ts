@@ -10,6 +10,7 @@ import {
 } from './controllers/catalogos.controller';
 import { ClasificacionController } from './controllers/clasificacion.controller';
 import { ColoresController } from './controllers/colores.controller';
+import { ConsultaPublicaController } from './controllers/consulta-publica.controller';
 import { ProductosController, VariantesController } from './controllers/productos.controller';
 import {
   crearAcabadoRequestSchema,
@@ -34,12 +35,14 @@ import {
 } from './repositories/catalogos-simples.repository';
 import { CategoriasRepository, SubcategoriasRepository } from './repositories/clasificacion.repository';
 import { ColoresRepository } from './repositories/colores.repository';
+import { ConsultaPublicaRepository } from './repositories/consulta-publica.repository';
 import { ProductosRepository } from './repositories/productos.repository';
 import { VariantesRepository } from './repositories/variantes.repository';
 import { LineasRepository, MarcasRepository, MedidasRepository } from './repositories/marcas-lineas-medidas.repository';
 import { AcabadosService, CatalogoSimpleService, TiposMedidaService } from './services/catalogo-simple.service';
 import { ClasificacionService } from './services/clasificacion.service';
 import { ColoresService } from './services/colores.service';
+import { ConsultaPublicaService } from './services/consulta-publica.service';
 import { LineasService } from './services/lineas.service';
 import { MarcasService } from './services/marcas.service';
 import { MedidasService } from './services/medidas.service';
@@ -60,6 +63,8 @@ export const PERMISOS_CATALOGO = {
 export interface ModuloM01 {
   /** Montar en `/api/v1/admin/catalogo`, detrás de la sesión. */
   adminRouter: Router;
+  /** Montar en `/api/v1/catalogo`, SIN sesión: solo lectura de lo publicado (HU-CAT-06). */
+  publicRouter: Router;
   clasificacionService: ClasificacionService;
   marcasService: MarcasService;
   lineasService: LineasService;
@@ -119,6 +124,7 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const colores = new ColoresController(coloresService);
   const productos = new ProductosController(productosService);
   const variantes = new VariantesController(variantesService);
+  const consultaPublica = new ConsultaPublicaController(new ConsultaPublicaService(new ConsultaPublicaRepository()));
   const superficies = controladorSimple({
     servicio: new CatalogoSimpleService(new SuperficiesRepository(), 'una superficie'),
     esquemaCrear: crearSuperficieRequestSchema,
@@ -244,8 +250,18 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   adminRouter.patch('/variantes/:idVariante/estado', cambiarEstado, variantes.cambiarEstado as RequestHandler);
   adminRouter.get('/variantes/:idVariante/impacto-desactivacion', ver, variantes.impacto as RequestHandler);
 
+  // HU-CAT-06: consulta pública, sin sesión y solo GET.
+  const publicRouter = Router();
+  publicRouter.get('/categorias', consultaPublica.categorias as RequestHandler);
+  publicRouter.get('/filtros', consultaPublica.filtros as RequestHandler);
+  publicRouter.get('/productos', consultaPublica.listar as RequestHandler);
+  publicRouter.get('/productos/:idProducto', consultaPublica.ficha as RequestHandler);
+  publicRouter.get('/productos/:idProducto/colores', consultaPublica.colores as RequestHandler);
+  publicRouter.get('/marcas/:idMarca/logotipo', consultaPublica.logotipo as RequestHandler);
+
   return {
     adminRouter,
+    publicRouter,
     clasificacionService,
     marcasService,
     lineasService,
