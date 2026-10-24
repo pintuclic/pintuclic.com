@@ -7,14 +7,29 @@ Flujo ágil: **sin gates, firmas ni roles de agente**. La calidad la dan el CI y
 
 ## Cómo se trabaja
 
-Un módulo = una rama `feature/m[xx]-nombre` + un contrato + un PR a `main`.
+Cada módulo sigue **tres etapas, en este orden**. La única aprobación humana es la del contrato.
+
+1. **Contrato, juntos.** Se escribe con el Tech Lead `contracts/m[xx]-nombre.contract.ts`: qué hace, qué NO hace,
+   reglas, endpoints y esquemas Zod. **La voz de la verdad es el contrato**; la documentación de `docs/` es guía.
+   Cuando el Tech Lead lo da por bueno, termina la etapa y **no se vuelve a pedir permiso para programar**.
+2. **PR general (archivos compartidos).** Lo que el módulo necesita de fuera de su carpeta (BD, `schema.prisma`, seed,
+   permisos, `app.routes.ts`, `core/`) va en **un PR pequeño aparte**, que se fusiona primero.
+3. **El módulo completo, backend y frontend.** Con el contrato firmado y el PR general en `main`, se construye todo el
+   módulo (código, pruebas y pantallas) en su rama `feature/m[xx]-nombre`, sin pausas de aprobación entre piezas.
+   Se avanza por partes pequeñas (commits) y se abre el PR del módulo cuando está completo.
+
+Durante la etapa 3 solo se detiene para preguntar si: (a) hay que cambiar código de **otro** módulo, (b) el contrato no
+alcanza o se contradice, o (c) un dato depende del cliente y no está escrito. En (b) y (c) se propone el cambio al
+contrato y se sigue con el resto. Al cerrar, se informa qué quedó hecho, qué se probó y qué falta; no se declara
+"listo" lo que no se ejecutó.
+
 El orden de módulos sigue [`RUTA_DEL_PROYECTO.md`](docs/00_SISTEMA/01_ARQUITECTURA/RUTA_DEL_PROYECTO.md) como guía:
 si falta un predecesor, avisa al usuario y propone una alternativa; decide el Tech Lead.
 
 ## Antes de escribir código
 
 1. Lee el contrato `contracts/m[xx]-nombre.contract.ts`. **El contrato es la especificación.**
-   Si no existe, escríbelo primero con el usuario: qué hace, qué NO hace, 5–10 reglas, endpoints y esquemas Zod.
+   Si no existe, es la etapa 1: escríbelo con el usuario (qué hace, qué NO hace, reglas, endpoints y esquemas Zod).
 2. Si existe, lee la spec en `docs/02_MODULOS_FUNCIONALES/` o `docs/01_TRANSVERSALES/` y los diagramas en
    `docs/assets/diagrams/M[XX]/`. Los diagramas siguen siendo contrato de flujo (estados, ramas, errores).
 3. Lee [`backend/ARQUITECTURA.md`](backend/ARQUITECTURA.md) y [`frontend/ARQUITECTURA.md`](frontend/ARQUITECTURA.md).
