@@ -10,6 +10,7 @@ import {
 } from './controllers/catalogos.controller';
 import { ClasificacionController } from './controllers/clasificacion.controller';
 import { ColoresController } from './controllers/colores.controller';
+import { ProductosController, VariantesController } from './controllers/productos.controller';
 import {
   crearAcabadoRequestSchema,
   crearBaseRequestSchema,
@@ -33,17 +34,17 @@ import {
 } from './repositories/catalogos-simples.repository';
 import { CategoriasRepository, SubcategoriasRepository } from './repositories/clasificacion.repository';
 import { ColoresRepository } from './repositories/colores.repository';
-import {
-  LineasRepository,
-  MarcasRepository,
-  MedidasRepository,
-} from './repositories/marcas-lineas-medidas.repository';
+import { ProductosRepository } from './repositories/productos.repository';
+import { VariantesRepository } from './repositories/variantes.repository';
+import { LineasRepository, MarcasRepository, MedidasRepository } from './repositories/marcas-lineas-medidas.repository';
 import { AcabadosService, CatalogoSimpleService, TiposMedidaService } from './services/catalogo-simple.service';
 import { ClasificacionService } from './services/clasificacion.service';
 import { ColoresService } from './services/colores.service';
 import { LineasService } from './services/lineas.service';
 import { MarcasService } from './services/marcas.service';
 import { MedidasService } from './services/medidas.service';
+import { ProductosService } from './services/productos.service';
+import { VariantesService } from './services/variantes.service';
 
 /**
  * Permisos del catálogo (decisión D1 del contrato): se reutilizan los `catalogo.*` del seed.
@@ -64,6 +65,8 @@ export interface ModuloM01 {
   lineasService: LineasService;
   medidasService: MedidasService;
   coloresService: ColoresService;
+  productosService: ProductosService;
+  variantesService: VariantesService;
 }
 
 /**
@@ -103,6 +106,9 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const marcasService = new MarcasService(marcasRepo);
   const lineasService = new LineasService(lineasRepo, marcasRepo);
   const medidasService = new MedidasService(medidasRepo, tiposMedidaRepo);
+  const productosRepo = new ProductosRepository();
+  const productosService = new ProductosService(productosRepo, marcasRepo, lineasRepo, subcategoriasRepo);
+  const variantesService = new VariantesService(new VariantesRepository(), productosRepo, medidasRepo);
   const coloresService = new ColoresService(new ColoresRepository(), marcasRepo, basesRepo, acabadosRepo, familiasRepo);
 
   // Controladores
@@ -111,6 +117,8 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const lineas = new LineasController(lineasService);
   const medidas = new MedidasController(medidasService);
   const colores = new ColoresController(coloresService);
+  const productos = new ProductosController(productosService);
+  const variantes = new VariantesController(variantesService);
   const superficies = controladorSimple({
     servicio: new CatalogoSimpleService(new SuperficiesRepository(), 'una superficie'),
     esquemaCrear: crearSuperficieRequestSchema,
@@ -220,5 +228,30 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   adminRouter.patch('/colores/:idColor/estado', cambiarEstado, colores.cambiarEstado as RequestHandler);
   adminRouter.get('/colores/:idColor/impacto-desactivacion', ver, colores.impacto as RequestHandler);
 
-  return { adminRouter, clasificacionService, marcasService, lineasService, medidasService, coloresService };
+  // HU-CAT-02/09/10/12: productos
+  adminRouter.get('/productos', ver, productos.listar as RequestHandler);
+  adminRouter.post('/productos', crear, productos.crear as RequestHandler);
+  adminRouter.get('/productos/:idProducto', ver, productos.obtener as RequestHandler);
+  adminRouter.put('/productos/:idProducto', editar, productos.editar as RequestHandler);
+  adminRouter.patch('/productos/:idProducto/estado', cambiarEstado, productos.cambiarEstado as RequestHandler);
+  adminRouter.patch('/productos/:idProducto/publicacion', editar, productos.publicar as RequestHandler);
+  adminRouter.get('/productos/:idProducto/impacto-desactivacion', ver, productos.impacto as RequestHandler);
+  adminRouter.get('/productos/:idProducto/colores', ver, productos.colores as RequestHandler);
+
+  // HU-CAT-03: variantes
+  adminRouter.post('/productos/:idProducto/variantes', crear, variantes.crear as RequestHandler);
+  adminRouter.put('/variantes/:idVariante', editar, variantes.editar as RequestHandler);
+  adminRouter.patch('/variantes/:idVariante/estado', cambiarEstado, variantes.cambiarEstado as RequestHandler);
+  adminRouter.get('/variantes/:idVariante/impacto-desactivacion', ver, variantes.impacto as RequestHandler);
+
+  return {
+    adminRouter,
+    clasificacionService,
+    marcasService,
+    lineasService,
+    medidasService,
+    coloresService,
+    productosService,
+    variantesService,
+  };
 }

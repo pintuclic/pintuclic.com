@@ -1,15 +1,9 @@
-import type {
-  CambiarEstadoRequest,
-  Estado,
-  ImpactoDesactivacion,
-} from '../dtos/m01-catalogo.dto';
+import type { CambiarEstadoRequest, Estado, ImpactoDesactivacion } from '../dtos/m01-catalogo.dto';
 import type { CODIGOS_ERROR_CATALOGO } from '../dtos/m01-catalogo.dto';
 import type { CODIGOS_ERROR_PRODUCTOS } from '../dtos/m01-catalogo-productos.dto';
 
 /** Códigos de las dos entregas del contrato; comparten el mismo envelope. */
-export type CodigoErrorCatalogo =
-  | (typeof CODIGOS_ERROR_CATALOGO)[number]
-  | (typeof CODIGOS_ERROR_PRODUCTOS)[number];
+export type CodigoErrorCatalogo = (typeof CODIGOS_ERROR_CATALOGO)[number] | (typeof CODIGOS_ERROR_PRODUCTOS)[number];
 
 /** `details` del envelope: el impacto de una desactivación, o el campo que causó el error. */
 export type DetallesError = ImpactoDesactivacion | { campo: string } | null;
@@ -54,6 +48,8 @@ export const errores = {
   /** Entrega 2: un id enviado en el cuerpo no existe o no es usable (base inactiva, marca ajena…). */
   relacionInvalida: (mensaje: string, campo: string): CatalogoError =>
     new CatalogoError('RELACION_INVALIDA', mensaje, 409, { campo }),
+  /** Entrega 2 (P7): publicar un producto que no cumple las condiciones. */
+  noPublicable: (mensaje: string): CatalogoError => new CatalogoError('NO_PUBLICABLE', mensaje, 409),
   acabadoProtegido: (): CatalogoError =>
     new CatalogoError('ACABADO_PROTEGIDO', 'El acabado por defecto no se puede renombrar ni desactivar.', 409),
 };
