@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import type { EnvioNotificacion, ReboteNotificacion } from '../interfaces/m18-notificaciones.interface';
+import type {
+  EnvioNotificacion,
+  EstadoEnvio,
+  ReboteNotificacion,
+  TipoComunicacion,
+} from '../interfaces/m18-notificaciones.interface';
 import { listarEnvios, listarRebotes } from '../services/m18-notificaciones.service';
 import { mensajeDeError } from '../services/mensaje-error';
 
@@ -9,6 +14,8 @@ interface RegistroEnviosState {
   paginaEnvios: number;
   limiteEnvios: number;
   cargandoEnvios: boolean;
+  filtroTipo: TipoComunicacion | undefined;
+  filtroEstado: EstadoEnvio | undefined;
 
   rebotes: ReboteNotificacion[];
   totalRebotes: number;
@@ -20,6 +27,8 @@ interface RegistroEnviosState {
 
   cargarEnvios: () => Promise<void>;
   establecerPaginaEnvios: (pagina: number) => void;
+  establecerFiltroTipo: (tipo: TipoComunicacion | undefined) => void;
+  establecerFiltroEstado: (estado: EstadoEnvio | undefined) => void;
   cargarRebotes: () => Promise<void>;
   establecerPaginaRebotes: (pagina: number) => void;
 }
@@ -30,6 +39,8 @@ export const useRegistroEnviosStore = create<RegistroEnviosState>((set, get) => 
   paginaEnvios: 1,
   limiteEnvios: 20,
   cargandoEnvios: false,
+  filtroTipo: undefined,
+  filtroEstado: undefined,
 
   rebotes: [],
   totalRebotes: 0,
@@ -42,8 +53,13 @@ export const useRegistroEnviosStore = create<RegistroEnviosState>((set, get) => 
   cargarEnvios: async () => {
     set({ cargandoEnvios: true, error: null });
     try {
-      const { paginaEnvios, limiteEnvios } = get();
-      const resultado = await listarEnvios({ pagina: paginaEnvios, limite: limiteEnvios });
+      const { paginaEnvios, limiteEnvios, filtroTipo, filtroEstado } = get();
+      const resultado = await listarEnvios({
+        pagina: paginaEnvios,
+        limite: limiteEnvios,
+        tipo: filtroTipo,
+        estado: filtroEstado,
+      });
       set({ envios: resultado.envios, totalEnvios: resultado.total, cargandoEnvios: false });
     } catch (err: unknown) {
       set({ error: mensajeDeError(err, 'Error al cargar el registro de envíos'), cargandoEnvios: false });
@@ -52,6 +68,16 @@ export const useRegistroEnviosStore = create<RegistroEnviosState>((set, get) => 
 
   establecerPaginaEnvios: (pagina) => {
     set({ paginaEnvios: pagina });
+    void get().cargarEnvios();
+  },
+
+  establecerFiltroTipo: (tipo) => {
+    set({ filtroTipo: tipo, paginaEnvios: 1 });
+    void get().cargarEnvios();
+  },
+
+  establecerFiltroEstado: (estado) => {
+    set({ filtroEstado: estado, paginaEnvios: 1 });
     void get().cargarEnvios();
   },
 

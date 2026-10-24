@@ -2,7 +2,8 @@
 
 import React, { useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { Badge, Skeleton } from '@/core/components';
+import { Badge, Select, Skeleton } from '@/core/components';
+import type { EstadoEnvio, TipoComunicacion } from '../interfaces/m18-notificaciones.interface';
 import { useRegistroEnviosStore } from '../store/registroEnviosStore';
 import { NotificacionesPagination } from './NotificacionesPagination';
 
@@ -12,6 +13,30 @@ function badgeDeEstado(estado: string): 'action' | 'success' | 'danger' {
   return 'action';
 }
 
+const ETIQUETAS_TIPO: Record<TipoComunicacion, string> = {
+  registro_otp: 'Código de registro',
+  recuperacion_password: 'Recuperación de contraseña',
+  activacion_empleado: 'Activación de colaborador',
+  cambio_correo_otp: 'Código de cambio de correo',
+  cambio_correo_confirmado: 'Confirmación de cambio de correo',
+  dictamen_empresa: 'Dictamen de cuenta empresa',
+};
+
+const OPCIONES_TIPO = [
+  { value: '', label: 'Todos los tipos' },
+  ...(Object.entries(ETIQUETAS_TIPO) as Array<[TipoComunicacion, string]>).map(([value, label]) => ({
+    value,
+    label,
+  })),
+];
+
+const OPCIONES_ESTADO = [
+  { value: '', label: 'Todos los estados' },
+  { value: 'enviado', label: 'Enviado' },
+  { value: 'fallido', label: 'Fallido' },
+  { value: 'pendiente', label: 'Pendiente' },
+];
+
 export const RegistroEnviosView: React.FC = () => {
   const {
     envios,
@@ -19,6 +44,8 @@ export const RegistroEnviosView: React.FC = () => {
     paginaEnvios,
     limiteEnvios,
     cargandoEnvios,
+    filtroTipo,
+    filtroEstado,
     rebotes,
     totalRebotes,
     paginaRebotes,
@@ -27,6 +54,8 @@ export const RegistroEnviosView: React.FC = () => {
     error,
     cargarEnvios,
     establecerPaginaEnvios,
+    establecerFiltroTipo,
+    establecerFiltroEstado,
     cargarRebotes,
     establecerPaginaRebotes,
   } = useRegistroEnviosStore();
@@ -46,8 +75,32 @@ export const RegistroEnviosView: React.FC = () => {
       )}
 
       <div className="bg-neutral-white border border-neutral-light/70 rounded-card shadow-card overflow-hidden">
-        <div className="p-4 border-b border-neutral-light/60">
+        <div className="p-4 border-b border-neutral-light/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="font-title font-bold text-sm text-corporate">Registro de envíos (RT-23)</h3>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Select
+              label="Tipo"
+              hideLabel
+              appearance="field"
+              className="w-full sm:w-56"
+              options={OPCIONES_TIPO}
+              value={filtroTipo ?? ''}
+              onChange={(e) =>
+                establecerFiltroTipo((e.target.value || undefined) as TipoComunicacion | undefined)
+              }
+            />
+            <Select
+              label="Estado"
+              hideLabel
+              appearance="field"
+              className="w-full sm:w-44"
+              options={OPCIONES_ESTADO}
+              value={filtroEstado ?? ''}
+              onChange={(e) =>
+                establecerFiltroEstado((e.target.value || undefined) as EstadoEnvio | undefined)
+              }
+            />
+          </div>
         </div>
         {cargandoEnvios ? (
           <div className="p-4"><Skeleton className="h-32 w-full" /></div>
