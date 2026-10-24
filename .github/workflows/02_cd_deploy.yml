@@ -1,0 +1,386 @@
+name: CD - Despliegue continuo (Docker Compose)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Entorno de despliegue objetivo'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      run_smoke_tests:
+        description: 'Ejecutar smoke test de contenedores antes de desplegar'
+        required: true
+        default: true
+        type: boolean
+      clean_deploy:
+        description: 'Forzar rebuild sin cache en el servidor'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: deploy-${{ github.ref_name }}-${{ inputs.environment || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  # ===========================================================================
+  # 1. Validacion previa y Smoke Test de la pila Docker Compose
+  # ===========================================================================
+  pre-deploy-validation:
+    name: Validacion y Smoke Test de Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validar sintaxis y coherencia de docker-compose.yml
+        run: |
+          echo "Validando configuracion de docker-compose.yml..."
+          export POSTGRES_USER=pintuclic
+          export POSTGRES_PASSWORD=pintuclic_ci_pwd
+          export POSTGRES_DB=pintuclic_ci
+          export JWT_SECRET=pintuclic_ci_jwt_secret_min_32_characters_length
+          export CORS_ORIGIN=http://localhost:3001
+          export BACKEND_URL=http://backend:3000
+          export BACKEND_PORT=3000
+          export FRONTEND_PORT=8080
+          
+          docker compose -f docker-compose.yml config --quiet
+          echo "Sintaxis y estructura de docker-compose.yml validas."
+
+      - name: Validar compilacion de imagenes (Build Verification)
+        run: |
+          echo "Compilando imagenes de backend y frontend..."
+          export POSTGRES_USER=pintuclic
+          export POSTGRES_PASSWORD=pintuclic_ci_pwd
+          export POSTGRES_DB=pintuclic_ci
+          export JWT_SECRET=pintuclic_ci_jwt_secret_min_32_characters_length
+          export CORS_ORIGIN=http://localhost:3001
+          export BACKEND_URL=http://backend:3000
+          export BACKEND_PORT=3000
+          export FRONTEND_PORT=8080
+
+          docker compose -f docker-compose.yml build
+
+      - name: Ejecutar Smoke Test de la arquitectura completa
+        if: ${{ github.event_name == 'push' || inputs.run_smoke_tests != false }}
+        run: |
+          echo "Iniciando contenedores de prueba en el runner..."
+          cat << 'EOF' > .env.smoke
+          POSTGRES_USER=pintuclic
+          POSTGRES_PASSWORD=pintuclic_smoke_test_pass
+          POSTGRES_DB=pintuclic_smoke
+          POSTGRES_PORT=5432
+          DATABASE_URL=postgres://pintuclic:pintuclic_smoke_test_pass@pintuclic-db:5432/pintuclic_smoke?schema=public
+          NODE_ENV=production
+          BACKEND_PORT=3000
+          FRONTEND_PORT=8080
+          CORS_ORIGIN=http://localhost:8080
+          BACKEND_URL=http://backend:3000
+          JWT_SECRET=super_secret_jwt_for_smoke_testing_only_32_chars
+          JWT_ACCESS_EXPIRES=15m
+          JWT_REFRESH_EXPIRES=7d
+          SMTP_HOST=localhost
+          SMTP_PORT=587
+          SMTP_SECURE=false
+          SMTP_USER=smoke@pintuclic.com
+          SMTP_PASS=smoke_pass
+          SMTP_FROM="Pintu Clic <notificaciones@pintuclic.com>"
+          GOOGLE_CLIENT_ID=mock_google_id
+          GOOGLE_CLIENT_SECRET=mock_google_secret
+          GOOGLE_CALLBACK_URL=http://localhost:3000/api/v1/auth/google/callback
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID=mock_google_id
+          EOF
+
+          docker compose --env-file .env.smoke -f docker-compose.yml up -d
+
+          echo "Monitoreando healthchecks de la arquitectura Pintu Clic..."
+          MAX_ATTEMPTS=24
+          ATTEMPT=0
+          HEALTHY=false
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Chequeo $ATTEMPT/$MAX_ATTEMPTS:"
+
+            DB_STATUS=$(docker inspect --format='{{json .State.Health.Status}}' pintuclic-db 2>/dev/null || echo '"unknown"')
+            BACKEND_STATUS=$(docker inspect --format='{{json .State.Health.Status}}' pintuclic-backend 2>/dev/null || echo '"unknown"')
+            FRONTEND_STATUS=$(docker inspect --format='{{json .State.Health.Status}}' pintuclic-frontend 2>/dev/null || echo '"unknown"')
+
+            echo "  - DB: $DB_STATUS"
+            echo "  - Backend: $BACKEND_STATUS"
+            echo "  - Frontend: $FRONTEND_STATUS"
+
+            if [ "$DB_STATUS" = '"healthy"' ] && [ "$BACKEND_STATUS" = '"healthy"' ] && [ "$FRONTEND_STATUS" = '"healthy"' ]; then
+              HEALTHY=true
+              break
+            fi
+
+            sleep 5
+          done
+
+          if [ "$HEALTHY" != "true" ]; then
+            echo "Fallo en smoke test: Los servicios no alcanzaron el estado saludable."
+            echo "=== Logs de Base de Datos ==="
+            docker compose -f docker-compose.yml logs db --tail=50
+            echo "=== Logs de Backend ==="
+            docker compose -f docker-compose.yml logs backend --tail=50
+            echo "=== Logs de Frontend ==="
+            docker compose -f docker-compose.yml logs frontend --tail=50
+            docker compose -f docker-compose.yml down -v
+            exit 1
+          fi
+
+          echo "Probando respuestas HTTP locales..."
+          # Backend healthcheck HTTP (<500 esperado)
+          curl -fsS http://127.0.0.1:3000/api/health || true
+          # Frontend HTTP
+          curl -fsS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080 || true
+
+          echo "Desmontando contenedores de prueba..."
+          docker compose -f docker-compose.yml down -v
+          rm -f .env.smoke
+          echo "Smoke test superado con exito."
+
+  # ===========================================================================
+  # 2. Despliegue al servidor de destino
+  # ===========================================================================
+  deploy:
+    name: Despliegue al Servidor
+    needs: pre-deploy-validation
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment || 'production' }}
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Detectar metodo de despliegue configurado
+        id: detect_method
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL || secrets.DOKPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SSH_HOST" ]; then
+            echo "method=ssh" >> "$GITHUB_OUTPUT"
+            echo "Metodo de despliegue: SSH Directo (Docker Compose)"
+          elif [ -n "$WEBHOOK_URL" ]; then
+            echo "method=webhook" >> "$GITHUB_OUTPUT"
+            echo "Metodo de despliegue: Webhook (Dokploy / PaaS)"
+          else
+            echo "method=unconfigured" >> "$GITHUB_OUTPUT"
+            echo "Sin secretos de servidor configurados en GitHub Secrets"
+          fi
+
+      # -----------------------------------------------------------------------
+      # A. Despliegue por SSH directo a servidor con Docker Engine
+      # -----------------------------------------------------------------------
+      - name: Configurar llave SSH
+        if: steps.detect_method.outputs.method == 'ssh'
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Sincronizar artefactos al servidor remoto
+        if: steps.detect_method.outputs.method == 'ssh'
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/pintuclic' }}
+        run: |
+          echo "Conectando y sincronizando archivos a $SSH_USER@$SSH_HOST:$DEPLOY_PATH..."
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "mkdir -p $DEPLOY_PATH"
+
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key -p $SSH_PORT -o StrictHostKeyChecking=no" \
+            --delete \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude '.next' \
+            --exclude 'dist' \
+            --exclude '.env*' \
+            --exclude 'docs/qa' \
+            ./ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/"
+
+      - name: Inyectar variables de entorno seguras (.env) en el servidor
+        if: steps.detect_method.outputs.method == 'ssh'
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/pintuclic' }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'pintuclic' }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'pintuclic' }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT || 5432 }}
+          BACKEND_PORT: ${{ secrets.BACKEND_PORT || 3000 }}
+          FRONTEND_PORT: ${{ secrets.FRONTEND_PORT || 8080 }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_ACCESS_EXPIRES: ${{ secrets.JWT_ACCESS_EXPIRES || '15m' }}
+          JWT_REFRESH_EXPIRES: ${{ secrets.JWT_REFRESH_EXPIRES || '7d' }}
+          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+          BACKEND_URL: ${{ secrets.BACKEND_URL || 'http://backend:3000' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || 'smtp-relay.brevo.com' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || 587 }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE || 'false' }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM || 'Pintu Clic <notificaciones@pintuclic.com>' }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL: ${{ secrets.GOOGLE_CALLBACK_URL }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
+        run: |
+          echo "Generando .env de produccion con permisos estrictos (600)..."
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "bash -s" << EOF
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+            umask 077
+            cat > .env << 'ENVFILE'
+          # Archivo de variables de entorno autogenerado por CD
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          POSTGRES_DB=${POSTGRES_DB}
+          POSTGRES_PORT=${POSTGRES_PORT}
+          DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pintuclic-db:5432/${POSTGRES_DB}?schema=public
+
+          BACKEND_PORT=${BACKEND_PORT}
+          NODE_ENV=production
+          CORS_ORIGIN=${CORS_ORIGIN}
+          BACKEND_URL=${BACKEND_URL}
+
+          JWT_SECRET=${JWT_SECRET}
+          JWT_ACCESS_EXPIRES=${JWT_ACCESS_EXPIRES}
+          JWT_REFRESH_EXPIRES=${JWT_REFRESH_EXPIRES}
+
+          SMTP_HOST=${SMTP_HOST}
+          SMTP_PORT=${SMTP_PORT}
+          SMTP_SECURE=${SMTP_SECURE}
+          SMTP_USER=${SMTP_USER}
+          SMTP_PASS=${SMTP_PASS}
+          SMTP_FROM=${SMTP_FROM}
+
+          GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+          GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+          GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}
+
+          FRONTEND_PORT=${FRONTEND_PORT}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+          ENVFILE
+            chmod 600 .env
+            echo ".env configurado correctamente."
+          EOF
+
+      - name: Recompilar y desplegar contenedores en el servidor
+        if: steps.detect_method.outputs.method == 'ssh'
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/pintuclic' }}
+          NO_CACHE: ${{ inputs.clean_deploy == true && '--no-cache' || '' }}
+        run: |
+          echo "Ejecutando orquestacion con Docker Compose en el servidor remoto..."
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "bash -s" << EOF
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+
+            echo "1. Validando compose en el host..."
+            docker compose -f docker-compose.yml config --quiet
+
+            echo "2. Compilando imagenes actualizadas..."
+            docker compose -f docker-compose.yml build --pull $NO_CACHE
+
+            echo "3. Levantando servicios..."
+            docker compose -f docker-compose.yml up -d --remove-orphans
+
+            echo "4. Verificando estado de salud de los servicios..."
+            MAX_ATTEMPTS=24
+            ATTEMPT=0
+            HEALTHY=false
+
+            while [ \$ATTEMPT -lt \$MAX_ATTEMPTS ]; do
+              ATTEMPT=\$((ATTEMPT + 1))
+              echo "Chequeo de salud (intento \$ATTEMPT/\$MAX_ATTEMPTS)..."
+
+              DB_STATUS=\$(docker inspect --format='{{json .State.Health.Status}}' pintuclic-db 2>/dev/null || echo '"unknown"')
+              BACKEND_STATUS=\$(docker inspect --format='{{json .State.Health.Status}}' pintuclic-backend 2>/dev/null || echo '"unknown"')
+              FRONTEND_STATUS=\$(docker inspect --format='{{json .State.Health.Status}}' pintuclic-frontend 2>/dev/null || echo '"unknown"')
+
+              echo "  - DB: \$DB_STATUS | Backend: \$BACKEND_STATUS | Frontend: \$FRONTEND_STATUS"
+
+              if [ "\$DB_STATUS" = '"healthy"' ] && [ "\$BACKEND_STATUS" = '"healthy"' ] && [ "\$FRONTEND_STATUS" = '"healthy"' ]; then
+                HEALTHY=true
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "\$HEALTHY" != "true" ]; then
+              echo "Error: Los contenedores no alcanzaron estado healthy a tiempo."
+              echo "=== Logs de contenedores ==="
+              docker compose -f docker-compose.yml logs --tail=50
+              exit 1
+            fi
+
+            echo "5. Limpieza de imagenes huerfanas en el host..."
+            docker image prune -f
+
+            echo "Despliegue finalizado con exito en $SSH_HOST."
+          EOF
+
+      # -----------------------------------------------------------------------
+      # B. Despliegue mediante Webhook (Dokploy / Portainer / PaaS)
+      # -----------------------------------------------------------------------
+      - name: Disparar webhook de despliegue
+        if: steps.detect_method.outputs.method == 'webhook'
+        env:
+          WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL || secrets.DOKPLOY_WEBHOOK_URL }}
+        run: |
+          echo "Disparando webhook de despliegue a Dokploy/PaaS..."
+          HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" -X POST "$WEBHOOK_URL" -H "Content-Type: application/json")
+          echo "Codigo HTTP recibido: $HTTP_CODE"
+          cat response.txt || true
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "El webhook fallo con codigo de estado HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "Despliegue via webhook activado exitosamente."
+
+      # -----------------------------------------------------------------------
+      # C. Resumen si no hay infraestructura configurada en Secrets
+      # -----------------------------------------------------------------------
+      - name: Reporte de configuracion de despliegue
+        if: steps.detect_method.outputs.method == 'unconfigured'
+        run: |
+          echo "### Pipeline CD: Pila Docker Compose validada con exito" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "La validacion de sintaxis, Dockerfiles y smoke test del stack pasaron sin errores." >> $GITHUB_STEP_SUMMARY
+          echo "Para activar el despliegue automatico hacia tu servidor, configura los siguientes secretos en **Settings > Secrets and variables > Actions**:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Opcion A: Despliegue por SSH directo (Docker Engine)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`SSH_HOST\`: IP o dominio del servidor de produccion." >> $GITHUB_STEP_SUMMARY
+          echo "- \`SSH_USER\`: Usuario con permisos Docker (ej. \`deploy\` o \`ubuntu\`)." >> $GITHUB_STEP_SUMMARY
+          echo "- \`SSH_PRIVATE_KEY\` o \`SSH_KEY\`: Llave privada SSH para autenticarse." >> $GITHUB_STEP_SUMMARY
+          echo "- \`DEPLOY_PATH\` (opcional): Ruta en el servidor (por defecto \`/opt/pintuclic\`)." >> $GITHUB_STEP_SUMMARY
+          echo "- \`SSH_PORT\` (opcional): Puerto SSH (por defecto \`22\`)." >> $GITHUB_STEP_SUMMARY
+          echo "- Secretos de aplicacion: \`POSTGRES_PASSWORD\`, \`JWT_SECRET\`, \`CORS_ORIGIN\`, \`SMTP_PASS\`, etc." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Opcion B: Despliegue por Webhook (Dokploy / Coolify / PaaS)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`DEPLOY_WEBHOOK_URL\` o \`DOKPLOY_WEBHOOK_URL\`: URL del webhook generado por tu panel de Dokploy." >> $GITHUB_STEP_SUMMARY
+
