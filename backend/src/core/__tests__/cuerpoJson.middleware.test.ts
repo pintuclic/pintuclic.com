@@ -36,6 +36,9 @@ beforeAll(async () => {
   app.post('/api/v1/admin/catalogo/marcas', eco);
   app.put('/api/v1/admin/catalogo/marcas/:idMarca/logotipo', eco);
   app.put('/api/v1/admin/catalogo/marcas/:idMarca', eco);
+  app.post('/api/v1/admin/catalogo/productos/:idProducto/imagenes', eco);
+  app.put('/api/v1/admin/catalogo/medidas/:idMedida/imagen', eco);
+  app.post('/api/v1/admin/catalogo/productos', eco);
   app.post('/api/v1/admin/catalogo/categorias', eco);
   app.use((_error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(500).json({ manejadorGlobal: true });
@@ -96,7 +99,7 @@ describe('construirParserJson — otros errores', () => {
   });
 });
 
-describe('construirParserJson — logotipo de marca de M01 (HU-CAT-04)', () => {
+describe('construirParserJson — imágenes de M01 (logotipos, productos y medidas)', () => {
   const base64DeCincoMb = Math.ceil((5 * MB) / 3) * 4;
 
   it('crear una marca acepta el base64 de un logotipo de 5 MB exactos', async () => {
@@ -109,13 +112,24 @@ describe('construirParserJson — logotipo de marca de M01 (HU-CAT-04)', () => {
     expect(status).toBe(200);
   });
 
-  it('por encima de 7 MB responde 413 CUERPO_DEMASIADO_GRANDE con mensaje del logotipo', async () => {
+  it('por encima de 7 MB responde 413 CUERPO_DEMASIADO_GRANDE con mensaje de la imagen', async () => {
     const { status, json } = await enviar('/api/v1/admin/catalogo/marcas', cuerpoDe(7 * MB + 1));
     expect(status).toBe(413);
     expect(json).toEqual({
       success: false,
-      error: { code: 'CUERPO_DEMASIADO_GRANDE', message: 'El logotipo no puede superar 5 MB.' },
+      error: { code: 'CUERPO_DEMASIADO_GRANDE', message: 'La imagen no puede superar 5 MB.' },
     });
+  });
+
+  it('subir una imagen de producto o de medida acepta 5 MB', async () => {
+    expect((await enviar('/api/v1/admin/catalogo/productos/7/imagenes', cuerpoDe(base64DeCincoMb))).status).toBe(200);
+    expect((await enviar('/api/v1/admin/catalogo/medidas/3/imagen', cuerpoDe(base64DeCincoMb), 'PUT')).status).toBe(200);
+  });
+
+  it('las demás rutas de productos y medidas conservan el límite de 100 kb', async () => {
+    expect((await enviar('/api/v1/admin/catalogo/productos', cuerpoDe(200 * 1024))).status).toBe(413);
+    expect((await enviar('/api/v1/admin/catalogo/productos/7/imagenes', cuerpoDe(1 * MB), 'PUT')).status).toBe(413);
+    expect((await enviar('/api/v1/admin/catalogo/medidas/abc/imagen', cuerpoDe(1 * MB), 'PUT')).status).toBe(413);
   });
 
   it('el resto del catálogo conserva el límite de 100 kb', async () => {
