@@ -56,6 +56,7 @@ function crearMockGobernanza(): {
           idRol: 1,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          primerAccesoPendiente: false,
         });
       }
       return Promise.resolve(null);
@@ -71,6 +72,7 @@ function crearMockGobernanza(): {
           idRol: 5,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          primerAccesoPendiente: false,
         });
       }
       return Promise.resolve(null);

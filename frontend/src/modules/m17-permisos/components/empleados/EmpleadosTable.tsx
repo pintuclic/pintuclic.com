@@ -5,6 +5,7 @@ import {
   AlertCircle,
   Edit2,
   KeyRound,
+  Mail,
   Power,
   RotateCcw,
   Search,
@@ -31,6 +32,7 @@ export const EmpleadosTable: React.FC = () => {
     totalPaginas,
     cargando,
     error,
+    aviso,
     filtroEstado,
     busqueda,
     cargarEmpleados,
@@ -39,6 +41,7 @@ export const EmpleadosTable: React.FC = () => {
     establecerPagina,
     limpiarFiltros,
     reactivar,
+    reenviarActivacion,
   } = useEmpleadosStore();
 
   // Estados de Modales
@@ -68,6 +71,12 @@ export const EmpleadosTable: React.FC = () => {
   useEffect(() => {
     void cargarEmpleados();
   }, [cargarEmpleados]);
+
+  const handleReenviarActivacion = async (empleado: ResumenEmpleado) => {
+    if (confirm(`¿Enviar a ${empleado.correo} un enlace de activación nuevo? El anterior dejará de funcionar.`)) {
+      await reenviarActivacion(empleado.idUsuario, empleado.correo);
+    }
+  };
 
   const handleReactivar = async (empleado: ResumenEmpleado) => {
     if (confirm(`¿Reactivar la cuenta de ${empleado.nombre}?`)) {
@@ -152,6 +161,13 @@ export const EmpleadosTable: React.FC = () => {
             </span>
           </div>
         </div>
+
+        {aviso && (
+          <div role="status" className="p-4 bg-conversion/10 border-b border-conversion/20 text-xs text-conversion flex items-center gap-2 font-medium">
+            <Mail className="w-4 h-4 shrink-0" />
+            <span>{aviso}</span>
+          </div>
+        )}
 
         {/* Mensaje de Error */}
         {error && (
@@ -306,6 +322,20 @@ export const EmpleadosTable: React.FC = () => {
                           >
                             <Edit2 className="w-4 h-4" />
                           </Button>
+
+                          {/* HU-ADM-01: reenviar el enlace a quien aún no definió su contraseña */}
+                          {esActivo && emp.primerAccesoPendiente && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleReenviarActivacion(emp)}
+                              aria-label="Reenviar enlace de activación"
+                              className="p-1.5 min-h-[32px] text-action hover:bg-subaction"
+                              title="Reenviar enlace de activación"
+                            >
+                              <Mail className="w-4 h-4" />
+                            </Button>
+                          )}
 
                           {/* Botón Desactivar / Reactivar */}
                           {esActivo ? (

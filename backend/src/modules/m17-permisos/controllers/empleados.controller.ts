@@ -155,6 +155,28 @@ export class EmpleadosController {
     }
   };
 
+  reenviarActivacion = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const idUsuario = Number(req.params.id);
+      if (!Number.isInteger(idUsuario) || idUsuario <= 0) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'PARAMETRO_INVALIDO',
+            message: 'El identificador del colaborador debe ser un entero positivo.',
+            details: null,
+          },
+        });
+        return;
+      }
+
+      await this.empleadosService.reenviarActivacion(idUsuario);
+      responderExito(res, { enviado: true }, 'Enlace de activación enviado.');
+    } catch (err: unknown) {
+      this.manejarError(res, err);
+    }
+  };
+
   private manejarError(res: Response, err: unknown): void {
     if (err instanceof EmpleadoError) {
       res.status(err.status).json({

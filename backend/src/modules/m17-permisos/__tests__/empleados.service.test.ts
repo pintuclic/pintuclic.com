@@ -21,6 +21,7 @@ function crearMockRepos(): {
           idRol: 2,
           fechaCreacion: new Date('2026-01-01'),
           fechaUltimoAcceso: new Date('2026-01-02'),
+          primerAccesoPendiente: false,
         },
       ],
       total: 1,
@@ -36,6 +37,7 @@ function crearMockRepos(): {
           idRol: 2,
           fechaCreacion: new Date('2026-01-01'),
           fechaUltimoAcceso: null,
+          primerAccesoPendiente: false,
         });
       }
       return Promise.resolve(null);
@@ -51,6 +53,7 @@ function crearMockRepos(): {
           idRol: 5,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          primerAccesoPendiente: false,
         });
       }
       return Promise.resolve(null);
@@ -65,6 +68,7 @@ function crearMockRepos(): {
         idRol: 10,
         fechaCreacion: new Date(),
         fechaUltimoAcceso: null,
+        primerAccesoPendiente: false,
       }),
     ),
     actualizarContacto: vi.fn().mockImplementation((id, datos) =>
@@ -77,6 +81,7 @@ function crearMockRepos(): {
         idRol: 2,
         fechaCreacion: new Date(),
         fechaUltimoAcceso: null,
+        primerAccesoPendiente: false,
       }),
     ),
     actualizarEstado: vi.fn().mockResolvedValue(undefined),
@@ -115,21 +120,67 @@ describe('HU-ADM-01 · Gestión de Cuentas de Empleado y Credenciales', () => {
     ).rejects.toThrow(EmpleadoError);
   });
 
-  it('RN-ADM-02 y RN-ADM-03: genera credencial temporal y crea al empleado con estado activo', async () => {
-    const { empleadosRepo, gobernanzaRepo, sesionService } = crearMockRepos();
-    const servicio = new EmpleadosService(empleadosRepo, gobernanzaRepo, sesionService);
+  const nuevoEmpleado = {
+    nombre: 'Nuevo Empleado',
+    documento: '98765432',
+    correo: 'nuevo@pintuclic.com',
+    telefono: '3110001122',
+  };
 
-    const resultado = await servicio.crear({
-      nombre: 'Nuevo Empleado',
-      documento: '98765432',
-      correo: 'nuevo@pintuclic.com',
-      telefono: '3110001122',
-    });
+  it('RN-ADM-02 y RN-ADM-03: crea al empleado activo y le envía el enlace de activación', async () => {
+    const { empleadosRepo, gobernanzaRepo, sesionService } = crearMockRepos();
+    const activacion = { enviarEnlaceActivacion: vi.fn().mockResolvedValue(undefined) };
+    const servicio = new EmpleadosService(empleadosRepo, gobernanzaRepo, sesionService, activacion);
+
+    const resultado = await servicio.crear(nuevoEmpleado);
 
     expect(resultado.idUsuario).toBe(10);
     expect(resultado.primerAccesoPendiente).toBe(true);
-    expect(resultado.credencialTemporal).toBeDefined();
-    expect(resultado.credencialTemporal?.length).toBeGreaterThanOrEqual(8);
+    expect(resultado.activacionEnviada).toBe(true);
+    expect(activacion.enviarEnlaceActivacion).toHaveBeenCalledWith(10);
+  });
+
+  it('HU-ADM-01: la respuesta del alta no expone ninguna contraseña', async () => {
+    const { empleadosRepo, gobernanzaRepo, sesionService } = crearMockRepos();
+    const activacion = { enviarEnlaceActivacion: vi.fn().mockResolvedValue(undefined) };
+    const servicio = new EmpleadosService(empleadosRepo, gobernanzaRepo, sesionService, activacion);
+
+    const resultado = await servicio.crear(nuevoEmpleado);
+
+    expect(Object.keys(resultado)).not.toContain('credencialTemporal');
+    expect(JSON.stringify(resultado)).not.toMatch(/Pintu#/);
+  });
+
+  it('HU-ADM-01: si el correo falla, el alta se conserva y avisa con activacionEnviada=false', async () => {
+    const { empleadosRepo, gobernanzaRepo, sesionService } = crearMockRepos();
+    const activacion = { enviarEnlaceActivacion: vi.fn().mockRejectedValue(new Error('SMTP caído')) };
+    const servicio = new EmpleadosService(empleadosRepo, gobernanzaRepo, sesionService, activacion);
+
+    const resultado = await servicio.crear(nuevoEmpleado);
+
+    expect(resultado.idUsuario).toBe(10);
+    expect(resultado.activacionEnviada).toBe(false);
+  });
+
+  it('HU-ADM-01: reenvía el enlace a un empleado que aún no lo usó', async () => {
+    const { empleadosRepo, gobernanzaRepo, sesionService } = crearMockRepos();
+    const activacion = { enviarEnlaceActivacion: vi.fn().mockResolvedValue(undefined) };
+    const servicio = new EmpleadosService(empleadosRepo, gobernanzaRepo, sesionService, activacion);
+    const pendiente = await empleadosRepo.obtenerPorId(2);
+    vi.mocked(empleadosRepo.obtenerPorId).mockResolvedValueOnce({ ...pendiente!, primerAccesoPendiente: true });
+
+    await servicio.reenviarActivacion(2);
+
+    expect(activacion.enviarEnlaceActivacion).toHaveBeenCalledWith(2);
+  });
+
+  it('HU-ADM-01: no reenvía el enlace si el empleado ya definió su contraseña', async () => {
+    const { empleadosRepo, gobernanzaRepo, sesionService } = crearMockRepos();
+    const activacion = { enviarEnlaceActivacion: vi.fn().mockResolvedValue(undefined) };
+    const servicio = new EmpleadosService(empleadosRepo, gobernanzaRepo, sesionService, activacion);
+
+    await expect(servicio.reenviarActivacion(2)).rejects.toMatchObject({ status: 409 });
+    expect(activacion.enviarEnlaceActivacion).not.toHaveBeenCalled();
   });
 
   it('RN-ADM-04 e Inmutabilidad Histórica: desactiva lógicamente al empleado', async () => {

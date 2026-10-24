@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Check, Copy, KeyRound, ShieldAlert, UserPlus } from 'lucide-react';
+import { AlertTriangle, MailCheck, UserPlus } from 'lucide-react';
 import { Button, Input, Modal } from '@/core/components';
 import { crearEmpleadoDto, type CrearEmpleadoFormData } from '../../dtos/empleados.dto';
 import { useEmpleadosStore } from '../../store/empleadosStore';
@@ -14,10 +14,7 @@ export interface CrearEmpleadoModalProps {
 }
 
 export const CrearEmpleadoModal: React.FC<CrearEmpleadoModalProps> = ({ isOpen, onClose }) => {
-  const { crearNuevoEmpleado, cargando, credencialTemporalGenerada, limpiarCredencialTemporal } =
-    useEmpleadosStore();
-  const [copiado, setCopiado] = useState(false);
-  const [errorCopia, setErrorCopia] = useState<string | null>(null);
+  const { crearNuevoEmpleado, cargando, activacionCreada, limpiarActivacion } = useEmpleadosStore();
 
   const {
     register,
@@ -42,48 +39,19 @@ export const CrearEmpleadoModal: React.FC<CrearEmpleadoModalProps> = ({ isOpen, 
   };
 
   const handleCerrar = () => {
-    limpiarCredencialTemporal();
+    limpiarActivacion();
     reset();
-    setCopiado(false);
-    setErrorCopia(null);
     onClose();
-  };
-
-  /**
-   * HU-SEG-06: la credencial temporal es de un solo uso y no puede volver a
-   * consultarse. Mientras está en pantalla, cerrar con Escape o con un clic en
-   * el fondo la destruiría sin aviso, así que ambos caminos se desactivan y
-   * solo el botón explícito "Entendido y Cerrar" la descarta.
-   */
-  const credencialVisible = credencialTemporalGenerada !== null;
-
-  const cierreIgnorado = () => {
-    // Intencionalmente vacío: ver `credencialVisible`.
-  };
-
-  const copiarCredencial = async () => {
-    if (!credencialTemporalGenerada) return;
-    try {
-      await navigator.clipboard.writeText(credencialTemporalGenerada);
-      setCopiado(true);
-      setErrorCopia(null);
-      setTimeout(() => setCopiado(false), 2500);
-    } catch {
-      // El portapapeles falla en contexto no seguro o sin permiso. Callarlo
-      // deja al usuario creyendo que copió una clave irrecuperable.
-      setErrorCopia('No se pudo copiar. Selecciona la credencial y cópiala manualmente.');
-    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={credencialVisible ? cierreIgnorado : handleCerrar}
-      closeOnOutsideClick={!credencialVisible}
+      onClose={handleCerrar}
       title={
-        credencialTemporalGenerada ? (
+        activacionCreada ? (
           <span className="flex items-center gap-2 text-conversion">
-            <KeyRound className="w-5 h-5" /> Colaborador Creado con Éxito
+            <MailCheck className="w-5 h-5" /> Colaborador Creado con Éxito
           </span>
         ) : (
           <span className="flex items-center gap-2 text-corporate">
@@ -92,53 +60,37 @@ export const CrearEmpleadoModal: React.FC<CrearEmpleadoModalProps> = ({ isOpen, 
         )
       }
       subtitle={
-        credencialTemporalGenerada
-          ? 'Guarda la credencial temporal para entregarla al colaborador.'
+        activacionCreada
+          ? 'El colaborador define su propia contraseña desde el correo.'
           : 'Ingresa los datos para registrar un colaborador en el sistema (HU-ADM-01).'
       }
       size="md"
       showRainbowStrip
     >
-      {credencialTemporalGenerada ? (
-        /* Vista de Credencial Temporal Generada */
+      {activacionCreada ? (
+        /* HU-ADM-01: el enlace de activación sustituye a la credencial temporal */
         <div className="space-y-5 py-2">
-          <div className="p-4 bg-conversion/10 border border-conversion/30 rounded-card">
-            <p className="font-title font-semibold text-sm text-conversion-hover mb-1">
-              Credencial Temporal de Acceso
-            </p>
-            <p className="font-sans text-xs text-neutral-dark mb-3">
-              Esta credencial es de un solo uso. El colaborador estará obligado a cambiarla en su
-              primer inicio de sesión para activar su cuenta.
-            </p>
-
-            <div className="flex items-center gap-2 p-2.5 bg-neutral-white border border-neutral-light rounded-btn font-mono text-sm text-neutral-black font-bold justify-between">
-              <span className="tracking-wider">{credencialTemporalGenerada}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={copiarCredencial}
-                leftIcon={copiado ? <Check className="w-3.5 h-3.5 text-conversion" /> : <Copy className="w-3.5 h-3.5" />}
-                className="py-1 px-2.5 min-h-[32px] text-xs"
-              >
-                {copiado ? 'Copiado' : 'Copiar'}
-              </Button>
-            </div>
-
-            {errorCopia && (
-              <p role="alert" className="mt-2 font-sans text-xs text-danger">
-                {errorCopia}
+          {activacionCreada.enviada ? (
+            <div className="p-4 bg-conversion/10 border border-conversion/30 rounded-card">
+              <p className="font-title font-semibold text-sm text-conversion-hover mb-1">
+                Enlace de activación enviado
               </p>
-            )}
-          </div>
-
-          <div className="p-3 bg-neutral-lightest border border-neutral-light/70 rounded-btn flex items-start gap-2.5 text-xs text-neutral-medium">
-            <ShieldAlert className="w-4 h-4 text-highlight shrink-0 mt-0.5" />
-            <span>
-              Por directiva de seguridad HU-SEG-06, esta clave temporal nunca se almacena en texto
-              plano y no podrá ser consultada nuevamente una vez cerrado este diálogo.
-            </span>
-          </div>
+              <p className="font-sans text-xs text-neutral-dark">
+                Enviamos a <strong>{activacionCreada.correo}</strong> un enlace de un solo uso para que
+                defina su contraseña. Vence según la vigencia configurada en Parámetros; si vence, puedes
+                reenviarlo desde la lista de colaboradores.
+              </p>
+            </div>
+          ) : (
+            <div role="alert" className="p-4 bg-highlight/10 border border-highlight/30 rounded-card flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-highlight shrink-0 mt-0.5" />
+              <p className="font-sans text-xs text-neutral-dark">
+                El colaborador quedó creado, pero no pudimos enviar el correo a{' '}
+                <strong>{activacionCreada.correo}</strong>. Usa “Reenviar enlace de activación” en la lista
+                de colaboradores.
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end pt-2">
             <Button variant="primary-action" size="md" onClick={handleCerrar}>

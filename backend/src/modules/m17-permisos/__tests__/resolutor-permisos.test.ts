@@ -33,6 +33,7 @@ function crearMockResolutor(permisosConcedidos: string[] = ['catalogo.ver']): {
           idRol: 1,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          primerAccesoPendiente: false,
         });
       }
       if (id === 2) {
@@ -45,6 +46,7 @@ function crearMockResolutor(permisosConcedidos: string[] = ['catalogo.ver']): {
           idRol: 2,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          primerAccesoPendiente: false,
         });
       }
       if (id === 3) {
@@ -57,6 +59,7 @@ function crearMockResolutor(permisosConcedidos: string[] = ['catalogo.ver']): {
           idRol: 3,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          primerAccesoPendiente: false,
         });
       }
       return Promise.resolve(null);

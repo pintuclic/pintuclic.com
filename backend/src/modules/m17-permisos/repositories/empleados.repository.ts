@@ -48,6 +48,7 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
       idRol: f.idRol,
       fechaCreacion: new Date(),
       fechaUltimoAcceso: f.sesiones[0]?.fechaUltimoAcceso ?? null,
+      primerAccesoPendiente: f.cambioContrasenaPendiente,
     }));
 
     return { empleados, total };
@@ -76,6 +77,7 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
       idRol: fila.idRol,
       fechaCreacion: new Date(),
       fechaUltimoAcceso: fila.sesiones[0]?.fechaUltimoAcceso ?? null,
+      primerAccesoPendiente: fila.cambioContrasenaPendiente,
     };
   }
 
@@ -95,6 +97,7 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
       idRol: fila.idRol,
       fechaCreacion: new Date(),
       fechaUltimoAcceso: null,
+      primerAccesoPendiente: fila.cambioContrasenaPendiente,
     };
   }
 
@@ -113,7 +116,7 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
           contrasena: datos.contrasenaHash,
           estado: 'activo',
           tipo: 'normal',
-          // CA-ADM-01-03: la credencial temporal obliga a fijar una propia en el primer acceso.
+          // CA-ADM-01-03: queda pendiente hasta que el empleado defina su contraseña con el enlace.
           cambioContrasenaPendiente: true,
         },
       });
@@ -141,6 +144,7 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
         idRol: nuevoRol.idRol,
         fechaCreacion: new Date(),
         fechaUltimoAcceso: null,
+        primerAccesoPendiente: nuevoUsuario.cambioContrasenaPendiente,
       };
     });
   }
@@ -174,6 +178,7 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
       idRol: actualizado.idRol,
       fechaCreacion: new Date(),
       fechaUltimoAcceso: actualizado.sesiones[0]?.fechaUltimoAcceso ?? null,
+      primerAccesoPendiente: actualizado.cambioContrasenaPendiente,
     };
   }
 

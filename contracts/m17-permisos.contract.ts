@@ -168,11 +168,12 @@ export const crearEmpleadoOutputSchema = z.object({
   primerAccesoPendiente: z.boolean(),
   fechaCreacion: z.string().datetime(),
   /**
-   * Se muestra una sola vez al administrador para que la entregue al empleado; no
-   * se envía por correo. Es de un solo uso: el empleado queda con cambio de
-   * contraseña obligatorio en su primer acceso (CA-ADM-01-03).
+   * HU-ADM-01: el empleado recibe por correo un enlace de un solo uso para definir
+   * su contraseña; nadie más la conoce. La vigencia la fija el parámetro
+   * `auth.vigencia_enlace_activacion_horas`. `false` si el correo no salió: el
+   * admin puede reenviarlo con POST /admin/empleados/:id/reenviar-activacion.
    */
-  credencialTemporal: z.string().optional(),
+  activacionEnviada: z.boolean(),
 });
 export type CrearEmpleadoOutput = z.infer<typeof crearEmpleadoOutputSchema>;
 
@@ -199,8 +200,16 @@ export const resumenEmpleadoSchema = z.object({
   fechaCreacion: z.string().datetime(),
   fechaUltimoAcceso: z.string().datetime().nullable(),
   cantidadPermisos: z.number().int().nonnegative(),
+  /** Todavía no definió su contraseña con el enlace de activación. */
+  primerAccesoPendiente: z.boolean(),
 });
 export type ResumenEmpleado = z.infer<typeof resumenEmpleadoSchema>;
+
+/** POST /admin/empleados/:id/reenviar-activacion: emite un enlace nuevo e invalida los anteriores. */
+export const reenviarActivacionEmpleadoOutputSchema = z.object({
+  enviado: z.literal(true),
+});
+export type ReenviarActivacionEmpleadoOutput = z.infer<typeof reenviarActivacionEmpleadoOutputSchema>;
 
 export const listarEmpleadosOutputSchema = z.object({
   empleados: z.array(resumenEmpleadoSchema),
@@ -310,6 +319,7 @@ export const CLAVES_PARAMETROS = [
   'auth.vigencia_enlace_recuperacion_minutos',
   'auth.intentos_fallidos_bloqueo',
   'auth.duracion_bloqueo_minutos',
+  'auth.vigencia_enlace_activacion_horas',
   // Comunicaciones (RF-ADM-07-03)
   'comms.reintentos_envio_transaccional',
   // Comercial básico (RF-ADM-07-04)
