@@ -4,6 +4,7 @@ import type {
   Categoria,
   CrearCategoriaRequest,
   EditarCategoriaRequest,
+  EditarSubcategoriaRequest,
   Estado,
   ImpactoDesactivacion,
   ListarCompletoRequest,
@@ -28,6 +29,7 @@ function aSubcategoria(fila: FilaSubcategoria): Subcategoria {
     nombre: fila.nombre,
     orden: fila.orden,
     estado: fila.estado,
+    idCategoriaComplementaria: fila.idCategoriaComplementaria,
   };
 }
 
@@ -127,15 +129,26 @@ export class SubcategoriasRepository implements SubcategoriasRepositoryPort {
 
   async crear(datos: CrearSubcategoriaDatos): Promise<Subcategoria> {
     const fila = await prisma.subcategoria.create({
-      data: { idCategoria: datos.idCategoria, nombre: datos.nombre, orden: datos.orden },
+      data: {
+        idCategoria: datos.idCategoria,
+        nombre: datos.nombre,
+        orden: datos.orden,
+        ...(datos.idCategoriaComplementaria === undefined
+          ? {}
+          : { idCategoriaComplementaria: datos.idCategoriaComplementaria }),
+      },
     });
     return aSubcategoria(fila);
   }
 
-  async editar(id: number, datos: EditarCategoriaRequest): Promise<Subcategoria> {
+  async editar(id: number, datos: EditarSubcategoriaRequest): Promise<Subcategoria> {
     const fila = await prisma.subcategoria.update({
       where: { idSubcategoria: id },
-      data: sinIndefinidos({ nombre: datos.nombre, orden: datos.orden }),
+      data: sinIndefinidos({
+        nombre: datos.nombre,
+        orden: datos.orden,
+        idCategoriaComplementaria: datos.idCategoriaComplementaria,
+      }),
     });
     return aSubcategoria(fila);
   }

@@ -1,4 +1,5 @@
 import { responderExito } from '../../../core/utils/apiResponse';
+import { tamanoImagenQuerySchema } from '../dtos/m01-catalogo-entrega3.dto';
 import {
   listarColoresProductoRequestSchema,
   listarProductosPublicosRequestSchema,
@@ -53,7 +54,18 @@ export class ConsultaPublicaController {
       responderParametroInvalido(res, 'El identificador de la imagen no es válido.');
       return;
     }
-    enviarImagen(res, await this.servicio.imagen(id), true);
+    const consulta = validar(res, tamanoImagenQuerySchema, req.query);
+    if (consulta === null) return;
+    enviarImagen(res, await this.servicio.imagen(id, consulta.tamano), true, true);
+  });
+
+  complementarios = manejar(async (req, res) => {
+    const id = leerId(req, 'idProducto');
+    if (id === null) {
+      responderParametroInvalido(res, 'El identificador del producto no es válido.');
+      return;
+    }
+    responderExito(res, await this.servicio.complementarios(id));
   });
 
   imagenMedida = manejar(async (req, res) => {

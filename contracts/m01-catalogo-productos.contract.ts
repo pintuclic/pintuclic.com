@@ -444,6 +444,8 @@ export const listarProductosRequestSchema = paginacionQuerySchema.extend({
   claseColor: claseColorSchema.optional(),
   estado: estadoSchema.optional(),
   publicado: booleanoQuerySchema.optional(),
+  /** Entrega 3: true = solo combos; false = sin combos; sin enviar = todos. */
+  esCombo: booleanoQuerySchema.optional(),
 });
 export type ListarProductosRequest = z.infer<typeof listarProductosRequestSchema>;
 
@@ -500,6 +502,9 @@ export const productoResumenSchema = z.object({
   estado: estadoSchema,
   publicado: z.boolean(),
   patrocinado: z.boolean(),
+  /** Entrega 3 (K1, K4). */
+  esCombo: z.boolean(),
+  excluidoDeDescuentos: z.boolean(),
   variantesActivas: z.number().int().nonnegative(),
 });
 export type ProductoResumen = z.infer<typeof productoResumenSchema>;
@@ -519,6 +524,9 @@ export const imagenProductoSchema = z.object({
   orden: z.number().int().nonnegative(),
   esPrincipal: z.boolean(),
   mimeType: tipoMimeLogotipoSchema,
+  /** Entrega 3 (I5): a lo sumo una de las dos; null en ambas = imagen general del producto. */
+  idVariante: idSchema.nullable(),
+  idColor: idSchema.nullable(),
 });
 export type ImagenProducto = z.infer<typeof imagenProductoSchema>;
 
@@ -683,10 +691,21 @@ export const productoPublicoTarjetaSchema = z.object({
   precioDesde: z.number().nonnegative().nullable(),
   tieneColor: z.boolean(),
   disponibilidad: disponibilidadSchema,
-  /** GET /catalogo/imagenes/:idImagen */
+  /** GET /catalogo/imagenes/:idImagen?tamano=miniatura */
   idImagenPrincipal: idSchema.nullable(),
+  /** Entrega 3: combo; y `compraBloqueada` = combo agotado (se ve, no se compra, K5). */
+  esCombo: z.boolean(),
+  compraBloqueada: z.boolean(),
 });
 export type ProductoPublicoTarjeta = z.infer<typeof productoPublicoTarjetaSchema>;
+
+/** Elemento de la galería de la ficha pública. */
+export const imagenPublicaSchema = z.object({
+  idImagen: idSchema,
+  idVariante: idSchema.nullable(),
+  idColor: idSchema.nullable(),
+});
+export type ImagenPublica = z.infer<typeof imagenPublicaSchema>;
 export const listarProductosPublicosResponseEnvelopeSchema = respuestaPaginada(productoPublicoTarjetaSchema);
 export type ListarProductosPublicosResponseEnvelope = z.infer<typeof listarProductosPublicosResponseEnvelopeSchema>;
 
@@ -706,6 +725,8 @@ export const variantePublicaSchema = z.object({
   sku: z.string(),
   precio: z.number().nonnegative(),
   disponibilidad: disponibilidadSchema,
+  /** Entrega 3 (K5): true cuando es un combo sin existencia. */
+  compraBloqueada: z.boolean(),
   rendimiento: rendimientoAproximadoSchema.nullable(),
   /** GET /catalogo/medidas/:idMedida/imagen */
   tieneImagenMedida: z.boolean(),
@@ -731,8 +752,14 @@ export const productoPublicoFichaSchema = z.object({
   acabados: z.array(referenciaSchema),
   caracteristicas: z.array(caracteristicaSchema),
   variantes: z.array(variantePublicaSchema),
-  /** Galería en orden; la primera es la principal. GET /catalogo/imagenes/:idImagen */
-  imagenes: z.array(z.object({ idImagen: idSchema })),
+  /** Entrega 3: combo; `compraBloqueada` = combo agotado. */
+  esCombo: z.boolean(),
+  compraBloqueada: z.boolean(),
+  /**
+   * Galería en orden; la primera es la principal. Cada imagen puede pertenecer a una variante o a un
+   * color (I6). GET /catalogo/imagenes/:idImagen?tamano=mediana
+   */
+  imagenes: z.array(imagenPublicaSchema),
 });
 export type ProductoPublicoFicha = z.infer<typeof productoPublicoFichaSchema>;
 export const productoPublicoResponseEnvelopeSchema = respuestaUno(productoPublicoFichaSchema);

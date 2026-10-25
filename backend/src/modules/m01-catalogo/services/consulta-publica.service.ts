@@ -1,3 +1,4 @@
+import { MAXIMO_COMPLEMENTARIOS, type TamanoImagen } from '../dtos/m01-catalogo-entrega3.dto';
 import type {
   CategoriaPublica,
   FiltrosPublicos,
@@ -10,6 +11,7 @@ import type { ImagenBytes, LogotipoMarca, Pagina } from '../interfaces/catalogo.
 import type { ConsultaPublicaRepositoryPort } from '../interfaces/consulta-publica.interface';
 import type { ColoresDeProducto } from '../interfaces/productos.interface';
 import { errores, ServicioCatalogoBase } from './catalogo-base.service';
+import { servirImagen } from './imagen-derivadas';
 
 /** HU-CAT-06: consulta pública. Lo que no es visible responde 404 uniforme (U1). */
 export class ConsultaPublicaService extends ServicioCatalogoBase {
@@ -37,8 +39,19 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
     return this.exigir(await this.consulta.colores(idProducto, query));
   }
 
-  async imagen(idImagen: number): Promise<ImagenBytes> {
-    return this.exigir(await this.consulta.imagen(idImagen));
+  async imagen(idImagen: number, tamano: TamanoImagen = 'original'): Promise<ImagenBytes> {
+    return this.exigir(
+      await servirImagen(tamano, {
+        original: () => this.consulta.imagen(idImagen),
+        derivada: (t) => this.consulta.imagenDerivada(idImagen, t),
+        guardar: (t, bytes) => this.consulta.guardarDerivada(idImagen, t, bytes),
+      }),
+    );
+  }
+
+  /** X1–X5: hasta 4 sugerencias para la ficha; vacío cuando no hay nada que sugerir (la pantalla oculta la sección). */
+  async complementarios(idProducto: number): Promise<ProductoPublicoTarjeta[]> {
+    return this.exigir(await this.consulta.complementarios(idProducto, MAXIMO_COMPLEMENTARIOS));
   }
 
   async imagenMedida(idMedida: number): Promise<ImagenBytes> {

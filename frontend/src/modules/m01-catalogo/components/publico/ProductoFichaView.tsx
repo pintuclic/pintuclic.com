@@ -7,7 +7,9 @@ import { formatCOP } from '@/core/utils/moneda';
 import type { ColorOfrecido, ProductoPublicoFicha } from '../../dtos/m01-catalogo-productos.dto';
 import { leerErrorCatalogo } from '../../services/mensaje-error';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
+import { imagenParaSeleccion } from '../../services/galeria';
 import { textoRendimiento } from '../../services/rendimiento';
+import { ComplementariosProducto } from './ComplementariosProducto';
 import { GaleriaProducto } from './GaleriaProducto';
 import { ColorProducto } from './SelectorColorProducto';
 
@@ -120,7 +122,15 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
       <div className="grid gap-8 lg:grid-cols-2">
         <GaleriaProducto
           nombre={p.nombre}
-          imagenes={p.imagenes.map((i) => ({ idImagen: i.idImagen, url: catalogoPublicoApi.urlImagen(i.idImagen) }))}
+          imagenes={p.imagenes.map((i) => ({
+            idImagen: i.idImagen,
+            url: catalogoPublicoApi.urlImagen(i.idImagen, 'mediana'),
+            urlMiniatura: catalogoPublicoApi.urlImagen(i.idImagen, 'miniatura'),
+          }))}
+          idImagenEnfocada={imagenParaSeleccion(p.imagenes, {
+            idColor: color?.idColor ?? null,
+            idVariante: variante?.idVariante ?? null,
+          })}
           imagenMedidaUrl={
             variante?.tieneImagenMedida === true ? catalogoPublicoApi.urlImagenMedida(variante.idMedida) : null
           }
@@ -133,9 +143,18 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
               {p.marca}
               {p.linea !== null && ` · ${p.linea}`}
             </p>
+            {p.esCombo && (
+              <p className="mt-1">
+                <Badge variant="action">Combo</Badge>
+              </p>
+            )}
             <h1 className="mt-1 font-title text-3xl font-bold text-neutral-black">{p.nombre}</h1>
             {p.descripcion !== null && <p className="mt-2 font-sans text-sm text-neutral-dark">{p.descripcion}</p>}
           </div>
+
+          {p.compraBloqueada && (
+            <Alert variant="warning">Este combo está agotado por ahora y no se puede comprar.</Alert>
+          )}
 
           {variante !== null && (
             <div>
@@ -204,6 +223,7 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
           )}
         </div>
       </div>
+      <ComplementariosProducto idProducto={p.idProducto} />
     </Container>
   );
 };

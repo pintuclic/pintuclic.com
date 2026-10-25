@@ -2,9 +2,15 @@
 
 import React, { useCallback, useId, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ImagePlus, Star, Trash2 } from 'lucide-react';
-import { Alert, Badge, Button, Modal } from '@/core/components';
+import { Alert, Badge, Button, Modal, Select } from '@/core/components';
 import { MAXIMO_IMAGENES_PRODUCTO, type ImagenProducto } from '../../dtos/m01-catalogo-productos.dto';
 import { useCargar } from '../../hooks/useCargar';
+import {
+  aAsociacion,
+  etiquetaDeAsociacion,
+  opcionesAsociacion,
+  valorDeAsociacion,
+} from '../../services/asociacion-imagen';
 import { leerImagen, validarImagen } from '../../services/archivos';
 import { imagenesApi, productosApi } from '../../services/catalogo-api';
 import { leerErrorCatalogo } from '../../services/mensaje-error';
@@ -30,12 +36,18 @@ export const ImagenesModal: React.FC<ImagenesModalProps> = ({
 }) => {
   const cargador = useCallback(async () => {
     const [producto, imagenes] = await Promise.all([productosApi.obtener(idProducto), imagenesApi.listar(idProducto)]);
-    return { nombre: producto.nombre, publicado: producto.publicado, imagenes };
+    const destinos = {
+      variantes: producto.variantes.map((v) => ({ idVariante: v.idVariante, medida: v.medida })),
+      colores: producto.coloresFabrica,
+    };
+    return { nombre: producto.nombre, publicado: producto.publicado, imagenes, destinos };
   }, [idProducto]);
   const { datos, cargando, error, recargar } = useCargar(cargador, 'No se pudo cargar la galería.');
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const cerrarAviso = useCallback(() => setAviso(null), []);
   const [subiendo, setSubiendo] = useState(false);
+  // I5: a qué se asocian las imágenes que se suban ahora ('' = todo el producto).
+  const [asociarA, setAsociarA] = useState('');
   const [aEliminar, setAEliminar] = useState<ImagenProducto | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
   const idEntrada = useId();
@@ -64,7 +76,7 @@ export const ImagenesModal: React.FC<ImagenesModalProps> = ({
         continue;
       }
       try {
-        await imagenesApi.subir(idProducto, await leerImagen(archivo));
+        await imagenesApi.subir(idProducto, { ...(await leerImagen(archivo)), ...aAsociacion(asociarA) });
         subidas += 1;
       } catch (err: unknown) {
         problemas.push(`${archivo.name}: ${leerErrorCatalogo(err, 'No se pudo subir.').message}`);
@@ -96,6 +108,15 @@ export const ImagenesModal: React.FC<ImagenesModalProps> = ({
       recargar();
     } catch (err: unknown) {
       fallo(err, 'No se pudo cambiar el orden.');
+    }
+  };
+
+  const cambiarAsociacion = async (imagen: ImagenProducto, valor: string) => {
+    try {
+      await imagenesApi.cambiarAsociacion(imagen.idImagen, aAsociacion(valor));
+      cambio('La imagen quedó asociada.');
+    } catch (err: unknown) {
+      fallo(err, 'No se pudo cambiar a qué pertenece la imagen.');
     }
   };
 
@@ -153,6 +174,18 @@ export const ImagenesModal: React.FC<ImagenesModalProps> = ({
           </div>
         </div>
 
+        {datos !== null && opcionesAsociacion(datos.destinos).length > 1 && (
+          <div className="max-w-sm">
+            <Select
+              label="Las imágenes nuevas pertenecen a"
+              value={asociarA}
+              onChange={(e) => setAsociarA(e.target.value)}
+              options={opcionesAsociacion(datos.destinos)}
+              helperText="Al elegir esa presentación o color en la ficha se muestra su imagen."
+            />
+          </div>
+        )}
+
         <AvisoAccion aviso={aviso} onCerrar={cerrarAviso} />
         {datos !== null && !datos.publicado && imagenes.length === 0 && (
           <Alert variant="info">
@@ -172,7 +205,7 @@ export const ImagenesModal: React.FC<ImagenesModalProps> = ({
               <div className="relative flex h-36 items-center justify-center bg-neutral-lightest">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={imagenesApi.url(imagen.idImagen)}
+                  src={imagenesApi.url(imagen.idImagen, 'miniatura')}
                   alt={`Imagen ${indice + 1} de ${datos?.nombre ?? 'el producto'}`}
                   className="max-h-full max-w-full object-contain"
                   loading="lazy"
@@ -183,6 +216,18 @@ export const ImagenesModal: React.FC<ImagenesModalProps> = ({
                   </span>
                 )}
               </div>
+              {datos !== null && opcionesAsociacion(datos.destinos).length > 1 && (
+                <div className="border-t border-neutral-light px-2 pt-2">
+                  <Select
+                    label={`Pertenece a (imagen ${indice + 1})`}
+                    hideLabel
+                    value={valorDeAsociacion(imagen)}
+                    onChange={(e) => void cambiarAsociacion(imagen, e.target.value)}
+                    options={opcionesAsociacion(datos.destinos)}
+                    title={etiquetaDeAsociacion(imagen, datos.destinos)}
+                  />
+                </div>
+              )}
               <div className="flex items-center justify-between gap-1 p-2">
                 <span className="flex gap-1">
                   <Button
