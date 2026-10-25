@@ -42,7 +42,13 @@ export function SegmentedTabs<T extends string>({
   };
 
   return (
-    <div role="tablist" aria-label={ariaLabel} className="grid grid-cols-2 gap-1 rounded-btn bg-subaction p-1">
+    // `grid-flow-col auto-cols-fr` reparte columnas iguales para cualquier número
+    // de pestañas; con `grid-cols-2` la tercera se iba a una segunda fila.
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className="grid grid-flow-col auto-cols-fr gap-1 rounded-btn bg-subaction p-1"
+    >
       {options.map((opcion, indice) => {
         const activa = opcion.value === value;
         return (
