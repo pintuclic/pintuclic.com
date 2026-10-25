@@ -1,26 +1,23 @@
 /**
  * ============================================================================
- * CONTENIDO ESTÁTICO TEMPORAL — Frente propio FP-01 (landing page)
+ * CONTENIDO BASE E INICIALIZACIÓN — Frente propio FP-01 (landing page)
  * ============================================================================
- * Secciones de la página de inicio, tomadas del mockup
- * (`docs/assets/mockups/VISTAS.pdf`, página 1) y de la UI Spec §4.1.
- *
- * ⚠️ Provisional por decisión del Director Humano (2026-10-22): los productos
- * destacados y las categorías serán datos reales de M01. Es contenido de UI, no
- * un catálogo sembrado en base de datos (Directiva #10).
- *
- * Las imágenes de `public/images/landing/` son marcadores extraídos del mockup:
- * se reemplazan sobrescribiendo los archivos, sin tocar el código.
+ * Datos iniciales de respaldo (SSR / sin conexión) para la página de inicio.
+ * En ejecución, `HeroSection`, `FeaturedProducts`, `CategoryExplorer` y
+ * `ToolsBar` consultan los endpoints reales de `FP-01` (`/api/v1/landing/banners`)
+ * y `M01` (`/api/v1/catalogo/productos` y `/api/v1/catalogo/categorias`).
  * ============================================================================
  */
 
 export interface HeroSlideContent {
   id: string;
+  idBanner?: number;
   titleLine1: string;
   titleLine2: string;
   description: string;
   primaryCta: { label: string; href: string };
   secondaryCta: { label: string; href: string };
+  customImageUrl?: string | null;
 }
 
 export const heroSlides: ReadonlyArray<HeroSlideContent> = [
@@ -28,9 +25,28 @@ export const heroSlides: ReadonlyArray<HeroSlideContent> = [
     id: 'todo-para-tu-proyecto',
     titleLine1: 'Todo para tu proyecto,',
     titleLine2: 'en un solo lugar',
-    description: 'Pinturas, herramientas y accesorios de las mejores marcas. Calidad, asesoría y envío rápido.',
-    primaryCta: { label: 'Comprar ahora', href: '/productos' },
-    secondaryCta: { label: 'Pedir asesoría', href: '/asesoria-de-color' },
+    description:
+      'Pinturas arquitectónicas, esmaltes, impermeabilizantes y herramientas de las mejores marcas con envío a toda Colombia.',
+    primaryCta: { label: 'Explorar catálogo', href: '/productos' },
+    secondaryCta: { label: 'Centro de ayuda', href: '/centro-de-ayuda' },
+  },
+  {
+    id: 'colores-y-acabados-para-renovar',
+    titleLine1: 'Colores y acabados',
+    titleLine2: 'para renovar tus espacios',
+    description:
+      'Descubre vinilos interiores, fachadas de máxima resistencia y protección para madera con rendimiento garantizado.',
+    primaryCta: { label: 'Ver pinturas', href: '/productos?categoria=1' },
+    secondaryCta: { label: 'Políticas de envío', href: '/politicas-de-envio' },
+  },
+  {
+    id: 'herramientas-y-preparacion-profesional',
+    titleLine1: 'Preparación y herramientas',
+    titleLine2: 'de acabado profesional',
+    description:
+      'Estucos, lijas, cintas, rodillos y brochas seleccionadas para lograr superficies uniformes desde la primera mano.',
+    primaryCta: { label: 'Ver herramientas', href: '/productos?categoria=6' },
+    secondaryCta: { label: 'Conoce Pintu Clic', href: '/sobre-nosotros' },
   },
 ];
 
@@ -47,15 +63,17 @@ export const tools = {
   search: {
     action: '/productos',
     categories: [
-      { value: '', label: 'Todas' },
-      { value: 'pinturas', label: 'Pinturas' },
-      { value: 'herramientas', label: 'Herramientas' },
-      { value: 'accesorios', label: 'Accesorios' },
-      { value: 'construccion', label: 'Construcción' },
+      { value: '', label: 'Todas las categorías' },
+      { value: '1', label: 'Pinturas' },
+      { value: '2', label: 'Estucos y pastas' },
+      { value: '3', label: 'Maderas' },
+      { value: '4', label: 'Impermeabilizantes' },
+      { value: '5', label: 'Solventes y preparadores' },
+      { value: '6', label: 'Herramientas y accesorios' },
     ],
   },
-  calculator: { label: 'Calculadora', href: '/calculadora' },
-  colorAdvice: { label: 'Asesorías de color', href: '/asesoria-de-color' },
+  calculator: { label: 'Ver catálogo completo', href: '/productos' },
+  colorAdvice: { label: 'Centro de ayuda y FAQ', href: '/centro-de-ayuda' },
 };
 
 export interface FeaturedProduct {
@@ -65,77 +83,97 @@ export interface FeaturedProduct {
   price: number;
   originalPrice?: number;
   offerBadge?: string;
-  imageUrl: string;
+  imageUrl?: string;
   href: string;
 }
 
 export const featuredProducts: ReadonlyArray<FeaturedProduct> = [
   {
-    id: 'pintura-acrilica-premium',
-    name: 'Pintura Acrílica Premium',
-    description: 'Pintura de alta cobertura, lavable y resistente.',
-    price: 89900,
-    originalPrice: 104900,
-    offerBadge: '-15%',
-    imageUrl: '/images/landing/producto-pintura-acrilica.png',
-    href: '/productos/pintura-acrilica-premium',
+    id: '1',
+    name: 'Viniltex Ultralavable',
+    description: 'Pintuco · Viniltex · Vinilos para muros · Carta de colores',
+    price: 28900,
+    imageUrl: '/images/landing/catalogo-viniltex.png',
+    href: '/productos/1',
   },
   {
-    id: 'taladro-inalambrico-20v',
-    name: 'Taladro Inalámbrico 20V',
-    description: 'Potente, ligero y resistente. Ideal para todo tipo de trabajo.',
-    price: 299900,
-    imageUrl: '/images/landing/producto-taladro.png',
-    href: '/productos/taladro-inalambrico-20v',
+    id: '2',
+    name: 'Koraza Sol & Lluvia',
+    description: 'Pintuco · Koraza · Pinturas para fachadas · Carta de colores',
+    price: 99900,
+    imageUrl: '/images/landing/catalogo-koraza.png',
+    href: '/productos/2',
   },
   {
-    id: 'rodillo-profesional-9',
-    name: 'Rodillo Profesional 9"',
-    description: 'Rodillo de alta absorción para un acabado uniforme.',
-    price: 24900,
-    imageUrl: '/images/landing/producto-rodillo.png',
-    href: '/productos/rodillo-profesional-9',
+    id: '3',
+    name: 'Pintulux 3 en 1',
+    description: 'Pintuco · Pintulux · Esmaltes · Carta de colores',
+    price: 31900,
+    imageUrl: '/images/landing/catalogo-pintulux.png',
+    href: '/productos/3',
   },
   {
-    id: 'brocha-premium-3',
-    name: 'Brocha Premium 3"',
-    description: 'Brocha de cerdas naturales para mejores acabados.',
-    price: 12900,
-    imageUrl: '/images/landing/producto-brocha.png',
-    href: '/productos/brocha-premium-3',
+    id: '4',
+    name: 'Esmalte ICO',
+    description: 'Pintuco · ICO · Esmaltes · Carta de colores',
+    price: 27900,
+    imageUrl: '/images/landing/catalogo-esmalte-ico.png',
+    href: '/productos/4',
   },
   {
-    id: 'cinta-de-enmascarar',
-    name: 'Cinta de Enmascarar',
-    description: 'Cinta de papel crepado de alta adherencia.',
-    price: 9900,
-    imageUrl: '/images/landing/producto-cinta.png',
-    href: '/productos/cinta-de-enmascarar',
+    id: '5',
+    name: 'Barniz Transparente',
+    description: 'Pintuco · Barnices · Carta de colores',
+    price: 34900,
+    imageUrl: '/images/landing/catalogo-barniz.png',
+    href: '/productos/5',
   },
 ];
 
 export const featuredLink = { label: 'Ver todos', href: '/productos' };
 
-export const categoryTiles: ReadonlyArray<{ title: string; href: string; imageSrc: string }> = [
-  { title: 'Pinturas', href: '/productos?categoria=pinturas', imageSrc: '/images/landing/categoria-pinturas.png' },
+export interface CategoryTileContent {
+  idCategoria: number;
+  title: string;
+  subtitle: string;
+  href: string;
+  imageSrc: string;
+}
+
+export const categoryTiles: ReadonlyArray<CategoryTileContent> = [
   {
-    title: 'Herramientas eléctricas',
-    href: '/productos?categoria=herramientas-electricas',
-    imageSrc: '/images/landing/categoria-herramientas-electricas.png',
+    idCategoria: 1,
+    title: 'Pinturas',
+    subtitle: 'Vinilos, esmaltes y anticorrosivos',
+    href: '/productos?categoria=1',
+    imageSrc: '/images/landing/categoria-pinturas.png',
   },
   {
-    title: 'Herramientas manuales',
-    href: '/productos?categoria=herramientas-manuales',
-    imageSrc: '/images/landing/categoria-herramientas-manuales.png',
-  },
-  {
-    title: 'Construcción',
-    href: '/productos?categoria=construccion',
+    idCategoria: 2,
+    title: 'Estucos y pastas',
+    subtitle: 'Preparación y acabado de muros',
+    href: '/productos?categoria=2',
     imageSrc: '/images/landing/categoria-construccion.png',
   },
   {
-    title: 'Accesorios y más',
-    href: '/productos?categoria=accesorios',
+    idCategoria: 3,
+    title: 'Maderas',
+    subtitle: 'Barnices, lacas y protectores',
+    href: '/productos?categoria=3',
+    imageSrc: '/images/landing/categoria-herramientas-manuales.png',
+  },
+  {
+    idCategoria: 4,
+    title: 'Impermeabilizantes',
+    subtitle: 'Protección para techos y fachadas',
+    href: '/productos?categoria=4',
+    imageSrc: '/images/landing/categoria-herramientas-electricas.png',
+  },
+  {
+    idCategoria: 6,
+    title: 'Herramientas y accesorios',
+    subtitle: 'Brochas, rodillos, cintas y lijas',
+    href: '/productos?categoria=6',
     imageSrc: '/images/landing/categoria-accesorios.png',
   },
 ];

@@ -12,6 +12,7 @@ import {
   ChevronRight,
   FileText,
   Home,
+  Images,
   LogOut,
   Mail,
   Menu,
@@ -73,6 +74,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Empresas',
     href: '/admin/empresas',
     icon: <Building2 className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Banners de Inicio',
+    href: '/admin/banners',
+    icon: <Images className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
@@ -196,6 +203,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     if (pathname?.startsWith('/admin/empleados')) return 'Colaboradores';
     if (pathname?.startsWith('/admin/clientes')) return 'Clientes';
     if (pathname?.startsWith('/admin/empresas')) return 'Empresas';
+    if (pathname?.startsWith('/admin/banners')) return 'Banners de Inicio';
     if (pathname?.startsWith('/admin/contenido')) return 'Contenido';
     if (pathname?.startsWith('/admin/configuracion')) return 'Configuración';
     if (pathname?.startsWith('/admin/gobernanza')) return 'Gobernanza';
