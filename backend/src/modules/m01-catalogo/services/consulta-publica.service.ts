@@ -6,7 +6,7 @@ import type {
   ProductoPublicoFicha,
   ProductoPublicoTarjeta,
 } from '../dtos/m01-catalogo-productos.dto';
-import type { LogotipoMarca, Pagina } from '../interfaces/catalogo.interface';
+import type { ImagenBytes, LogotipoMarca, Pagina } from '../interfaces/catalogo.interface';
 import type { ConsultaPublicaRepositoryPort } from '../interfaces/consulta-publica.interface';
 import type { ColoresDeProducto } from '../interfaces/productos.interface';
 import { errores, ServicioCatalogoBase } from './catalogo-base.service';
@@ -35,6 +35,14 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
 
   async colores(idProducto: number, query: ListarColoresProductoRequest): Promise<ColoresDeProducto> {
     return this.exigir(await this.consulta.colores(idProducto, query));
+  }
+
+  async imagen(idImagen: number): Promise<ImagenBytes> {
+    return this.exigir(await this.consulta.imagen(idImagen));
+  }
+
+  async imagenMedida(idMedida: number): Promise<ImagenBytes> {
+    return this.exigir(await this.consulta.imagenMedida(idMedida));
   }
 
   async logotipo(idMarca: number): Promise<LogotipoMarca> {

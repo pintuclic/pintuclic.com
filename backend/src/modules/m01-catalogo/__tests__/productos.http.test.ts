@@ -190,6 +190,15 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
     expect(r.status, JSON.stringify(r.cuerpo)).toBe(201);
     return dato(r);
   }
+  /** Una imagen mínima: publicar exige al menos una. */
+  async function subirImagen(idProducto: unknown): Promise<Dato> {
+    const r = await admin('POST', `/productos/${String(idProducto)}/imagenes`, {
+      imagenBase64: PNG_1X1.toString('base64'),
+      imagenMimeType: 'image/png',
+    });
+    expect(r.status, JSON.stringify(r.cuerpo)).toBe(201);
+    return dato(r);
+  }
   async function crearColor(extra: Dato = {}): Promise<Dato> {
     const r = await admin('POST', '/colores', {
       idMarca: fx.marca,
@@ -763,6 +772,9 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       expect([sinVariante.status, sinVariante.cuerpo.error?.code]).toEqual([409, 'NO_PUBLICABLE']);
 
       const v = await crearVariante(p.idProducto);
+      const sinImagen = await admin('PATCH', `/productos/${p.idProducto}/publicacion`, { publicado: true });
+      expect([sinImagen.status, sinImagen.cuerpo.error?.code]).toEqual([409, 'NO_PUBLICABLE']);
+      await subirImagen(p.idProducto);
       const ok = await admin('PATCH', `/productos/${p.idProducto}/publicacion`, { publicado: true });
       expect(dato(ok)).toMatchObject({ publicado: true });
       expect(
@@ -812,6 +824,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       const v2 = await crearVariante(p.idProducto, {
         idMedida: fx.medidaCuarto,
       });
+      await subirImagen(p.idProducto);
       await admin('PATCH', `/productos/${p.idProducto}/publicacion`, {
         publicado: true,
       });
@@ -1081,6 +1094,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       });
       const p = await crearProducto();
       await crearVariante(p.idProducto);
+      await subirImagen(p.idProducto);
       // El impacto solo cuenta productos visibles al público: publicado y con cadena activa.
       await admin('PATCH', `/productos/${p.idProducto}/publicacion`, {
         publicado: true,
@@ -1100,6 +1114,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
     it('lector solo consulta; editor crea, edita y publica pero no desactiva; cliente y anónimo no ven nada', async () => {
       const p = await crearProducto();
       const v = await crearVariante(p.idProducto);
+      await subirImagen(p.idProducto);
       const ver = (actor: 'lector' | 'cliente' | null) => servidor.peticion(actor, 'GET', `/productos/${p.idProducto}`);
       expect((await ver('lector')).status).toBe(200);
       expect((await ver('cliente')).status).toBe(404);

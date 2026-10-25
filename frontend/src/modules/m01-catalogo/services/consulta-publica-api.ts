@@ -24,6 +24,9 @@ export const catalogoPublicoApi = {
     params?: ParametrosConsulta,
   ): Promise<PaginaColoresApi<ColorOfrecido, FamiliaDisponible>> =>
     obtenerColoresProducto(`${PUBLICO}/productos/${idProducto}/colores`, params),
+  urlImagen: (idImagen: number): string => `${apiClient.defaults.baseURL ?? '/api/v1'}${PUBLICO}/imagenes/${idImagen}`,
+  urlImagenMedida: (idMedida: number): string =>
+    `${apiClient.defaults.baseURL ?? '/api/v1'}${PUBLICO}/medidas/${idMedida}/imagen`,
   urlLogotipo: (idMarca: number): string =>
     `${apiClient.defaults.baseURL ?? '/api/v1'}${PUBLICO}/marcas/${idMarca}/logotipo`,
 };

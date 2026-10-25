@@ -129,6 +129,7 @@ export class ProductosService extends ServicioCatalogoBase {
               tipoCalidad: peticion.ficha.tipoCalidad ?? null,
               rendimientoMin: peticion.ficha.rendimientoMin ?? null,
               rendimientoMax: peticion.ficha.rendimientoMax ?? null,
+              manos: peticion.ficha.manos ?? null,
             },
       idsSuperficies: peticion.idsSuperficies,
       idsAcabados: peticion.idsAcabados,
@@ -176,6 +177,7 @@ export class ProductosService extends ServicioCatalogoBase {
               tipoCalidad: actual.ficha.tipoCalidad,
               rendimientoMin: actual.ficha.rendimientoMin,
               rendimientoMax: actual.ficha.rendimientoMax,
+              manos: actual.ficha.manos,
             }
         : peticion.ficha === null
           ? null
@@ -184,6 +186,7 @@ export class ProductosService extends ServicioCatalogoBase {
               tipoCalidad: peticion.ficha.tipoCalidad ?? null,
               rendimientoMin: peticion.ficha.rendimientoMin ?? null,
               rendimientoMax: peticion.ficha.rendimientoMax ?? null,
+              manos: peticion.ficha.manos ?? null,
             };
     const ids = (nuevos: number[] | undefined, previos: ReadonlyArray<{ id: number }>): readonly number[] =>
       nuevos ?? previos.map((r) => r.id);
@@ -296,6 +299,9 @@ export class ProductosService extends ServicioCatalogoBase {
       }
       if ((await this.productos.contarVariantesActivas(id)) === 0) {
         throw errores.noPublicable('Un producto necesita al menos una variante activa para publicarse.');
+      }
+      if ((await this.productos.contarImagenes(id)) === 0) {
+        throw errores.noPublicable('Un producto necesita al menos una imagen para publicarse.');
       }
     }
     return this.productos.cambiarPublicacion(id, publicado);

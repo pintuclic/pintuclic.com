@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Pencil, Plus, Power, RotateCcw } from 'lucide-react';
+import Link from 'next/link';
+import { Package, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import { Alert, Button } from '@/core/components';
 import type { Categoria, Subcategoria } from '../../dtos/m01-catalogo.dto';
 import type { FormFamiliaColor } from '../../dtos/formularios.dto';
 import { useCargar } from '../../hooks/useCargar';
 import { categoriasApi, subcategoriasApi } from '../../services/catalogo-api';
+import { enlaceProductos } from '../../services/enlaces';
 import { aCuerpoSimple } from '../../services/formularios';
 import { AvisoAccion, Cargando, EstadoBadge, MensajeVacio, ModalDesactivar, reactivar, type Aviso } from './comunes';
 import { FormularioSimple } from './CatalogoSimpleView';
@@ -69,7 +71,16 @@ export const ClasificacionView: React.FC = () => {
         {item.nombre}
         <EstadoBadge estado={item.estado} />
       </span>
-      <span className="flex gap-1">
+      <span className="flex items-center gap-1">
+        {tipo === 'subcategoria' && (
+          <Link
+            href={enlaceProductos({ subcategoria: id })}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-btn px-3 py-1.5 font-title text-xs font-medium text-action hover:bg-subaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
+          >
+            <Package className="h-4 w-4" aria-hidden="true" />
+            Ver productos
+          </Link>
+        )}
         <Button variant="ghost" size="sm" aria-label={`Editar ${item.nombre}`} onClick={onEditar}>
           <Pencil className="h-4 w-4" aria-hidden="true" />
         </Button>

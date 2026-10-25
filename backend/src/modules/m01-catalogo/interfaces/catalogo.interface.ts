@@ -15,7 +15,6 @@ import type {
   EditarFamiliaColorRequest,
   EditarLineaRequest,
   EditarMarcaRequest,
-  EditarMedidaRequest,
   EditarSuperficieRequest,
   EditarTipoMedidaRequest,
   Estado,
@@ -156,7 +155,23 @@ export interface ClaveMedida {
   nombre: string;
 }
 
+/** Cambios de una medida ya resueltos por el servicio (el nombre y el tipo finales). */
+export interface EditarMedidaDatos {
+  idTipoMedida: number;
+  valor: number;
+  nombre: string;
+}
+
+/** Bytes de una imagen con su tipo (medidas y marcas). */
+export interface ImagenBytes {
+  bytes: Buffer;
+  mimeType: Marca['logotipoMimeType'];
+}
+
 export interface MedidasRepositoryPort
-  extends RecursoCatalogoPort<Medida, CrearMedidaDatos, EditarMedidaRequest, ClaveMedida> {
+  extends RecursoCatalogoPort<Medida, CrearMedidaDatos, EditarMedidaDatos, ClaveMedida> {
   listar(query: ListarMedidasRequest): Promise<Pagina<Medida>>;
+  reemplazarImagen(id: number, imagen: Buffer, mimeType: ImagenBytes['mimeType']): Promise<Medida>;
+  quitarImagen(id: number): Promise<Medida>;
+  obtenerImagen(id: number): Promise<ImagenBytes | null>;
 }

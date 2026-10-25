@@ -4,20 +4,14 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Alert, Badge, Container, Skeleton } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
-import type { ColorOfrecido, ProductoPublicoFicha, VariantePublica } from '../../dtos/m01-catalogo-productos.dto';
+import type { ColorOfrecido, ProductoPublicoFicha } from '../../dtos/m01-catalogo-productos.dto';
 import { leerErrorCatalogo } from '../../services/mensaje-error';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
-import { Muestra } from '../admin/comunes';
-import { SelectorColorProducto } from './SelectorColorProducto';
+import { textoRendimiento } from '../../services/rendimiento';
+import { GaleriaProducto } from './GaleriaProducto';
+import { ColorProducto } from './SelectorColorProducto';
 
 const TIPOS_CALIDAD: Record<number, string> = { 1: 'Tipo 1 (gama alta)', 2: 'Tipo 2', 3: 'Tipo 3' };
-
-const aTexto = (n: number): string => n.toLocaleString('es-CO', { maximumFractionDigits: 2 });
-
-/** U6: el rendimiento por presentación, siempre marcado como aproximado. */
-export function textoRendimiento(v: VariantePublica): string | null {
-  return v.rendimiento === null ? null : `Rinde aprox. ${aTexto(v.rendimiento.min)} a ${aTexto(v.rendimiento.max)} m²`;
-}
 
 export interface ProductoFichaViewProps {
   idProducto: number;
@@ -85,7 +79,7 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
 
   const p = estado.ficha;
   const variante = p.variantes.find((v) => v.idVariante === idVariante) ?? p.variantes[0] ?? null;
-  const rendimiento = variante === null ? null : textoRendimiento(variante);
+  const rendimiento = variante === null ? null : textoRendimiento(variante.rendimiento, p.manos);
   const ambientes = [p.usoInterior ? 'Interior' : null, p.usoExterior ? 'Exterior' : null].filter(
     (x): x is string => x !== null,
   );
@@ -124,25 +118,14 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
       </nav>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <div
-          className="flex min-h-72 items-center justify-center rounded-card bg-neutral-lightest p-6"
-          aria-label={color === null ? 'Sin color elegido' : `Color elegido: ${color.nombre}`}
-        >
-          {color !== null ? (
-            <div className="text-center">
-              <span
-                role="img"
-                aria-label={`Muestra del color ${color.nombre}`}
-                className="mx-auto block h-40 w-40 rounded-full border border-neutral-light shadow-card"
-                style={{ backgroundColor: color.hexadecimal }}
-              />
-              <p className="mt-4 font-title text-lg font-semibold text-neutral-black">{color.nombre}</p>
-              {color.codigo !== null && <p className="font-sans text-sm text-neutral-medium">Código {color.codigo}</p>}
-            </div>
-          ) : (
-            <p className="font-sans text-sm text-neutral-medium">Las imágenes del producto llegarán pronto.</p>
-          )}
-        </div>
+        <GaleriaProducto
+          nombre={p.nombre}
+          imagenes={p.imagenes.map((i) => ({ idImagen: i.idImagen, url: catalogoPublicoApi.urlImagen(i.idImagen) }))}
+          imagenMedidaUrl={
+            variante?.tieneImagenMedida === true ? catalogoPublicoApi.urlImagenMedida(variante.idMedida) : null
+          }
+          nombreMedida={variante?.medida ?? null}
+        />
 
         <div className="space-y-6">
           <div>
@@ -194,13 +177,7 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
           )}
 
           {p.claseColor !== 'sin_color' && (
-            <SelectorColorProducto idProducto={p.idProducto} elegido={color} onElegir={setColor} />
-          )}
-          {color !== null && (
-            <p className="flex items-center gap-2 font-sans text-sm text-neutral-dark" role="status">
-              <Muestra hexadecimal={color.hexadecimal} etiqueta={`Muestra de ${color.nombre}`} /> {color.nombre} ·{' '}
-              {color.acabado}
-            </p>
+            <ColorProducto idProducto={p.idProducto} elegido={color} onElegir={setColor} />
           )}
 
           {p.acabados.length > 0 && (

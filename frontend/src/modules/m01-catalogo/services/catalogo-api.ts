@@ -35,11 +35,13 @@ import type {
   EditarColorRequest,
   EditarProductoRequest,
   EditarVarianteRequest,
+  ImagenProducto,
   ImportarColoresRequest,
   ColorOfrecido,
   FamiliaDisponible,
   ProductoDetalle,
   ProductoResumen,
+  SubirImagenRequest,
   Variante,
 } from '../dtos/m01-catalogo-productos.dto';
 import type { PaginaApi, PaginaColoresApi, PaginacionApi, ParametrosConsulta } from '../interfaces/catalogo.interface';
@@ -154,12 +156,39 @@ export const subcategoriasApi = {
 
 /* ─── Marcas ─── */
 
+const URL_BASE = (): string => apiClient.defaults.baseURL ?? '/api/v1';
+
+/** Imágenes de la galería de un producto (administración). */
+export const imagenesApi = {
+  listar: (idProducto: number) => obtener<ImagenProducto[]>(`${BASE}/productos/${idProducto}/imagenes`),
+  subir: (idProducto: number, cuerpo: SubirImagenRequest) =>
+    enviar<ImagenProducto>('post', `${BASE}/productos/${idProducto}/imagenes`, cuerpo),
+  ordenar: (idProducto: number, idsOrdenados: number[]) =>
+    enviar<ImagenProducto[]>('patch', `${BASE}/productos/${idProducto}/imagenes/orden`, { idsOrdenados }),
+  marcarPrincipal: (idImagen: number) => enviar<ImagenProducto>('patch', `${BASE}/imagenes/${idImagen}/principal`, {}),
+  eliminar: async (idImagen: number): Promise<void> => {
+    await apiClient.delete(`${BASE}/imagenes/${idImagen}`);
+  },
+  url: (idImagen: number): string => `${URL_BASE()}${BASE}/imagenes/${idImagen}`,
+};
+
+/** Imagen opcional de una medida (administración). */
+export const imagenMedidaApi = {
+  reemplazar: (idMedida: number, cuerpo: SubirImagenRequest) =>
+    enviar<Medida>('put', `${BASE}/medidas/${idMedida}/imagen`, cuerpo),
+  quitar: async (idMedida: number): Promise<Medida> => {
+    const { data } = await apiClient.delete<RespuestaExitosa<Medida>>(`${BASE}/medidas/${idMedida}/imagen`);
+    return data.data;
+  },
+  url: (idMedida: number): string => `${URL_BASE()}${BASE}/medidas/${idMedida}/imagen`,
+};
+
 export const marcasApi = {
   ...recursoPaginado<Marca, CrearMarcaRequest, EditarMarcaRequest>('marcas'),
   reemplazarLogotipo: (id: number, cuerpo: ReemplazarLogotipoRequest) =>
     enviar<Marca>('put', `${BASE}/marcas/${id}/logotipo`, cuerpo),
   /** URL del logotipo en administración (requiere sesión; el navegador envía la cookie). */
-  urlLogotipo: (id: number): string => `${apiClient.defaults.baseURL ?? '/api/v1'}${BASE}/marcas/${id}/logotipo`,
+  urlLogotipo: (id: number): string => `${URL_BASE()}${BASE}/marcas/${id}/logotipo`,
 };
 
 /* ─── Colores: importación por bloques (C8) ─── */

@@ -18,6 +18,9 @@ import {
   respuestaUno,
   paginacionSchema,
   impactoDesactivacionSchema,
+  LOGOTIPO_MAXIMO_BASE64,
+  tipoMimeLogotipoSchema,
+  medidaSchema,
 } from './m01-catalogo.dto';
 
 
@@ -210,8 +213,13 @@ export const fichaRecubrimientoRequestSchema = z
     tipoCalidad: tipoCalidadSchema.nullable().optional(),
     rendimientoMin: z.number().positive().max(99_999).nullable().optional(),
     rendimientoMax: z.number().positive().max(99_999).nullable().optional(),
+    /** Manos con las que se logra el rendimiento ("35 m² por galón a 2 manos"). Exige rendimiento. */
+    manos: z.number().int().min(1).max(10).nullable().optional(),
   })
-  .refine(rendimientoCompleto, MENSAJE_RENDIMIENTO);
+  .refine(rendimientoCompleto, MENSAJE_RENDIMIENTO)
+  .refine((v) => (v.manos ?? null) === null || ((v.rendimientoMin ?? null) !== null && (v.rendimientoMax ?? null) !== null), {
+    message: 'Las manos se indican junto con el rendimiento',
+  });
 export type FichaRecubrimientoRequest = z.infer<typeof fichaRecubrimientoRequestSchema>;
 
 export const caracteristicaRequestSchema = z.object({
@@ -325,6 +333,7 @@ export const fichaRecubrimientoSchema = z.object({
   /** m² por galón (RF-CAT-10-02). */
   rendimientoMin: z.number().nullable(),
   rendimientoMax: z.number().nullable(),
+  manos: z.number().int().nullable(),
 });
 export type FichaRecubrimiento = z.infer<typeof fichaRecubrimientoSchema>;
 
@@ -371,6 +380,41 @@ export const productoResumenSchema = z.object({
 });
 export type ProductoResumen = z.infer<typeof productoResumenSchema>;
 
+export const MAXIMO_IMAGENES_PRODUCTO = 12;
+
+/** POST /productos/:idProducto/imagenes y PUT /medidas/:idMedida/imagen (I1, I4) */
+export const subirImagenRequestSchema = z.object({
+  imagenBase64: z.string().min(1, 'Elija una imagen').max(LOGOTIPO_MAXIMO_BASE64, 'La imagen no puede superar 5 MB'),
+  imagenMimeType: tipoMimeLogotipoSchema,
+});
+export type SubirImagenRequest = z.infer<typeof subirImagenRequestSchema>;
+
+/** Los bytes se piden aparte: GET /imagenes/:idImagen. */
+export const imagenProductoSchema = z.object({
+  idImagen: idSchema,
+  orden: z.number().int().nonnegative(),
+  esPrincipal: z.boolean(),
+  mimeType: tipoMimeLogotipoSchema,
+});
+export type ImagenProducto = z.infer<typeof imagenProductoSchema>;
+
+/** PATCH /productos/:idProducto/imagenes/orden (I3) */
+export const ordenarImagenesRequestSchema = z.object({
+  idsOrdenados: z
+    .array(idSchema)
+    .min(1)
+    .max(MAXIMO_IMAGENES_PRODUCTO)
+    .refine((ids) => new Set(ids).size === ids.length, { message: 'Hay ids repetidos' }),
+});
+export type OrdenarImagenesRequest = z.infer<typeof ordenarImagenesRequestSchema>;
+
+export const imagenResponseEnvelopeSchema = respuestaUno(imagenProductoSchema);
+export type ImagenResponseEnvelope = z.infer<typeof imagenResponseEnvelopeSchema>;
+export const imagenesResponseEnvelopeSchema = respuestaLista(imagenProductoSchema);
+export type ImagenesResponseEnvelope = z.infer<typeof imagenesResponseEnvelopeSchema>;
+export const medidaImagenResponseEnvelopeSchema = respuestaUno(medidaSchema);
+export type MedidaImagenResponseEnvelope = z.infer<typeof medidaImagenResponseEnvelopeSchema>;
+
 export const productoDetalleSchema = productoResumenSchema.extend({
   descripcion: z.string().nullable(),
   idCategoriaComplementaria: idSchema.nullable(),
@@ -380,6 +424,7 @@ export const productoDetalleSchema = productoResumenSchema.extend({
   bases: z.array(referenciaSchema),
   coloresFabrica: z.array(referenciaSchema),
   caracteristicas: z.array(caracteristicaSchema),
+  imagenes: z.array(imagenProductoSchema),
   variantes: z.array(varianteSchema),
 });
 export type ProductoDetalle = z.infer<typeof productoDetalleSchema>;
@@ -516,8 +561,8 @@ export const productoPublicoTarjetaSchema = z.object({
   precioDesde: z.number().nonnegative().nullable(),
   tieneColor: z.boolean(),
   disponibilidad: disponibilidadSchema,
-  /** Siempre null hasta la entrega 3 (D9). */
-  imagenPrincipalUrl: z.string().nullable(),
+  /** GET /catalogo/imagenes/:idImagen */
+  idImagenPrincipal: idSchema.nullable(),
 });
 export type ProductoPublicoTarjeta = z.infer<typeof productoPublicoTarjetaSchema>;
 export const listarProductosPublicosResponseEnvelopeSchema = respuestaPaginada(productoPublicoTarjetaSchema);
@@ -540,6 +585,8 @@ export const variantePublicaSchema = z.object({
   precio: z.number().nonnegative(),
   disponibilidad: disponibilidadSchema,
   rendimiento: rendimientoAproximadoSchema.nullable(),
+  /** GET /catalogo/medidas/:idMedida/imagen */
+  tieneImagenMedida: z.boolean(),
 });
 export type VariantePublica = z.infer<typeof variantePublicaSchema>;
 
@@ -556,11 +603,14 @@ export const productoPublicoFichaSchema = z.object({
   claseColor: claseColorSchema,
   tipoResina: z.string().nullable(),
   tipoCalidad: tipoCalidadSchema.nullable(),
+  /** Manos con las que se logra el rendimiento de la ficha. */
+  manos: z.number().int().nullable(),
   superficies: z.array(z.string()),
   acabados: z.array(referenciaSchema),
   caracteristicas: z.array(caracteristicaSchema),
   variantes: z.array(variantePublicaSchema),
-  imagenPrincipalUrl: z.string().nullable(),
+  /** Galería en orden; la primera es la principal. GET /catalogo/imagenes/:idImagen */
+  imagenes: z.array(z.object({ idImagen: idSchema })),
 });
 export type ProductoPublicoFicha = z.infer<typeof productoPublicoFichaSchema>;
 export const productoPublicoResponseEnvelopeSchema = respuestaUno(productoPublicoFichaSchema);
@@ -573,7 +623,7 @@ export type ProductoPublicoResponseEnvelope = z.infer<typeof productoPublicoResp
 /**
  * Mismo envelope global que la entrega 1. Estados HTTP: 400 PARAMETRO_INVALIDO · 404 RECURSO_NO_DISPONIBLE
  * (también toda denegación y toda ficha pública no disponible) · 409 DUPLICADO, RELACION_INVALIDA,
- * PADRE_INACTIVO, CONFIRMACION_REQUERIDA, NO_PUBLICABLE.
+ * PADRE_INACTIVO, CONFIRMACION_REQUERIDA, NO_PUBLICABLE, LIMITE_IMAGENES · 400 IMAGEN_INVALIDA.
  */
 export const CODIGOS_ERROR_PRODUCTOS = [
   'PARAMETRO_INVALIDO',
@@ -583,6 +633,8 @@ export const CODIGOS_ERROR_PRODUCTOS = [
   'PADRE_INACTIVO',
   'CONFIRMACION_REQUERIDA',
   'NO_PUBLICABLE',
+  'IMAGEN_INVALIDA',
+  'LIMITE_IMAGENES',
 ] as const;
 
 export const errorProductosEnvelopeSchema = z.object({
@@ -613,6 +665,12 @@ export type ErrorProductosEnvelope = z.infer<typeof errorProductosEnvelopeSchema
  *  GET /productos/:idProducto/impacto-desactivacion
  *  GET /productos/:idProducto/colores                      (P5, paginado)
  *
+ *  Imágenes (POST y PUT/DELETE de medidas con límite JSON de 7 MB)
+ *  GET /productos/:idProducto/imagenes · POST /productos/:idProducto/imagenes
+ *  PATCH /productos/:idProducto/imagenes/orden
+ *  GET /imagenes/:idImagen (bytes) · PATCH /imagenes/:idImagen/principal · DELETE /imagenes/:idImagen
+ *  GET /medidas/:idMedida/imagen (bytes) · PUT /medidas/:idMedida/imagen · DELETE /medidas/:idMedida/imagen
+ *
  *  Variantes
  *  POST /productos/:idProducto/variantes
  *  PUT /variantes/:idVariante · PATCH /variantes/:idVariante/estado
@@ -625,4 +683,6 @@ export type ErrorProductosEnvelope = z.infer<typeof errorProductosEnvelopeSchema
  *  GET /productos/:idProducto    ficha con variantes (404 si no está disponible, U1)
  *  GET /productos/:idProducto/colores   carta paginada por familia (U3, U4)
  *  GET /marcas/:idMarca/logotipo bytes del logotipo
+ *  GET /imagenes/:idImagen       bytes de una imagen de producto visible
+ *  GET /medidas/:idMedida/imagen bytes de la imagen de una medida
  * ─────────────────────────────────────────────────────────────────────────── */

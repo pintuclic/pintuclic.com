@@ -697,6 +697,9 @@ model Medida {
   valor        Decimal       @db.Decimal(12, 3)
   nombre       String        @unique @db.VarChar(60)
   estado       EstadoGeneral @default(activo)
+  /// Imagen opcional de la medida (ej. silueta del envase)
+  imagen         Bytes?
+  imagenMimeType String?       @map("imagen_mime_type") @db.VarChar(50)
 
   tipoMedida TipoMedida @relation(fields: [idTipoMedida], references: [idTipoMedida], onDelete: Restrict, map: "fk_medida_tipo")
   variantes  Variante[]
@@ -784,6 +787,8 @@ model FichaRecubrimiento {
   /// m² por galón
   rendimientoMin Decimal? @map("rendimiento_min") @db.Decimal(8, 2)
   rendimientoMax Decimal? @map("rendimiento_max") @db.Decimal(8, 2)
+  /// Manos con las que se logra el rendimiento
+  manos          Int?     @db.SmallInt
 
   producto   Producto   @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_ficha_producto")
   tipoResina TipoResina @relation(fields: [idTipoResina], references: [idTipoResina], onDelete: Restrict, map: "fk_ficha_resina")
