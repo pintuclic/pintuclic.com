@@ -43,6 +43,7 @@ export const header: HeaderProps = {
     { label: 'Servicios', href: '/servicios' },
     { label: 'Paleta de Color', href: '/paleta-de-color' },
     { label: 'Sobre Nosotros', href: '/sobre-nosotros' },
+    { label: 'Centro de ayuda', href: '/centro-de-ayuda' },
   ],
   megaMenu: {
     groups: [

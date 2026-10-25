@@ -10,6 +10,7 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  Headset,
   Home,
   LogOut,
   Mail,
@@ -84,6 +85,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Notificaciones',
     href: '/admin/notificaciones',
     icon: <Mail className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Atención al cliente',
+    href: '/admin/atencion',
+    icon: <Headset className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
