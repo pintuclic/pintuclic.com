@@ -31,7 +31,7 @@ export function FormularioContacto() {
   // CA-ATC-02-04: sin sesión no se muestra el formulario, se lleva a iniciar sesión.
   if (usuario === null) {
     return (
-      <div className="space-y-4 rounded-card border border-neutral-light bg-neutral-white p-5">
+      <div className="space-y-4 rounded-card border border-neutral-light bg-neutral-lightest p-5">
         <p className="font-sans text-sm text-neutral-dark">
           Para escribirnos necesitas iniciar sesión. Así tomamos tus datos de contacto de tu cuenta y no
           tienes que escribirlos.

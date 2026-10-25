@@ -22,6 +22,9 @@ export const DIAS_SEMANA = [
   { valor: 'domingo', etiqueta: 'Domingo' },
 ] as const;
 
+/** R7/D6: un destino que empieza así es una URL HTTP/HTTPS completa y se usa tal cual. */
+export const DESTINO_ES_URL = /^https?:\/\//i;
+
 const horaSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Usa el formato de 24 horas, por ejemplo 08:00');

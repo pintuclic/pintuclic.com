@@ -40,6 +40,15 @@ describe('enlaceDelCanal — destino del botón de WhatsApp (HU-ATC-03, R7)', ()
     expect(texto).toBe('Hola, quiero información.');
   });
 
+  it('no devuelve una URL cruda si el esquema no es HTTP/HTTPS pese a destinoEsUrl=true', () => {
+    const inseguro: CanalWhatsappPublico = {
+      destino: 'javascript:alert(1)',
+      mensajeBase: null,
+      destinoEsUrl: true,
+    };
+    expect(enlaceDelCanal(inseguro)).toBe('https://wa.me/1');
+  });
+
   it('ignora una referencia vacía o en blanco', () => {
     expect(enlaceDelCanal({ ...NUMERO, mensajeBase: null }, '   ')).toBe('https://wa.me/573001234567');
   });
