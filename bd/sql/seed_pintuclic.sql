@@ -86,7 +86,9 @@ INSERT INTO usuario (id_usuario, nombre, telefono, correo, contrasena, id_rol, e
     (3, 'Cliente De Baja',            '3155551234', 'baja@pintuclic.co',
         '$2b$12$rzP5oOr82AJTsAGk4dRAEOtzJnPwwxpsSdcZkx3hm1jVa9AZjcXIC', 2, 'inactivo', 'normal'),
     (4, 'Pinturas del Valle S.A.S.',  '3208889900', 'contacto@pinturasvalle.co',
-        '$2b$12$rzP5oOr82AJTsAGk4dRAEOtzJnPwwxpsSdcZkx3hm1jVa9AZjcXIC', 3, 'activo',   'empresa')
+        '$2b$12$rzP5oOr82AJTsAGk4dRAEOtzJnPwwxpsSdcZkx3hm1jVa9AZjcXIC', 3, 'activo',   'empresa'),
+    (5, 'Laura Martínez',             '3124567890', 'laura@pintuclic.co',
+        '$2b$12$rzP5oOr82AJTsAGk4dRAEOtzJnPwwxpsSdcZkx3hm1jVa9AZjcXIC', 2, 'activo',   'normal')
 ON CONFLICT (id_usuario) DO NOTHING;
 
 -- 2.2 Relación 1:1 Usuario - Rol
@@ -94,7 +96,8 @@ INSERT INTO usuario_rol (id_usuario, id_rol) VALUES
     (1, 1),
     (2, 2),
     (3, 2),
-    (4, 3)
+    (4, 3),
+    (5, 2)
 ON CONFLICT (id_usuario) DO NOTHING;
 
 -- 2.3 Sesiones de Usuario (M20 - HU-SEG-02)
@@ -404,6 +407,72 @@ INSERT INTO contacto_orden (id_contacto_orden, id_orden, id_usuario_autor, medio
     (1, 2, 1, 'telefono', 'Se confirmó con el cliente la dirección de la bodega para el despacho.', now() - interval '20 minutes')
 ON CONFLICT (id_contacto_orden) DO NOTHING;
 
+-- 5.7 Clienta de ejemplo (Laura Martínez, id 5) con un pedido en cada estado del ciclo (M08). Usan el
+-- formato vigente PC-AAAA-NNNNN; el servicio de creación arranca la numeración después del mayor.
+-- Montos coherentes: total = base sin impuesto + IVA (19 %). Entregas a domicilio y recogida en almacén.
+-- id_variante_ref 9999 no existe a propósito (producto retirado del catálogo, RF-ORD-04-03).
+INSERT INTO orden (id_orden, codigo_visible, id_usuario, origen, id_cotizacion, carrito_o_cotizacion, estado, transaccion_pago_id, codigo_solicitud, modo_entrega, costo_entrega, direccion, sub_total, descuento, total, base_sin_impuesto, importe_iva, tasa_iva, observaciones, fecha) VALUES
+    (4, 'PC-2026-00001', 5, 'carrito', NULL, 'carrito_directo', 'orden_confirmada',        'TRX-PSE-500000001', 'SOL-2026-00002', 'domicilio', 0.00,
+        'Carrera 7 # 32-16, Piso 5, Centro, Bogotá D.C.', 171800.00, 0.00, 171800.00, 144369.75, 27430.25, 19.00, NULL, CURRENT_DATE),
+    (5, 'PC-2026-00002', 5, 'carrito', NULL, 'carrito_directo', 'revision_disponibilidad', 'TRX-TAR-500000002', 'SOL-2026-00003', 'domicilio', 0.00,
+        'Carrera 7 # 32-16, Piso 5, Centro, Bogotá D.C.',  95900.00, 9590.00,  86310.00,  72529.41, 13780.59, 19.00, 'Llamar antes de entregar', CURRENT_DATE - 1),
+    (6, 'PC-2026-00003', 5, 'carrito', NULL, 'carrito_directo', 'en_preparacion',          'TRX-PSE-500000003', 'SOL-2026-00004', 'recogida',  0.00,
+        NULL, 120000.00, 0.00, 120000.00, 100840.34, 19159.66, 19.00, NULL, CURRENT_DATE - 2),
+    (7, 'PC-2026-00004', 5, 'carrito', NULL, 'carrito_directo', 'preparada',               'TRX-PSE-500000004', 'SOL-2026-00005', 'domicilio', 0.00,
+        'Calle 100 # 15-20, Oficina 501, Chicó, Bogotá D.C.', 145900.00, 0.00, 145900.00, 122605.04, 23294.96, 19.00, NULL, CURRENT_DATE - 3),
+    (8, 'PC-2026-00005', 5, 'carrito', NULL, 'carrito_directo', 'despachado',              'TRX-TAR-500000005', 'SOL-2026-00006', 'domicilio', 0.00,
+        'Carrera 7 # 32-16, Piso 5, Centro, Bogotá D.C.', 250000.00, 25000.00, 225000.00, 189075.63, 35924.37, 19.00, NULL, CURRENT_DATE - 6),
+    (9, 'PC-2026-00006', 5, 'carrito', NULL, 'carrito_directo', 'entregado',               'TRX-PSE-500000006', 'SOL-2026-00007', 'recogida',  0.00,
+        NULL, 95900.00, 0.00, 95900.00, 80588.24, 15311.76, 19.00, NULL, CURRENT_DATE - 10)
+ON CONFLICT (codigo_visible) DO NOTHING;
+
+INSERT INTO linea_orden (id_linea_orden, id_orden, nombre_producto, variante_copia, precio_aplicado, cantidad, color_solicitado, precio_inicial, id_variante_ref, es_entonado, base_consumida) VALUES
+    (6,  4, 'Viniltex Máxima Protección Antibacterial', 'Galón - Blanco Puro',             85900.00,  2, 'Blanco Puro',   85900.00,  1,    false, NULL),
+    (7,  5, 'Viniltex Máxima Protección Antibacterial', 'Galón - Azul Océano',             86310.00,  1, 'Azul Océano',   95900.00,  2,    false, NULL),
+    (8,  6, 'Pintura Entonada de Carta (ejemplo)',      'Galón - Base A',                 120000.00,  1, 'Amarillo Sol', 120000.00, NULL, true,  'Base A - Galón'),
+    (9,  7, 'Esmalte Sintético Brillante',              'Cuarto de Galón - Rojo Colonial', 30000.00,  2, 'Rojo Colonial', 30000.00, 9999, false, NULL),
+    (10, 7, 'Viniltex Máxima Protección Antibacterial', 'Galón - Blanco Puro',             85900.00,  1, 'Blanco Puro',   85900.00,  1,    false, NULL),
+    (11, 8, 'Kit Renovación Hogar Premium',             'Kit Corporativo Pro',            225000.00,  1, NULL,           250000.00, NULL, false, NULL),
+    (12, 9, 'Viniltex Máxima Protección Antibacterial', 'Galón - Azul Océano',             95900.00,  1, 'Azul Océano',   95900.00,  2,    false, NULL)
+ON CONFLICT (id_linea_orden) DO NOTHING;
+
+INSERT INTO linea_orden_descuento (id_linea_orden_descuento, id_linea_orden, orden_aplicacion, origen, porcentaje, importe) VALUES
+    (4, 7,  1, 'Promoción Viniltex',    10.00,  9590.00),
+    (5, 11, 1, 'Descuento de temporada', 10.00, 25000.00)
+ON CONFLICT (id_linea_orden_descuento) DO NOTHING;
+
+-- Historial completo de cada pedido; autor NULL = transición automática del sistema, 1 = el administrador.
+INSERT INTO historial_estado_orden (id_historial_estado_orden, id_orden, estado_anterior, estado_nuevo, id_usuario_autor, motivo, referencia_externa, fecha) VALUES
+    (6,  4, NULL,                      'orden_confirmada',        NULL, NULL, NULL, now() - interval '20 minutes'),
+    (7,  5, NULL,                      'orden_confirmada',        NULL, NULL, NULL, now() - interval '26 hours'),
+    (8,  5, 'orden_confirmada',        'revision_disponibilidad', 1,    NULL, NULL, now() - interval '25 hours'),
+    (9,  6, NULL,                      'orden_confirmada',        NULL, NULL, NULL, now() - interval '50 hours'),
+    (10, 6, 'orden_confirmada',        'revision_disponibilidad', 1,    NULL, NULL, now() - interval '49 hours'),
+    (11, 6, 'revision_disponibilidad', 'en_preparacion',          1,    NULL, NULL, now() - interval '48 hours'),
+    (12, 7, NULL,                      'orden_confirmada',        NULL, NULL, NULL, now() - interval '74 hours'),
+    (13, 7, 'orden_confirmada',        'revision_disponibilidad', 1,    NULL, NULL, now() - interval '73 hours'),
+    (14, 7, 'revision_disponibilidad', 'en_preparacion',          1,    NULL, NULL, now() - interval '72 hours'),
+    (15, 7, 'en_preparacion',          'preparada',               1,    NULL, NULL, now() - interval '70 hours'),
+    (16, 8, NULL,                      'orden_confirmada',        NULL, NULL, NULL, now() - interval '146 hours'),
+    (17, 8, 'orden_confirmada',        'revision_disponibilidad', 1,    NULL, NULL, now() - interval '145 hours'),
+    (18, 8, 'revision_disponibilidad', 'en_preparacion',          1,    NULL, NULL, now() - interval '144 hours'),
+    (19, 8, 'en_preparacion',          'preparada',               1,    NULL, NULL, now() - interval '120 hours'),
+    (20, 8, 'preparada',               'despachado',              1,    NULL, NULL, now() - interval '96 hours'),
+    (21, 9, NULL,                      'orden_confirmada',        NULL, NULL, NULL, now() - interval '242 hours'),
+    (22, 9, 'orden_confirmada',        'revision_disponibilidad', 1,    NULL, NULL, now() - interval '241 hours'),
+    (23, 9, 'revision_disponibilidad', 'en_preparacion',          1,    NULL, NULL, now() - interval '240 hours'),
+    (24, 9, 'en_preparacion',          'preparada',               1,    NULL, NULL, now() - interval '216 hours'),
+    (25, 9, 'preparada',               'entregado',               1,    NULL, NULL, now() - interval '192 hours')
+ON CONFLICT (id_historial_estado_orden) DO NOTHING;
+
+INSERT INTO nota_orden (id_nota_orden, id_orden, id_usuario_autor, texto, fecha) VALUES
+    (2, 5, 1, 'Verificando con bodega la disponibilidad del Azul Océano antes de pasar a preparación.', now() - interval '24 hours')
+ON CONFLICT (id_nota_orden) DO NOTHING;
+
+INSERT INTO contacto_orden (id_contacto_orden, id_orden, id_usuario_autor, medio, detalle, fecha) VALUES
+    (2, 5, 1, 'correo', 'Se avisó a la clienta de la demora en la revisión de disponibilidad.', now() - interval '23 hours')
+ON CONFLICT (id_contacto_orden) DO NOTHING;
+
 -- ==============================================================================
 -- 6. MÓDULO DE PAGOS Y FACTURACIÓN (3 Tablas)
 -- ==============================================================================
@@ -418,7 +487,13 @@ ON CONFLICT (id_metodo_pago) DO NOTHING;
 -- 6.2 Pagos
 INSERT INTO pagos (id_pago, id_orden, id_metodo_pago, estado, monto) VALUES
     (1, 1, 1, 'completado', 171800.00),
-    (2, 2, 2, 'completado', 425000.00)
+    (2, 2, 2, 'completado', 425000.00),
+    (3, 4, 1, 'completado', 171800.00),
+    (4, 5, 2, 'completado',  86310.00),
+    (5, 6, 1, 'completado', 120000.00),
+    (6, 7, 1, 'completado', 145900.00),
+    (7, 8, 2, 'completado', 225000.00),
+    (8, 9, 1, 'completado',  95900.00)
 ON CONFLICT (id_pago) DO NOTHING;
 
 -- 6.3 Factura
@@ -467,7 +542,8 @@ ON CONFLICT (id_solicitud_supresion) DO NOTHING;
 INSERT INTO direccion_cliente (id_direccion, id_usuario, direccion, barrio, apartamento_casa, nombre_apellido, telefono, es_predeterminada, latitud, longitud) VALUES
     ('d0000000-0000-0000-0000-000000000001', 2, 'Carrera 7 # 45-23', 'Chapinero', 'Apto 402', 'Cliente Activo', '3001234567', true, 4.6300000, -74.0650000),
     ('d0000000-0000-0000-0000-000000000002', 2, 'Calle 100 # 15-20', 'Chicó', 'Oficina 501', 'Cliente Activo', '3001234567', false, 4.6850000, -74.0500000),
-    ('d0000000-0000-0000-0000-000000000003', 4, 'Zona Industrial Acopi Cl 15 # 22-10', 'Acopi', 'Bodega 3', 'Pinturas del Valle S.A.S.', '3157778899', true, 3.5100000, -76.5100000)
+    ('d0000000-0000-0000-0000-000000000003', 4, 'Zona Industrial Acopi Cl 15 # 22-10', 'Acopi', 'Bodega 3', 'Pinturas del Valle S.A.S.', '3157778899', true, 3.5100000, -76.5100000),
+    ('d0000000-0000-0000-0000-000000000004', 5, 'Carrera 7 # 32-16', 'Centro', 'Piso 5', 'Laura Martínez', '3124567890', true, 4.6100000, -74.0700000)
 ON CONFLICT (id_direccion) DO NOTHING;
 
 -- 9.2 Solicitudes de Empresa (B2B - HU-CUE-03 / HU-CUE-09)

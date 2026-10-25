@@ -63,9 +63,18 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
   let consulta: import('../repositories/consulta-cliente.repository').PrismaConsultaClienteRepository;
   let notas: import('../repositories/notas.repository').PrismaNotasRepository;
 
+  /**
+   * Último número usado. Sin fila en `consecutivo` la numeración arranca después del mayor código
+   * `PC-AAAA-NNNNN` ya existente (el seed trae pedidos con ese formato).
+   */
   async function consecutivoActual(): Promise<number> {
     const fila = await prisma.consecutivo.findUnique({ where: { nombre: 'orden' } });
-    return Number(fila?.ultimoValor ?? 0);
+    if (fila) return Number(fila.ultimoValor);
+    const sembradas = await prisma.orden.findMany({
+      where: { codigoVisible: { startsWith: 'PC-' } },
+      select: { codigoVisible: true },
+    });
+    return Math.max(0, ...sembradas.map((o) => Number(o.codigoVisible.split('-')[2])));
   }
 
   beforeAll(async () => {
