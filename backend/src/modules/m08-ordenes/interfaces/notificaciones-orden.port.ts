@@ -8,6 +8,12 @@ export interface EventoOrdenCreada {
   total: number;
 }
 
+export interface EventoOrdenDespachada {
+  codigo: string;
+  idUsuario: number;
+}
+
 export interface NotificacionesOrdenPort {
   notificarOrdenCreada(evento: EventoOrdenCreada): Promise<void>;
+  notificarOrdenDespachada(evento: EventoOrdenDespachada): Promise<void>;
 }

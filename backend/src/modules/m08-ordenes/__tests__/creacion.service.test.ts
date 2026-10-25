@@ -105,7 +105,10 @@ describe('CreacionService (HU-ORD-01, HU-ORD-02, HU-ORD-06)', () => {
 
   beforeEach(() => {
     repo = new RepoMemoria();
-    notificaciones = { notificarOrdenCreada: vi.fn().mockResolvedValue(undefined) };
+    notificaciones = {
+      notificarOrdenCreada: vi.fn().mockResolvedValue(undefined),
+      notificarOrdenDespachada: vi.fn().mockResolvedValue(undefined),
+    };
     ahora = new Date('2026-10-24T15:00:00Z');
     servicio = new CreacionService(repo, notificaciones, { ahora: () => ahora });
   });
@@ -219,7 +222,10 @@ describe('CreacionService (HU-ORD-01, HU-ORD-02, HU-ORD-06)', () => {
   });
 
   it('un fallo del correo no revierte la orden (D5)', async () => {
-    notificaciones = { notificarOrdenCreada: vi.fn().mockRejectedValue(new Error('smtp caído')) };
+    notificaciones = {
+      notificarOrdenCreada: vi.fn().mockRejectedValue(new Error('smtp caído')),
+      notificarOrdenDespachada: vi.fn().mockResolvedValue(undefined),
+    };
     servicio = new CreacionService(repo, notificaciones, { ahora: () => ahora });
 
     const resultado = await servicio.crearDesdePagoConfirmado(solicitud());
