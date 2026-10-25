@@ -1525,26 +1525,23 @@ CREATE TRIGGER trg_parametro_sistema_fecha
 -- ==============================================================================
 
 -- Tabla: plantilla_notificacion
--- Contenido editable desde el panel para cada comunicación transaccional (M18 · HU-NOT-03).
--- variables_disponibles y variables_obligatorias documentan qué campos admite la plantilla y cuáles
--- no pueden eliminarse (ej. el enlace de verificación), para que el backend rechace el guardado si faltan.
+-- Copia introductoria editable desde el panel para cada comunicación transaccional (M18 · HU-NOT-03).
+-- Solo texto plano: el admin nunca edita HTML ni variables. El maquetado (caja de código, botón,
+-- datos dinámicos) vive fijo en código (adapters/plantillas-html.ts) para que no pueda romperse
+-- desde el panel ni dejar de sustituirse una variable por error de escritura.
 CREATE TABLE IF NOT EXISTS plantilla_notificacion (
     id_plantilla UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tipo enum_tipo_comunicacion NOT NULL UNIQUE,
     asunto VARCHAR(200) NOT NULL,
-    contenido_html TEXT NOT NULL,
     contenido_texto TEXT NOT NULL,
-    variables_disponibles JSONB NOT NULL DEFAULT '[]'::jsonb,
-    variables_obligatorias JSONB NOT NULL DEFAULT '[]'::jsonb,
     fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     id_usuario_actualizo INT,
     CONSTRAINT fk_plantilla_usuario FOREIGN KEY (id_usuario_actualizo)
         REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
-COMMENT ON TABLE plantilla_notificacion IS 'Plantillas de comunicación transaccional editables desde el panel (M18 · HU-NOT-03)';
-COMMENT ON COLUMN plantilla_notificacion.variables_disponibles IS 'Lista de nombres de campo que pueden insertarse en el contenido (ej. nombre_cliente, numero_orden)';
-COMMENT ON COLUMN plantilla_notificacion.variables_obligatorias IS 'Subconjunto de variables_disponibles que no puede eliminarse del contenido (RF-NOT-03-04)';
+COMMENT ON TABLE plantilla_notificacion IS 'Copia introductoria de cada comunicación transaccional, editable desde el panel (M18 · HU-NOT-03)';
+COMMENT ON COLUMN plantilla_notificacion.contenido_texto IS 'Texto plano sin HTML ni variables; el sistema lo inserta en el maquetado fijo de cada tipo';
 
 -- Tabla: envio_notificacion
 -- Registro de cada envío transaccional intentado, con su resultado final, para diagnosticar fallos de

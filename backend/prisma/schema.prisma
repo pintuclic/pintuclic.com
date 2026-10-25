@@ -502,15 +502,12 @@ model ControlIntentoAcceso {
 
 /// Contenido editable desde el panel para cada comunicación transaccional (HU-NOT-03)
 model PlantillaNotificacion {
-  idPlantilla           String                @id @default(uuid()) @map("id_plantilla") @db.Uuid
-  tipo                  TipoComunicacion       @unique
-  asunto                String                @db.VarChar(200)
-  contenidoHtml         String                @map("contenido_html")
-  contenidoTexto        String                @map("contenido_texto")
-  variablesDisponibles  Json                  @default("[]") @map("variables_disponibles")
-  variablesObligatorias Json                  @default("[]") @map("variables_obligatorias")
-  fechaActualizacion    DateTime              @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
-  idUsuarioActualizo    Int?                  @map("id_usuario_actualizo")
+  idPlantilla        String           @id @default(uuid()) @map("id_plantilla") @db.Uuid
+  tipo               TipoComunicacion @unique
+  asunto             String           @db.VarChar(200)
+  contenidoTexto     String           @map("contenido_texto")
+  fechaActualizacion DateTime         @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?             @map("id_usuario_actualizo")
 
   @@map("plantilla_notificacion")
 }
