@@ -167,6 +167,7 @@ export class ProductosService extends ServicioCatalogoBase {
 
   async editar(id: number, peticion: EditarProductoRequest): Promise<ProductoDetalle> {
     const actual = this.exigir(await this.productos.obtener(id));
+    if (actual.esCombo) throw errores.comboSoloPorCombos();
 
     const fichaFinal: FichaRecubrimientoDatos | null =
       peticion.ficha === undefined

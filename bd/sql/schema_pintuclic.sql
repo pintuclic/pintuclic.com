@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.8 (v4.7 + M15: preguntas frecuentes, contacto, horario y canal de atención)
+-- VERSIÓN: 4.11 (v4.10 + M15: contacto, horario y canal de atención)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 66
+-- TOTAL TABLAS: 67
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -145,6 +145,11 @@ BEGIN
         CREATE TYPE enum_origen_ajuste_inventario AS ENUM ('manual', 'carga_masiva', 'samit');
     END IF;
 
+    -- Estado editorial de una página institucional (M16 - HU-CON-01 / HU-CON-03)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_contenido') THEN
+        CREATE TYPE enum_estado_contenido AS ENUM ('borrador', 'publicado', 'archivado');
+    END IF;
+
     -- Tipo y estado de una solicitud del formulario de contacto (M15 - HU-ATC-02).
     -- 'cotizacion' es solo intención: el camino formal es el carrito (RF-ATC-02-07).
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_solicitud_contacto') THEN
@@ -187,6 +192,11 @@ END $$;
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'revision_disponibilidad' AFTER 'orden_confirmada';
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'preparada' AFTER 'en_preparacion';
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'devuelto' AFTER 'cancelado';
+
+-- M13 (ExistenciaComboPort): la existencia de un combo baja al crearse la orden y vuelve al cancelarse.
+ALTER TYPE enum_origen_ajuste_inventario ADD VALUE IF NOT EXISTS 'orden' AFTER 'samit';
+ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'venta' AFTER 'carga_masiva';
+ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'devolucion' AFTER 'venta';
 
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS
@@ -394,6 +404,18 @@ CREATE TABLE IF NOT EXISTS subcategoria (
 );
 
 COMMENT ON TABLE subcategoria IS 'Nivel 2 y último de la clasificación (RF-CAT-01-02). Mismo nombre permitido bajo categorías distintas (RF-CAT-01-03).';
+
+-- M01 entrega 3 (D6): categoría de la que se extraen los complementarios por defecto de sus productos (RF-CAT-08-01).
+ALTER TABLE subcategoria ADD COLUMN IF NOT EXISTS id_categoria_complementaria INT;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_subcategoria_categoria_complementaria') THEN
+        ALTER TABLE subcategoria ADD CONSTRAINT fk_subcategoria_categoria_complementaria
+            FOREIGN KEY (id_categoria_complementaria) REFERENCES categoria (id_categoria)
+            ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+END $$;
+COMMENT ON COLUMN subcategoria.id_categoria_complementaria IS 'Categoría de la que se sugieren complementarios a los productos de esta subcategoría que no tienen una propia (RF-CAT-08-01). Opcional.';
 
 -- Tabla: superficie
 CREATE TABLE IF NOT EXISTS superficie (
@@ -617,6 +639,12 @@ COMMENT ON CONSTRAINT fk_producto_linea_marca ON producto IS 'La línea, si exis
 COMMENT ON COLUMN producto.uso_interior IS 'Ambiente: apto para interiores. Junto con uso_exterior alimenta las pestañas Pintura Interior / Exterior.';
 COMMENT ON COLUMN producto.publicado IS 'Visible en el catálogo público (RF-CAT-02-05).';
 
+-- M01 entrega 3 (K1, K4): combos como producto con una sola variante.
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS es_combo BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS excluido_de_descuentos BOOLEAN NOT NULL DEFAULT false;
+COMMENT ON COLUMN producto.es_combo IS 'Combo (HU-CAT-13): paquete a precio propio con una única variante; único producto cuya venta se limita por existencia. No cambia después de creado.';
+COMMENT ON COLUMN producto.excluido_de_descuentos IS 'Si es true, M06 no le aplica descuentos ni a clientes empresa (RF-CAT-13-01, CA-CAT-13-09). Pensado para combos.';
+
 -- Tabla: ficha_recubrimiento (1:1 opcional con producto)
 CREATE TABLE IF NOT EXISTS ficha_recubrimiento (
     id_producto INT PRIMARY KEY,
@@ -771,6 +799,19 @@ CREATE TABLE IF NOT EXISTS imagen (
 );
 
 COMMENT ON TABLE imagen IS 'Imágenes de un producto (HU-CAT-07) como BYTEA (RF-CAT-07-03). Pueden asociarse a una variante o a un color (RF-CAT-07-02).';
+
+-- M01 entrega 3 (I5, I7): una imagen se asocia a una variante o a un color, nunca a ambos; y lleva miniaturas.
+ALTER TABLE imagen ADD COLUMN IF NOT EXISTS miniatura BYTEA;
+ALTER TABLE imagen ADD COLUMN IF NOT EXISTS mediana BYTEA;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_imagen_una_asociacion') THEN
+        ALTER TABLE imagen ADD CONSTRAINT chk_imagen_una_asociacion
+            CHECK (id_variante IS NULL OR id_color IS NULL);
+    END IF;
+END $$;
+COMMENT ON COLUMN imagen.miniatura IS 'Miniatura de 320 px en WebP, para los listados (RNF-CAT-07-01). Null en imágenes anteriores: se genera al pedirla por primera vez.';
+COMMENT ON COLUMN imagen.mediana IS 'Versión de 960 px en WebP, para la ficha. Null en imágenes anteriores: se genera al pedirla por primera vez.';
 
 -- Una sola imagen principal por producto (CA-CAT-07-02)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_imagen_principal ON imagen (id_producto) WHERE es_principal;
@@ -1624,30 +1665,68 @@ CREATE TABLE IF NOT EXISTS ajuste_inventario (
 
 COMMENT ON TABLE ajuste_inventario IS 'Historial inmutable de ajustes de la existencia referencial por variante (M13); el inventario no bloquea ventas';
 COMMENT ON COLUMN ajuste_inventario.id_carga IS 'Identificador generado por el cliente para agrupar los ajustes de una misma carga masiva; sin tabla propia';
+-- M13 (P6): el movimiento de una orden guarda su referencia; con ella, repetir la misma operación no mueve dos veces.
+ALTER TABLE ajuste_inventario ADD COLUMN IF NOT EXISTS referencia VARCHAR(100);
+COMMENT ON COLUMN ajuste_inventario.referencia IS 'Identificador de la orden que movió la existencia de un combo (origen orden). Único por variante y motivo: hace idempotente descontar y reponer.';
 COMMENT ON COLUMN ajuste_inventario.origen IS 'manual = ajuste en pantalla; carga_masiva = plantilla CSV; samit = integración futura';
 
 -- ==============================================================================
--- 9E. MÓDULO DE ATENCIÓN AL CLIENTE (M15)
+-- 9E. MÓDULO DE CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (M16 - HU-CON-01 a HU-CON-04)
 -- ==============================================================================
 
--- Tabla: pregunta_frecuente
--- Preguntas frecuentes administrables desde el panel y públicas para el visitante (M15 · HU-ATC-01).
--- Se agrupan por `tema` y se ordenan por `orden` dentro de cada tema. Desactivar no borra: la fila
--- queda pero deja de mostrarse al público (CA-ATC-01-02).
-CREATE TABLE IF NOT EXISTS pregunta_frecuente (
-    id_pregunta SERIAL PRIMARY KEY,
-    tema VARCHAR(60) NOT NULL,
-    pregunta VARCHAR(300) NOT NULL,
-    respuesta VARCHAR(2000) NOT NULL,
-    orden INT NOT NULL DEFAULT 0,
-    activa BOOLEAN NOT NULL DEFAULT TRUE,
+-- Tabla: pagina_institucional
+-- Páginas estáticas e institucionales administrables (Sobre Nosotros, Términos, Privacidad, Envíos).
+-- Separada de aviso_privacidad (M20 Habeas Data) para respetar fronteras de módulo.
+CREATE TABLE IF NOT EXISTS pagina_institucional (
+    id_pagina SERIAL PRIMARY KEY,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    titulo VARCHAR(160) NOT NULL,
+    resumen VARCHAR(300),
+    cuerpo_markdown TEXT NOT NULL,
+    estado enum_estado_contenido NOT NULL DEFAULT 'borrador',
+    id_autor INT,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_pagina_institucional_autor FOREIGN KEY (id_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_pagina_slug_formato CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+    CONSTRAINT ck_pagina_titulo_no_vacio CHECK (length(trim(titulo)) >= 3),
+    CONSTRAINT ck_pagina_cuerpo_no_vacio CHECK (length(trim(cuerpo_markdown)) >= 10)
+);
+
+COMMENT ON TABLE pagina_institucional IS 'Páginas de contenido institucional y políticas informativas de vitrina (M16 - HU-CON-01, HU-CON-03)';
+COMMENT ON COLUMN pagina_institucional.slug IS 'Identificador URL único en formato kebab-case (ej. sobre-nosotros, terminos-y-condiciones)';
+COMMENT ON COLUMN pagina_institucional.estado IS 'Ciclo de vida editorial: borrador, publicado o archivado. Solo publicado es visible en rutas públicas';
+COMMENT ON COLUMN pagina_institucional.id_autor IS 'Último usuario administrador/empleado que creó o editó la página';
+
+-- Tabla: faq_entrada
+-- Preguntas frecuentes del Centro de Ayuda público (HU-CON-02, HU-CON-04) y puerto hacia M15.
+CREATE TABLE IF NOT EXISTS faq_entrada (
+    id_faq SERIAL PRIMARY KEY,
+    pregunta VARCHAR(240) NOT NULL,
+    respuesta_markdown TEXT NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    id_autor INT,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_faq_entrada_autor FOREIGN KEY (id_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_faq_pregunta_no_vacia CHECK (length(trim(pregunta)) >= 5),
+    CONSTRAINT ck_faq_respuesta_no_vacia CHECK (length(trim(respuesta_markdown)) >= 5),
     CONSTRAINT ck_faq_orden_no_negativo CHECK (orden >= 0)
 );
 
-COMMENT ON TABLE pregunta_frecuente IS 'Preguntas frecuentes administrables, agrupadas por tema y ordenadas (M15 · HU-ATC-01)';
-COMMENT ON COLUMN pregunta_frecuente.activa IS 'FALSE oculta la pregunta al público sin eliminarla (CA-ATC-01-02)';
+COMMENT ON TABLE faq_entrada IS 'Entradas del catálogo de preguntas frecuentes (FAQ) para el Centro de Ayuda y puerto hacia M15 (M16 - HU-CON-02, HU-CON-04)';
+COMMENT ON COLUMN faq_entrada.orden IS 'Posición de visualización ascendente en el Centro de Ayuda público';
+COMMENT ON COLUMN faq_entrada.estado IS 'Visibilidad pública de la entrada: activo o inactivo';
+COMMENT ON COLUMN faq_entrada.id_autor IS 'Último usuario administrador/empleado que creó o modificó la entrada';
+
+-- ==============================================================================
+-- 9F. MÓDULO DE ATENCIÓN AL CLIENTE (M15 - HU-ATC-02, HU-ATC-03, HU-ATC-04)
+-- Las preguntas frecuentes NO viven aquí: son de M16 (`faq_entrada`), que las
+-- expone por puerto. M15 aporta el contacto, el horario y el canal directo.
+-- ==============================================================================
 
 -- Tabla: solicitud_contacto
 -- Solicitudes enviadas desde el formulario de contacto por un usuario autenticado (M15 · HU-ATC-02).
@@ -1836,17 +1915,22 @@ CREATE INDEX IF NOT EXISTS idx_rebote_envio ON rebote_notificacion(id_envio);
 CREATE INDEX IF NOT EXISTS idx_ajuste_variante_fecha ON ajuste_inventario(id_variante, fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_ajuste_carga ON ajuste_inventario(id_carga);
 CREATE INDEX IF NOT EXISTS idx_ajuste_usuario ON ajuste_inventario(id_usuario);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ajuste_referencia_variante_motivo ON ajuste_inventario(referencia, id_variante, motivo) WHERE referencia IS NOT NULL;
 
 -- Índices en Analítica de Búsqueda (M02 - HU-BUS-06): filtro por periodo y agrupación por término
 CREATE INDEX IF NOT EXISTS idx_bsr_fecha ON busqueda_sin_resultado(fecha);
 CREATE INDEX IF NOT EXISTS idx_bsr_termino ON busqueda_sin_resultado(termino);
 
--- M15: listado público de FAQs (agrupado y ordenado) y bandeja de solicitudes de contacto
-CREATE INDEX IF NOT EXISTS idx_faq_tema_orden ON pregunta_frecuente(tema, orden);
-CREATE INDEX IF NOT EXISTS idx_faq_activa ON pregunta_frecuente(activa);
+-- Índices en Contenido Institucional y FAQ (M16 - HU-CON-01 a HU-CON-04)
+CREATE INDEX IF NOT EXISTS idx_pagina_institucional_estado ON pagina_institucional(estado);
+CREATE INDEX IF NOT EXISTS idx_pagina_institucional_autor ON pagina_institucional(id_autor);
+CREATE INDEX IF NOT EXISTS idx_faq_entrada_estado_orden ON faq_entrada(estado, orden, id_faq);
+CREATE INDEX IF NOT EXISTS idx_faq_entrada_autor ON faq_entrada(id_autor);
+
+-- M15: bandeja de solicitudes de contacto
 CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_usuario ON solicitud_contacto(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_estado_fecha ON solicitud_contacto(estado, fecha_creacion DESC);
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (66 TABLAS - v4.8)
+-- FIN DEL SCRIPT DDL (67 TABLAS - v4.11)
 -- ==============================================================================

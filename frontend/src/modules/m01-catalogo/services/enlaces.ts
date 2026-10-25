@@ -1,5 +1,13 @@
 /** Secciones del panel de administración del catálogo, tal como viajan en la URL. */
-export const SECCIONES_ADMIN = ['productos', 'colores', 'marcas', 'clasificacion', 'medidas', 'atributos'] as const;
+export const SECCIONES_ADMIN = [
+  'productos',
+  'combos',
+  'colores',
+  'marcas',
+  'clasificacion',
+  'medidas',
+  'atributos',
+] as const;
 export type SeccionAdmin = (typeof SECCIONES_ADMIN)[number];
 
 export const RUTA_ADMIN_CATALOGO = '/admin/catalogo';

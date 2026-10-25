@@ -2,7 +2,14 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../../../core/db/client';
 import type { ImagenProducto } from '../dtos/m01-catalogo-productos.dto';
 import type { ImagenBytes } from '../interfaces/catalogo.interface';
-import type { ImagenesRepositoryPort, MetaImagen } from '../interfaces/imagenes.interface';
+import type {
+  AsociacionImagen,
+  DerivadaGuardada,
+  Derivadas,
+  ImagenesRepositoryPort,
+  MetaImagen,
+  TamanoDerivado,
+} from '../interfaces/imagenes.interface';
 
 /** Nunca se leen los bytes salvo en `obtenerBytes`. */
 export const SELECCION_IMAGEN = {
@@ -10,6 +17,8 @@ export const SELECCION_IMAGEN = {
   orden: true,
   esPrincipal: true,
   mimeType: true,
+  idVariante: true,
+  idColor: true,
 } satisfies Prisma.ImagenSelect;
 
 export const ORDEN_GALERIA = [{ orden: 'asc' }, { idImagen: 'asc' }] satisfies Prisma.ImagenOrderByWithRelationInput[];
@@ -22,6 +31,8 @@ export function aImagen(f: FilaImagen): ImagenProducto {
     orden: f.orden,
     esPrincipal: f.esPrincipal,
     mimeType: f.mimeType as ImagenProducto['mimeType'],
+    idVariante: f.idVariante,
+    idColor: f.idColor,
   };
 }
 
@@ -39,7 +50,13 @@ export class ImagenesRepository implements ImagenesRepositoryPort {
     return prisma.imagen.count({ where: { idProducto } });
   }
 
-  async crear(idProducto: number, bytes: Buffer, mimeType: ImagenBytes['mimeType']): Promise<ImagenProducto> {
+  async crear(
+    idProducto: number,
+    bytes: Buffer,
+    mimeType: ImagenBytes['mimeType'],
+    asociacion: AsociacionImagen,
+    derivadas: Derivadas,
+  ): Promise<ImagenProducto> {
     const fila = await prisma.$transaction(async (tx) => {
       const ultima = await tx.imagen.aggregate({
         where: { idProducto },
@@ -50,7 +67,11 @@ export class ImagenesRepository implements ImagenesRepositoryPort {
         data: {
           idProducto,
           datos: new Uint8Array(bytes),
+          miniatura: new Uint8Array(derivadas.miniatura),
+          mediana: new Uint8Array(derivadas.mediana),
           mimeType,
+          idVariante: asociacion.idVariante,
+          idColor: asociacion.idColor,
           orden: (ultima._max.orden ?? -1) + 1,
           esPrincipal: ultima._count._all === 0,
         },
@@ -58,6 +79,34 @@ export class ImagenesRepository implements ImagenesRepositoryPort {
       });
     });
     return aImagen(fila);
+  }
+
+  async cambiarAsociacion(idImagen: number, asociacion: AsociacionImagen): Promise<ImagenProducto> {
+    const fila = await prisma.imagen.update({
+      where: { idImagen },
+      data: { idVariante: asociacion.idVariante, idColor: asociacion.idColor },
+      select: SELECCION_IMAGEN,
+    });
+    return aImagen(fila);
+  }
+
+  async obtenerDerivada(idImagen: number, tamano: TamanoDerivado): Promise<DerivadaGuardada | null> {
+    // Solo se lee la columna pedida: jamás las tres a la vez.
+    const f =
+      tamano === 'miniatura'
+        ? await prisma.imagen.findUnique({ where: { idImagen }, select: { miniatura: true } })
+        : await prisma.imagen.findUnique({ where: { idImagen }, select: { mediana: true } });
+    if (f === null) return null;
+    const guardada = 'miniatura' in f ? f.miniatura : f.mediana;
+    if (guardada !== null) return { derivada: Buffer.from(guardada), original: null };
+    return { derivada: null, original: await this.obtenerBytes(idImagen) };
+  }
+
+  async guardarDerivada(idImagen: number, tamano: TamanoDerivado, bytes: Buffer): Promise<void> {
+    await prisma.imagen.update({
+      where: { idImagen },
+      data: tamano === 'miniatura' ? { miniatura: new Uint8Array(bytes) } : { mediana: new Uint8Array(bytes) },
+    });
   }
 
   async obtenerMeta(idImagen: number): Promise<MetaImagen | null> {

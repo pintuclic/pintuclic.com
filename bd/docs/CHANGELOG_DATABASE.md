@@ -10,19 +10,49 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
-## [v3.6] - 2026-10-25
-### Esquema 4.8 (66 Tablas) - M15 Atención al cliente
-- **Alcance General:** Cuatro tablas nuevas pedidas por el contrato de M15 (`contracts/m15-atencion.contract.ts`). Cambio puramente aditivo.
-  - **`pregunta_frecuente`**: preguntas frecuentes administrables y públicas (HU-ATC-01). Cada fila lleva su propia `pregunta` (hasta 300) y `respuesta` (hasta 2000), más `tema` para agruparlas, `orden` (≥ 0, `ck_faq_orden_no_negativo`) para ordenarlas dentro del tema y `activa` para ocultarlas al público **sin eliminarlas** (CA-ATC-01-02).
-  - **`solicitud_contacto`**: solicitudes del formulario de contacto, que exige sesión (HU-ATC-02). Guarda `tipo`, `descripcion` y `estado`; **no duplica los datos de contacto**, que se leen de la cuenta al mostrarla (RF-ATC-02-04). `ON DELETE CASCADE` sobre `usuario`: si la cuenta se elimina, sus solicitudes se van con ella.
+## [v3.9] - 2026-10-25
+### Esquema 4.11 (67 Tablas) - M15 Atención al cliente
+- **Alcance General:** Tres tablas nuevas pedidas por el contrato de M15 (`contracts/m15-atencion.contract.ts`). Cambio puramente aditivo. **Las preguntas frecuentes NO están aquí:** son de M16 (`faq_entrada`, esquema 4.9) y M15 las consume por el puerto que M16 expone.
+  - **`solicitud_contacto`**: solicitudes del formulario de contacto, que exige sesión (HU-ATC-02). Guarda `tipo` (`consulta`, `cotizacion`, `reclamo`), `descripcion` y `estado`; **no duplica los datos de contacto**, que se leen de la cuenta al mostrarla (RF-ATC-02-04). `ON DELETE CASCADE` sobre `usuario`.
   - **`horario_atencion`**: una fila por día de la semana (`dia_semana` UNIQUE, HU-ATC-04). Las horas son texto `"HH:mm"` en 24h —no `TIME`— para que coincidan con el contrato sin convertir husos; `ck_horario_formato_horas` valida el formato y `ck_horario_franja_coherente` exige que un día cerrado no lleve horas y que uno abierto tenga `hora_fin > hora_inicio`.
   - **`configuracion_atencion_whatsapp`**: fila única (`ck_whatsapp_fila_unica`) con el `destino` del botón de contacto directo (HU-ATC-03). Admite una URL completa —hoy el canal de difusión, que no acepta texto prellenado— o un número de WhatsApp Business cuando exista; de ahí que el campo no se llame `numero`.
-  - **ENUMs nuevos:** `enum_tipo_solicitud_contacto` (`consulta`, `cotizacion`, `reclamo`), `enum_estado_solicitud_contacto` (`pendiente`, `atendida`) y `enum_dia_semana` (`lunes` … `domingo`).
-  - **Índices:** `(tema, orden)` y `activa` para el listado público de FAQs; `id_usuario` y `(estado, fecha_creacion DESC)` para la bandeja de solicitudes.
+  - **ENUMs nuevos:** `enum_tipo_solicitud_contacto`, `enum_estado_solicitud_contacto` y `enum_dia_semana`.
+  - **Índices:** `id_usuario` y `(estado, fecha_creacion DESC)` para la bandeja de solicitudes.
   - **Permisos nuevos (24-26):** `atencion.ver`, `atencion.editar` y `atencion.atender_clientes`, con área funcional `atencion` y dependencia `editar → ver` en M17. El último queda reservado al escalamiento de HU-ATC-05, bloqueado por M03.
-  - **Seed:** 10 preguntas frecuentes en 5 temas (la de envíos declara cobertura solo en el departamento del Caquetá), la semana completa de horario (lunes a viernes 08:00-18:00, sábado 08:00-13:00, domingo cerrado) y el canal de WhatsApp vigente.
-  - **Bases existentes en 4.7:** el DDL crea los tipos y las tablas con `IF NOT EXISTS`. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` y `npm run db:seed`.
-  - **Verificado en PostgreSQL 18:** esquema y seed ejecutados sobre una base nueva y repetidos una segunda vez sin errores (idempotentes); 66 tablas; las 7 pruebas negativas de los `CHECK` y la FK rechazan los datos inválidos.
+  - **Seed:** la semana completa de horario (lunes a viernes 08:00-18:00, sábado 08:00-13:00, domingo cerrado) y el canal de WhatsApp vigente.
+  - **Bases existentes en 4.10:** el DDL crea los tipos y las tablas con `IF NOT EXISTS`. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` y `npm run db:seed`.
+  - **Verificado en PostgreSQL 18:** esquema y seed ejecutados sobre una base nueva y repetidos sin errores (idempotentes); las pruebas negativas de los `CHECK` y la FK rechazan los datos inválidos.
+
+---
+
+## [v3.8] - 2026-10-25
+### Esquema 4.10 (64 Tablas) - M13: movimientos de existencia de combos por orden
+- **Alcance General:** Valores de ENUM y una columna pedidos por el puerto `ExistenciaComboPort` (`contracts/m01-catalogo-entrega3.contract.ts`, D8; `contracts/m13-inventario.contract.ts`). Cambio puramente aditivo; no agrega tablas.
+  - **`enum_origen_ajuste_inventario`** += `orden`; **`enum_motivo_ajuste_inventario`** += `venta`, `devolucion`: la existencia de un combo baja al crearse la orden y vuelve al cancelarse.
+  - **`ajuste_inventario.referencia`** (`VARCHAR(100)` opcional): la orden que movió la existencia. Índice único parcial `uq_ajuste_referencia_variante_motivo (referencia, id_variante, motivo) WHERE referencia IS NOT NULL`: repetir la misma operación no mueve dos veces (idempotencia).
+  - **Bases existentes en 4.9:** el DDL agrega los valores con `ADD VALUE IF NOT EXISTS`, la columna y el índice con `IF NOT EXISTS`; no requiere seed. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql`.
+
+---
+
+## [v3.7] - 2026-10-25
+### Esquema 4.9 (64 Tablas) - M01 entrega 3: combos, complementarios por subcategoría e imágenes con miniaturas
+- **Alcance General:** Columnas y valores de ENUM pedidos por el contrato de la entrega 3 de M01 (`contracts/m01-catalogo-entrega3.contract.ts`). Cambio puramente aditivo; no agrega tablas.
+  - **`producto.es_combo`** y **`producto.excluido_de_descuentos`** (`BOOLEAN NOT NULL DEFAULT false`): un combo es un producto con una sola variante (K1, K2); la marca de exclusión de descuentos la respeta M06. Las tablas `combo` y `variante_combo` quedan sin uso (D2).
+  - **`subcategoria.id_categoria_complementaria`** (`INT` opcional, FK a `categoria` con `ON DELETE SET NULL`): categoría de la que se sugieren complementarios por defecto (D6).
+  - **`imagen.miniatura`** y **`imagen.mediana`** (`BYTEA` opcionales, WebP de 320 y 960 px): nulas en imágenes anteriores, se completan al pedirlas (D7). Nuevo `chk_imagen_una_asociacion`: una imagen se asocia a una variante o a un color, no a ambos.
+  - **Pendiente (D8):** los valores de ENUM de M13 para los movimientos por orden (`orden`, `venta`, `devolucion`) llegan con el PR de código de M13, junto con su contrato, para no romper el código vigente.
+  - **Bases existentes en 4.8:** el DDL agrega todo con `IF NOT EXISTS`; no requiere seed. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql`.
+
+---
+
+## [v3.6] - 2026-10-25
+### Esquema 4.8 (64 Tablas) - M16 Contenido institucional y Centro de Ayuda / FAQ
+- **Alcance General:** Dos tablas nuevas y un ENUM pedidos por el contrato de M16 (`contracts/m16-contenido.contract.ts`). Cambio puramente aditivo.
+  - **`pagina_institucional`**: páginas estáticas e institucionales administrables (`slug` único en `kebab-case`, `titulo`, `resumen` opcional, `cuerpo_markdown`, `estado` en `enum_estado_contenido`, `id_autor` con `ON DELETE SET NULL`, `fecha_creacion` y `fecha_actualizacion`). Separada de `aviso_privacidad` (M20 Habeas Data).
+  - **`faq_entrada`**: preguntas frecuentes del Centro de Ayuda público y puerto de lectura hacia M15 (`pregunta`, `respuesta_markdown`, `orden` >= 0, `estado` en `enum_estado_general`, `id_autor` con `ON DELETE SET NULL`, `fecha_creacion` y `fecha_actualizacion`).
+  - **ENUM nuevo:** `enum_estado_contenido` (`borrador`, `publicado`, `archivado`).
+  - **Índices:** `idx_pagina_institucional_estado`, `idx_pagina_institucional_autor`, `idx_faq_entrada_estado_orden` (`(estado, orden, id_faq)`) e `idx_faq_entrada_autor`.
+  - **Seed:** 4 páginas institucionales publicadas (`sobre-nosotros`, `terminos-y-condiciones`, `politica-de-privacidad`, `politicas-de-envio`) y 5 entradas FAQ activas iniciales.
 
 ---
 

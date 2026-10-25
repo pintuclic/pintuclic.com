@@ -19,9 +19,9 @@ import { z } from 'zod';
  * ── Qué NO hace ─────────────────────────────────────────────────────────────
  *  · No se conecta a SAMIT (ni lee ni escribe). La importación desde SAMIT será un
  *    módulo aparte y futuro; el `origen` 'samit' del historial queda reservado.
- *  · No bloquea ventas por existencia (cero o insuficiente). La única excepción es la
- *    de los combos de M01, que M13 NO gestiona.
- *  · No toca precios, promociones, combos ni el resto de la variante. Solo escribe
+ *  · No bloquea ventas por existencia (cero o insuficiente). La única excepción son los
+ *    combos de M01: su existencia sí se mueve con las órdenes (R15) y M13 la escribe.
+ *  · No toca precios, promociones ni el resto de la variante. Solo escribe
  *    `existencia_referencial` y su historial.
  *  · No exporta pedidos, ventas ni clientes (son de M08, M04 y M19).
  *
@@ -55,6 +55,12 @@ import { z } from 'zod';
  *  R13 Autorización siempre en servidor, también en los GET. Toda denegación (sin
  *      sesión o sin permiso) responde 404 RECURSO_NO_DISPONIBLE, sin revelar nada.
  *  R14 El historial es inmutable: no se edita ni se borra.
+ *  R15 Los combos (M01) son la excepción a "no bloquea ventas": su existencia SÍ se mueve con las
+ *      órdenes. M13 implementa `ExistenciaComboPort` (definido en la entrega 3 de M01): descontar al
+ *      crearse la orden y reponer al cancelarse o devolverse, de forma todo-o-nada, atómica (sin
+ *      llegar nunca a menos de cero) e idempotente por `referencia` (origen 'orden', motivos
+ *      'venta' y 'devolucion'). Solo actúa sobre combos; las demás variantes no se mueven. Sin
+ *      usuario: el movimiento es del sistema. El ajuste manual de un combo sigue igual (D4 de M01).
  *
  * ── Pantallas (administración, `/admin/inventario`) ─────────────────────────
  *  Existencias (lista con filtros y ajuste de una variante) · Carga masiva
@@ -86,6 +92,9 @@ import { z } from 'zod';
  *      módulo, y por eso se pregunta al Tech Lead): en un PR aparte, M01 deja de
  *      aceptar la existencia en esas dos operaciones (las variantes nacen en 0) y M13
  *      es el único que la escribe.
+ *  D8  El puerto vive en el contrato de la entrega 3 de M01; aquí solo se amplía el historial. Las
+ *      importaciones de existencia (carga masiva de esta pantalla o una futura de SAMIT) no tienen
+ *      por qué saltarse los combos aquí: la exclusión de SAMIT (CA-CAT-13-08) es de ese módulo.
  *
  * Regla de Oro #1: Cero código sin contrato previo.
  * Regla de Oro #11: Tolerancia Cero al tipo `any`.
@@ -109,10 +118,19 @@ export type EstadoExistencia = z.infer<typeof estadoExistenciaSchema>;
 
 export const estadoVarianteSchema = z.enum(['activo', 'inactivo']);
 
-export const origenAjusteSchema = z.enum(['manual', 'carga_masiva', 'samit']);
+export const origenAjusteSchema = z.enum(['manual', 'carga_masiva', 'samit', 'orden']);
 export type OrigenAjuste = z.infer<typeof origenAjusteSchema>;
 
-export const motivoAjusteSchema = z.enum(['conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva']);
+export const motivoAjusteSchema = z.enum([
+  'conteo_fisico',
+  'ingreso_mercancia',
+  'salida',
+  'correccion',
+  'otro',
+  'carga_masiva',
+  'venta',
+  'devolucion',
+]);
 export type MotivoAjuste = z.infer<typeof motivoAjusteSchema>;
 
 /** Motivos que se pueden elegir a mano (D6). */
@@ -161,8 +179,10 @@ export const ajusteInventarioSchema = z.object({
   origen: origenAjusteSchema,
   idCarga: z.string().uuid().nullable(),
   idUsuario: idSchema.nullable(),
-  /** D5. */
+  /** D5; los movimientos de una orden (origen 'orden') los hace "Sistema". */
   usuario: z.string(),
+  /** Identificador de la orden en los movimientos de combos (D8); null en el resto. */
+  referencia: z.string().nullable(),
   fecha: z.string().datetime(),
 });
 export type AjusteInventario = z.infer<typeof ajusteInventarioSchema>;

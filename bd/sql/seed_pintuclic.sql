@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 4.8 (alineado con schema_pintuclic.sql v4.8 - atención al cliente M15)
+-- VERSIÓN: 4.11 (alineado con schema_pintuclic.sql v4.11 - atención al cliente M15)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -62,9 +62,9 @@ INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     -- Notificaciones y Comunicaciones (M18 HU-NOT-03)
     (22, 'notificaciones.ver',             'Ver plantillas de comunicación y el registro de envíos y rebotes', 'activo'),
     (23, 'notificaciones.editar',          'Editar el contenido de las plantillas de comunicación',            'activo'),
-    -- Atención al cliente (M15 HU-ATC-01, HU-ATC-05)
-    (24, 'atencion.ver',                   'Ver preguntas frecuentes, solicitudes de contacto, horario y canal de atención', 'activo'),
-    (25, 'atencion.editar',                'Gestionar preguntas frecuentes, el horario de atención y el canal de WhatsApp', 'activo'),
+    -- Atención al cliente (M15 HU-ATC-02, HU-ATC-03, HU-ATC-04, HU-ATC-05)
+    (24, 'atencion.ver',                   'Ver solicitudes de contacto, horario y canal de atención',         'activo'),
+    (25, 'atencion.editar',                'Gestionar el horario de atención y el canal de WhatsApp',          'activo'),
     (26, 'atencion.atender_clientes',      'Atender las consultas escaladas a un asesor humano',               'activo')
 ON CONFLICT (id_permiso) DO NOTHING;
 
@@ -580,35 +580,160 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
 ON CONFLICT (tipo) DO NOTHING;
 
 -- ==============================================================================
--- 9E. MÓDULO DE ATENCIÓN AL CLIENTE (3 Tablas - M15 - HU-ATC-01, 03, 04)
+-- 9E. MÓDULO DE CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (2 Tablas - M16)
 -- ==============================================================================
 
--- 9E.1 Preguntas frecuentes públicas, agrupadas por tema y ordenadas (HU-ATC-01).
--- Contenido inicial editable desde el panel; sin esto el Centro de ayuda nace vacío.
-INSERT INTO pregunta_frecuente (id_pregunta, tema, pregunta, respuesta, orden, activa) VALUES
-    (1, 'Pedidos y pagos', '¿Qué métodos de pago aceptan?',
-        'Aceptamos tarjeta de crédito, tarjeta débito, PSE y transferencia bancaria. El pago se confirma antes de despachar el pedido.', 1, TRUE),
-    (2, 'Pedidos y pagos', '¿Puedo cotizar un pedido grande antes de comprar?',
-        'Sí. Agrega al carrito los productos y las cantidades que necesitas y solicita la cotización desde allí. Si se trata de una obra completa, también puedes escribirnos por WhatsApp para que un asesor te acompañe.', 2, TRUE),
-    (3, 'Envíos y entregas', '¿A qué ciudades hacen envíos?',
-        'Por el momento tenemos cobertura en todo el departamento del Caquetá. Estamos trabajando para ampliarla a otros departamentos.', 1, TRUE),
-    (4, 'Envíos y entregas', '¿Cuánto tarda en llegar mi pedido?',
-        'En Florencia los pedidos se entregan normalmente el siguiente día hábil. En el resto del departamento del Caquetá, entre dos y cuatro días hábiles.', 2, TRUE),
-    (5, 'Cuenta y empresa', '¿Cómo creo una cuenta?',
-        'Entra a Registrarse, ingresa tu nombre, tu correo y una contraseña, y confirma el código de verificación que enviamos a tu correo.', 1, TRUE),
-    (6, 'Cuenta y empresa', '¿Puedo comprar como empresa con NIT?',
-        'Sí. Al registrarte puedes solicitar una cuenta de empresa adjuntando el RUT. Una vez aprobada, tus compras quedan a nombre de la empresa con su NIT.', 2, TRUE),
-    (7, 'Garantías y devoluciones', '¿Puedo devolver un producto si no era el color que esperaba?',
-        'Los productos sin abrir y en su empaque original admiten devolución. Los colores entonados a pedido no, porque se preparan exclusivamente para ti; por eso recomendamos confirmar el color antes de ordenar.', 1, TRUE),
-    (8, 'Garantías y devoluciones', '¿Qué cubre la garantía de un producto?',
-        'La garantía cubre defectos de fabricación. No cubre fallas por una aplicación distinta a la indicada en la ficha técnica ni por preparación inadecuada de la superficie.', 2, TRUE),
-    (9, 'Productos y color', '¿Cómo sé qué pintura usar en cada superficie?',
-        'Cada producto indica las superficies para las que está recomendado y su rendimiento. Si tienes dudas, escríbenos por WhatsApp y te orientamos.', 1, TRUE),
-    (10, 'Productos y color', '¿Puedo pedir un color personalizado?',
-        'Sí. Varias de nuestras líneas se entonan en el color que necesites a partir de la base correspondiente. Consulta la disponibilidad en la ficha del producto.', 2, TRUE)
-ON CONFLICT (id_pregunta) DO NOTHING;
+-- 9E.1 Páginas Institucionales Publicadas (HU-CON-01 / HU-CON-03)
+INSERT INTO pagina_institucional (id_pagina, slug, titulo, resumen, cuerpo_markdown, estado, id_autor) VALUES
+    (
+        1,
+        'sobre-nosotros',
+        'Sobre Nosotros',
+        'Conoce nuestra historia, misión, visión y horarios de atención especializada en recubrimientos y pinturas.',
+        '## Nuestra Historia
+Pintu Clic nació con el propósito de modernizar el suministro de pinturas arquitectónicas, recubrimientos industriales y accesorios para el hogar y la construcción en Colombia, integrando asesoría técnica especializada con una experiencia digital ágil para clientes particulares (B2C) y empresas (B2B).
 
--- 9E.2 Horario de atención humana, una fila por día (HU-ATC-04).
+## Misión
+Brindar soluciones integrales en recubrimientos, pinturas y herramientas de aplicación con respaldo técnico, entregas confiables y trazabilidad completa en cada orden, acompañando tanto al maestro de obra y al hogar como a las grandes constructoras e industrias del país.
+
+## Visión
+Consolidarnos como la plataforma líder de comercio especializado en pinturas y acabados en Colombia, reconocida por la precisión de nuestro catálogo técnico, la transparencia comercial y la excelencia en el servicio postventa.
+
+## Horarios de Atención
+- **Lunes a Viernes:** 7:30 a. m. a 5:30 p. m. (jornada continua)
+- **Sábados:** 8:00 a. m. a 1:00 p. m.
+- **Domingos y Festivos:** Atención digital de autogestión en plataforma 24/7
+
+## Nuestros Pilares
+- **Respaldo Técnico:** Fichas técnicas verificadas, rendimientos claros por metro cuadrado y compatibilidad de superficies.
+- **Atención Corporativa B2B:** Condiciones comerciales dedicadas para empresas con NIT validado.
+- **Calidad Garantizada:** Trabajamos exclusivamente con marcas certificadas y lotes trazables.',
+        'publicado',
+        1
+    ),
+    (
+        2,
+        'terminos-y-condiciones',
+        'Términos y Condiciones',
+        'Condiciones legales de uso de la plataforma Pintu Clic, formación de órdenes, precios y responsabilidades.',
+        '## 1. Aceptación de los Términos
+El acceso y uso de la plataforma **Pintu Clic** implica la aceptación plena de los presentes Términos y Condiciones por parte de visitantes, clientes particulares y cuentas corporativas registradas.
+
+## 2. Catálogo, Variantes y Colores Entonados
+- Los productos exhibidos especifican su presentación, medida, acabado y ficha técnica de referencia.
+- Las tonalidades visualizadas en pantalla son aproximaciones digitales; el cliente debe verificar el código de color seleccionado antes de confirmar su compra.
+- Los productos preparados bajo modalidad de **color entonado a medida** se fabrican específicamente para la orden confirmada y no admiten retracto por cambio de tonalidad una vez procesados.
+
+## 3. Precios, Impuestos y Confirmación de Orden
+- Todos los precios publicados en el portal están expresados en pesos colombianos (COP).
+- Una orden de compra nace únicamente cuando el pago ha sido confirmado y validado por la pasarela o medio autorizado, congelando de forma inmutable los precios, descuentos e impuestos vigentes en ese instante.
+
+## 4. Cuentas Empresariales (B2B)
+Las cuentas corporativas requieren validación documental del NIT y RUT vigente por parte del equipo administrativo antes de habilitar beneficios o escalas de descuento empresarial.',
+        'publicado',
+        1
+    ),
+    (
+        3,
+        'politica-de-privacidad',
+        'Política de Privacidad y Tratamiento de Datos',
+        'Lineamientos de protección de datos personales conforme a la Ley 1581 de 2012 y ejercicio de derechos Habeas Data.',
+        '## 1. Marco Normativo y Responsable
+En cumplimiento de la **Ley Estatutaria 1581 de 2012** y el **Decreto 1377 de 2013** de la República de Colombia, **Pintu Clic** informa a sus usuarios, clientes y colaboradores los lineamientos bajo los cuales recolecta, almacena y protege sus datos personales.
+
+## 2. Finalidades del Tratamiento
+Los datos recolectados se utilizan estrictamente para:
+- Gestionar el registro de cuentas particulares y la verificación tributaria de cuentas empresa (B2B).
+- Procesar órdenes de compra, despachos a domicilio, entregas en almacén y facturación legal.
+- Enviar notificaciones transaccionales de seguridad (códigos de verificación, alertas de sesión y estados de pedido).
+- Atender consultas, garantías y solicitudes de derechos ARCO.
+
+## 3. Derechos de los Titulares (Habeas Data)
+Todo titular de datos personales tiene derecho a:
+- Conocer, actualizar y rectificar sus datos personales desde su perfil de cuenta.
+- Solicitar prueba de la autorización otorgada al momento del registro.
+- Presentar solicitudes de supresión de cuenta y revocatoria de consentimiento a través de los mecanismos dispuestos en la plataforma, siempre que no exista un deber legal o contractual de permanencia.
+
+## 4. Seguridad de la Información
+Aplicamos controles criptográficos de contraseñas, sesiones seguras y segregación de privilegios administrativos para impedir el acceso no autorizado a la información personal.',
+        'publicado',
+        1
+    ),
+    (
+        4,
+        'politicas-de-envio',
+        'Políticas de Envío y Entregas',
+        'Modalidades de despacho a domicilio, recogida en almacén, tiempos estimados y recepción de mercancía.',
+        '## 1. Modalidades de Entrega
+En **Pintu Clic** ofrecemos dos modalidades de entrega seleccionables durante el proceso de compra:
+- **Envío a domicilio:** Despacho directo a la dirección registrada y confirmada por el cliente.
+- **Recogida en almacén:** Retiro presencial sin costo de flete en nuestro punto autorizado una vez la orden cambie a estado preparada.
+
+## 2. Tarifas y Exoneración de Envío
+- El costo base de despacho estándar se calcula automáticamente en el resumen de compra según los parámetros comerciales vigentes.
+- Las órdenes que superen el umbral de compra establecido por la tienda obtienen **envío estándar gratuito** de manera automática.
+
+## 3. Tiempos de Preparación y Despacho
+- Las órdenes con productos de línea estándar se alistan entre **24 y 48 horas hábiles** tras la confirmación del pago.
+- Los pedidos que incluyan preparación de colores entonados o volúmenes industriales pueden requerir validación adicional de alistamiento, notificada oportunamente en el seguimiento de la orden.
+
+## 4. Recomendaciones al Recibir su Pedido
+Verifique al momento de la entrega que los envases se encuentren sellados, sin abolladuras que comprometan el contenido y que las referencias coincidan con el detalle de su orden.',
+        'publicado',
+        1
+    )
+ON CONFLICT (slug) DO NOTHING;
+
+-- 9E.2 Preguntas Frecuentes del Centro de Ayuda (HU-CON-02 / HU-CON-04)
+INSERT INTO faq_entrada (id_faq, pregunta, respuesta_markdown, orden, estado, id_autor) VALUES
+    (
+        1,
+        '¿Cómo solicito una cuenta empresarial (B2B) con precios para negocios?',
+        'Puedes registrarte seleccionando la modalidad **Cuenta Empresa** o solicitar el ascenso desde tu perfil particular adjuntando los datos de tu empresa y el **NIT**. Nuestro equipo administrativo verificará la información tributaria y te notificará la activación de tus condiciones corporativas.',
+        1,
+        'activo',
+        1
+    ),
+    (
+        2,
+        '¿Cuánto tardan los envíos a domicilio y cuándo aplica el envío gratis?',
+        'El alistamiento y despacho estándar toma entre **24 y 48 horas hábiles** después de confirmado el pago. Las compras que igualen o superen el monto mínimo vigente reciben **envío gratis** automáticamente en el resumen del pedido.',
+        2,
+        'activo',
+        1
+    ),
+    (
+        3,
+        '¿Puedo devolver o cambiar una pintura preparada con color entonado a medida?',
+        'Las pinturas preparadas bajo **sistema de entonado a medida** se formulan exclusivamente para tu orden según el código de color seleccionado; por ello no admiten cambios por elección de tono, salvo defecto técnico comprobado de fabricación.',
+        3,
+        'activo',
+        1
+    ),
+    (
+        4,
+        '¿Cómo calculo cuántos galones de pintura necesito para mi proyecto?',
+        'En la ficha técnica de cada recubrimiento encontrarás el **rendimiento estimado en metros cuadrados por galón** ($m^2/gal$) y el número de manos recomendado según la superficie. Divide el área total a pintar entre el rendimiento indicado para estimar la cantidad necesaria.',
+        4,
+        'activo',
+        1
+    ),
+    (
+        5,
+        '¿Qué modalidades de entrega están disponibles al realizar un pedido?',
+        'Puedes elegir entre **Envío a domicilio** a cualquiera de las direcciones guardadas en tu libreta o **Recogida en almacén** sin costo de transporte cuando tu orden se encuentre lista para entrega.',
+        5,
+        'activo',
+        1
+    )
+ON CONFLICT (id_faq) DO NOTHING;
+
+-- ==============================================================================
+-- 9F. MÓDULO DE ATENCIÓN AL CLIENTE (2 Tablas - M15 - HU-ATC-03, HU-ATC-04)
+-- Las preguntas frecuentes se siembran arriba, en M16: son suyas.
+-- ==============================================================================
+
+-- 9F.1 Horario de atención humana, una fila por día (HU-ATC-04).
 -- Domingo cerrado: sin horas, como exige ck_horario_franja_coherente.
 INSERT INTO horario_atencion (dia_semana, abierto, hora_inicio, hora_fin) VALUES
     ('lunes',     TRUE,  '08:00', '18:00'),
@@ -620,7 +745,7 @@ INSERT INTO horario_atencion (dia_semana, abierto, hora_inicio, hora_fin) VALUES
     ('domingo',   FALSE, NULL,    NULL)
 ON CONFLICT (dia_semana) DO NOTHING;
 
--- 9E.3 Canal de contacto directo por WhatsApp, fila única (HU-ATC-03).
+-- 9F.2 Canal de contacto directo por WhatsApp, fila única (HU-ATC-03).
 -- Hoy apunta al canal de difusión de la empresa: es temporal, solo para verificar la redirección,
 -- y un canal no acepta texto prellenado. `mensaje_base` queda listo para cuando el destino sea un
 -- número de WhatsApp Business y el botón arme el enlace wa.me con la referencia del producto.
@@ -674,7 +799,8 @@ SELECT setval('consentimiento_usuario_id_consentimiento_seq',    COALESCE((SELEC
 SELECT setval('solicitud_supresion_id_solicitud_supresion_seq',  COALESCE((SELECT MAX(id_solicitud_supresion) FROM solicitud_supresion), 1));
 SELECT setval('usuario_identidad_externa_id_identidad_seq',      COALESCE((SELECT MAX(id_identidad) FROM usuario_identidad_externa), 1));
 SELECT setval('parametro_sistema_id_parametro_seq',              COALESCE((SELECT MAX(id_parametro) FROM parametro_sistema), 1));
-SELECT setval('pregunta_frecuente_id_pregunta_seq',              COALESCE((SELECT MAX(id_pregunta) FROM pregunta_frecuente), 1));
+SELECT setval('pagina_institucional_id_pagina_seq',              COALESCE((SELECT MAX(id_pagina) FROM pagina_institucional), 1));
+SELECT setval('faq_entrada_id_faq_seq',                          COALESCE((SELECT MAX(id_faq) FROM faq_entrada), 1));
 SELECT setval('horario_atencion_id_horario_seq',                 COALESCE((SELECT MAX(id_horario) FROM horario_atencion), 1));
 
 COMMIT;

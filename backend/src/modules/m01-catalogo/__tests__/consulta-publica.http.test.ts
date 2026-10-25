@@ -357,6 +357,8 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: consulta pública (HTTP
         tieneColor: true,
         disponibilidad: 'disponible',
         idImagenPrincipal: expect.any(Number),
+        esCombo: false,
+        compraBloqueada: false,
       });
       expect(lista(r)[1]).toMatchObject({
         idProducto: b,

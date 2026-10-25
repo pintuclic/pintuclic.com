@@ -244,7 +244,7 @@ const Formulario: React.FC<{
             .filter((c) => c.estado === 'activo')
             .map((c) => ({ value: String(c.idCategoria), label: c.nombre }))}
           textoSinElegir="Ninguna"
-          helperText="Para sugerir este producto junto a otra categoría."
+          helperText="De esta categoría se sugieren productos en la ficha de este producto."
         />
         <div className="sm:col-span-2">
           <Textarea label="Descripción" rows={3} {...register('descripcion')} error={errors.descripcion?.message} />

@@ -5,6 +5,7 @@ import type {
   CrearAcabadoRequest,
   CrearBaseRequest,
   CrearCategoriaRequest,
+  CrearSubcategoriaRequest,
   CrearFamiliaColorRequest,
   CrearSuperficieRequest,
   CrearTipoMedidaRequest,
@@ -15,6 +16,7 @@ import type {
   EditarFamiliaColorRequest,
   EditarLineaRequest,
   EditarMarcaRequest,
+  EditarSubcategoriaRequest,
   EditarSuperficieRequest,
   EditarTipoMedidaRequest,
   Estado,
@@ -58,18 +60,22 @@ export interface RecursoCatalogoPort<E extends { estado: Estado }, CrearDatos, E
 
 /* ─── Categorías y subcategorías ─────────────────────────────────────────── */
 
-export interface CategoriasRepositoryPort
-  extends RecursoCatalogoPort<Categoria, CrearCategoriaRequest, EditarCategoriaRequest, { nombre: string }> {
+export interface CategoriasRepositoryPort extends RecursoCatalogoPort<
+  Categoria,
+  CrearCategoriaRequest,
+  EditarCategoriaRequest,
+  { nombre: string }
+> {
   /** Árbol completo (D5). */
   listar(query: ListarCompletoRequest): Promise<Categoria[]>;
 }
 
-export type CrearSubcategoriaDatos = CrearCategoriaRequest & { idCategoria: number };
+export type CrearSubcategoriaDatos = CrearSubcategoriaRequest & { idCategoria: number };
 
 export type SubcategoriasRepositoryPort = RecursoCatalogoPort<
   Subcategoria,
   CrearSubcategoriaDatos,
-  EditarCategoriaRequest,
+  EditarSubcategoriaRequest,
   { idCategoria: number; nombre: string }
 >;
 
@@ -121,8 +127,12 @@ export interface LogotipoMarca {
   mimeType: Marca['logotipoMimeType'];
 }
 
-export interface MarcasRepositoryPort
-  extends RecursoCatalogoPort<Marca, CrearMarcaDatos, EditarMarcaRequest, { nombre: string }> {
+export interface MarcasRepositoryPort extends RecursoCatalogoPort<
+  Marca,
+  CrearMarcaDatos,
+  EditarMarcaRequest,
+  { nombre: string }
+> {
   listar(query: ListarBaseRequest): Promise<Pagina<Marca>>;
   reemplazarLogotipo(id: number, logotipo: Buffer, mimeType: Marca['logotipoMimeType']): Promise<Marca>;
   obtenerLogotipo(id: number): Promise<LogotipoMarca | null>;
@@ -136,8 +146,12 @@ export interface CrearLineaDatos {
   gamaComercial: string | null;
 }
 
-export interface LineasRepositoryPort
-  extends RecursoCatalogoPort<Linea, CrearLineaDatos, EditarLineaRequest, { idMarca: number; nombre: string }> {
+export interface LineasRepositoryPort extends RecursoCatalogoPort<
+  Linea,
+  CrearLineaDatos,
+  EditarLineaRequest,
+  { idMarca: number; nombre: string }
+> {
   listar(query: ListarLineasRequest): Promise<Pagina<Linea>>;
 }
 
@@ -168,8 +182,12 @@ export interface ImagenBytes {
   mimeType: Marca['logotipoMimeType'];
 }
 
-export interface MedidasRepositoryPort
-  extends RecursoCatalogoPort<Medida, CrearMedidaDatos, EditarMedidaDatos, ClaveMedida> {
+export interface MedidasRepositoryPort extends RecursoCatalogoPort<
+  Medida,
+  CrearMedidaDatos,
+  EditarMedidaDatos,
+  ClaveMedida
+> {
   listar(query: ListarMedidasRequest): Promise<Pagina<Medida>>;
   reemplazarImagen(id: number, imagen: Buffer, mimeType: ImagenBytes['mimeType']): Promise<Medida>;
   quitarImagen(id: number): Promise<Medida>;

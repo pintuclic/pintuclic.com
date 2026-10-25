@@ -5,12 +5,17 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface ImagenGaleria {
   idImagen: number;
+  /** Versión mediana, para la imagen grande. */
   url: string;
+  /** Miniatura, para la tira de abajo (I7). */
+  urlMiniatura: string;
 }
 
 export interface GaleriaProductoProps {
   nombre: string;
   imagenes: readonly ImagenGaleria[];
+  /** Si cambia, la galería salta a esa imagen (la del color o la presentación elegidos). */
+  idImagenEnfocada?: number | null;
   /** Imagen de la medida elegida (por ejemplo la silueta del envase): se muestra en una esquina. */
   imagenMedidaUrl: string | null;
   nombreMedida: string | null;
@@ -20,6 +25,7 @@ export interface GaleriaProductoProps {
 export const GaleriaProducto: React.FC<GaleriaProductoProps> = ({
   nombre,
   imagenes,
+  idImagenEnfocada = null,
   imagenMedidaUrl,
   nombreMedida,
 }) => {
@@ -29,6 +35,12 @@ export const GaleriaProducto: React.FC<GaleriaProductoProps> = ({
   useEffect(() => {
     if (indice >= total) setIndice(0);
   }, [indice, total]);
+
+  useEffect(() => {
+    if (idImagenEnfocada === null) return;
+    const destino = imagenes.findIndex((i) => i.idImagen === idImagenEnfocada);
+    if (destino !== -1) setIndice(destino);
+  }, [idImagenEnfocada, imagenes]);
 
   const ir = (paso: number) => setIndice((i) => (total === 0 ? 0 : (i + paso + total) % total));
   const actual = imagenes[indice];
@@ -91,7 +103,7 @@ export const GaleriaProducto: React.FC<GaleriaProductoProps> = ({
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imagen.url} alt="" className="h-full w-full object-contain" loading="lazy" />
+                <img src={imagen.urlMiniatura} alt="" className="h-full w-full object-contain" loading="lazy" />
               </button>
             </li>
           ))}
