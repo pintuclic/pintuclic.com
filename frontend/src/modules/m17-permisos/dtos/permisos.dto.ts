@@ -4,7 +4,8 @@ import { z } from 'zod';
  * ==============================================================================
  * DTOs de Permisos Atómicos — M17 (Frontend)
  * ==============================================================================
- * Catálogo Maestro Oficial de 20 Códigos de Permiso Atómicos (seed_pintuclic.sql §1.4).
+ * Catálogo Maestro Oficial de Códigos de Permiso Atómicos (seed_pintuclic.sql §1.4).
+ * Espejo del catálogo del backend: lo que se agregue allí se agrega aquí.
  */
 
 export const CODIGOS_PERMISO = [
@@ -25,6 +26,11 @@ export const CODIGOS_PERMISO = [
   'configuracion.editar',
   'estadisticas.consultar',
   'empresas.validar',
+  'notificaciones.ver',
+  'notificaciones.editar',
+  'atencion.ver',
+  'atencion.editar',
+  'atencion.atender_clientes',
   'productos.crear',
   'productos.eliminar',
   'ordenes.ver',
@@ -41,6 +47,8 @@ export const AREA_FUNCIONAL = [
   'seguridad',
   'configuracion',
   'estadisticas',
+  'notificaciones',
+  'atencion',
 ] as const;
 export const areaFuncionalSchema = z.enum(AREA_FUNCIONAL);
 export type AreaFuncional = z.infer<typeof areaFuncionalSchema>;
