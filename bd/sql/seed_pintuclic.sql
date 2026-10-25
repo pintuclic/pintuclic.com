@@ -576,6 +576,155 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
 ON CONFLICT (tipo) DO NOTHING;
 
 -- ==============================================================================
+-- 9E. MÓDULO DE CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (2 Tablas - M16)
+-- ==============================================================================
+
+-- 9E.1 Páginas Institucionales Publicadas (HU-CON-01 / HU-CON-03)
+INSERT INTO pagina_institucional (id_pagina, slug, titulo, resumen, cuerpo_markdown, estado, id_autor) VALUES
+    (
+        1,
+        'sobre-nosotros',
+        'Sobre Nosotros',
+        'Conoce nuestra historia, misión, visión y horarios de atención especializada en recubrimientos y pinturas.',
+        '## Nuestra Historia
+Pintu Clic nació con el propósito de modernizar el suministro de pinturas arquitectónicas, recubrimientos industriales y accesorios para el hogar y la construcción en Colombia, integrando asesoría técnica especializada con una experiencia digital ágil para clientes particulares (B2C) y empresas (B2B).
+
+## Misión
+Brindar soluciones integrales en recubrimientos, pinturas y herramientas de aplicación con respaldo técnico, entregas confiables y trazabilidad completa en cada orden, acompañando tanto al maestro de obra y al hogar como a las grandes constructoras e industrias del país.
+
+## Visión
+Consolidarnos como la plataforma líder de comercio especializado en pinturas y acabados en Colombia, reconocida por la precisión de nuestro catálogo técnico, la transparencia comercial y la excelencia en el servicio postventa.
+
+## Horarios de Atención
+- **Lunes a Viernes:** 7:30 a. m. a 5:30 p. m. (jornada continua)
+- **Sábados:** 8:00 a. m. a 1:00 p. m.
+- **Domingos y Festivos:** Atención digital de autogestión en plataforma 24/7
+
+## Nuestros Pilares
+- **Respaldo Técnico:** Fichas técnicas verificadas, rendimientos claros por metro cuadrado y compatibilidad de superficies.
+- **Atención Corporativa B2B:** Condiciones comerciales dedicadas para empresas con NIT validado.
+- **Calidad Garantizada:** Trabajamos exclusivamente con marcas certificadas y lotes trazables.',
+        'publicado',
+        1
+    ),
+    (
+        2,
+        'terminos-y-condiciones',
+        'Términos y Condiciones',
+        'Condiciones legales de uso de la plataforma Pintu Clic, formación de órdenes, precios y responsabilidades.',
+        '## 1. Aceptación de los Términos
+El acceso y uso de la plataforma **Pintu Clic** implica la aceptación plena de los presentes Términos y Condiciones por parte de visitantes, clientes particulares y cuentas corporativas registradas.
+
+## 2. Catálogo, Variantes y Colores Entonados
+- Los productos exhibidos especifican su presentación, medida, acabado y ficha técnica de referencia.
+- Las tonalidades visualizadas en pantalla son aproximaciones digitales; el cliente debe verificar el código de color seleccionado antes de confirmar su compra.
+- Los productos preparados bajo modalidad de **color entonado a medida** se fabrican específicamente para la orden confirmada y no admiten retracto por cambio de tonalidad una vez procesados.
+
+## 3. Precios, Impuestos y Confirmación de Orden
+- Todos los precios publicados en el portal están expresados en pesos colombianos (COP).
+- Una orden de compra nace únicamente cuando el pago ha sido confirmado y validado por la pasarela o medio autorizado, congelando de forma inmutable los precios, descuentos e impuestos vigentes en ese instante.
+
+## 4. Cuentas Empresariales (B2B)
+Las cuentas corporativas requieren validación documental del NIT y RUT vigente por parte del equipo administrativo antes de habilitar beneficios o escalas de descuento empresarial.',
+        'publicado',
+        1
+    ),
+    (
+        3,
+        'politica-de-privacidad',
+        'Política de Privacidad y Tratamiento de Datos',
+        'Lineamientos de protección de datos personales conforme a la Ley 1581 de 2012 y ejercicio de derechos Habeas Data.',
+        '## 1. Marco Normativo y Responsable
+En cumplimiento de la **Ley Estatutaria 1581 de 2012** y el **Decreto 1377 de 2013** de la República de Colombia, **Pintu Clic** informa a sus usuarios, clientes y colaboradores los lineamientos bajo los cuales recolecta, almacena y protege sus datos personales.
+
+## 2. Finalidades del Tratamiento
+Los datos recolectados se utilizan estrictamente para:
+- Gestionar el registro de cuentas particulares y la verificación tributaria de cuentas empresa (B2B).
+- Procesar órdenes de compra, despachos a domicilio, entregas en almacén y facturación legal.
+- Enviar notificaciones transaccionales de seguridad (códigos de verificación, alertas de sesión y estados de pedido).
+- Atender consultas, garantías y solicitudes de derechos ARCO.
+
+## 3. Derechos de los Titulares (Habeas Data)
+Todo titular de datos personales tiene derecho a:
+- Conocer, actualizar y rectificar sus datos personales desde su perfil de cuenta.
+- Solicitar prueba de la autorización otorgada al momento del registro.
+- Presentar solicitudes de supresión de cuenta y revocatoria de consentimiento a través de los mecanismos dispuestos en la plataforma, siempre que no exista un deber legal o contractual de permanencia.
+
+## 4. Seguridad de la Información
+Aplicamos controles criptográficos de contraseñas, sesiones seguras y segregación de privilegios administrativos para impedir el acceso no autorizado a la información personal.',
+        'publicado',
+        1
+    ),
+    (
+        4,
+        'politicas-de-envio',
+        'Políticas de Envío y Entregas',
+        'Modalidades de despacho a domicilio, recogida en almacén, tiempos estimados y recepción de mercancía.',
+        '## 1. Modalidades de Entrega
+En **Pintu Clic** ofrecemos dos modalidades de entrega seleccionables durante el proceso de compra:
+- **Envío a domicilio:** Despacho directo a la dirección registrada y confirmada por el cliente.
+- **Recogida en almacén:** Retiro presencial sin costo de flete en nuestro punto autorizado una vez la orden cambie a estado preparada.
+
+## 2. Tarifas y Exoneración de Envío
+- El costo base de despacho estándar se calcula automáticamente en el resumen de compra según los parámetros comerciales vigentes.
+- Las órdenes que superen el umbral de compra establecido por la tienda obtienen **envío estándar gratuito** de manera automática.
+
+## 3. Tiempos de Preparación y Despacho
+- Las órdenes con productos de línea estándar se alistan entre **24 y 48 horas hábiles** tras la confirmación del pago.
+- Los pedidos que incluyan preparación de colores entonados o volúmenes industriales pueden requerir validación adicional de alistamiento, notificada oportunamente en el seguimiento de la orden.
+
+## 4. Recomendaciones al Recibir su Pedido
+Verifique al momento de la entrega que los envases se encuentren sellados, sin abolladuras que comprometan el contenido y que las referencias coincidan con el detalle de su orden.',
+        'publicado',
+        1
+    )
+ON CONFLICT (slug) DO NOTHING;
+
+-- 9E.2 Preguntas Frecuentes del Centro de Ayuda (HU-CON-02 / HU-CON-04)
+INSERT INTO faq_entrada (id_faq, pregunta, respuesta_markdown, orden, estado, id_autor) VALUES
+    (
+        1,
+        '¿Cómo solicito una cuenta empresarial (B2B) con precios para negocios?',
+        'Puedes registrarte seleccionando la modalidad **Cuenta Empresa** o solicitar el ascenso desde tu perfil particular adjuntando los datos de tu empresa y el **NIT**. Nuestro equipo administrativo verificará la información tributaria y te notificará la activación de tus condiciones corporativas.',
+        1,
+        'activo',
+        1
+    ),
+    (
+        2,
+        '¿Cuánto tardan los envíos a domicilio y cuándo aplica el envío gratis?',
+        'El alistamiento y despacho estándar toma entre **24 y 48 horas hábiles** después de confirmado el pago. Las compras que igualen o superen el monto mínimo vigente reciben **envío gratis** automáticamente en el resumen del pedido.',
+        2,
+        'activo',
+        1
+    ),
+    (
+        3,
+        '¿Puedo devolver o cambiar una pintura preparada con color entonado a medida?',
+        'Las pinturas preparadas bajo **sistema de entonado a medida** se formulan exclusivamente para tu orden según el código de color seleccionado; por ello no admiten cambios por elección de tono, salvo defecto técnico comprobado de fabricación.',
+        3,
+        'activo',
+        1
+    ),
+    (
+        4,
+        '¿Cómo calculo cuántos galones de pintura necesito para mi proyecto?',
+        'En la ficha técnica de cada recubrimiento encontrarás el **rendimiento estimado en metros cuadrados por galón** ($m^2/gal$) y el número de manos recomendado según la superficie. Divide el área total a pintar entre el rendimiento indicado para estimar la cantidad necesaria.',
+        4,
+        'activo',
+        1
+    ),
+    (
+        5,
+        '¿Qué modalidades de entrega están disponibles al realizar un pedido?',
+        'Puedes elegir entre **Envío a domicilio** a cualquiera de las direcciones guardadas en tu libreta o **Recogida en almacén** sin costo de transporte cuando tu orden se encuentre lista para entrega.',
+        5,
+        'activo',
+        1
+    )
+ON CONFLICT (id_faq) DO NOTHING;
+
+-- ==============================================================================
 -- 10. ACTUALIZACIÓN AUTOMÁTICA DE SECUENCIAS (EVITA COLISIONES DE IDs)
 -- ==============================================================================
 
@@ -621,5 +770,7 @@ SELECT setval('consentimiento_usuario_id_consentimiento_seq',    COALESCE((SELEC
 SELECT setval('solicitud_supresion_id_solicitud_supresion_seq',  COALESCE((SELECT MAX(id_solicitud_supresion) FROM solicitud_supresion), 1));
 SELECT setval('usuario_identidad_externa_id_identidad_seq',      COALESCE((SELECT MAX(id_identidad) FROM usuario_identidad_externa), 1));
 SELECT setval('parametro_sistema_id_parametro_seq',              COALESCE((SELECT MAX(id_parametro) FROM parametro_sistema), 1));
+SELECT setval('pagina_institucional_id_pagina_seq',              COALESCE((SELECT MAX(id_pagina) FROM pagina_institucional), 1));
+SELECT setval('faq_entrada_id_faq_seq',                          COALESCE((SELECT MAX(id_faq) FROM faq_entrada), 1));
 
 COMMIT;
