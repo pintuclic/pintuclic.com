@@ -4,20 +4,17 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import type { OpcionesFiltro } from '../dtos/busqueda.dto';
 import type { FiltrosBusqueda } from '../services/filtros-busqueda';
-import { hayFiltrosActivos } from '../services/filtros-busqueda';
 
 interface Props {
   filtros: FiltrosBusqueda;
   opciones: OpcionesFiltro | null;
   onCambiar: (cambios: Partial<FiltrosBusqueda>) => void;
-  onLimpiar: () => void;
 }
 
 export const BusquedaFiltrosSidebar: React.FC<Props> = ({
   filtros,
   opciones,
   onCambiar,
-  onLimpiar,
 }) => {
   const toggleArrayItem = (array: number[], item: number): number[] => {
     return array.includes(item) ? array.filter((id) => id !== item) : [...array, item];

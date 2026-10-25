@@ -340,7 +340,6 @@ export const BusquedaCatalogoView: React.FC = () => {
             filtros={filtros}
             opciones={opcionesFiltro}
             onCambiar={aplicar}
-            onLimpiar={limpiarTodo}
           />
         </aside>
 
@@ -385,7 +384,6 @@ export const BusquedaCatalogoView: React.FC = () => {
                 filtros={filtros}
                 opciones={opcionesFiltro}
                 onCambiar={aplicar}
-                onLimpiar={limpiarTodo}
               />
             </div>
           )}
