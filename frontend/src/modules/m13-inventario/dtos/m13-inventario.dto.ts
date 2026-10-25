@@ -25,10 +25,19 @@ export type EstadoExistencia = z.infer<typeof estadoExistenciaSchema>;
 
 export const estadoVarianteSchema = z.enum(['activo', 'inactivo']);
 
-export const origenAjusteSchema = z.enum(['manual', 'carga_masiva', 'samit']);
+export const origenAjusteSchema = z.enum(['manual', 'carga_masiva', 'samit', 'orden']);
 export type OrigenAjuste = z.infer<typeof origenAjusteSchema>;
 
-export const motivoAjusteSchema = z.enum(['conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva']);
+export const motivoAjusteSchema = z.enum([
+  'conteo_fisico',
+  'ingreso_mercancia',
+  'salida',
+  'correccion',
+  'otro',
+  'carga_masiva',
+  'venta',
+  'devolucion',
+]);
 export type MotivoAjuste = z.infer<typeof motivoAjusteSchema>;
 
 /** Motivos que se pueden elegir a mano (D6). */
@@ -77,8 +86,10 @@ export const ajusteInventarioSchema = z.object({
   origen: origenAjusteSchema,
   idCarga: z.string().uuid().nullable(),
   idUsuario: idSchema.nullable(),
-  /** D5. */
+  /** D5; los movimientos de una orden (origen 'orden') los hace "Sistema". */
   usuario: z.string(),
+  /** Identificador de la orden en los movimientos de combos (D8); null en el resto. */
+  referencia: z.string().nullable(),
   fecha: z.string().datetime(),
 });
 export type AjusteInventario = z.infer<typeof ajusteInventarioSchema>;

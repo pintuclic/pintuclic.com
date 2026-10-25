@@ -157,6 +157,8 @@ enum MotivoAjusteInventario {
   correccion
   otro
   carga_masiva
+  venta
+  devolucion
 
   @@map("enum_motivo_ajuste_inventario")
 }
@@ -166,6 +168,7 @@ enum OrigenAjusteInventario {
   manual
   carga_masiva
   samit
+  orden
 
   @@map("enum_origen_ajuste_inventario")
 }
@@ -598,6 +601,8 @@ model AjusteInventario {
   /// Agrupa los ajustes de una misma carga masiva; lo genera el cliente, sin tabla propia
   idCarga            String?                @map("id_carga") @db.Uuid
   idUsuario          Int?                   @map("id_usuario")
+  /// Orden que movió la existencia de un combo; con el motivo y la variante es única (idempotencia)
+  referencia         String?                @db.VarChar(100)
   fecha              DateTime               @default(now()) @db.Timestamptz(6)
 
   variante Variante @relation(fields: [idVariante], references: [idVariante], onDelete: Restrict, map: "fk_ajuste_variante")
@@ -606,6 +611,7 @@ model AjusteInventario {
   @@index([idVariante, fecha(sort: Desc)], map: "idx_ajuste_variante_fecha")
   @@index([idCarga], map: "idx_ajuste_carga")
   @@index([idUsuario], map: "idx_ajuste_usuario")
+  // Índice único parcial (WHERE referencia IS NOT NULL) solo en el DDL: Prisma no expresa índices parciales.
   @@map("ajuste_inventario")
 }
 

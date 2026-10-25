@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.9 (v4.8 + M01 entrega 3: combos, complementarios por subcategoría y miniaturas de imágenes)
+-- VERSIÓN: 4.10 (v4.9 + M13: movimientos de existencia de combos por orden)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 64
@@ -178,6 +178,11 @@ END $$;
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'revision_disponibilidad' AFTER 'orden_confirmada';
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'preparada' AFTER 'en_preparacion';
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'devuelto' AFTER 'cancelado';
+
+-- M13 (ExistenciaComboPort): la existencia de un combo baja al crearse la orden y vuelve al cancelarse.
+ALTER TYPE enum_origen_ajuste_inventario ADD VALUE IF NOT EXISTS 'orden' AFTER 'samit';
+ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'venta' AFTER 'carga_masiva';
+ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'devolucion' AFTER 'venta';
 
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS
@@ -1646,6 +1651,9 @@ CREATE TABLE IF NOT EXISTS ajuste_inventario (
 
 COMMENT ON TABLE ajuste_inventario IS 'Historial inmutable de ajustes de la existencia referencial por variante (M13); el inventario no bloquea ventas';
 COMMENT ON COLUMN ajuste_inventario.id_carga IS 'Identificador generado por el cliente para agrupar los ajustes de una misma carga masiva; sin tabla propia';
+-- M13 (P6): el movimiento de una orden guarda su referencia; con ella, repetir la misma operación no mueve dos veces.
+ALTER TABLE ajuste_inventario ADD COLUMN IF NOT EXISTS referencia VARCHAR(100);
+COMMENT ON COLUMN ajuste_inventario.referencia IS 'Identificador de la orden que movió la existencia de un combo (origen orden). Único por variante y motivo: hace idempotente descontar y reponer.';
 COMMENT ON COLUMN ajuste_inventario.origen IS 'manual = ajuste en pantalla; carga_masiva = plantilla CSV; samit = integración futura';
 
 -- ==============================================================================
@@ -1823,6 +1831,7 @@ CREATE INDEX IF NOT EXISTS idx_rebote_envio ON rebote_notificacion(id_envio);
 CREATE INDEX IF NOT EXISTS idx_ajuste_variante_fecha ON ajuste_inventario(id_variante, fecha DESC);
 CREATE INDEX IF NOT EXISTS idx_ajuste_carga ON ajuste_inventario(id_carga);
 CREATE INDEX IF NOT EXISTS idx_ajuste_usuario ON ajuste_inventario(id_usuario);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ajuste_referencia_variante_motivo ON ajuste_inventario(referencia, id_variante, motivo) WHERE referencia IS NOT NULL;
 
 -- Índices en Analítica de Búsqueda (M02 - HU-BUS-06): filtro por periodo y agrupación por término
 CREATE INDEX IF NOT EXISTS idx_bsr_fecha ON busqueda_sin_resultado(fecha);

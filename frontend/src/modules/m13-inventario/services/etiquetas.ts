@@ -7,12 +7,15 @@ export const ETIQUETAS_MOTIVO: Record<MotivoAjuste, string> = {
   correccion: 'Corrección',
   otro: 'Otro',
   carga_masiva: 'Carga masiva',
+  venta: 'Venta',
+  devolucion: 'Devolución',
 };
 
 export const ETIQUETAS_ORIGEN: Record<OrigenAjuste, string> = {
   manual: 'Manual',
   carga_masiva: 'Carga masiva',
   samit: 'SAMIT',
+  orden: 'Orden de venta',
 };
 
 export const ETIQUETAS_RECHAZO: Record<MotivoRechazo, string> = {

@@ -10,6 +10,15 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.8] - 2026-10-25
+### Esquema 4.10 (64 Tablas) - M13: movimientos de existencia de combos por orden
+- **Alcance General:** Valores de ENUM y una columna pedidos por el puerto `ExistenciaComboPort` (`contracts/m01-catalogo-entrega3.contract.ts`, D8; `contracts/m13-inventario.contract.ts`). Cambio puramente aditivo; no agrega tablas.
+  - **`enum_origen_ajuste_inventario`** += `orden`; **`enum_motivo_ajuste_inventario`** += `venta`, `devolucion`: la existencia de un combo baja al crearse la orden y vuelve al cancelarse.
+  - **`ajuste_inventario.referencia`** (`VARCHAR(100)` opcional): la orden que movió la existencia. Índice único parcial `uq_ajuste_referencia_variante_motivo (referencia, id_variante, motivo) WHERE referencia IS NOT NULL`: repetir la misma operación no mueve dos veces (idempotencia).
+  - **Bases existentes en 4.9:** el DDL agrega los valores con `ADD VALUE IF NOT EXISTS`, la columna y el índice con `IF NOT EXISTS`; no requiere seed. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql`.
+
+---
+
 ## [v3.7] - 2026-10-25
 ### Esquema 4.9 (64 Tablas) - M01 entrega 3: combos, complementarios por subcategoría e imágenes con miniaturas
 - **Alcance General:** Columnas y valores de ENUM pedidos por el contrato de la entrega 3 de M01 (`contracts/m01-catalogo-entrega3.contract.ts`). Cambio puramente aditivo; no agrega tablas.

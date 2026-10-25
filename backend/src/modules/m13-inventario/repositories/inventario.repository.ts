@@ -41,6 +41,7 @@ const SELECCION_AJUSTE = {
   origen: true,
   idCarga: true,
   idUsuario: true,
+  referencia: true,
   fecha: true,
   usuario: { select: { nombre: true } },
   variante: {
@@ -55,6 +56,8 @@ const SELECCION_AJUSTE = {
 type FilaAjuste = Prisma.AjusteInventarioGetPayload<{ select: typeof SELECCION_AJUSTE }>;
 
 const USUARIO_ELIMINADO = 'Usuario eliminado';
+/** Los movimientos de una orden (origen 'orden') no tienen usuario: los hace el sistema. */
+const USUARIO_SISTEMA = 'Sistema';
 
 const ORDEN_VARIANTES: Prisma.VarianteOrderByWithRelationInput[] = [
   { producto: { marca: { nombre: 'asc' } } },
@@ -94,8 +97,9 @@ function aAjuste(f: FilaAjuste): AjusteInventario {
     origen: f.origen,
     idCarga: f.idCarga,
     idUsuario: f.idUsuario,
-    // D5: el nombre vigente del usuario; si ya no existe, un rótulo fijo.
-    usuario: f.usuario?.nombre ?? USUARIO_ELIMINADO,
+    // D5: el nombre vigente del usuario; si ya no existe, un rótulo fijo; y 'Sistema' para las órdenes.
+    usuario: f.usuario?.nombre ?? (f.origen === 'orden' ? USUARIO_SISTEMA : USUARIO_ELIMINADO),
+    referencia: f.referencia,
     fecha: f.fecha.toISOString(),
   };
 }
