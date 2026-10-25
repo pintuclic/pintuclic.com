@@ -12,7 +12,7 @@ import { EstadoBadge } from '../EstadoBadge';
  */
 export function FilaBandeja({ orden }: { orden: OrdenFilaBandeja }) {
   return (
-    <article className="flex flex-col gap-4 rounded-card bg-neutral-white p-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
+    <article className="relative flex flex-col gap-4 rounded-card bg-neutral-white p-4 shadow-card transition-shadow hover:shadow-card-hover sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-4">
         <div
           aria-hidden="true"
@@ -50,7 +50,13 @@ export function FilaBandeja({ orden }: { orden: OrdenFilaBandeja }) {
           <span className="block text-xs text-neutral-medium">Total</span>
           <span className="font-title text-lg font-bold text-corporate">{formatCOP(orden.total)}</span>
         </p>
-        <ButtonLink href={`/admin/pedidos/${orden.codigo}`} variant="outline" size="sm">
+        {/* El seudoelemento extiende el enlace a toda la tarjeta: se puede pulsar en cualquier parte. */}
+        <ButtonLink
+          href={`/admin/pedidos/${orden.codigo}`}
+          variant="outline"
+          size="sm"
+          className="after:absolute after:inset-0 after:rounded-card"
+        >
           Ver detalle
         </ButtonLink>
       </div>
