@@ -2,8 +2,10 @@ import { Router, type RequestHandler } from 'express';
 import { requirePermission } from '../../core/middlewares/autorizacion.middleware';
 import type { AutorizacionService } from '../m20-seguridad/services/autorizacion.service';
 import { InventarioController } from './controllers/inventario.controller';
+import { ExistenciaComboRepository } from './repositories/existencia-combo.repository';
 import { InventarioRepository } from './repositories/inventario.repository';
 import { CargaService } from './services/carga.service';
+import { ExistenciaComboService } from './services/existencia-combo.service';
 import { InventarioService } from './services/inventario.service';
 
 /**
@@ -20,6 +22,8 @@ export interface ModuloM13 {
   router: Router;
   inventarioService: InventarioService;
   cargaService: CargaService;
+  /** Puerto para M08: descontar y reponer la existencia de los combos (R15). */
+  existenciaCombo: ExistenciaComboService;
 }
 
 export function construirModuloM13(autorizacion: AutorizacionService): ModuloM13 {
@@ -41,5 +45,7 @@ export function construirModuloM13(autorizacion: AutorizacionService): ModuloM13
   router.post('/cargas/previsualizar', editar, controlador.previsualizar);
   router.post('/cargas/aplicar', editar, controlador.aplicar);
 
-  return { router, inventarioService, cargaService };
+  const existenciaCombo = new ExistenciaComboService(new ExistenciaComboRepository());
+
+  return { router, inventarioService, cargaService, existenciaCombo };
 }
