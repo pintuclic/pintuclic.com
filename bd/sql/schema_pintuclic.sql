@@ -842,7 +842,7 @@ CREATE TABLE IF NOT EXISTS orden (
 );
 
 COMMENT ON TABLE orden IS 'Cabecera de órdenes de compra inmutables';
-COMMENT ON COLUMN orden.codigo_visible IS 'Código amigable alfanumérico para el cliente (ej. ORD-2026-0001)';
+COMMENT ON COLUMN orden.codigo_visible IS 'Código amigable alfanumérico para el cliente (formato PC-AAAA-NNNNN, ej. PC-2026-00001)';
 COMMENT ON COLUMN orden.origen IS 'Flujo de procedencia: carrito de compras o cotización aprobada';
 COMMENT ON COLUMN orden.carrito_o_cotizacion IS 'Identificador descriptivo del origen de la compra';
 COMMENT ON COLUMN orden.transaccion_pago_id IS 'Identificador único de la pasarela de pago vinculada';

@@ -10,6 +10,7 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
   Home,
   LogOut,
   Menu,
@@ -53,6 +54,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Catálogo',
     href: '/admin/catalogo',
     icon: <Package className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Pedidos',
+    href: '/admin/pedidos',
+    icon: <ClipboardList className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
