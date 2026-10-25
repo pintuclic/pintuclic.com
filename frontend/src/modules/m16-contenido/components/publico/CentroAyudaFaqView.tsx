@@ -11,7 +11,6 @@ import {
   Search,
 } from 'lucide-react';
 import {
-  Badge,
   Button,
   Container,
   Input,
@@ -70,34 +69,21 @@ export const CentroAyudaFaqView: React.FC = () => {
   }, [items, busqueda]);
 
   return (
-    <div className="bg-neutral-lightest min-h-[70vh] py-8 sm:py-12">
+    <section
+      id="preguntas-frecuentes"
+      aria-labelledby="titulo-preguntas-frecuentes"
+      className="scroll-mt-24"
+    >
       <Container>
-        {/* Breadcrumb */}
-        <nav
-          aria-label="Ruta de navegación"
-          className="mb-6 flex items-center gap-2 text-xs sm:text-sm font-sans text-neutral-medium"
-        >
-          <Link
-            href="/"
-            className="hover:text-action transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 rounded-xs"
-          >
-            Inicio
-          </Link>
-          <ChevronRight className="w-4 h-4 shrink-0" aria-hidden="true" />
-          <span className="text-neutral-dark font-medium">
-            Centro de Ayuda y Preguntas Frecuentes
-          </span>
-        </nav>
-
-        {/* Cabecera del Centro de Ayuda */}
+        {/* Cabecera de la sección. El título y la ruta de la página los pone el centro de ayuda. */}
         <div className="bg-neutral-white rounded-card border border-neutral-light p-6 sm:p-8 shadow-card mb-8">
           <div className="max-w-2xl">
-            <Badge variant="action" className="mb-3">
-              Centro de Ayuda Pintu Clic
-            </Badge>
-            <h1 className="font-title font-bold text-2xl sm:text-3xl text-corporate tracking-tight">
-              Preguntas Frecuentes (FAQ)
-            </h1>
+            <h2
+              id="titulo-preguntas-frecuentes"
+              className="font-title font-bold text-xl sm:text-2xl text-corporate tracking-tight"
+            >
+              Preguntas frecuentes
+            </h2>
             <p className="font-sans text-sm sm:text-base text-neutral-medium mt-2">
               Encuentra respuestas rápidas sobre pedidos, modalidades de entrega, colores entonados y cuentas empresariales B2B.
             </p>
@@ -129,9 +115,9 @@ export const CentroAyudaFaqView: React.FC = () => {
                   className="w-8 h-8 text-neutral-medium mx-auto mb-2"
                   aria-hidden="true"
                 />
-                <h2 className="font-title font-semibold text-base text-neutral-black">
+                <h3 className="font-title font-semibold text-base text-neutral-black">
                   No encontramos preguntas que coincidan con tu búsqueda
-                </h2>
+                </h3>
                 <p className="font-sans text-sm text-neutral-medium mt-1">
                   Intenta con otra palabra clave o explora nuestras páginas institucionales.
                 </p>
@@ -145,7 +131,7 @@ export const CentroAyudaFaqView: React.FC = () => {
                     key={faq.idFaq}
                     className="bg-neutral-white rounded-card border border-neutral-light shadow-card overflow-hidden"
                   >
-                    <h2 className="m-0">
+                    <h3 className="m-0">
                       <Button
                         type="button"
                         variant="ghost"
@@ -166,7 +152,7 @@ export const CentroAyudaFaqView: React.FC = () => {
                       >
                         {faq.pregunta}
                       </Button>
-                    </h2>
+                    </h3>
                     {expandida && (
                       <div
                         id={panelId}
@@ -189,10 +175,10 @@ export const CentroAyudaFaqView: React.FC = () => {
             className="lg:col-span-4 space-y-4"
           >
             <div className="bg-neutral-white rounded-card border border-neutral-light p-5 shadow-card">
-              <h2 className="font-title font-semibold text-base text-corporate mb-3 flex items-center gap-2">
+              <h3 className="font-title font-semibold text-base text-corporate mb-3 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-action" aria-hidden="true" />
                 Políticas e Información
-              </h2>
+              </h3>
               <ul className="space-y-1.5">
                 {paginas.map((p) => (
                   <li key={p.slug}>
@@ -210,6 +196,6 @@ export const CentroAyudaFaqView: React.FC = () => {
           </aside>
         </div>
       </Container>
-    </div>
+    </section>
   );
 };

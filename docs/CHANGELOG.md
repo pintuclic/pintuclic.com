@@ -6,6 +6,30 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [v0.17.3] - 2026-10-25
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🧭 **Una sola página de ayuda.** `/faq` y `/centro-de-ayuda` mostraban la misma vista, así que el contacto con el equipo que aporta M15 quedaba escondido debajo de una pantalla entera de preguntas frecuentes y el ítem "¿Necesitas ayuda?" de la franja superior llevaba a la página que no lo tenía. Entra como la rama `fix/centro-de-ayuda-unificado`.
+
+### Centro de ayuda
+- **`/faq` redirige a `/centro-de-ayuda`** con un 308 permanente (`next.config.ts`); se elimina la ruta duplicada. Los enlaces ya compartidos siguen funcionando.
+- **La página la abre el contacto:** cabecera propia (`<h1>Centro de ayuda</h1>` y ruta de navegación), el formulario, el horario y el botón de WhatsApp de M15, y debajo las preguntas frecuentes de M16 con un atajo `Ver preguntas frecuentes` hacia `#preguntas-frecuentes`.
+- **Navegación:** la franja superior y el pie llevan a `/centro-de-ayuda`; los dos ítems del menú ("Ayuda" y "FAQ") se funden en **"Ayuda y FAQ"**, y "Preguntas frecuentes" del pie apunta al ancla de la sección.
+- **Jerarquía de encabezados:** la página tiene un solo `h1`; cada módulo aporta un `h2` y lo de dentro baja a `h3`. Antes las dos rutas repetían el mismo `h1` "Preguntas Frecuentes (FAQ)".
+
+### Módulo M16 — Contenido
+- `CentroAyudaFaqView` deja de ser una página completa y pasa a ser la sección `#preguntas-frecuentes`: sin ruta de navegación, sin distintivo y sin `min-h-[70vh]`, que era lo que empujaba el contacto fuera de la primera pantalla.
+
+### Módulo M15 — Atención al cliente
+- `ContactoYHorarioView` pone el formulario a todo el ancho y baja el horario y el canal directo a dos tarjetas: sin sesión el formulario se reduce a un aviso y la columna lateral fija dejaba un hueco de media pantalla.
+- Textos al día ahora que la sección va primero: "Escríbenos" en lugar de "¿No encontraste tu respuesta?".
+
+### Verificación
+- Frontend **259/259**, ESLint, `lint:a11y`, `tsc --noEmit` y `check:no-any` en verde; contratos **48/48**.
+- Comprobado en el navegador contra el backend de dev: `/faq` responde **308 → /centro-de-ayuda**, los cuatro `GET` públicos responden 200, el ancla existe, hay un solo `h1` y no hay desborde horizontal a 390 px.
+- **Nota:** este archivo venía sin registrar desde la v0.7.0 (las etiquetas publicadas llegan a la v0.17.2). Aquí solo se documenta este cambio; el hueco de versiones sigue pendiente.
+
+---
+
 ## [v0.7.0] - 2026-10-23
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🛡️ **QA combinado de M20, M17 y M04 y activación de empleados por correo.** Se corrigen los hallazgos de seguridad y de conformidad con los contratos de los tres módulos, y el alta de colaboradores deja de usar una clave temporal visible para el administrador. Entra a `main` como cuatro ramas: `feature/m04-cuentas`, `fix/core-rutas-publicas-y-sesion`, `feature/m17-permisos` y `fix/core-parametros-auth`.
