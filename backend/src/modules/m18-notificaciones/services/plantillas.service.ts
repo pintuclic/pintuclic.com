@@ -1,11 +1,53 @@
+import * as plantillasHtml from '../adapters/plantillas-html';
 import { CODIGOS_ERROR_M18 } from '../dtos/m18-notificaciones.dto';
 import type { CambiosPlantilla, EntidadPlantillaNotificacion, PlantillasRepositoryPort } from '../interfaces/plantillas.port';
 import type { TipoComunicacion } from '../interfaces/registro-envios.port';
 import { NotificacionError } from './notificacion.error';
 
-/** RF-NOT-03-02 / RF-NOT-03-04: convención de placeholder para variables de plantilla. */
-function placeholderDe(variable: string): string {
-  return `{{${variable}}}`;
+/** Datos de ejemplo realistas para previsualizar cada tipo sin depender de un envío real. */
+function renderizarMuestra(
+  tipo: TipoComunicacion,
+  asunto: string,
+  intro: string,
+): { asunto: string; contenidoHtml: string; contenidoTexto: string } {
+  switch (tipo) {
+    case 'registro_otp':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlRegistroOtp(intro, '482910', 15),
+        contenidoTexto: plantillasHtml.textoRegistroOtp(intro, '482910', 15),
+      };
+    case 'recuperacion_password':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlRecuperacionPassword(intro, 'https://pintuclic.com/restablecer-contrasena?token=ejemplo', 30),
+        contenidoTexto: plantillasHtml.textoRecuperacionPassword(intro, 'https://pintuclic.com/restablecer-contrasena?token=ejemplo', 30),
+      };
+    case 'activacion_empleado':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlActivacionEmpleado(intro, 'Nombre Ejemplo', 'https://pintuclic.com/activar-cuenta?token=ejemplo', 72),
+        contenidoTexto: plantillasHtml.textoActivacionEmpleado(intro, 'Nombre Ejemplo', 'https://pintuclic.com/activar-cuenta?token=ejemplo', 72),
+      };
+    case 'cambio_correo_otp':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlCambioCorreoOtp(intro, '918273', 15),
+        contenidoTexto: plantillasHtml.textoCambioCorreoOtp(intro, '918273', 15),
+      };
+    case 'cambio_correo_confirmado':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlCambioCorreoConfirmado(intro, 'nuevo-correo@ejemplo.com'),
+        contenidoTexto: plantillasHtml.textoCambioCorreoConfirmado(intro, 'nuevo-correo@ejemplo.com'),
+      };
+    case 'dictamen_empresa':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlDictamenEmpresa(intro, true),
+        contenidoTexto: plantillasHtml.textoDictamenEmpresa(intro, true),
+      };
+  }
 }
 
 export class PlantillasService {
@@ -32,42 +74,18 @@ export class PlantillasService {
     cambios: CambiosPlantilla,
     idAdmin?: number,
   ): Promise<EntidadPlantillaNotificacion> {
-    const actual = await this.obtener(tipo);
-
-    const htmlFinal = cambios.contenidoHtml ?? actual.contenidoHtml;
-    const textoFinal = cambios.contenidoTexto ?? actual.contenidoTexto;
-    const contenidoCombinado = `${htmlFinal}\n${textoFinal}`;
-
-    const variableFaltante = actual.variablesObligatorias.find(
-      (variable) => !contenidoCombinado.includes(placeholderDe(variable)),
-    );
-    if (variableFaltante) {
-      throw new NotificacionError(
-        CODIGOS_ERROR_M18.VARIABLE_OBLIGATORIA_REQUERIDA,
-        `El contenido debe incluir la variable obligatoria "${placeholderDe(variableFaltante)}".`,
-        400,
-      );
-    }
-
+    await this.obtener(tipo);
     return this.plantillasRepo.actualizar(tipo, cambios, idAdmin);
   }
 
+  /** Previsualiza con datos de ejemplo fijos; permite ver cambios de asunto/texto sin guardarlos. */
   async previsualizar(
     tipo: TipoComunicacion,
-    datosEjemplo?: Record<string, string>,
+    overrides?: { asunto?: string | undefined; contenidoTexto?: string | undefined },
   ): Promise<{ asunto: string; contenidoHtml: string; contenidoTexto: string }> {
     const plantilla = await this.obtener(tipo);
-
-    const sustituir = (contenido: string): string =>
-      plantilla.variablesDisponibles.reduce((acc, variable) => {
-        const valor = datosEjemplo?.[variable] ?? `[${variable}]`;
-        return acc.split(placeholderDe(variable)).join(valor);
-      }, contenido);
-
-    return {
-      asunto: plantilla.asunto,
-      contenidoHtml: sustituir(plantilla.contenidoHtml),
-      contenidoTexto: sustituir(plantilla.contenidoTexto),
-    };
+    const asunto = overrides?.asunto ?? plantilla.asunto;
+    const intro = overrides?.contenidoTexto ?? plantilla.contenidoTexto;
+    return renderizarMuestra(tipo, asunto, intro);
   }
 }

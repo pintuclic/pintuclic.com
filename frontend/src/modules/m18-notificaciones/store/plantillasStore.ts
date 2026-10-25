@@ -14,11 +14,8 @@ interface PlantillasState {
   cargandoPreview: boolean;
 
   cargarPlantillas: () => Promise<void>;
-  guardarPlantilla: (
-    tipo: TipoComunicacion,
-    cambios: { asunto: string; contenidoHtml: string; contenidoTexto: string },
-  ) => Promise<boolean>;
-  previsualizar: (tipo: TipoComunicacion) => Promise<void>;
+  guardarPlantilla: (tipo: TipoComunicacion, cambios: { asunto: string; contenidoTexto: string }) => Promise<boolean>;
+  previsualizar: (tipo: TipoComunicacion, overrides?: { asunto?: string; contenidoTexto?: string }) => Promise<void>;
   limpiarPreview: () => void;
   limpiarMensajes: () => void;
 }
@@ -56,10 +53,10 @@ export const usePlantillasStore = create<PlantillasState>((set, get) => ({
     }
   },
 
-  previsualizar: async (tipo) => {
+  previsualizar: async (tipo, overrides) => {
     set({ cargandoPreview: true, error: null });
     try {
-      const resultado = await previsualizarPlantilla(tipo);
+      const resultado = await previsualizarPlantilla(tipo, overrides);
       set({
         previewAsunto: resultado.asunto,
         previewHtml: resultado.contenidoHtml,

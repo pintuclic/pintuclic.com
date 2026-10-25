@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, CheckCircle2, Edit3, Eye, Mail, Save } from 'lucide-react';
-import { Badge, Button, Modal, Skeleton, Textarea } from '@/core/components';
+import { Button, Modal, Skeleton, Textarea } from '@/core/components';
 import {
   editarPlantillaFormSchema,
   type EditarPlantillaFormData,
@@ -35,6 +35,7 @@ export const PlantillasView: React.FC = () => {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<EditarPlantillaFormData>({
     resolver: zodResolver(editarPlantillaFormSchema),
@@ -49,7 +50,6 @@ export const PlantillasView: React.FC = () => {
     setPlantillaEditando(plantilla);
     reset({
       asunto: plantilla.asunto,
-      contenidoHtml: plantilla.contenidoHtml,
       contenidoTexto: plantilla.contenidoTexto,
     });
   };
@@ -62,6 +62,12 @@ export const PlantillasView: React.FC = () => {
 
   const abrirPreview = (tipo: PlantillaNotificacion['tipo']) => {
     void previsualizar(tipo);
+  };
+
+  const abrirPreviewSinGuardar = () => {
+    if (!plantillaEditando) return;
+    const valores = watch();
+    void previsualizar(plantillaEditando.tipo, valores);
   };
 
   return (
@@ -92,16 +98,11 @@ export const PlantillasView: React.FC = () => {
               className="bg-neutral-white border border-neutral-light/70 rounded-card p-5 shadow-card flex flex-col justify-between gap-4"
             >
               <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-corporate">
-                    <Mail className="w-3.5 h-3.5" /> {plantilla.tipo}
-                  </span>
-                  <Badge variant="action">{plantilla.variablesObligatorias.length} obligatorias</Badge>
-                </div>
+                <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-corporate mb-2">
+                  <Mail className="w-3.5 h-3.5" /> {plantilla.tipo}
+                </span>
                 <p className="font-sans text-sm text-neutral-dark font-medium">{plantilla.asunto}</p>
-                <p className="font-sans text-[11px] text-neutral-medium mt-2">
-                  Variables: {plantilla.variablesDisponibles.join(', ') || 'ninguna'}
-                </p>
+                <p className="font-sans text-xs text-neutral-medium mt-2 line-clamp-2">{plantilla.contenidoTexto}</p>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => abrirPreview(plantilla.tipo)} leftIcon={<Eye className="w-3.5 h-3.5" />}>
@@ -126,19 +127,29 @@ export const PlantillasView: React.FC = () => {
         {plantillaEditando && (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
             <div className="p-3 bg-neutral-lightest border border-neutral-light rounded-btn text-xs text-neutral-dark">
-              Variables obligatorias (no se pueden quitar del contenido):{' '}
-              {plantillaEditando.variablesObligatorias.map((v) => `{{${v}}}`).join(', ') || 'ninguna'}
+              Solo texto: el asunto y el cuerpo del correo se insertan en un diseño fijo (código, botón o enlace
+              según el tipo de comunicación). No se admite HTML ni variables.
             </div>
             <Textarea label="Asunto" rows={1} error={errors.asunto?.message} {...register('asunto')} />
-            <Textarea label="Contenido HTML" rows={8} error={errors.contenidoHtml?.message} {...register('contenidoHtml')} />
-            <Textarea label="Contenido en texto" rows={5} error={errors.contenidoTexto?.message} {...register('contenidoTexto')} />
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-light/50">
-              <Button type="button" variant="outline" onClick={() => setPlantillaEditando(null)} disabled={guardando}>
-                Cancelar
+            <Textarea
+              label="Texto introductorio"
+              rows={5}
+              helperText="Párrafos separados por una línea en blanco."
+              error={errors.contenidoTexto?.message}
+              {...register('contenidoTexto')}
+            />
+            <div className="flex items-center justify-between gap-3 pt-4 border-t border-neutral-light/50">
+              <Button type="button" variant="outline" size="sm" onClick={abrirPreviewSinGuardar} leftIcon={<Eye className="w-3.5 h-3.5" />}>
+                Vista previa
               </Button>
-              <Button type="submit" variant="primary-action" isLoading={guardando} leftIcon={<Save className="w-4 h-4" />}>
-                Guardar plantilla
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button type="button" variant="outline" onClick={() => setPlantillaEditando(null)} disabled={guardando}>
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary-action" isLoading={guardando} leftIcon={<Save className="w-4 h-4" />}>
+                  Guardar plantilla
+                </Button>
+              </div>
             </div>
           </form>
         )}

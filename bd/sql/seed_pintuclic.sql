@@ -536,128 +536,42 @@ WHERE clave = 'auth.complejidad_minima_contrasena' AND rango_minimo < 12;
 
 -- ==============================================================================
 -- 9D. MÓDULO DE NOTIFICACIONES Y COMUNICACIONES (6 Plantillas - M18 - HU-NOT-03)
--- Contenido inicial editable desde el panel. Placeholder: {{variable}} (ver plantillas.service.ts).
+-- Copia introductoria inicial: solo texto plano, sin HTML ni variables (el admin no edita
+-- ninguna de las dos). El maquetado y los datos dinámicos van fijos en
+-- backend/src/modules/m18-notificaciones/adapters/plantillas-html.ts.
 -- ON CONFLICT DO NOTHING: re-ejecutar el seed NO pisa ediciones ya hechas por un administrador.
 -- ==============================================================================
 
-INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto, contenido_html, variables_disponibles, variables_obligatorias) VALUES
+INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
 (
     'registro_otp',
     'Código de verificación de tu cuenta · Pintu Clic',
-    $txt$Bienvenido a Pintu Clic.
-
-Tu código de verificación es: {{codigo_otp}}
-Este código expira en {{minutos_vigencia}} minutos.
-
-Si no solicitaste este registro, puedes ignorar este mensaje.$txt$,
-    $html$<div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-  <h2 style="color: #0B2D6B; margin-top: 0;">Verifica tu correo en Pintu Clic</h2>
-  <p>Usa el siguiente código de verificación para activar tu cuenta:</p>
-  <div style="font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #0B2D6B; background: #F3F4F6; padding: 16px; text-align: center; border-radius: 8px; margin: 20px 0;">
-    {{codigo_otp}}
-  </div>
-  <p style="font-size: 13px; color: #4B5563;">Este código tiene una vigencia de <strong>{{minutos_vigencia}} minutos</strong>.</p>
-  <p style="font-size: 12px; color: #6B7280; margin-top: 24px;">Si no solicitaste este código, ignora este correo.</p>
-</div>$html$,
-    '["codigo_otp", "minutos_vigencia"]'::jsonb,
-    '["codigo_otp"]'::jsonb
+    'Bienvenido a Pintu Clic. Usa el código de verificación que aparece abajo para activar tu cuenta.'
 ),
 (
     'recuperacion_password',
     'Restablecimiento de contraseña · Pintu Clic',
-    $txt$Recibimos una solicitud para restablecer tu contraseña en Pintu Clic.
-
-Abre el siguiente enlace para crear una nueva contraseña (válido por {{minutos_vigencia}} minutos):
-{{enlace_recuperacion}}
-
-Si no solicitaste este cambio, tu cuenta sigue protegida y puedes ignorar este mensaje.$txt$,
-    $html$<div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-  <h2 style="color: #0B2D6B; margin-top: 0;">Restablece tu contraseña</h2>
-  <p>Recibimos una solicitud para cambiar la contraseña de tu cuenta en Pintu Clic.</p>
-  <p style="margin: 24px 0;">
-    <a href="{{enlace_recuperacion}}" style="background: #F47B20; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 20px; border-radius: 6px; display: inline-block;">
-      Crear nueva contraseña
-    </a>
-  </p>
-  <p style="font-size: 13px; color: #4B5563;">Este enlace expirará en <strong>{{minutos_vigencia}} minutos</strong>.</p>
-  <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>{{enlace_recuperacion}}</p>
-</div>$html$,
-    '["enlace_recuperacion", "minutos_vigencia"]'::jsonb,
-    '["enlace_recuperacion"]'::jsonb
+    'Recibimos una solicitud para restablecer la contraseña de tu cuenta en Pintu Clic. Usa el botón de abajo para crear una nueva.'
 ),
 (
     'activacion_empleado',
     'Activa tu cuenta de colaborador · Pintu Clic',
-    $txt$Hola, {{nombre}}.
-
-Te crearon una cuenta de colaborador en Pintu Clic.
-Abre el siguiente enlace para definir tu contraseña (válido por {{horas_vigencia}} horas):
-{{enlace_activacion}}
-
-Si el enlace vence, pide al administrador que te envíe uno nuevo.$txt$,
-    $html$<div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-  <h2 style="color: #0B2D6B; margin-top: 0;">Bienvenido a Pintu Clic, {{nombre}}</h2>
-  <p>Te crearon una cuenta de colaborador. Define tu contraseña para empezar.</p>
-  <p style="margin: 24px 0;">
-    <a href="{{enlace_activacion}}" style="background: #F47B20; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 20px; border-radius: 6px; display: inline-block;">
-      Definir mi contraseña
-    </a>
-  </p>
-  <p style="font-size: 13px; color: #4B5563;">Este enlace expirará en <strong>{{horas_vigencia}} horas</strong> y solo puede usarse una vez.</p>
-  <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>{{enlace_activacion}}</p>
-</div>$html$,
-    '["nombre", "enlace_activacion", "horas_vigencia"]'::jsonb,
-    '["enlace_activacion"]'::jsonb
+    'Te crearon una cuenta de colaborador en Pintu Clic. Usa el botón de abajo para definir tu contraseña y comenzar.'
 ),
 (
     'cambio_correo_otp',
     'Confirma tu nuevo correo electrónico · Pintu Clic',
-    $txt$Solicitaste actualizar el correo electrónico de tu cuenta en Pintu Clic.
-
-Tu código de confirmación es: {{codigo_otp}}
-Este código expira en {{minutos_vigencia}} minutos.
-
-Si no realizaste esta solicitud, ignora este mensaje.$txt$,
-    $html$<div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-  <h2 style="color: #0B2D6B; margin-top: 0;">Confirma tu nuevo correo</h2>
-  <p>Ingresa el siguiente código para confirmar el cambio de correo electrónico en tu perfil:</p>
-  <div style="font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #0B2D6B; background: #F3F4F6; padding: 16px; text-align: center; border-radius: 8px; margin: 20px 0;">
-    {{codigo_otp}}
-  </div>
-  <p style="font-size: 13px; color: #4B5563;">Este código tiene una vigencia de <strong>{{minutos_vigencia}} minutos</strong>.</p>
-</div>$html$,
-    '["codigo_otp", "minutos_vigencia"]'::jsonb,
-    '["codigo_otp"]'::jsonb
+    'Solicitaste actualizar el correo electrónico de tu cuenta en Pintu Clic. Usa el código de abajo para confirmar el cambio.'
 ),
 (
     'cambio_correo_confirmado',
     'Aviso de seguridad: cambio de correo electrónico · Pintu Clic',
-    $txt$Te informamos que el correo electrónico asociado a tu cuenta de Pintu Clic fue actualizado.
-
-Nuevo correo registrado: {{nuevo_correo}}
-
-Si no reconoces esta operación, contacta de inmediato al soporte de Pintu Clic.$txt$,
-    $html$<div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-  <h2 style="color: #0B2D6B; margin-top: 0;">Aviso de seguridad: correo actualizado</h2>
-  <p>El correo electrónico titular de tu cuenta en Pintu Clic ha sido modificado a <strong>{{nuevo_correo}}</strong>.</p>
-  <p style="font-size: 13px; color: #4B5563;">Si no autorizaste este cambio, comunícate de inmediato con nuestro equipo de soporte.</p>
-</div>$html$,
-    '["nuevo_correo"]'::jsonb,
-    '["nuevo_correo"]'::jsonb
+    'Te informamos que el correo electrónico asociado a tu cuenta de Pintu Clic fue actualizado. Si no reconoces esta operación, contacta de inmediato a nuestro equipo de soporte.'
 ),
 (
     'dictamen_empresa',
     'Resultado de tu solicitud de cuenta empresarial · Pintu Clic',
-    $txt$Te informamos el resultado de tu solicitud de cuenta empresarial en Pintu Clic: {{resultado}}.
-
-{{motivo}}$txt$,
-    $html$<div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-  <h2 style="color: #0B2D6B; margin-top: 0;">Estado de tu solicitud empresarial</h2>
-  <p>Tu solicitud corporativa fue revisada. Resultado: <strong>{{resultado}}</strong>.</p>
-  <p style="font-size: 14px; color: #991B1B; background: #FEF2F2; padding: 12px; border-radius: 6px;">{{motivo}}</p>
-</div>$html$,
-    '["resultado", "motivo"]'::jsonb,
-    '["resultado"]'::jsonb
+    'Gracias por tu solicitud de cuenta empresarial en Pintu Clic. A continuación encontrarás el resultado de la revisión.'
 )
 ON CONFLICT (tipo) DO NOTHING;
 

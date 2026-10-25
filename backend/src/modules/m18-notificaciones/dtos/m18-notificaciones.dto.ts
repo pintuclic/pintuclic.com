@@ -39,7 +39,6 @@ const limiteSchema = z.coerce.number().int().min(1).max(100).default(20);
 export const CODIGOS_ERROR_M18 = {
   ACCESO_DENEGADO: 'ACCESO_DENEGADO',
   PLANTILLA_NO_ENCONTRADA: 'PLANTILLA_NO_ENCONTRADA',
-  VARIABLE_OBLIGATORIA_REQUERIDA: 'VARIABLE_OBLIGATORIA_REQUERIDA',
   PARAMETRO_INVALIDO: 'PARAMETRO_INVALIDO',
   ERROR_INTERNO: 'ERROR_INTERNO',
 } as const;
@@ -51,10 +50,7 @@ export const CODIGOS_ERROR_M18 = {
 export const plantillaNotificacionSchema = z.object({
   tipo: tipoComunicacionSchema,
   asunto: z.string(),
-  contenidoHtml: z.string(),
   contenidoTexto: z.string(),
-  variablesDisponibles: z.array(z.string()),
-  variablesObligatorias: z.array(z.string()),
   fechaActualizacion: z.string().datetime(),
 });
 export type PlantillaNotificacion = z.infer<typeof plantillaNotificacionSchema>;
@@ -64,15 +60,17 @@ export const listarPlantillasOutputSchema = z.object({
 });
 export type ListarPlantillasOutput = z.infer<typeof listarPlantillasOutputSchema>;
 
+/** Solo asunto y copia introductoria en texto plano: el admin no edita HTML ni variables. */
 export const actualizarPlantillaInputSchema = z.object({
   asunto: z.string().trim().min(1).max(200).optional(),
-  contenidoHtml: z.string().trim().min(1).optional(),
   contenidoTexto: z.string().trim().min(1).optional(),
 });
 export type ActualizarPlantillaInput = z.infer<typeof actualizarPlantillaInputSchema>;
 
+/** Permite previsualizar cambios de asunto/texto sin guardarlos todavía. */
 export const previsualizarPlantillaInputSchema = z.object({
-  datosEjemplo: z.record(z.string(), z.string()).optional(),
+  asunto: z.string().trim().min(1).max(200).optional(),
+  contenidoTexto: z.string().trim().min(1).optional(),
 });
 export type PrevisualizarPlantillaInput = z.infer<typeof previsualizarPlantillaInputSchema>;
 

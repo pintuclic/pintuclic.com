@@ -9,7 +9,6 @@ import { z } from 'zod';
 
 export const editarPlantillaFormSchema = z.object({
   asunto: z.string().trim().min(1, 'El asunto no puede estar vacío').max(200),
-  contenidoHtml: z.string().trim().min(1, 'El contenido HTML no puede estar vacío'),
-  contenidoTexto: z.string().trim().min(1, 'El contenido en texto no puede estar vacío'),
+  contenidoTexto: z.string().trim().min(1, 'El texto introductorio no puede estar vacío'),
 });
 export type EditarPlantillaFormData = z.infer<typeof editarPlantillaFormSchema>;

@@ -20,7 +20,7 @@ export async function listarPlantillas(): Promise<ListarPlantillasRespuesta> {
 
 export async function actualizarPlantilla(
   tipo: TipoComunicacion,
-  cambios: { asunto: string; contenidoHtml: string; contenidoTexto: string },
+  cambios: { asunto: string; contenidoTexto: string },
 ): Promise<PlantillaNotificacion> {
   const { data } = await apiClient.put<RespuestaExitosa<PlantillaNotificacion>>(
     `/admin/notificaciones/plantillas/${tipo}`,
@@ -29,13 +29,14 @@ export async function actualizarPlantilla(
   return data.data;
 }
 
+/** Permite previsualizar cambios de asunto/texto sin guardarlos todavía. */
 export async function previsualizarPlantilla(
   tipo: TipoComunicacion,
-  datosEjemplo?: Record<string, string>,
+  overrides?: { asunto?: string; contenidoTexto?: string },
 ): Promise<PrevisualizarPlantillaRespuesta> {
   const { data } = await apiClient.post<RespuestaExitosa<PrevisualizarPlantillaRespuesta>>(
     `/admin/notificaciones/plantillas/${tipo}/preview`,
-    { datosEjemplo },
+    overrides ?? {},
   );
   return data.data;
 }

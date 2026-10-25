@@ -232,16 +232,13 @@ describe('SmtpNotificacionesAdapter · Envío de correos transaccionales por SMT
       };
     }
 
-    it('sustituye los placeholders {{variable}} del contenido editado por el admin, en vez del texto hardcodeado', async () => {
+    it('usa el asunto y la copia introductoria editados por el admin, con el código real insertado por el maquetado fijo', async () => {
       const { transporter, sendMailMock } = crearTransporteMock();
       const { plantillas } = crearPlantillasMock({
         idPlantilla: 'p-1',
         tipo: 'registro_otp',
-        asunto: 'Tu código Pintu Clic: {{codigo_otp}}',
-        contenidoTexto: 'Código: {{codigo_otp}} (vence en {{minutos_vigencia}} min)',
-        contenidoHtml: '<p>Código: {{codigo_otp}}</p>',
-        variablesDisponibles: ['codigo_otp', 'minutos_vigencia'],
-        variablesObligatorias: ['codigo_otp'],
+        asunto: 'Tu código Pintu Clic',
+        contenidoTexto: 'Copia editada por el admin para el OTP de registro.',
         fechaActualizacion: new Date(),
         idUsuarioActualizo: 1,
       });
@@ -250,9 +247,30 @@ describe('SmtpNotificacionesAdapter · Envío de correos transaccionales por SMT
       await adapter.enviarCodigoRegistro('cliente@gmail.com', '777888', 20);
 
       const args = sendMailMock.mock.calls[0]?.[0];
-      expect(args.subject).toBe('Tu código Pintu Clic: 777888');
-      expect(args.text).toBe('Código: 777888 (vence en 20 min)');
-      expect(args.html).toBe('<p>Código: 777888</p>');
+      expect(args.subject).toBe('Tu código Pintu Clic');
+      expect(args.text).toContain('Copia editada por el admin para el OTP de registro.');
+      expect(args.text).toContain('777888');
+      expect(args.html).toContain('Copia editada por el admin para el OTP de registro.');
+      expect(args.html).toContain('777888');
+    });
+
+    it('escapa el texto introductorio del admin dentro del maquetado fijo, sin dejarlo inyectar HTML', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      const { plantillas } = crearPlantillasMock({
+        idPlantilla: 'p-1',
+        tipo: 'registro_otp',
+        asunto: 'Tu código Pintu Clic',
+        contenidoTexto: '<script>alert("xss")</script>',
+        fechaActualizacion: new Date(),
+        idUsuarioActualizo: 1,
+      });
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter, undefined, undefined, plantillas);
+
+      await adapter.enviarCodigoRegistro('cliente@gmail.com', '111222', 20);
+
+      const args = sendMailMock.mock.calls[0]?.[0];
+      expect(args.html).not.toContain('<script>');
+      expect(args.html).toContain('&lt;script&gt;');
     });
 
     it('cae en el contenido de respaldo si no hay plantilla para ese tipo', async () => {

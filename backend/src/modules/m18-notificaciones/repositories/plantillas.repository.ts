@@ -6,40 +6,33 @@ import type {
 } from '../interfaces/plantillas.port';
 import type { TipoComunicacion } from '../interfaces/registro-envios.port';
 
-function comoListaTexto(valor: unknown): string[] {
-  return Array.isArray(valor) ? valor.filter((v): v is string => typeof v === 'string') : [];
+function aEntidad(fila: {
+  idPlantilla: string;
+  tipo: string;
+  asunto: string;
+  contenidoTexto: string;
+  fechaActualizacion: Date;
+  idUsuarioActualizo: number | null;
+}): EntidadPlantillaNotificacion {
+  return {
+    idPlantilla: fila.idPlantilla,
+    tipo: fila.tipo as TipoComunicacion,
+    asunto: fila.asunto,
+    contenidoTexto: fila.contenidoTexto,
+    fechaActualizacion: fila.fechaActualizacion,
+    idUsuarioActualizo: fila.idUsuarioActualizo,
+  };
 }
 
 export class PrismaPlantillasRepository implements PlantillasRepositoryPort {
   async listar(): Promise<EntidadPlantillaNotificacion[]> {
     const filas = await prisma.plantillaNotificacion.findMany({ orderBy: { tipo: 'asc' } });
-    return filas.map((f) => ({
-      idPlantilla: f.idPlantilla,
-      tipo: f.tipo as TipoComunicacion,
-      asunto: f.asunto,
-      contenidoHtml: f.contenidoHtml,
-      contenidoTexto: f.contenidoTexto,
-      variablesDisponibles: comoListaTexto(f.variablesDisponibles),
-      variablesObligatorias: comoListaTexto(f.variablesObligatorias),
-      fechaActualizacion: f.fechaActualizacion,
-      idUsuarioActualizo: f.idUsuarioActualizo,
-    }));
+    return filas.map(aEntidad);
   }
 
   async obtenerPorTipo(tipo: TipoComunicacion): Promise<EntidadPlantillaNotificacion | null> {
     const fila = await prisma.plantillaNotificacion.findUnique({ where: { tipo } });
-    if (!fila) return null;
-    return {
-      idPlantilla: fila.idPlantilla,
-      tipo: fila.tipo as TipoComunicacion,
-      asunto: fila.asunto,
-      contenidoHtml: fila.contenidoHtml,
-      contenidoTexto: fila.contenidoTexto,
-      variablesDisponibles: comoListaTexto(fila.variablesDisponibles),
-      variablesObligatorias: comoListaTexto(fila.variablesObligatorias),
-      fechaActualizacion: fila.fechaActualizacion,
-      idUsuarioActualizo: fila.idUsuarioActualizo,
-    };
+    return fila ? aEntidad(fila) : null;
   }
 
   async actualizar(
@@ -51,22 +44,10 @@ export class PrismaPlantillasRepository implements PlantillasRepositoryPort {
       where: { tipo },
       data: {
         ...(cambios.asunto !== undefined ? { asunto: cambios.asunto } : {}),
-        ...(cambios.contenidoHtml !== undefined ? { contenidoHtml: cambios.contenidoHtml } : {}),
         ...(cambios.contenidoTexto !== undefined ? { contenidoTexto: cambios.contenidoTexto } : {}),
         idUsuarioActualizo: idAdmin ?? null,
       },
     });
-
-    return {
-      idPlantilla: fila.idPlantilla,
-      tipo: fila.tipo as TipoComunicacion,
-      asunto: fila.asunto,
-      contenidoHtml: fila.contenidoHtml,
-      contenidoTexto: fila.contenidoTexto,
-      variablesDisponibles: comoListaTexto(fila.variablesDisponibles),
-      variablesObligatorias: comoListaTexto(fila.variablesObligatorias),
-      fechaActualizacion: fila.fechaActualizacion,
-      idUsuarioActualizo: fila.idUsuarioActualizo,
-    };
+    return aEntidad(fila);
   }
 }

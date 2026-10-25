@@ -7,6 +7,9 @@ import type {
   RegistroEnviosRepositoryPort,
   TipoComunicacion,
 } from '../interfaces/registro-envios.port';
+import * as plantillasHtml from './plantillas-html';
+
+export { escaparHtml } from './html-utils';
 
 export interface OpcionesEnvioCorreo {
   from: string;
@@ -32,23 +35,6 @@ export interface ConfiguracionSmtp {
 
 const MAX_INTENTOS_POR_DEFECTO = 3;
 const BACKOFF_BASE_MS = 200;
-
-export function escaparHtml(texto: string): string {
-  return texto
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/** RF-NOT-03-02: misma convención de placeholder que plantillas.service.ts ({{variable}}). */
-function sustituirPlaceholders(contenido: string, datos: Record<string, string>, escapar: boolean): string {
-  return Object.entries(datos).reduce((acc, [clave, valor]) => {
-    const valorFinal = escapar ? escaparHtml(valor) : valor;
-    return acc.split(`{{${clave}}}`).join(valorFinal);
-  }, contenido);
-}
 
 export function resolverRemitenteSmtp(host: string, user: string, fromConfigurado?: string): string {
   const limpio = fromConfigurado?.trim();
@@ -253,18 +239,20 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
    * una fila para `tipo`; si no (tabla vacía, repositorio no inyectado, o error de lectura),
    * cae en el contenido de respaldo para no dejar de enviar la comunicación.
    */
-  private async resolverMensaje(
+  /**
+   * HU-NOT-03: usa el asunto y la copia introductoria editados por el admin en
+   * `plantilla_notificacion` si existe una fila para `tipo`; si no (tabla vacía,
+   * repositorio no inyectado, o error de lectura), cae en el respaldo para no dejar
+   * de enviar la comunicación. El admin nunca edita HTML ni variables — eso lo pone
+   * `plantillas-html.ts` con los datos reales de cada envío.
+   */
+  private async resolverIntroYAsunto(
     tipo: TipoComunicacion,
-    datos: Record<string, string>,
-    respaldo: { subject: string; text: string; html: string },
-  ): Promise<{ subject: string; text: string; html: string }> {
+    respaldo: { subject: string; intro: string },
+  ): Promise<{ subject: string; intro: string }> {
     const plantilla = await this.plantillas?.obtenerPorTipo(tipo).catch(() => null);
     if (!plantilla) return respaldo;
-    return {
-      subject: sustituirPlaceholders(plantilla.asunto, datos, false),
-      text: sustituirPlaceholders(plantilla.contenidoTexto, datos, false),
-      html: sustituirPlaceholders(plantilla.contenidoHtml, datos, true),
-    };
+    return { subject: plantilla.asunto, intro: plantilla.contenidoTexto };
   }
 
   /**
@@ -318,160 +306,69 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
   }
 
   async enviarCodigoRegistro(correo: string, codigoOtp: string, minutosVigencia: number): Promise<void> {
-    const otpSeguro = escaparHtml(codigoOtp);
-    const mensaje = await this.resolverMensaje(
-      'registro_otp',
-      { codigo_otp: codigoOtp, minutos_vigencia: String(minutosVigencia) },
-      {
-        subject: 'Código de verificación de tu cuenta · Pintu Clic',
-        text: [
-          'Bienvenido a Pintu Clic.',
-          '',
-          `Tu código de verificación es: ${codigoOtp}`,
-          `Este código expira en ${minutosVigencia} minutos.`,
-          '',
-          'Si no solicitaste este registro, puedes ignorar este mensaje.',
-        ].join('\n'),
-        html: `
-          <div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-            <h2 style="color: #0B2D6B; margin-top: 0;">Verifica tu correo en Pintu Clic</h2>
-            <p>Usa el siguiente código de verificación para activar tu cuenta:</p>
-            <div style="font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #0B2D6B; background: #F3F4F6; padding: 16px; text-align: center; border-radius: 8px; margin: 20px 0;">
-              ${otpSeguro}
-            </div>
-            <p style="font-size: 13px; color: #4B5563;">Este código tiene una vigencia de <strong>${minutosVigencia} minutos</strong>.</p>
-            <p style="font-size: 12px; color: #6B7280; margin-top: 24px;">Si no solicitaste este código, ignora este correo.</p>
-          </div>
-        `.trim(),
-      },
-    );
-    await this.enviarConRegistro('registro_otp', correo, mensaje);
+    const { subject, intro } = await this.resolverIntroYAsunto('registro_otp', {
+      subject: 'Código de verificación de tu cuenta · Pintu Clic',
+      intro: 'Bienvenido a Pintu Clic. Usa el código de verificación que aparece abajo para activar tu cuenta.',
+    });
+    await this.enviarConRegistro('registro_otp', correo, {
+      subject,
+      text: plantillasHtml.textoRegistroOtp(intro, codigoOtp, minutosVigencia),
+      html: plantillasHtml.htmlRegistroOtp(intro, codigoOtp, minutosVigencia),
+    });
   }
 
   async enviarEnlaceRecuperacion(correo: string, token: string, minutosVigencia: number): Promise<void> {
     const enlace = `${this.frontendBaseUrl}/restablecer-contrasena?token=${encodeURIComponent(token)}`;
-    const enlaceSeguro = escaparHtml(enlace);
-    const mensaje = await this.resolverMensaje(
-      'recuperacion_password',
-      { enlace_recuperacion: enlace, minutos_vigencia: String(minutosVigencia) },
-      {
-        subject: 'Restablecimiento de contraseña · Pintu Clic',
-        text: [
-          'Recibimos una solicitud para restablecer tu contraseña en Pintu Clic.',
-          '',
-          `Abre el siguiente enlace para crear una nueva contraseña (válido por ${minutosVigencia} minutos):`,
-          enlace,
-          '',
-          'Si no solicitaste este cambio, tu cuenta sigue protegida y puedes ignorar este mensaje.',
-        ].join('\n'),
-        html: `
-          <div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-            <h2 style="color: #0B2D6B; margin-top: 0;">Restablece tu contraseña</h2>
-            <p>Recibimos una solicitud para cambiar la contraseña de tu cuenta en Pintu Clic.</p>
-            <p style="margin: 24px 0;">
-              <a href="${enlaceSeguro}" style="background: #F47B20; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 20px; border-radius: 6px; display: inline-block;">
-                Crear nueva contraseña
-              </a>
-            </p>
-            <p style="font-size: 13px; color: #4B5563;">Este enlace expirará en <strong>${minutosVigencia} minutos</strong>.</p>
-            <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
-          </div>
-        `.trim(),
-      },
-    );
-    await this.enviarConRegistro('recuperacion_password', correo, mensaje);
+    const { subject, intro } = await this.resolverIntroYAsunto('recuperacion_password', {
+      subject: 'Restablecimiento de contraseña · Pintu Clic',
+      intro:
+        'Recibimos una solicitud para restablecer la contraseña de tu cuenta en Pintu Clic. Usa el botón de abajo para crear una nueva.',
+    });
+    await this.enviarConRegistro('recuperacion_password', correo, {
+      subject,
+      text: plantillasHtml.textoRecuperacionPassword(intro, enlace, minutosVigencia),
+      html: plantillasHtml.htmlRecuperacionPassword(intro, enlace, minutosVigencia),
+    });
   }
 
   async enviarEnlaceActivacion(correo: string, nombre: string, token: string, horasVigencia: number): Promise<void> {
     const enlace = `${this.frontendBaseUrl}/activar-cuenta?token=${encodeURIComponent(token)}`;
-    const enlaceSeguro = escaparHtml(enlace);
-    const nombreSeguro = escaparHtml(nombre);
-    const mensaje = await this.resolverMensaje(
-      'activacion_empleado',
-      { nombre, enlace_activacion: enlace, horas_vigencia: String(horasVigencia) },
-      {
-        subject: 'Activa tu cuenta de colaborador · Pintu Clic',
-        text: [
-          `Hola, ${nombre}.`,
-          '',
-          'Te crearon una cuenta de colaborador en Pintu Clic.',
-          `Abre el siguiente enlace para definir tu contraseña (válido por ${horasVigencia} horas):`,
-          enlace,
-          '',
-          'Si el enlace vence, pide al administrador que te envíe uno nuevo.',
-        ].join('\n'),
-        html: `
-          <div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-            <h2 style="color: #0B2D6B; margin-top: 0;">Bienvenido a Pintu Clic, ${nombreSeguro}</h2>
-            <p>Te crearon una cuenta de colaborador. Define tu contraseña para empezar.</p>
-            <p style="margin: 24px 0;">
-              <a href="${enlaceSeguro}" style="background: #F47B20; color: #FFFFFF; text-decoration: none; font-weight: bold; padding: 12px 20px; border-radius: 6px; display: inline-block;">
-                Definir mi contraseña
-              </a>
-            </p>
-            <p style="font-size: 13px; color: #4B5563;">Este enlace expirará en <strong>${horasVigencia} horas</strong> y solo puede usarse una vez.</p>
-            <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
-          </div>
-        `.trim(),
-      },
-    );
-    await this.enviarConRegistro('activacion_empleado', correo, mensaje);
+    const { subject, intro } = await this.resolverIntroYAsunto('activacion_empleado', {
+      subject: 'Activa tu cuenta de colaborador · Pintu Clic',
+      intro:
+        'Te crearon una cuenta de colaborador en Pintu Clic. Usa el botón de abajo para definir tu contraseña y comenzar.',
+    });
+    await this.enviarConRegistro('activacion_empleado', correo, {
+      subject,
+      text: plantillasHtml.textoActivacionEmpleado(intro, nombre, enlace, horasVigencia),
+      html: plantillasHtml.htmlActivacionEmpleado(intro, nombre, enlace, horasVigencia),
+    });
   }
 
   async enviarCodigoCambioCorreo(correoNuevo: string, codigoOtp: string, minutosVigencia: number): Promise<void> {
-    const otpSeguro = escaparHtml(codigoOtp);
-    const mensaje = await this.resolverMensaje(
-      'cambio_correo_otp',
-      { codigo_otp: codigoOtp, minutos_vigencia: String(minutosVigencia) },
-      {
-        subject: 'Confirma tu nuevo correo electrónico · Pintu Clic',
-        text: [
-          'Solicitaste actualizar el correo electrónico de tu cuenta en Pintu Clic.',
-          '',
-          `Tu código de confirmación es: ${codigoOtp}`,
-          `Este código expira en ${minutosVigencia} minutos.`,
-          '',
-          'Si no realizaste esta solicitud, ignora este mensaje.',
-        ].join('\n'),
-        html: `
-          <div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-            <h2 style="color: #0B2D6B; margin-top: 0;">Confirma tu nuevo correo</h2>
-            <p>Ingresa el siguiente código para confirmar el cambio de correo electrónico en tu perfil:</p>
-            <div style="font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #0B2D6B; background: #F3F4F6; padding: 16px; text-align: center; border-radius: 8px; margin: 20px 0;">
-              ${otpSeguro}
-            </div>
-            <p style="font-size: 13px; color: #4B5563;">Este código tiene una vigencia de <strong>${minutosVigencia} minutos</strong>.</p>
-          </div>
-        `.trim(),
-      },
-    );
-    await this.enviarConRegistro('cambio_correo_otp', correoNuevo, mensaje);
+    const { subject, intro } = await this.resolverIntroYAsunto('cambio_correo_otp', {
+      subject: 'Confirma tu nuevo correo electrónico · Pintu Clic',
+      intro:
+        'Solicitaste actualizar el correo electrónico de tu cuenta en Pintu Clic. Usa el código de abajo para confirmar el cambio.',
+    });
+    await this.enviarConRegistro('cambio_correo_otp', correoNuevo, {
+      subject,
+      text: plantillasHtml.textoCambioCorreoOtp(intro, codigoOtp, minutosVigencia),
+      html: plantillasHtml.htmlCambioCorreoOtp(intro, codigoOtp, minutosVigencia),
+    });
   }
 
   async notificarCambioCorreoConfirmado(correoAnterior: string, nuevoCorreo: string): Promise<void> {
-    const nuevoSeguro = escaparHtml(nuevoCorreo);
-    const mensaje = await this.resolverMensaje(
-      'cambio_correo_confirmado',
-      { nuevo_correo: nuevoCorreo },
-      {
-        subject: 'Aviso de seguridad: cambio de correo electrónico · Pintu Clic',
-        text: [
-          'Te informamos que el correo electrónico asociado a tu cuenta de Pintu Clic fue actualizado.',
-          '',
-          `Nuevo correo registrado: ${nuevoCorreo}`,
-          '',
-          'Si no reconoces esta operación, contacta de inmediato al soporte de Pintu Clic.',
-        ].join('\n'),
-        html: `
-          <div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-            <h2 style="color: #0B2D6B; margin-top: 0;">Aviso de seguridad: correo actualizado</h2>
-            <p>El correo electrónico titular de tu cuenta en Pintu Clic ha sido modificado a <strong>${nuevoSeguro}</strong>.</p>
-            <p style="font-size: 13px; color: #4B5563;">Si no autorizaste este cambio, comunícate de inmediato con nuestro equipo de soporte.</p>
-          </div>
-        `.trim(),
-      },
-    );
-    await this.enviarConRegistro('cambio_correo_confirmado', correoAnterior, mensaje);
+    const { subject, intro } = await this.resolverIntroYAsunto('cambio_correo_confirmado', {
+      subject: 'Aviso de seguridad: cambio de correo electrónico · Pintu Clic',
+      intro:
+        'Te informamos que el correo electrónico asociado a tu cuenta de Pintu Clic fue actualizado. Si no reconoces esta operación, contacta de inmediato a nuestro equipo de soporte.',
+    });
+    await this.enviarConRegistro('cambio_correo_confirmado', correoAnterior, {
+      subject,
+      text: plantillasHtml.textoCambioCorreoConfirmado(intro, nuevoCorreo),
+      html: plantillasHtml.htmlCambioCorreoConfirmado(intro, nuevoCorreo),
+    });
   }
 
   async notificarDictamenEmpresa(
@@ -480,42 +377,17 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
     motivoRechazo?: string,
   ): Promise<void> {
     const aprobada = resultado === 'aprobada';
-    const motivoLimpio = motivoRechazo?.trim();
-    const motivoHtml = motivoLimpio
-      ? `<p style="font-size: 14px; color: #991B1B; background: #FEF2F2; padding: 12px; border-radius: 6px;"><strong>Motivo:</strong> ${escaparHtml(motivoLimpio)}</p>`
-      : '';
-
-    const mensaje = await this.resolverMensaje(
-      'dictamen_empresa',
-      { resultado, motivo: motivoLimpio ?? '' },
-      {
-        subject: aprobada
-          ? 'Tu solicitud de cuenta empresarial fue aprobada · Pintu Clic'
-          : 'Resultado de tu solicitud de cuenta empresarial · Pintu Clic',
-        text: [
-          aprobada
-            ? '¡Buenas noticias! Tu solicitud de cuenta empresarial en Pintu Clic ha sido aprobada.'
-            : 'Te informamos que tu solicitud de cuenta empresarial en Pintu Clic no fue aprobada.',
-          ...(motivoLimpio ? ['', `Motivo: ${motivoLimpio}`] : []),
-        ].join('\n'),
-        html: `
-          <div style="font-family: Arial, sans-serif; color: #1A1A1A; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px;">
-            <h2 style="color: #0B2D6B; margin-top: 0;">
-              ${aprobada ? 'Cuenta empresarial aprobada' : 'Estado de solicitud empresarial'}
-            </h2>
-            <p>
-              ${
-                aprobada
-                  ? 'Tu solicitud corporativa ha sido validada y aprobada. Ya puedes iniciar sesión y operar con beneficios empresariales en Pintu Clic.'
-                  : 'Tu solicitud corporativa fue revisada y rechazada por nuestro equipo de validación.'
-              }
-            </p>
-            ${motivoHtml}
-          </div>
-        `.trim(),
-      },
-    );
-    await this.enviarConRegistro('dictamen_empresa', correo, mensaje);
+    const { subject, intro } = await this.resolverIntroYAsunto('dictamen_empresa', {
+      subject: aprobada
+        ? 'Tu solicitud de cuenta empresarial fue aprobada · Pintu Clic'
+        : 'Resultado de tu solicitud de cuenta empresarial · Pintu Clic',
+      intro: 'Gracias por tu solicitud de cuenta empresarial en Pintu Clic. A continuación encontrarás el resultado de la revisión.',
+    });
+    await this.enviarConRegistro('dictamen_empresa', correo, {
+      subject,
+      text: plantillasHtml.textoDictamenEmpresa(intro, aprobada, motivoRechazo),
+      html: plantillasHtml.htmlDictamenEmpresa(intro, aprobada, motivoRechazo),
+    });
   }
 }
 
