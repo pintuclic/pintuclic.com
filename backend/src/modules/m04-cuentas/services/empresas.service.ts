@@ -4,7 +4,7 @@ import type { CuentasRepository } from '../repositories/cuentas.repository';
 import type { SolicitudesEmpresaRepository } from '../repositories/solicitudes-empresa.repository';
 import type { AlmacenDocumentosPort } from '../interfaces/almacen-documentos.port';
 import type { EntidadDocumentoSoporte, MisSolicitudesEmpresa } from '../interfaces/cuentas.interfaces';
-import type { NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import type {
   DictamenRenovacionNitRequest,
   DictamenSolicitudEmpresaRequest,

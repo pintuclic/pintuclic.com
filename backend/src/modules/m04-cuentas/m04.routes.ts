@@ -10,7 +10,7 @@ import { PrismaDocumentosRepository } from './repositories/documentos.repository
 import { PrismaSolicitudesEmpresaRepository } from './repositories/solicitudes-empresa.repository';
 import { PrismaDireccionesRepository } from './repositories/direcciones.repository';
 import { SistemaDateProviderAdapter } from './adapters/date-provider.adapter';
-import { crearNotificacionesAdapterDesdeEntorno } from './adapters/notificaciones.adapter';
+import { crearNotificacionesAdapterDesdeEntorno } from '../m18-notificaciones/adapters/notificaciones.adapter';
 import { GoogleAuthDeshabilitadoAdapter } from './adapters/google-auth.adapter';
 import { AuthCuentasService } from './services/auth-cuentas.service';
 import { RecuperacionPasswordService } from './services/recuperacion-password.service';
@@ -23,7 +23,7 @@ import { DireccionesController } from './controllers/direcciones.controller';
 import { RecuperacionPasswordController } from './controllers/recuperacion-password.controller';
 import { EmpresasController } from './controllers/empresas.controller';
 import type { DateProviderPort } from './interfaces/date-provider.port';
-import type { NotificacionesPort } from './interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../m18-notificaciones/interfaces/notificaciones.port';
 import type { GoogleAuthPort } from './interfaces/google-auth.port';
 import type { ParametrosCuentasPort } from './interfaces/parametros-cuentas.port';
 

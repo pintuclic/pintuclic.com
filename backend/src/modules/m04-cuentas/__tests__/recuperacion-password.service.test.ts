@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { CodigoVerificacion, Usuario } from '@prisma/client';
 import type { CuentasRepository } from '../repositories/cuentas.repository';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
-import type { NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import { SimuladoDateProviderAdapter } from '../adapters/date-provider.adapter';
 import {
   RecuperacionPasswordError,

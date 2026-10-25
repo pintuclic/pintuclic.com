@@ -5,7 +5,7 @@ import { derivarContrasena } from '../../../core/utils/crypto';
 import type { CuentasRepository } from '../repositories/cuentas.repository';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
 import type { ControlIntentosRepository } from '../repositories/control-intentos.repository';
-import type { NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import type { GoogleAuthPort } from '../interfaces/google-auth.port';
 import type { ParametrosCuentasPort } from '../interfaces/parametros-cuentas.port';
 import { SimuladoDateProviderAdapter } from '../adapters/date-provider.adapter';

@@ -3,6 +3,7 @@ import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
 import { construirModuloM17 } from './modules/m17-permisos/m17.routes';
+import { construirModuloM18 } from './modules/m18-notificaciones/m18.routes';
 import { construirModuloM20 } from './modules/m20-seguridad/m20.routes';
 
 interface RutaPublica {
@@ -38,6 +39,16 @@ export function construirAppRoutes(): Router {
       enviarEnlaceActivacion: (idUsuario) => m04.recuperacionService.emitirEnlaceActivacion(idUsuario),
     },
   });
+  const m18 = construirModuloM18(m17.autorizacionService, {
+    // RF-NOT-01-03: M18 lee el límite de reintentos que el admin edita en M17.
+    parametros: {
+      obtenerNumero: async (clave) => {
+        const { parametros } = await m17.configService.obtenerCatalogo();
+        const valor = parametros.find((p) => p.clave === clave)?.valor;
+        return typeof valor === 'number' ? valor : null;
+      },
+    },
+  });
   const m04 = construirModuloM04(m20.sesionService, m17.autorizacionService, {
     // HU-ADM-07: M04 lee los parámetros de autenticación que el admin edita en M17
     // (caché corta de 30 s en el repositorio de configuración).
@@ -48,6 +59,8 @@ export function construirAppRoutes(): Router {
         return typeof valor === 'number' ? valor : null;
       },
     },
+    // ADR-009 (migrado a M18): M04 ya no construye su propio adapter SMTP.
+    notificaciones: m18.notificaciones,
   });
 
   // M20: El aviso de privacidad es público (RF-SEG-05-03); el resto exige sesión vigente.
@@ -75,6 +88,9 @@ export function construirAppRoutes(): Router {
     exigirSesionSalvo(auth, [{ metodo: 'POST', ruta: '/gobernanza/confirmar-correo' }]),
     m17.router,
   );
+
+  // M18: Notificaciones y Comunicaciones — plantillas y diagnóstico de envíos (HU-NOT-03/04)
+  router.use('/admin/notificaciones', auth, m18.router);
 
   return router;
 }

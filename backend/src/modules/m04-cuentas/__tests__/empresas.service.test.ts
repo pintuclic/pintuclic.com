@@ -11,7 +11,7 @@ import type { CuentasRepository } from '../repositories/cuentas.repository';
 import type { SolicitudesEmpresaRepository } from '../repositories/solicitudes-empresa.repository';
 import type { AlmacenDocumentosPort } from '../interfaces/almacen-documentos.port';
 import type { EntidadDocumentoSoporte } from '../interfaces/cuentas.interfaces';
-import type { NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import { EmpresasError, EmpresasService } from '../services/empresas.service';
 
 describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
