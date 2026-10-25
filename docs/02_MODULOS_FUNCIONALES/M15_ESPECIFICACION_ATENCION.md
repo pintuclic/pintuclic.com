@@ -5,8 +5,29 @@
 
 ---
 
+> ### ⚠️ Corrección del 2026-10-25: las preguntas frecuentes son de M16
+>
+> **HU-ATC-01 no la construye M15: la cumple M16 Contenido**, que llegó antes a `main`
+> con la tabla `faq_entrada`, su administración, la página pública `/centro-de-ayuda`
+> y el `ContenidoFaqPort` que su contrato expone precisamente para que M15 las consuma
+> (ver `contracts/m16-contenido.contract.ts`, HU-CON-02 y HU-CON-04).
+>
+> Esta spec decía lo contrario en **RF-ATC-01-06** («pertenece a este módulo y no a M16»).
+> Esa línea quedó obsoleta y está corregida más abajo: el equipo resolvió a favor de M16
+> para no duplicar la gestión de las FAQ en dos sitios.
+>
+> **Lo que sí entrega M15:** el formulario de contacto (HU-ATC-02), el canal directo por
+> WhatsApp (HU-ATC-03), el horario de atención humana (HU-ATC-04) y la base del
+> escalamiento (HU-ATC-05). En `/centro-de-ayuda`, M15 agrega sus secciones debajo de
+> las preguntas frecuentes de M16.
+>
+> El resto del documento se conserva como quedó en el análisis, para no perder la
+> trazabilidad de los requisitos.
+
+---
+
 ## 1. Propósito y Alcance
-El módulo M15 centraliza los canales de orientación, preguntas frecuentes y atención humana de Pintu Clic. Permite resolver dudas recurrentes mediante un listado público de preguntas frecuentes administrable desde el panel, recibir solicitudes autenticadas a través del formulario de contacto (consultas, intención de cotización que remite al carrito o reclamos), ofrecer el botón de contacto directo por WhatsApp («Megaconstrucción») con referencia contextual del producto o carrito, configurar y publicar el horario de atención humana, y gestionar el escalamiento de consultas automatizadas hacia asesores autorizados.
+El módulo M15 centraliza los canales de contacto y la atención humana de Pintu Clic. Permite recibir solicitudes autenticadas a través del formulario de contacto (consultas, intención de cotización que remite al carrito o reclamos), ofrecer el botón de contacto directo por WhatsApp («Megaconstrucción») con referencia contextual del producto o carrito, configurar y publicar el horario de atención humana, y gestionar el escalamiento de consultas automatizadas hacia asesores autorizados. El listado público de preguntas frecuentes **lo administra y lo publica M16**; M15 lo consume y le suma el contacto con el equipo.
 
 **Qué cambió en la versión 3.0:**
 - **HU-ATC-03 deja de estar bloqueada:** el botón «Megaconstrucción» es un enlace al WhatsApp de la empresa para quien va a cotizar una obra entera, y eso se puede especificar hoy. Lo que sigue sin definirse es la integración de WhatsApp para notificaciones y automatización, que es otra cosa.
@@ -19,7 +40,8 @@ El módulo M15 centraliza los canales de orientación, preguntas frecuentes y at
   - **M03 Asesoría e IA (puerto):** origen de las consultas automatizadas que escalan a un asesor humano (HU-ATC-05; RF-ATC-05-04 pendiente de M03).
 - **Transversales Aplicables:**
   - 🔒 **M20 Seguridad:** protección frente a envíos automatizados en el formulario de contacto (RF-ATC-02-08) y validación de sesión en servidor.
-  - 🛡️ **M17 Permisos:** exige los permisos «Gestión de preguntas frecuentes» (RF-ATC-01-06) y «Atender clientes» (RF-ATC-05-01), además de la configuración administrativa del canal WhatsApp y del horario de atención.
+  - 🛡️ **M17 Permisos:** exige el par `atencion.ver` / `atencion.editar` para las solicitudes de contacto, el horario y el canal de WhatsApp, y «Atender clientes» (`atencion.atender_clientes`, RF-ATC-05-01) para las consultas escaladas. El permiso de las preguntas frecuentes no es de M15: lo define M16 junto con el resto de su contenido.
+- **Relación con M16 Contenido:** M16 es el dueño de las preguntas frecuentes y de la página `/centro-de-ayuda`. M15 consume su catálogo publicado por puerto y añade a esa página el formulario de contacto, el horario y el botón de WhatsApp.
 
 ---
 
@@ -37,7 +59,7 @@ La versión anterior traía siete. Tres se cierran: la entrevista aclaró qué e
 ## 4. Tabla Resumen de Historias de Usuario
 | ID | Historia de Usuario | Actores | Prioridad | Estado |
 | :--- | :--- | :--- | :--- | :--- |
-| **HU-ATC-01** | Preguntas frecuentes administrables | Administrador / Visitante | Alta | Definido |
+| **HU-ATC-01** | Preguntas frecuentes administrables | Administrador / Visitante | Alta | **La cumple M16** (HU-CON-02 / HU-CON-04) |
 | **HU-ATC-02** | Formulario de contacto | Cliente autenticado / Administrador | Alta | Definido |
 | **HU-ATC-03** | Canal de contacto directo por WhatsApp («Megaconstrucción») | Cliente / Administrador | Alta | Definido |
 | **HU-ATC-04** | Horario de atención configurable | Visitante / Administrador | Alta | Definido |
@@ -49,6 +71,12 @@ La versión anterior traía siete. Tres se cierran: la entrevista aclaró qué e
 
 ### HU-ATC-01 — Preguntas frecuentes administrables
 
+> ⚠️ **Esta historia la implementa M16 Contenido, no M15** (decisión del 2026-10-25).
+> Se conserva aquí por trazabilidad del análisis. Los requisitos siguen siendo válidos
+> como necesidad del negocio; lo que cambió es quién los construye:
+> `contracts/m16-contenido.contract.ts` (HU-CON-02 administración, HU-CON-04 consulta
+> pública) y la tabla `faq_entrada`. M15 consume ese catálogo por `ContenidoFaqPort`.
+
 > **Como** administrador  
 > **Quiero** mantener las preguntas frecuentes desde el panel  
 > **Para** resolver dudas repetidas sin ocupar tiempo del equipo de atención.
@@ -58,7 +86,7 @@ La versión anterior traía siete. Tres se cierran: la entrevista aclaró qué e
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **RF-ATC-01-01** | RF | Contenido | El sistema debe permitir crear, editar, eliminar, activar y desactivar preguntas frecuentes desde el panel, agruparlas por tema y definir su orden de presentación. | **Definido** | **Alta** |
 | **RF-ATC-01-05** | RF | Consulta pública | El sistema debe presentar públicamente el listado de preguntas frecuentes activas, agrupadas y ordenadas conforme a lo configurado. | **Definido** | **Alta** |
-| **RF-ATC-01-06** | RF | Control de acceso | El sistema debe reservar la administración de preguntas frecuentes al permiso «Gestión de preguntas frecuentes», que pertenece a este módulo y no a M16. | **Deducido** | **Alta** |
+| **RF-ATC-01-06** | RF | Control de acceso | ~~El sistema debe reservar la administración de preguntas frecuentes al permiso «Gestión de preguntas frecuentes», que pertenece a este módulo y no a M16.~~ **CORREGIDO (2026-10-25):** la administración de preguntas frecuentes pertenece a **M16**, igual que el resto de su contenido, y se reserva al permiso que M16 define. M15 no la gobierna. | **Corregido** | **Alta** |
 
 #### Criterios de aceptación
 | ID | Criterio |
