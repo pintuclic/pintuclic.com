@@ -10,6 +10,22 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.6] - 2026-10-25
+### Esquema 4.8 (66 Tablas) - M15 Atención al cliente
+- **Alcance General:** Cuatro tablas nuevas pedidas por el contrato de M15 (`contracts/m15-atencion.contract.ts`). Cambio puramente aditivo.
+  - **`pregunta_frecuente`**: preguntas frecuentes administrables y públicas (HU-ATC-01). Cada fila lleva su propia `pregunta` (hasta 300) y `respuesta` (hasta 2000), más `tema` para agruparlas, `orden` (≥ 0, `ck_faq_orden_no_negativo`) para ordenarlas dentro del tema y `activa` para ocultarlas al público **sin eliminarlas** (CA-ATC-01-02).
+  - **`solicitud_contacto`**: solicitudes del formulario de contacto, que exige sesión (HU-ATC-02). Guarda `tipo`, `descripcion` y `estado`; **no duplica los datos de contacto**, que se leen de la cuenta al mostrarla (RF-ATC-02-04). `ON DELETE CASCADE` sobre `usuario`: si la cuenta se elimina, sus solicitudes se van con ella.
+  - **`horario_atencion`**: una fila por día de la semana (`dia_semana` UNIQUE, HU-ATC-04). Las horas son texto `"HH:mm"` en 24h —no `TIME`— para que coincidan con el contrato sin convertir husos; `ck_horario_formato_horas` valida el formato y `ck_horario_franja_coherente` exige que un día cerrado no lleve horas y que uno abierto tenga `hora_fin > hora_inicio`.
+  - **`configuracion_atencion_whatsapp`**: fila única (`ck_whatsapp_fila_unica`) con el `destino` del botón de contacto directo (HU-ATC-03). Admite una URL completa —hoy el canal de difusión, que no acepta texto prellenado— o un número de WhatsApp Business cuando exista; de ahí que el campo no se llame `numero`.
+  - **ENUMs nuevos:** `enum_tipo_solicitud_contacto` (`consulta`, `cotizacion`, `reclamo`), `enum_estado_solicitud_contacto` (`pendiente`, `atendida`) y `enum_dia_semana` (`lunes` … `domingo`).
+  - **Índices:** `(tema, orden)` y `activa` para el listado público de FAQs; `id_usuario` y `(estado, fecha_creacion DESC)` para la bandeja de solicitudes.
+  - **Permisos nuevos (24-26):** `atencion.ver`, `atencion.editar` y `atencion.atender_clientes`, con área funcional `atencion` y dependencia `editar → ver` en M17. El último queda reservado al escalamiento de HU-ATC-05, bloqueado por M03.
+  - **Seed:** 10 preguntas frecuentes en 5 temas (la de envíos declara cobertura solo en el departamento del Caquetá), la semana completa de horario (lunes a viernes 08:00-18:00, sábado 08:00-13:00, domingo cerrado) y el canal de WhatsApp vigente.
+  - **Bases existentes en 4.7:** el DDL crea los tipos y las tablas con `IF NOT EXISTS`. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` y `npm run db:seed`.
+  - **Verificado en PostgreSQL 18:** esquema y seed ejecutados sobre una base nueva y repetidos una segunda vez sin errores (idempotentes); 66 tablas; las 7 pruebas negativas de los `CHECK` y la FK rechazan los datos inválidos.
+
+---
+
 ## [v3.5] - 2026-10-25
 ### Esquema 4.7 (62 Tablas) - M13 Inventario referencial: historial de ajustes
 - **Alcance General:** Tabla nueva pedida por el contrato de M13 (`contracts/m13-inventario.contract.ts`). Cambio puramente aditivo.
