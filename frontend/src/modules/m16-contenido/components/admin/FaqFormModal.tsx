@@ -17,6 +17,7 @@ import {
   type FaqFormValues,
 } from '../../dtos/m16-contenido.dto';
 import type { FaqAdminEntity } from '../../interfaces/contenido.interface';
+import { BarraFormatoTexto } from './BarraFormatoTexto';
 
 export interface FaqFormModalProps {
   isOpen: boolean;
@@ -46,6 +47,8 @@ export const FaqFormModal: React.FC<FaqFormModalProps> = ({
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FaqFormValues>({
     resolver: zodResolver(faqFormSchema),
@@ -128,15 +131,24 @@ export const FaqFormModal: React.FC<FaqFormModalProps> = ({
           )}
         </div>
 
-        <Textarea
-          id="faq-respuesta-markdown"
-          label="Respuesta (formato Markdown)"
-          rows={6}
-          required
-          placeholder="Escribe una respuesta clara y concisa. Puedes usar **negritas** y listas con - ."
-          error={errors.respuestaMarkdown?.message}
-          {...register('respuestaMarkdown')}
-        />
+        <BarraFormatoTexto
+          textareaId="faq-respuesta-markdown"
+          valor={watch('respuestaMarkdown') ?? ''}
+          onChangeValor={(nuevo) =>
+            setValue('respuestaMarkdown', nuevo, { shouldValidate: true, shouldDirty: true })
+          }
+        >
+          <Textarea
+            id="faq-respuesta-markdown"
+            label="Respuesta de la pregunta"
+            rows={6}
+            required
+            placeholder="Escribe una respuesta clara y usa los botones superiores para Negrita o Listas."
+            helperText="Selecciona texto y pulsa Negrita o Lista arriba, o usa 'Ver cómo queda'."
+            error={errors.respuestaMarkdown?.message}
+            {...register('respuestaMarkdown')}
+          />
+        </BarraFormatoTexto>
 
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-light">
           <Button

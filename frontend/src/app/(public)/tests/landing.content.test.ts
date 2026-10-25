@@ -53,7 +53,7 @@ describe('Landing · todas las imágenes referenciadas existen en public/', () =
   const imagenes = [
     header.logo.src,
     footer.logo.src,
-    ...featuredProducts.map((p) => p.imageUrl),
+    ...featuredProducts.flatMap((p) => (p.imageUrl ? [p.imageUrl] : [])),
     ...categoryTiles.map((c) => c.imageSrc),
   ];
 

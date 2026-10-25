@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ShoppingCart } from 'lucide-react';
+import { PaintBucket, ShoppingCart } from 'lucide-react';
 import { Button } from '../buttons/Button';
 import { ButtonLink } from '../buttons/ButtonLink';
 import { formatCOP } from '../../utils/moneda';
@@ -26,6 +26,20 @@ export interface ProductCardProps {
   className?: string;
 }
 
+function resolverImagenPorDefecto(name: string, imageUrl?: string): string | undefined {
+  if (imageUrl) return imageUrl;
+  const n = name.toLowerCase();
+  if (n.includes('viniltex')) return '/images/landing/catalogo-viniltex.png';
+  if (n.includes('koraza')) return '/images/landing/catalogo-koraza.png';
+  if (n.includes('pintulux')) return '/images/landing/catalogo-pintulux.png';
+  if (n.includes('ico') || n.includes('esmalte')) return '/images/landing/catalogo-esmalte-ico.png';
+  if (n.includes('barniz') || n.includes('madera')) return '/images/landing/catalogo-barniz.png';
+  if (n.includes('brocha')) return '/images/landing/producto-brocha.png';
+  if (n.includes('rodillo')) return '/images/landing/producto-rodillo.png';
+  if (n.includes('cinta')) return '/images/landing/producto-cinta.png';
+  return undefined;
+}
+
 export const ProductCard: React.FC<ProductCardProps> = ({
   id,
   name,
@@ -44,6 +58,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   // UI Spec §4.1.1: "$ 98.900 COP".
   const formatCurrency = (amount: number) => `${formatCOP(amount)} COP`;
+  const imagenEfectiva = resolverImagenPorDefecto(name, imageUrl);
 
   return (
     <div
@@ -63,10 +78,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {isOffer && <Badge variant="offer">{offerBadgeText}</Badge>}
         </div>
 
-        {imageUrl ? (
+        {imagenEfectiva ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={imageUrl}
+            src={imagenEfectiva}
             alt={name}
             width={400}
             height={300}
@@ -75,8 +90,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-neutral-medium text-xs font-title">
-            Sin imagen
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-card bg-linear-to-br from-subaction/60 via-neutral-lightest to-subaction/30 p-4 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-white shadow-sm transition-transform duration-300 group-hover:scale-105">
+              <PaintBucket className="h-8 w-8 text-action" strokeWidth={1.75} aria-hidden="true" />
+            </div>
+            <span className="font-title text-xs font-medium text-corporate/80">
+              {brand || 'Pintu Clic'}
+            </span>
           </div>
         )}
       </div>
@@ -156,16 +176,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </Button>
           )}
 
-          <Button
-            type="button"
-            variant="primary-conversion"
-            size="sm"
-            aria-label={`Agregar ${name} al carrito`}
-            onClick={() => onAddToCart?.(id)}
-            className="px-3 shrink-0 max-sm:min-h-11 max-sm:min-w-11"
-          >
-            <ShoppingCart className="w-4 h-4" aria-hidden="true" />
-          </Button>
+          {href && !onAddToCart ? (
+            <ButtonLink
+              href={href}
+              variant="primary-conversion"
+              size="sm"
+              aria-label={`Agregar ${name} al carrito`}
+              className="px-3 shrink-0 max-sm:min-h-11 max-sm:min-w-11"
+            >
+              <ShoppingCart className="w-4 h-4" aria-hidden="true" />
+            </ButtonLink>
+          ) : (
+            <Button
+              type="button"
+              variant="primary-conversion"
+              size="sm"
+              aria-label={`Agregar ${name} al carrito`}
+              onClick={() => onAddToCart?.(id)}
+              className="px-3 shrink-0 max-sm:min-h-11 max-sm:min-w-11"
+            >
+              <ShoppingCart className="w-4 h-4" aria-hidden="true" />
+            </Button>
+          )}
         </div>
       </div>
     </div>
