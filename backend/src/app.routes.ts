@@ -1,4 +1,5 @@
 import { Router, type RequestHandler } from 'express';
+import { construirRutasLandingBanners } from './core/landing/banners.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
@@ -94,6 +95,11 @@ export function construirAppRoutes(): Router {
   const m16 = construirModuloM16(m17.autorizacionService);
   router.use('/admin/contenido', exigirSesionSalvo(auth, []), m16.adminRouter);
   router.use('/contenido', m16.publicRouter);
+
+  // FP-01 (Transversal): gestión administrativa de banners / sliders de inicio y consulta pública.
+  const landing = construirRutasLandingBanners(m17.autorizacionService);
+  router.use('/admin/landing', exigirSesionSalvo(auth, []), landing.adminRouter);
+  router.use('/landing', landing.publicRouter);
 
   // M17: la confirmación del cambio de correo del admin llega desde un enlace y es
   // pública (HU-ADM-06); el resto de endpoints administrativos exige sesión.

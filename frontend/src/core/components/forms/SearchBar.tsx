@@ -14,6 +14,14 @@ export interface SearchBarProps {
   categoryLabel?: string;
   /** Si se omite, no se muestra el selector de categoría. */
   categories?: ReadonlyArray<SelectOption>;
+  /** Valor controlado opcional del término de búsqueda. */
+  queryValue?: string;
+  /** Valor controlado opcional de la categoría seleccionada. */
+  categoryValue?: string;
+  /** Callback opcional al escribir en el buscador para filtrado en vivo. */
+  onQueryChange?: (q: string) => void;
+  /** Callback opcional al cambiar la categoría para filtrado en vivo. */
+  onCategoryChange?: (categoria: string) => void;
   className?: string;
 }
 
@@ -28,6 +36,10 @@ export function SearchBar({
   searchLabel = 'Buscar productos',
   categoryLabel = 'Categoría',
   categories,
+  queryValue,
+  categoryValue,
+  onQueryChange,
+  onCategoryChange,
   className = '',
 }: SearchBarProps) {
   const id = useId();
@@ -48,6 +60,8 @@ export function SearchBar({
           aria-label={searchLabel}
           placeholder={placeholder}
           autoComplete="off"
+          {...(queryValue !== undefined ? { value: queryValue } : {})}
+          {...(onQueryChange ? { onChange: (e) => onQueryChange(e.target.value) } : {})}
         />
       </div>
 
@@ -60,6 +74,8 @@ export function SearchBar({
             label={categoryLabel}
             hideLabel
             options={categories}
+            {...(categoryValue !== undefined ? { value: categoryValue } : {})}
+            {...(onCategoryChange ? { onChange: (e) => onCategoryChange(e.target.value) } : {})}
           />
         </div>
       )}

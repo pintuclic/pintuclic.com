@@ -19,6 +19,7 @@ import {
   type PaginaFormValues,
 } from '../../dtos/m16-contenido.dto';
 import type { PaginaAdminEntity } from '../../interfaces/contenido.interface';
+import { BarraFormatoTexto } from './BarraFormatoTexto';
 
 export interface PaginaFormModalProps {
   isOpen: boolean;
@@ -83,6 +84,7 @@ export const PaginaFormModal: React.FC<PaginaFormModalProps> = ({
   }, [isOpen, paginaEditar, reset]);
 
   const tituloActual = watch('titulo');
+  const cuerpoActual = watch('cuerpoMarkdown') ?? '';
 
   const autogenerarSlug = () => {
     const sugerido = normalizarSlugPagina(tituloActual || '');
@@ -166,16 +168,24 @@ export const PaginaFormModal: React.FC<PaginaFormModalProps> = ({
           />
         )}
 
-        <Textarea
-          id="pagina-cuerpo-markdown"
-          label="Contenido (formato Markdown)"
-          rows={10}
-          required
-          placeholder="Escribe aquí el contenido. Puedes usar ## Subtítulos, - Listas con viñetas y **texto en negrita**."
-          helperText="Soporta encabezados (##, ###), listas (- elemento) y negritas (**texto**)."
-          error={errors.cuerpoMarkdown?.message}
-          {...register('cuerpoMarkdown')}
-        />
+        <BarraFormatoTexto
+          textareaId="pagina-cuerpo-markdown"
+          valor={cuerpoActual}
+          onChangeValor={(nuevo) =>
+            setValue('cuerpoMarkdown', nuevo, { shouldValidate: true, shouldDirty: true })
+          }
+        >
+          <Textarea
+            id="pagina-cuerpo-markdown"
+            label="Contenido de la página"
+            rows={10}
+            required
+            placeholder="Escribe aquí el contenido y usa los botones superiores para poner Negrita, Títulos o Listas."
+            helperText="Usa los botones de arriba (Negrita, Título, Subtítulo, Lista) o haz clic en 'Ver cómo queda'."
+            error={errors.cuerpoMarkdown?.message}
+            {...register('cuerpoMarkdown')}
+          />
+        </BarraFormatoTexto>
 
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-light">
           <Button

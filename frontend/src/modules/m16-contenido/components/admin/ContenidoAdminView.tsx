@@ -301,12 +301,20 @@ export const ContenidoAdminView: React.FC = () => {
     }
   };
 
-  const moverOrdenFaq = async (faq: FaqAdminEntity, delta: number) => {
-    const nuevoOrden = Math.max(0, faq.orden + delta);
-    if (nuevoOrden === faq.orden) return;
+  const moverOrdenFaq = async (indiceActual: number, delta: -1 | 1) => {
+    const indiceVecino = indiceActual + delta;
+    if (indiceVecino < 0 || indiceVecino >= faqs.length) return;
+    const reordenados = [...faqs];
+    const actual = reordenados[indiceActual];
+    const vecino = reordenados[indiceVecino];
+    if (!actual || !vecino) return;
+    reordenados[indiceActual] = vecino;
+    reordenados[indiceVecino] = actual;
     setErrorVista(null);
     try {
-      await cambiarOrdenFaqAdmin(faq.idFaq, nuevoOrden);
+      await Promise.all(
+        reordenados.map((item, idx) => cambiarOrdenFaqAdmin(item.idFaq, idx + 1)),
+      );
       await cargarFaqs();
     } catch (err: unknown) {
       setErrorVista(extraerMensajeErrorContenido(err));
@@ -582,7 +590,7 @@ export const ContenidoAdminView: React.FC = () => {
                 </div>
               ) : (
                 <div className="divide-y divide-neutral-light">
-                  {faqs.map((faq) => {
+                  {faqs.map((faq, indice) => {
                     const badge = badgeEstadoFaq(faq.estado);
                     return (
                       <div
@@ -614,8 +622,8 @@ export const ContenidoAdminView: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             aria-label={`Subir prioridad de ${faq.pregunta}`}
-                            onClick={() => void moverOrdenFaq(faq, -1)}
-                            disabled={faq.orden <= 0}
+                            onClick={() => void moverOrdenFaq(indice, -1)}
+                            disabled={indice === 0}
                             leftIcon={
                               <ArrowUp className="w-4 h-4" aria-hidden="true" />
                             }
@@ -627,7 +635,8 @@ export const ContenidoAdminView: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             aria-label={`Bajar prioridad de ${faq.pregunta}`}
-                            onClick={() => void moverOrdenFaq(faq, 1)}
+                            onClick={() => void moverOrdenFaq(indice, 1)}
+                            disabled={indice === faqs.length - 1}
                             leftIcon={
                               <ArrowDown className="w-4 h-4" aria-hidden="true" />
                             }
