@@ -623,6 +623,7 @@ model Categoria {
 
   subcategorias            Subcategoria[]
   productosComplementarios Producto[]     @relation("CategoriaComplementaria")
+  subcategoriasComplementarias Subcategoria[] @relation("SubcategoriaCategoriaComplementaria")
 
   @@map("categoria")
 }
@@ -634,8 +635,11 @@ model Subcategoria {
   nombre         String        @db.VarChar(100)
   orden          Int           @default(0)
   estado         EstadoGeneral @default(activo)
+  /// Categoría de la que se sugieren complementarios a sus productos sin una propia (RF-CAT-08-01)
+  idCategoriaComplementaria Int? @map("id_categoria_complementaria")
 
   categoria Categoria  @relation(fields: [idCategoria], references: [idCategoria], onDelete: Restrict, map: "fk_subcategoria_categoria")
+  categoriaComplementaria Categoria? @relation("SubcategoriaCategoriaComplementaria", fields: [idCategoriaComplementaria], references: [idCategoria], onDelete: SetNull, map: "fk_subcategoria_categoria_complementaria")
   productos Producto[]
 
   @@unique([idCategoria, nombre], map: "uq_subcategoria_nombre_categoria")
@@ -813,6 +817,10 @@ model Producto {
   publicado                 Boolean       @default(false)
   idCategoriaComplementaria Int?          @map("id_categoria_complementaria")
   patrocinado               Boolean       @default(false)
+  /// Combo (HU-CAT-13): paquete a precio propio con una única variante; su venta se limita por existencia
+  esCombo                   Boolean       @default(false) @map("es_combo")
+  /// M06 no le aplica descuentos (RF-CAT-13-01)
+  excluidoDeDescuentos      Boolean       @default(false) @map("excluido_de_descuentos")
   fechaCreacion             DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
 
   marca                   Marca        @relation(fields: [idMarca], references: [idMarca], onDelete: Restrict, map: "fk_producto_marca")
@@ -959,6 +967,10 @@ model Imagen {
   mimeType    String  @map("mime_type") @db.VarChar(50)
   orden       Int     @default(0)
   esPrincipal Boolean @default(false) @map("es_principal")
+  /// Miniatura de 320 px en WebP para los listados; null en imágenes anteriores (RNF-CAT-07-01)
+  miniatura   Bytes?
+  /// Versión de 960 px en WebP para la ficha; null en imágenes anteriores
+  mediana     Bytes?
 
   producto Producto  @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_imagen_producto")
   variante Variante? @relation(fields: [idVariante], references: [idVariante], onDelete: Cascade, map: "fk_imagen_variante")
