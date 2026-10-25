@@ -72,10 +72,6 @@ jobs:
             echo "Compilando y levantando contenedores en produccion..."
             docker compose -f docker-compose.yml up -d --build --remove-orphans
 
-            # 5b. Sincronizacion idempotente de esquema y semillas SQL sobre volumen existente
-            echo "Sincronizando esquema y semillas idempotentes en pintuclic-db..."
-            docker exec -i pintuclic-db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/schema_pintuclic.sql >/dev/null && PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/seed_pintuclic.sql >/dev/null'
-
             # 6. Verificacion de servicios
             echo "Estado de los servicios activos:"
             docker compose -f docker-compose.yml ps
