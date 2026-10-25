@@ -40,6 +40,9 @@ beforeAll(async () => {
   app.put('/api/v1/admin/catalogo/medidas/:idMedida/imagen', eco);
   app.post('/api/v1/admin/catalogo/productos', eco);
   app.post('/api/v1/admin/catalogo/categorias', eco);
+  app.post('/api/v1/admin/inventario/cargas/previsualizar', eco);
+  app.post('/api/v1/admin/inventario/cargas/aplicar', eco);
+  app.put('/api/v1/admin/inventario/variantes/:idVariante/existencia', eco);
   app.use((_error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(500).json({ manejadorGlobal: true });
   });
@@ -146,5 +149,27 @@ describe('construirParserJson — imágenes de M01 (logotipos, productos y medid
     // PUT /marcas (sin id) y POST /marcas/:id/logotipo no son rutas con logotipo.
     expect((await enviar('/api/v1/admin/catalogo/marcas', cuerpoDe(1 * MB), 'PUT')).status).toBe(413);
     expect((await enviar('/api/v1/admin/catalogo/marcas/12/logotipo', cuerpoDe(1 * MB), 'POST')).status).toBe(413);
+  });
+});
+
+describe('construirParserJson — cargas masivas de inventario (M13)', () => {
+  it('previsualizar y aplicar aceptan un bloque de ~900 kb', async () => {
+    expect((await enviar('/api/v1/admin/inventario/cargas/previsualizar', cuerpoDe(900 * 1024))).status).toBe(200);
+    expect((await enviar('/api/v1/admin/inventario/cargas/aplicar', cuerpoDe(900 * 1024))).status).toBe(200);
+  });
+
+  it('por encima de 1 MB responde 413 con el mensaje del bloque', async () => {
+    const { status, json } = await enviar('/api/v1/admin/inventario/cargas/aplicar', cuerpoDe(1 * MB + 1));
+    expect(status).toBe(413);
+    expect(json).toEqual({
+      success: false,
+      error: { code: 'CUERPO_DEMASIADO_GRANDE', message: 'El bloque de la carga supera el tamaño permitido.' },
+    });
+  });
+
+  it('el ajuste manual y otros métodos de la ruta conservan el límite de 100 kb', async () => {
+    const ajuste = '/api/v1/admin/inventario/variantes/5/existencia';
+    expect((await enviar(ajuste, cuerpoDe(200 * 1024), 'PUT')).status).toBe(413);
+    expect((await enviar('/api/v1/admin/inventario/cargas/aplicar', cuerpoDe(200 * 1024), 'PUT')).status).toBe(413);
   });
 });

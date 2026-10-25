@@ -24,6 +24,17 @@ const RUTAS_CON_IMAGEN: ReadonlyArray<{ metodo: string; ruta: RegExp }> = [
   { metodo: 'PUT', ruta: /^\/api\/v1\/admin\/catalogo\/medidas\/\d+\/imagen$/ },
 ];
 
+/**
+ * M13 (D2 del contrato): una carga masiva de inventario viaja en bloques de hasta 500 filas
+ * (cada una con su nota), que no caben en 100 kb. Solo estas dos rutas reciben 1 MB; la
+ * cantidad de filas la valida el DTO (≤ 500).
+ */
+export const LIMITE_JSON_CON_CARGA = '1mb';
+const RUTAS_CON_CARGA: ReadonlySet<string> = new Set([
+  '/api/v1/admin/inventario/cargas/previsualizar',
+  '/api/v1/admin/inventario/cargas/aplicar',
+]);
+
 interface ErrorDeCuerpo {
   type?: unknown;
 }
@@ -39,12 +50,14 @@ function esCuerpoDemasiadoGrande(error: unknown): boolean {
 export function construirParserJson(): RequestHandler {
   const general = express.json({ limit: LIMITE_JSON_GENERAL });
   const conDocumento = express.json({ limit: LIMITE_JSON_CON_DOCUMENTO });
+  const conCarga = express.json({ limit: LIMITE_JSON_CON_CARGA });
 
   return (req: Request, res: Response, next: NextFunction) => {
     const ruta = req.path.replace(/\/+$/, '');
     const llevaDocumento = req.method === 'POST' && RUTAS_CON_DOCUMENTO.has(ruta);
     const llevaImagen = RUTAS_CON_IMAGEN.some((r) => r.metodo === req.method && r.ruta.test(ruta));
-    const parser = llevaDocumento || llevaImagen ? conDocumento : general;
+    const llevaCarga = req.method === 'POST' && RUTAS_CON_CARGA.has(ruta);
+    const parser = llevaDocumento || llevaImagen ? conDocumento : llevaCarga ? conCarga : general;
 
     parser(req, res, (error?: unknown) => {
       if (error && esCuerpoDemasiadoGrande(error)) {
@@ -54,7 +67,9 @@ export function construirParserJson(): RequestHandler {
             ? { code: 'DOCUMENTO_RUT_INVALIDO', message: 'El documento RUT no puede superar 5 MB.' }
             : llevaImagen
               ? { code: 'CUERPO_DEMASIADO_GRANDE', message: 'La imagen no puede superar 5 MB.' }
-              : { code: 'CUERPO_DEMASIADO_GRANDE', message: 'La solicitud supera el tamaño permitido.' },
+              : llevaCarga
+                ? { code: 'CUERPO_DEMASIADO_GRANDE', message: 'El bloque de la carga supera el tamaño permitido.' }
+                : { code: 'CUERPO_DEMASIADO_GRANDE', message: 'La solicitud supera el tamaño permitido.' },
         });
         return;
       }
