@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.8 (v4.7 + M16: páginas institucionales y preguntas frecuentes FAQ)
+-- VERSIÓN: 4.9 (v4.8 + M01 entrega 3: combos, complementarios por subcategoría y miniaturas de imágenes)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 64
@@ -386,6 +386,18 @@ CREATE TABLE IF NOT EXISTS subcategoria (
 
 COMMENT ON TABLE subcategoria IS 'Nivel 2 y último de la clasificación (RF-CAT-01-02). Mismo nombre permitido bajo categorías distintas (RF-CAT-01-03).';
 
+-- M01 entrega 3 (D6): categoría de la que se extraen los complementarios por defecto de sus productos (RF-CAT-08-01).
+ALTER TABLE subcategoria ADD COLUMN IF NOT EXISTS id_categoria_complementaria INT;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_subcategoria_categoria_complementaria') THEN
+        ALTER TABLE subcategoria ADD CONSTRAINT fk_subcategoria_categoria_complementaria
+            FOREIGN KEY (id_categoria_complementaria) REFERENCES categoria (id_categoria)
+            ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+END $$;
+COMMENT ON COLUMN subcategoria.id_categoria_complementaria IS 'Categoría de la que se sugieren complementarios a los productos de esta subcategoría que no tienen una propia (RF-CAT-08-01). Opcional.';
+
 -- Tabla: superficie
 CREATE TABLE IF NOT EXISTS superficie (
     id_superficie SERIAL PRIMARY KEY,
@@ -608,6 +620,12 @@ COMMENT ON CONSTRAINT fk_producto_linea_marca ON producto IS 'La línea, si exis
 COMMENT ON COLUMN producto.uso_interior IS 'Ambiente: apto para interiores. Junto con uso_exterior alimenta las pestañas Pintura Interior / Exterior.';
 COMMENT ON COLUMN producto.publicado IS 'Visible en el catálogo público (RF-CAT-02-05).';
 
+-- M01 entrega 3 (K1, K4): combos como producto con una sola variante.
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS es_combo BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS excluido_de_descuentos BOOLEAN NOT NULL DEFAULT false;
+COMMENT ON COLUMN producto.es_combo IS 'Combo (HU-CAT-13): paquete a precio propio con una única variante; único producto cuya venta se limita por existencia. No cambia después de creado.';
+COMMENT ON COLUMN producto.excluido_de_descuentos IS 'Si es true, M06 no le aplica descuentos ni a clientes empresa (RF-CAT-13-01, CA-CAT-13-09). Pensado para combos.';
+
 -- Tabla: ficha_recubrimiento (1:1 opcional con producto)
 CREATE TABLE IF NOT EXISTS ficha_recubrimiento (
     id_producto INT PRIMARY KEY,
@@ -762,6 +780,19 @@ CREATE TABLE IF NOT EXISTS imagen (
 );
 
 COMMENT ON TABLE imagen IS 'Imágenes de un producto (HU-CAT-07) como BYTEA (RF-CAT-07-03). Pueden asociarse a una variante o a un color (RF-CAT-07-02).';
+
+-- M01 entrega 3 (I5, I7): una imagen se asocia a una variante o a un color, nunca a ambos; y lleva miniaturas.
+ALTER TABLE imagen ADD COLUMN IF NOT EXISTS miniatura BYTEA;
+ALTER TABLE imagen ADD COLUMN IF NOT EXISTS mediana BYTEA;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_imagen_una_asociacion') THEN
+        ALTER TABLE imagen ADD CONSTRAINT chk_imagen_una_asociacion
+            CHECK (id_variante IS NULL OR id_color IS NULL);
+    END IF;
+END $$;
+COMMENT ON COLUMN imagen.miniatura IS 'Miniatura de 320 px en WebP, para los listados (RNF-CAT-07-01). Null en imágenes anteriores: se genera al pedirla por primera vez.';
+COMMENT ON COLUMN imagen.mediana IS 'Versión de 960 px en WebP, para la ficha. Null en imágenes anteriores: se genera al pedirla por primera vez.';
 
 -- Una sola imagen principal por producto (CA-CAT-07-02)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_imagen_principal ON imagen (id_producto) WHERE es_principal;

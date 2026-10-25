@@ -1,6 +1,6 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.6 — esquema 4.8 (M16 Contenido institucional y Centro de Ayuda / FAQ: páginas institucionales y preguntas frecuentes).  
+> **Versión Actual:** 3.7 — esquema 4.9 (M01 entrega 3: combos, complementarios por subcategoría e imágenes con miniaturas).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
 > **Total de Tablas:** 64  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.7** (esquema 4.9) | 2026-10-25 | Ninguna | Ninguna | M01 entrega 3: `producto.es_combo` y `excluido_de_descuentos`; `subcategoria.id_categoria_complementaria`; `imagen.miniatura` y `mediana` (+ una imagen se asocia a variante o a color, no a ambos). Total 64 tablas. | [Ver v3.7](./CHANGELOG_DATABASE.md#v37---2026-10-25) |
 | **v3.6** (esquema 4.8) | 2026-10-25 | `pagina_institucional`, `faq_entrada` (2) | Ninguna | M16: páginas institucionales administrables (`sobre-nosotros`, `terminos-y-condiciones`, `politica-de-privacidad`, `politicas-de-envio`) con ciclo editorial (`enum_estado_contenido`) y catálogo de preguntas frecuentes (FAQ) ordenadas para el Centro de Ayuda y puerto hacia M15. Total 64 tablas. | [Ver v3.6](./CHANGELOG_DATABASE.md#v36---2026-10-25) |
 | **v3.5** (esquema 4.7) | 2026-10-25 | `ajuste_inventario` (+ `envio_notificacion`, `rebote_notificacion`, `plantilla_notificacion` de M18, esquema 4.6) | Ninguna | M13: historial inmutable de cada cambio de la existencia referencial de una variante, con motivo, origen, nota, usuario y `id_carga` para agrupar cargas masivas. Dos ENUMs nuevos. Total 62 tablas. | [Ver v3.5](./CHANGELOG_DATABASE.md#v35---2026-10-25) |
 | **v3.4** (esquema 4.5) | 2026-10-24 | Ninguna | Ninguna | `ficha_recubrimiento.manos` (opcional, 1 a 10): manos con las que se logra el rendimiento. `medida.imagen` e `imagen_mime_type` (opcionales, siempre juntas): imagen de la medida para la galería del producto. Total 58 tablas. | [Ver v3.4](./CHANGELOG_DATABASE.md#v34---2026-10-24) |
@@ -588,7 +589,7 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | Tabla | PK | FKs | Descripción |
 | :--- | :--- | :--- | :--- |
 | **`categoria`** | `id_categoria` | Ninguna | Qué ES el producto (Pinturas, Maderas, Herramientas…). `nombre` UNIQUE, `orden`, `estado`. |
-| **`subcategoria`** | `id_subcategoria` | `id_categoria` (RESTRICT) | Segundo y último nivel. Nombre único por categoría. |
+| **`subcategoria`** | `id_subcategoria` | `id_categoria` (RESTRICT), `id_categoria_complementaria` (SET NULL) | Segundo y último nivel. Nombre único por categoría. La categoría complementaria es opcional y es el valor por defecto de sus productos (v3.7). |
 | **`superficie`** | `id_superficie` | Ninguna | Dónde se aplica (Paredes y techos, Madera, Metal…). Etiqueta N:M. |
 | **`marca`** | `id_marca` | Ninguna | Marca con logotipo `BYTEA` (máx. 5 MB, jpeg/png/webp). |
 | **`linea`** | `id_linea` | `id_marca` (RESTRICT) | Línea comercial; nombre único por marca. `UNIQUE (id_linea, id_marca)` soporta la FK compuesta de producto. |
@@ -599,7 +600,7 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | **`tipo_medida`** | `id_tipo_medida` | Ninguna | Galón, litro, mililitro, pulgada, metro, unidad. `equivalencia_galones` (> 0, opcional) deriva el rendimiento por medida (RF-CAT-10-03). |
 | **`medida`** | `id_medida` | `id_tipo_medida` (RESTRICT) | Valor + tipo (ej. 1/4 de galón). `UNIQUE (id_tipo_medida, valor)`. |
 | **`color`** | `id_color` | `id_marca`, `id_base` (opcional), `id_acabado`, `id_familia_color` (opcional) | Hexadecimal obligatorio; CIELAB opcional y completo o vacío. `UNIQUE (id_marca, nombre, id_acabado)`; código único por marca. |
-| **`producto`** | `id_producto` | `id_marca`, `(id_linea, id_marca)` → `linea`, `id_subcategoria`, `id_categoria_complementaria` (SET NULL) | Nombre único por marca; ambiente, publicación y patrocinio. La FK compuesta impide una línea de otra marca. |
+| **`producto`** | `id_producto` | `id_marca`, `(id_linea, id_marca)` → `linea`, `id_subcategoria`, `id_categoria_complementaria` (SET NULL) | Nombre único por marca; ambiente, publicación y patrocinio. La FK compuesta impide una línea de otra marca. `es_combo` (paquete con una sola variante, único producto con venta limitada por existencia) y `excluido_de_descuentos` (v3.7). |
 | **`ficha_recubrimiento`** | `id_producto` | `id_producto` (CASCADE), `id_tipo_resina` | 1:1 opcional: resina, tipo 1/2/3, rendimiento m²/galón. Las herramientas no tienen. |
 | **`producto_superficie`** | `(id_producto, id_superficie)` | ambos | Superficies del producto. |
 | **`producto_acabado`** | `(id_producto, id_acabado)` | ambos | Acabados del producto; filtran su carta. |
@@ -607,7 +608,7 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | **`producto_color`** | `(id_producto, id_color)` | ambos | Colores de fábrica / exclusivos del producto. |
 | **`producto_caracteristica`** | `id_caracteristica` | `id_producto` (CASCADE) | Atributos técnicos nombre/valor. |
 | **`variante`** | `id_variante` | `id_producto` (RESTRICT), `id_medida` (RESTRICT) | Producto + medida, `sku` UNIQUE, `precio_vigente`, existencia referencial, `codigo_proveedor` (SAMIT futuro). |
-| **`imagen`** | `id_imagen` | `id_producto`, `id_variante`, `id_color` | Imágenes `BYTEA`; una principal por producto. |
+| **`imagen`** | `id_imagen` | `id_producto`, `id_variante`, `id_color` | Imágenes `BYTEA`; una principal por producto. Se asocia a una variante o a un color, no a ambos. `miniatura` y `mediana` (WebP, opcionales) para listados y ficha (v3.7). |
 | **`combo`** / **`variante_combo`** | `id_combo` / `id_variante_combo` | — | Combos; pendientes de rediseño en su entrega. |
 
 ### Módulo 4: Carrito Vivo de Compras (2 Tablas)

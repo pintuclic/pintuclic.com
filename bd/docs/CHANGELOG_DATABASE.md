@@ -10,6 +10,17 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.7] - 2026-10-25
+### Esquema 4.9 (64 Tablas) - M01 entrega 3: combos, complementarios por subcategoría e imágenes con miniaturas
+- **Alcance General:** Columnas y valores de ENUM pedidos por el contrato de la entrega 3 de M01 (`contracts/m01-catalogo-entrega3.contract.ts`). Cambio puramente aditivo; no agrega tablas.
+  - **`producto.es_combo`** y **`producto.excluido_de_descuentos`** (`BOOLEAN NOT NULL DEFAULT false`): un combo es un producto con una sola variante (K1, K2); la marca de exclusión de descuentos la respeta M06. Las tablas `combo` y `variante_combo` quedan sin uso (D2).
+  - **`subcategoria.id_categoria_complementaria`** (`INT` opcional, FK a `categoria` con `ON DELETE SET NULL`): categoría de la que se sugieren complementarios por defecto (D6).
+  - **`imagen.miniatura`** y **`imagen.mediana`** (`BYTEA` opcionales, WebP de 320 y 960 px): nulas en imágenes anteriores, se completan al pedirlas (D7). Nuevo `chk_imagen_una_asociacion`: una imagen se asocia a una variante o a un color, no a ambos.
+  - **Pendiente (D8):** los valores de ENUM de M13 para los movimientos por orden (`orden`, `venta`, `devolucion`) llegan con el PR de código de M13, junto con su contrato, para no romper el código vigente.
+  - **Bases existentes en 4.8:** el DDL agrega todo con `IF NOT EXISTS`; no requiere seed. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql`.
+
+---
+
 ## [v3.6] - 2026-10-25
 ### Esquema 4.8 (64 Tablas) - M16 Contenido institucional y Centro de Ayuda / FAQ
 - **Alcance General:** Dos tablas nuevas y un ENUM pedidos por el contrato de M16 (`contracts/m16-contenido.contract.ts`). Cambio puramente aditivo.
