@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Home,
   LogOut,
+  Mail,
   Menu,
   Package,
   Search,
@@ -77,6 +78,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Configuración',
     href: '/admin/configuracion',
     icon: <Settings className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Notificaciones',
+    href: '/admin/notificaciones',
+    icon: <Mail className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
