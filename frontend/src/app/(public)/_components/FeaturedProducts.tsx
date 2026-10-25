@@ -87,7 +87,24 @@ export function FeaturedProducts() {
           setProductos(reales);
         })
         .catch(() => {
-          // Conserva el listado base si la red no está disponible.
+          // Si el backend o la base de datos están temporalmente inaccesibles en el VPS,
+          // aplica el filtrado reactivo de forma resiliente sobre la colección destacada.
+          const terminoMin = termino.toLowerCase();
+          const filtrados = featuredProducts.filter((p) => {
+            const coincideTexto =
+              terminoMin === '' ||
+              p.name.toLowerCase().includes(terminoMin) ||
+              p.description.toLowerCase().includes(terminoMin);
+
+            const coincideCategoria =
+              filtro.idCategoria === '' ||
+              (filtro.idCategoria === '1' && (p.id === '1' || p.id === '2' || p.id === '3' || p.id === '4')) ||
+              (filtro.idCategoria === '3' && p.id === '5') ||
+              (filtro.idCategoria === '6' && p.id === '6');
+
+            return coincideTexto && coincideCategoria;
+          });
+          setProductos(filtrados);
         })
         .finally(() => {
           if (activo) setCargando(false);
