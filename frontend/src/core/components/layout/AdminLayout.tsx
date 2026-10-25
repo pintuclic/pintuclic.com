@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import {
   ArrowRight,
   Bell,
+  Boxes,
   Building2,
   ChevronDown,
   ChevronRight,
@@ -55,6 +56,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Catálogo',
     href: '/admin/catalogo',
     icon: <Package className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Inventario',
+    href: '/admin/inventario',
+    icon: <Boxes className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
