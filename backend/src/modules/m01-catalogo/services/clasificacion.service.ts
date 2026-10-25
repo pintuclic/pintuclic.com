@@ -69,6 +69,7 @@ export class ClasificacionService extends ServicioCatalogoBase {
       this.subcategorias.existeDuplicado({ idCategoria, nombre: datos.nombre }),
       'una subcategoría en esa categoría',
     );
+    await this.exigirCategoriaComplementaria(datos.idCategoriaComplementaria);
     return this.subcategorias.crear({ ...datos, idCategoria });
   }
 
@@ -80,7 +81,20 @@ export class ClasificacionService extends ServicioCatalogoBase {
         'una subcategoría en esa categoría',
       );
     }
+    await this.exigirCategoriaComplementaria(datos.idCategoriaComplementaria);
     return this.subcategorias.editar(id, datos);
+  }
+
+  /** Entrega 3 (D6): la categoría de la que se sugieren complementarios debe existir y estar activa. */
+  private async exigirCategoriaComplementaria(id: number | null | undefined): Promise<void> {
+    if (id === undefined || id === null) return;
+    const categoria = await this.categorias.obtener(id);
+    if (categoria === null || categoria.estado !== 'activo') {
+      throw errores.relacionInvalida(
+        'La categoría complementaria no existe o está inactiva.',
+        'idCategoriaComplementaria',
+      );
+    }
   }
 
   async cambiarEstadoSubcategoria(id: number, peticion: CambiarEstadoRequest): Promise<Subcategoria> {

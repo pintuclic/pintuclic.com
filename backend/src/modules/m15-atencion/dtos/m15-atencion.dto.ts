@@ -15,10 +15,6 @@ import { z } from 'zod';
 export const idSchema = z.number().int().positive();
 export const idSolicitudSchema = z.string().uuid();
 
-export const temaFaqSchema = z.string().trim().min(1).max(60);
-export const preguntaFaqSchema = z.string().trim().min(1).max(300);
-export const respuestaFaqSchema = z.string().trim().min(1).max(2000);
-
 export const TIPOS_SOLICITUD_CONTACTO = ['consulta', 'cotizacion', 'reclamo'] as const;
 export const tipoSolicitudContactoSchema = z.enum(TIPOS_SOLICITUD_CONTACTO);
 export type TipoSolicitudContacto = z.infer<typeof tipoSolicitudContactoSchema>;
@@ -49,27 +45,6 @@ export const paginacionQuerySchema = z.object({
 /* ───────────────────────────────────────────────────────────────────────────
  * 2. ENTIDADES
  * ─────────────────────────────────────────────────────────────────────────── */
-
-export const preguntaFrecuenteSchema = z.object({
-  idPregunta: idSchema,
-  tema: temaFaqSchema,
-  pregunta: preguntaFaqSchema,
-  respuesta: respuestaFaqSchema,
-  orden: z.number().int().nonnegative(),
-  activa: z.boolean(),
-  fechaCreacion: z.string().datetime(),
-  fechaActualizacion: z.string().datetime(),
-});
-export type PreguntaFrecuente = z.infer<typeof preguntaFrecuenteSchema>;
-
-export const preguntaFrecuentePublicaSchema = preguntaFrecuenteSchema.pick({
-  idPregunta: true,
-  tema: true,
-  pregunta: true,
-  respuesta: true,
-  orden: true,
-});
-export type PreguntaFrecuentePublica = z.infer<typeof preguntaFrecuentePublicaSchema>;
 
 export const remitenteSolicitudSchema = z.object({
   nombre: z.string(),
@@ -135,40 +110,6 @@ export type ConfirmacionContacto = z.infer<typeof confirmacionContactoSchema>;
 /* ───────────────────────────────────────────────────────────────────────────
  * 3. PETICIONES
  * ─────────────────────────────────────────────────────────────────────────── */
-
-/** GET /admin/atencion/faqs */
-export const listarFaqsAdminRequestSchema = paginacionQuerySchema.extend({
-  tema: temaFaqSchema.optional(),
-  incluirInactivas: z
-    .enum(['true', 'false'])
-    .transform((v) => v === 'true')
-    .default(true),
-});
-export type ListarFaqsAdminRequest = z.infer<typeof listarFaqsAdminRequestSchema>;
-
-/** POST /admin/atencion/faqs */
-export const crearFaqRequestSchema = z.object({
-  tema: temaFaqSchema,
-  pregunta: preguntaFaqSchema,
-  respuesta: respuestaFaqSchema,
-  orden: z.number().int().nonnegative().default(0),
-});
-export type CrearFaqRequest = z.infer<typeof crearFaqRequestSchema>;
-
-/** PUT /admin/atencion/faqs/:idPregunta — al menos un campo. */
-export const editarFaqRequestSchema = crearFaqRequestSchema
-  .partial()
-  .refine((datos) => Object.keys(datos).length > 0, {
-    message: 'Envíe al menos un campo para actualizar.',
-  });
-export type EditarFaqRequest = z.infer<typeof editarFaqRequestSchema>;
-
-/** PUT /admin/atencion/faqs/orden */
-export const reordenarFaqsRequestSchema = z.object({
-  tema: temaFaqSchema,
-  ordenIds: z.array(idSchema).min(1),
-});
-export type ReordenarFaqsRequest = z.infer<typeof reordenarFaqsRequestSchema>;
 
 /** POST /atencion/contacto — el remitente lo resuelve el servidor (R5). */
 export const crearSolicitudContactoRequestSchema = z.object({

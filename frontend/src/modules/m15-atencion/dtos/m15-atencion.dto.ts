@@ -39,31 +39,6 @@ export const contactoFormSchema = z.object({
 });
 export type ContactoFormData = z.infer<typeof contactoFormSchema>;
 
-/** Crear o editar una pregunta frecuente desde el panel (HU-ATC-01). */
-export const faqFormSchema = z.object({
-  tema: z
-    .string()
-    .trim()
-    .min(1, 'Escribe el tema que agrupa la pregunta')
-    .max(60, 'El tema no puede superar los 60 caracteres'),
-  pregunta: z
-    .string()
-    .trim()
-    .min(1, 'Escribe la pregunta')
-    .max(300, 'La pregunta no puede superar los 300 caracteres'),
-  respuesta: z
-    .string()
-    .trim()
-    .min(1, 'Escribe la respuesta')
-    .max(2000, 'La respuesta no puede superar los 2000 caracteres'),
-  /** Se registra con `valueAsNumber`; sin `coerce` para no romper los tipos de React Hook Form. */
-  orden: z
-    .number({ message: 'El orden debe ser un número' })
-    .int('El orden debe ser un número entero')
-    .min(0, 'El orden no puede ser negativo'),
-});
-export type FaqFormData = z.infer<typeof faqFormSchema>;
-
 /** Canal de contacto directo (HU-ATC-03). */
 export const canalFormSchema = z.object({
   destino: z

@@ -1,10 +1,7 @@
 import type {
   ConfiguracionWhatsapp,
-  CrearFaqRequest,
-  EditarFaqRequest,
   EstadoSolicitudContacto,
   FranjaHorario,
-  PreguntaFrecuente,
   SolicitudContacto,
   TipoSolicitudContacto,
 } from '../dtos/m15-atencion.dto';
@@ -12,33 +9,6 @@ import type {
 /**
  * Puertos de persistencia de M15. Solo tipos, cero runtime (AGENTS.md).
  */
-
-export interface FiltroFaqsAdmin {
-  tema?: string;
-  incluirInactivas: boolean;
-  pagina: number;
-  limite: number;
-}
-
-export interface PaginaFaqs {
-  items: PreguntaFrecuente[];
-  total: number;
-}
-
-export interface FaqsRepositoryPort {
-  /** Solo activas, agrupadas por tema y ordenadas (R1, R2). */
-  listarPublicas(): Promise<PreguntaFrecuente[]>;
-  listarAdmin(filtro: FiltroFaqsAdmin): Promise<PaginaFaqs>;
-  obtener(idPregunta: number): Promise<PreguntaFrecuente | null>;
-  crear(datos: CrearFaqRequest): Promise<PreguntaFrecuente>;
-  actualizar(idPregunta: number, datos: EditarFaqRequest): Promise<PreguntaFrecuente>;
-  cambiarActiva(idPregunta: number, activa: boolean): Promise<PreguntaFrecuente>;
-  eliminar(idPregunta: number): Promise<void>;
-  /** Ids del tema, para validar un reordenamiento completo. */
-  idsDelTema(tema: string): Promise<number[]>;
-  /** Fija el `orden` de cada id según su posición en la lista, en una transacción. */
-  reordenar(ordenIds: number[]): Promise<void>;
-}
 
 export interface FiltroSolicitudes {
   tipo?: TipoSolicitudContacto;

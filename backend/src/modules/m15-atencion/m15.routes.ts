@@ -3,41 +3,36 @@ import { requirePermission } from '../../core/middlewares/autorizacion.middlewar
 import type { AutorizacionService } from '../m20-seguridad/services/autorizacion.service';
 import { ConfiguracionAtencionController } from './controllers/configuracion.controller';
 import { ContactoController } from './controllers/contacto.controller';
-import { FaqsController } from './controllers/faqs.controller';
 import { PrismaConfiguracionAtencionRepository } from './repositories/configuracion.repository';
 import { PrismaContactoRepository } from './repositories/contacto.repository';
-import { PrismaFaqsRepository } from './repositories/faqs.repository';
 import { ConfiguracionAtencionService } from './services/configuracion.service';
 import { ContactoService } from './services/contacto.service';
-import { FaqsService } from './services/faqs.service';
 
 /**
- * M15 — Atención al cliente. Dos routers, como M01:
- *  · `publicRouter`, montado en /atencion: FAQ, horario y canal son públicos, y
+ * M15 — Atención al cliente. Dos routers, como M01 y M16:
+ *  · `publicRouter`, montado en /atencion: el horario y el canal son públicos, y
  *    POST /contacto exige sesión (la aplica app.routes.ts con exigirSesionSalvo).
  *  · `adminRouter`, montado en /admin/atencion: todo exige sesión y permiso.
+ *
+ * Las preguntas frecuentes NO están aquí: son de M16 (HU-CON-02 / HU-CON-04),
+ * que las sirve en /contenido/faq y las expone por `ContenidoFaqPort`.
  */
 export function construirModuloM15(autorizacion: AutorizacionService): {
   publicRouter: Router;
   adminRouter: Router;
-  faqsService: FaqsService;
   contactoService: ContactoService;
   configuracionService: ConfiguracionAtencionService;
 } {
-  const faqsRepo = new PrismaFaqsRepository();
   const contactoRepo = new PrismaContactoRepository();
   const configuracionRepo = new PrismaConfiguracionAtencionRepository();
 
-  const faqsService = new FaqsService(faqsRepo);
   const contactoService = new ContactoService(contactoRepo, configuracionRepo);
   const configuracionService = new ConfiguracionAtencionService(configuracionRepo);
 
-  const faqs = new FaqsController(faqsService);
   const contacto = new ContactoController(contactoService);
   const configuracion = new ConfiguracionAtencionController(configuracionService);
 
   const publicRouter = Router();
-  publicRouter.get('/faqs', faqs.listarPublicas as RequestHandler);
   publicRouter.get('/horario', configuracion.obtenerHorario as RequestHandler);
   publicRouter.get('/whatsapp', configuracion.obtenerCanalPublico as RequestHandler);
   publicRouter.post('/contacto', contacto.crear as RequestHandler);
@@ -45,15 +40,6 @@ export function construirModuloM15(autorizacion: AutorizacionService): {
   const adminRouter = Router();
   const puedeVer = requirePermission(autorizacion, 'atencion.ver') as RequestHandler;
   const puedeEditar = requirePermission(autorizacion, 'atencion.editar') as RequestHandler;
-
-  adminRouter.get('/faqs', puedeVer, faqs.listarAdmin as RequestHandler);
-  adminRouter.post('/faqs', puedeEditar, faqs.crear as RequestHandler);
-  // `/faqs/orden` va ANTES de `/faqs/:idPregunta`: al revés, el parámetro capturaría "orden".
-  adminRouter.put('/faqs/orden', puedeEditar, faqs.reordenar as RequestHandler);
-  adminRouter.put('/faqs/:idPregunta', puedeEditar, faqs.editar as RequestHandler);
-  adminRouter.delete('/faqs/:idPregunta', puedeEditar, faqs.eliminar as RequestHandler);
-  adminRouter.patch('/faqs/:idPregunta/activar', puedeEditar, faqs.activar as RequestHandler);
-  adminRouter.patch('/faqs/:idPregunta/desactivar', puedeEditar, faqs.desactivar as RequestHandler);
 
   adminRouter.get('/solicitudes-contacto', puedeVer, contacto.listar as RequestHandler);
   adminRouter.patch(
@@ -67,5 +53,5 @@ export function construirModuloM15(autorizacion: AutorizacionService): {
   adminRouter.get('/whatsapp', puedeVer, configuracion.obtenerWhatsapp as RequestHandler);
   adminRouter.put('/whatsapp', puedeEditar, configuracion.actualizarWhatsapp as RequestHandler);
 
-  return { publicRouter, adminRouter, faqsService, contactoService, configuracionService };
+  return { publicRouter, adminRouter, contactoService, configuracionService };
 }

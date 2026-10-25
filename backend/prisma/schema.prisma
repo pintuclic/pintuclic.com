@@ -157,6 +157,8 @@ enum MotivoAjusteInventario {
   correccion
   otro
   carga_masiva
+  venta
+  devolucion
 
   @@map("enum_motivo_ajuste_inventario")
 }
@@ -166,6 +168,7 @@ enum OrigenAjusteInventario {
   manual
   carga_masiva
   samit
+  orden
 
   @@map("enum_origen_ajuste_inventario")
 }
@@ -210,6 +213,15 @@ enum EstadoProducto {
   @@map("enum_estado_producto")
 }
 
+/// Estado editorial de una página institucional (M16 · HU-CON-01 / HU-CON-03)
+enum EstadoContenido {
+  borrador
+  publicado
+  archivado
+
+  @@map("enum_estado_contenido")
+}
+
 // =============================================================================
 // MÓDULO M04 — USUARIO
 // =============================================================================
@@ -248,6 +260,10 @@ model Usuario {
 
   // M15 Relaciones
   solicitudesContacto SolicitudContacto[]
+
+  // M16 Relaciones
+  paginasInstitucionales PaginaInstitucional[] @relation("PaginaInstitucionalAutor")
+  entradasFaq            FaqEntrada[]          @relation("FaqEntradaAutor")
 
   @@map("usuario")
 }
@@ -618,6 +634,8 @@ model AjusteInventario {
   /// Agrupa los ajustes de una misma carga masiva; lo genera el cliente, sin tabla propia
   idCarga            String?                @map("id_carga") @db.Uuid
   idUsuario          Int?                   @map("id_usuario")
+  /// Orden que movió la existencia de un combo; con el motivo y la variante es única (idempotencia)
+  referencia         String?                @db.VarChar(100)
   fecha              DateTime               @default(now()) @db.Timestamptz(6)
 
   variante Variante @relation(fields: [idVariante], references: [idVariante], onDelete: Restrict, map: "fk_ajuste_variante")
@@ -626,31 +644,17 @@ model AjusteInventario {
   @@index([idVariante, fecha(sort: Desc)], map: "idx_ajuste_variante_fecha")
   @@index([idCarga], map: "idx_ajuste_carga")
   @@index([idUsuario], map: "idx_ajuste_usuario")
+  // Índice único parcial (WHERE referencia IS NOT NULL) solo en el DDL: Prisma no expresa índices parciales.
   @@map("ajuste_inventario")
 }
 
 // =============================================================================
-// MÓDULO M15 — ATENCIÓN AL CLIENTE (esquema 4.8)
+// MÓDULO M15 — ATENCIÓN AL CLIENTE (esquema 4.11)
 // Contrato: contracts/m15-atencion.contract.ts
+// Las preguntas frecuentes son de M16 (`faq_entrada`): M15 las consume por puerto.
 // =============================================================================
 
 /// Pregunta frecuente administrable, agrupada por tema y ordenada (M15 · HU-ATC-01)
-model PreguntaFrecuente {
-  idPregunta         Int      @id @default(autoincrement()) @map("id_pregunta")
-  tema               String   @db.VarChar(60)
-  pregunta           String   @db.VarChar(300)
-  respuesta          String   @db.VarChar(2000)
-  orden              Int      @default(0)
-  /// false la oculta al público sin eliminarla (CA-ATC-01-02)
-  activa             Boolean  @default(true)
-  fechaCreacion      DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
-  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
-
-  @@index([tema, orden], map: "idx_faq_tema_orden")
-  @@index([activa], map: "idx_faq_activa")
-  @@map("pregunta_frecuente")
-}
-
 /// Solicitud del formulario de contacto dirigida al administrador (M15 · HU-ATC-02).
 /// Los datos de contacto no se guardan: se leen de la cuenta al mostrarla (RF-ATC-02-04).
 model SolicitudContacto {
@@ -709,6 +713,7 @@ model Categoria {
 
   subcategorias            Subcategoria[]
   productosComplementarios Producto[]     @relation("CategoriaComplementaria")
+  subcategoriasComplementarias Subcategoria[] @relation("SubcategoriaCategoriaComplementaria")
 
   @@map("categoria")
 }
@@ -720,8 +725,11 @@ model Subcategoria {
   nombre         String        @db.VarChar(100)
   orden          Int           @default(0)
   estado         EstadoGeneral @default(activo)
+  /// Categoría de la que se sugieren complementarios a sus productos sin una propia (RF-CAT-08-01)
+  idCategoriaComplementaria Int? @map("id_categoria_complementaria")
 
   categoria Categoria  @relation(fields: [idCategoria], references: [idCategoria], onDelete: Restrict, map: "fk_subcategoria_categoria")
+  categoriaComplementaria Categoria? @relation("SubcategoriaCategoriaComplementaria", fields: [idCategoriaComplementaria], references: [idCategoria], onDelete: SetNull, map: "fk_subcategoria_categoria_complementaria")
   productos Producto[]
 
   @@unique([idCategoria, nombre], map: "uq_subcategoria_nombre_categoria")
@@ -899,6 +907,10 @@ model Producto {
   publicado                 Boolean       @default(false)
   idCategoriaComplementaria Int?          @map("id_categoria_complementaria")
   patrocinado               Boolean       @default(false)
+  /// Combo (HU-CAT-13): paquete a precio propio con una única variante; su venta se limita por existencia
+  esCombo                   Boolean       @default(false) @map("es_combo")
+  /// M06 no le aplica descuentos (RF-CAT-13-01)
+  excluidoDeDescuentos      Boolean       @default(false) @map("excluido_de_descuentos")
   fechaCreacion             DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
 
   marca                   Marca        @relation(fields: [idMarca], references: [idMarca], onDelete: Restrict, map: "fk_producto_marca")
@@ -1045,6 +1057,10 @@ model Imagen {
   mimeType    String  @map("mime_type") @db.VarChar(50)
   orden       Int     @default(0)
   esPrincipal Boolean @default(false) @map("es_principal")
+  /// Miniatura de 320 px en WebP para los listados; null en imágenes anteriores (RNF-CAT-07-01)
+  miniatura   Bytes?
+  /// Versión de 960 px en WebP para la ficha; null en imágenes anteriores
+  mediana     Bytes?
 
   producto Producto  @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_imagen_producto")
   variante Variante? @relation(fields: [idVariante], references: [idVariante], onDelete: Cascade, map: "fk_imagen_variante")
@@ -1081,4 +1097,45 @@ model VarianteCombo {
   @@index([idVariante], map: "idx_varcombo_variante")
   @@index([idCombo], map: "idx_varcombo_combo")
   @@map("variante_combo")
+}
+
+// =============================================================================
+// MÓDULO M16 — CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (HU-CON-01 a HU-CON-04)
+// =============================================================================
+
+/// Página institucional administrable (Sobre Nosotros, Términos, Privacidad, Envíos)
+model PaginaInstitucional {
+  idPagina           Int             @id @default(autoincrement()) @map("id_pagina")
+  slug               String          @unique @db.VarChar(120)
+  titulo             String          @db.VarChar(160)
+  resumen            String?         @db.VarChar(300)
+  cuerpoMarkdown     String          @map("cuerpo_markdown")
+  estado             EstadoContenido @default(borrador)
+  idAutor            Int?            @map("id_autor")
+  fechaCreacion      DateTime        @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime        @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  autor Usuario? @relation("PaginaInstitucionalAutor", fields: [idAutor], references: [idUsuario], onDelete: SetNull, map: "fk_pagina_institucional_autor")
+
+  @@index([estado], map: "idx_pagina_institucional_estado")
+  @@index([idAutor], map: "idx_pagina_institucional_autor")
+  @@map("pagina_institucional")
+}
+
+/// Entrada del catálogo de preguntas frecuentes (FAQ) para el Centro de Ayuda y puerto hacia M15
+model FaqEntrada {
+  idFaq              Int           @id @default(autoincrement()) @map("id_faq")
+  pregunta           String        @db.VarChar(240)
+  respuestaMarkdown  String        @map("respuesta_markdown")
+  orden              Int           @default(0)
+  estado             EstadoGeneral @default(activo)
+  idAutor            Int?          @map("id_autor")
+  fechaCreacion      DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime      @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  autor Usuario? @relation("FaqEntradaAutor", fields: [idAutor], references: [idUsuario], onDelete: SetNull, map: "fk_faq_entrada_autor")
+
+  @@index([estado, orden, idFaq], map: "idx_faq_entrada_estado_orden")
+  @@index([idAutor], map: "idx_faq_entrada_autor")
+  @@map("faq_entrada")
 }

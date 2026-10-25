@@ -22,6 +22,8 @@ const RUTAS_CON_IMAGEN: ReadonlyArray<{ metodo: string; ruta: RegExp }> = [
   { metodo: 'PUT', ruta: /^\/api\/v1\/admin\/catalogo\/marcas\/\d+\/logotipo$/ },
   { metodo: 'POST', ruta: /^\/api\/v1\/admin\/catalogo\/productos\/\d+\/imagenes$/ },
   { metodo: 'PUT', ruta: /^\/api\/v1\/admin\/catalogo\/medidas\/\d+\/imagen$/ },
+  { metodo: 'POST', ruta: /^\/api\/v1\/admin\/landing\/banners$/ },
+  { metodo: 'PUT', ruta: /^\/api\/v1\/admin\/landing\/banners\/\d+$/ },
 ];
 
 /**

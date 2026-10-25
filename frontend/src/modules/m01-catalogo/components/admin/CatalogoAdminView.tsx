@@ -2,12 +2,13 @@
 
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Layers, Package, Palette, Ruler, SlidersHorizontal, Tags } from 'lucide-react';
+import { Boxes, Layers, Package, Palette, Ruler, SlidersHorizontal, Tags } from 'lucide-react';
 import { AdminPageHeader, SectionNav, type SectionNavItem } from '@/core/components';
 import { leerSeccion, RUTA_ADMIN_CATALOGO, type SeccionAdmin } from '../../services/enlaces';
 import { AtributosView } from './AtributosView';
 import { ClasificacionView } from './ClasificacionView';
 import { ColoresView } from './ColoresView';
+import { CombosView } from './CombosView';
 import { MarcasLineasView } from './MarcasLineasView';
 import { MedidasView } from './MedidasView';
 import { ProductosView } from './ProductosView';
@@ -16,6 +17,7 @@ type Seccion = SeccionAdmin;
 
 const SECCIONES: ReadonlyArray<SectionNavItem<Seccion>> = [
   { id: 'productos', label: 'Productos', icon: Package },
+  { id: 'combos', label: 'Combos', icon: Boxes },
   { id: 'colores', label: 'Colores', icon: Palette },
   { id: 'marcas', label: 'Marcas y líneas', icon: Tags },
   { id: 'clasificacion', label: 'Categorías', icon: Layers },
@@ -46,6 +48,7 @@ export const CatalogoAdminView: React.FC = () => {
         />
         <div id="panel-catalogo" className="min-w-0">
           {seccion === 'productos' && <ProductosView key={parametros.toString()} />}
+          {seccion === 'combos' && <CombosView />}
           {seccion === 'colores' && <ColoresView />}
           {seccion === 'marcas' && <MarcasLineasView />}
           {seccion === 'clasificacion' && <ClasificacionView />}

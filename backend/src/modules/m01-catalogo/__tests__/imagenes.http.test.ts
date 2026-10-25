@@ -14,8 +14,29 @@ const PNG = Buffer.from(
   'base64',
 );
 /** Una imagen distinta de la anterior: PNG con relleno, para comprobar que se sirven los bytes correctos. */
-const pngConRelleno = (n: number): Buffer => Buffer.concat([PNG, Buffer.alloc(n, 7)]);
-const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32, 1)]);
+const crc32 = (datos: Buffer): number => {
+  let crc = 0xffffffff;
+  for (const byte of datos) {
+    crc ^= byte;
+    for (let i = 0; i < 8; i += 1) crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+};
+/** Un PNG válido distinto para cada `n` (lleva un fragmento de texto de n bytes antes del final). */
+const pngConRelleno = (n: number): Buffer => {
+  const tipoYDatos = Buffer.concat([Buffer.from('tEXt'), Buffer.from('k\0'), Buffer.alloc(n, 0x61)]);
+  const longitud = Buffer.alloc(4);
+  longitud.writeUInt32BE(tipoYDatos.length - 4);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(tipoYDatos));
+  const iend = PNG.subarray(PNG.length - 12);
+  return Buffer.concat([PNG.subarray(0, PNG.length - 12), longitud, tipoYDatos, crc, iend]);
+};
+/** Un JPEG de verdad (2×2): desde la entrega 3 se generan miniaturas, y un archivo con solo la firma no se procesa. */
+const JPEG = Buffer.from(
+  '/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAABv/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJAAnHX/2Q==',
+  'base64',
+);
 const base64 = (b: Buffer): string => b.toString('base64');
 
 interface Dato {

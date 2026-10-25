@@ -20,6 +20,7 @@ export class VariantesService extends ServicioCatalogoBase {
 
   async crear(idProducto: number, peticion: CrearVarianteRequest): Promise<Variante> {
     const producto = this.exigir(await this.productos.obtener(idProducto));
+    if (producto.esCombo) throw errores.comboSoloPorCombos();
     if (producto.estado !== 'activo') throw errores.padreInactivo('el producto');
 
     const medida = await this.medidas.obtener(peticion.idMedida);
@@ -55,6 +56,8 @@ export class VariantesService extends ServicioCatalogoBase {
 
   async editar(id: number, peticion: EditarVarianteRequest): Promise<Variante> {
     const actual = this.exigir(await this.variantes.obtener(id));
+    const producto = this.exigir(await this.productos.obtener(actual.idProducto));
+    if (producto.esCombo) throw errores.comboSoloPorCombos();
     if (peticion.sku !== undefined && peticion.sku.toLowerCase() !== actual.sku.toLowerCase()) {
       if (await this.variantes.existeSku(peticion.sku, id)) throw errores.duplicado('una variante con ese SKU', 'sku');
     }

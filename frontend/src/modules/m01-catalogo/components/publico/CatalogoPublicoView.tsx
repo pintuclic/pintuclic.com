@@ -249,12 +249,12 @@ export const CatalogoPublicoView: React.FC = () => {
                     id={String(p.idProducto)}
                     name={p.nombre}
                     brand={p.marca}
-                    description={`${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
+                    description={`${p.esCombo ? 'Combo · ' : ''}${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
                     price={p.precioDesde ?? 0}
                     href={`/productos/${p.idProducto}`}
                     {...(p.idImagenPrincipal === null
                       ? {}
-                      : { imageUrl: catalogoPublicoApi.urlImagen(p.idImagenPrincipal) })}
+                      : { imageUrl: catalogoPublicoApi.urlImagen(p.idImagenPrincipal, 'miniatura') })}
                     className="w-full"
                   />
                 </li>

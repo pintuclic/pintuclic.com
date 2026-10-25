@@ -1,8 +1,11 @@
 import { Router, type RequestHandler } from 'express';
+import { construirRutasLandingBanners } from './core/landing/banners.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
+import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
 import { construirModuloM15 } from './modules/m15-atencion/m15.routes';
+import { construirModuloM16 } from './modules/m16-contenido/m16.routes';
 import { construirModuloM17 } from './modules/m17-permisos/m17.routes';
 import { construirModuloM18 } from './modules/m18-notificaciones/m18.routes';
 import { construirModuloM20 } from './modules/m20-seguridad/m20.routes';
@@ -82,15 +85,31 @@ export function construirAppRoutes(): Router {
   router.use('/admin/catalogo', exigirSesionSalvo(auth, []), m01.adminRouter);
   router.use('/catalogo', m01.publicRouter);
 
-  // M15: atención al cliente. Las preguntas frecuentes, el horario y el canal son
-  // públicos; el formulario de contacto exige sesión (RF-ATC-02-01). Va antes de
-  // `/admin` por lo mismo que M01.
+  // M13: inventario referencial (existencias, historial y carga masiva). Exige sesión y los permisos
+  // `catalogo.ver` / `catalogo.editar`, resueltos en servidor. Va antes de `/admin` por la misma razón.
+  const m13 = construirModuloM13(m17.autorizacionService);
+  router.use('/admin/inventario', exigirSesionSalvo(auth, []), m13.router);
+
+  // M16: gestión administrativa de contenido institucional y FAQ (exige sesión y permisos
+  // `configuracion.*`) y consulta pública de páginas publicadas y FAQ activas (sin sesión).
+  // Va antes de `/admin` para no colisionar con el enrutador general de M17.
+  const m16 = construirModuloM16(m17.autorizacionService);
+  router.use('/admin/contenido', exigirSesionSalvo(auth, []), m16.adminRouter);
+  router.use('/contenido', m16.publicRouter);
+
+  // FP-01 (Transversal): gestión administrativa de banners / sliders de inicio y consulta pública.
+  const landing = construirRutasLandingBanners(m17.autorizacionService);
+  router.use('/admin/landing', exigirSesionSalvo(auth, []), landing.adminRouter);
+  router.use('/landing', landing.publicRouter);
+
+  // M15: atención al cliente. El horario y el canal son públicos; el formulario de
+  // contacto exige sesión (RF-ATC-02-01). Las preguntas frecuentes no son de M15:
+  // las sirve M16 en /contenido/faq. Va antes de `/admin` por lo mismo que M01.
   const m15 = construirModuloM15(m17.autorizacionService);
   router.use('/admin/atencion', exigirSesionSalvo(auth, []), m15.adminRouter);
   router.use(
     '/atencion',
     exigirSesionSalvo(auth, [
-      { metodo: 'GET', ruta: '/faqs' },
       { metodo: 'GET', ruta: '/horario' },
       { metodo: 'GET', ruta: '/whatsapp' },
     ]),

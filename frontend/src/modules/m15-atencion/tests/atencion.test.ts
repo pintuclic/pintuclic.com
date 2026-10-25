@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  canalFormSchema,
-  contactoFormSchema,
-  faqFormSchema,
-  horarioFormSchema,
-} from '../dtos/m15-atencion.dto';
+import { canalFormSchema, contactoFormSchema, horarioFormSchema } from '../dtos/m15-atencion.dto';
 import type { CanalWhatsappPublico } from '../interfaces/atencion.interface';
 import { enlaceDelCanal } from '../services/enlace-canal';
 
@@ -78,42 +73,6 @@ describe('contactoFormSchema (HU-ATC-02)', () => {
 
     expect(resultado.success).toBe(false);
     expect(resultado.error?.issues[0]?.message).toContain('5 caracteres');
-  });
-});
-
-describe('faqFormSchema (HU-ATC-01)', () => {
-  const valida = {
-    tema: 'Envíos y entregas',
-    pregunta: '¿A qué ciudades hacen envíos?',
-    respuesta: 'Por el momento a todo el departamento del Caquetá.',
-    orden: 1,
-  };
-
-  it('acepta una pregunta completa', () => {
-    expect(faqFormSchema.safeParse(valida).success).toBe(true);
-  });
-
-  it('exige la respuesta: cada pregunta lleva la suya', () => {
-    const resultado = faqFormSchema.safeParse({
-      tema: valida.tema,
-      pregunta: valida.pregunta,
-      orden: valida.orden,
-    });
-
-    expect(resultado.success).toBe(false);
-  });
-
-  it('rechaza un orden negativo', () => {
-    const resultado = faqFormSchema.safeParse({ ...valida, orden: -1 });
-
-    expect(resultado.success).toBe(false);
-    expect(resultado.error?.issues[0]?.message).toContain('negativo');
-  });
-
-  it('rechaza un tema de más de 60 caracteres', () => {
-    const resultado = faqFormSchema.safeParse({ ...valida, tema: 'x'.repeat(61) });
-
-    expect(resultado.success).toBe(false);
   });
 });
 

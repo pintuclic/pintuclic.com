@@ -55,8 +55,8 @@ describe('ProductCard con href', () => {
     />
   );
 
-  it('el nombre y "Ver producto" son enlaces a la ficha, no botones', () => {
-    expect(html.match(/href="\/productos\/brocha-premium-3"/g)).toHaveLength(2);
+  it('el nombre, "Ver producto" y la acción de compra son enlaces a la ficha cuando no hay callback de carrito', () => {
+    expect(html.match(/href="\/productos\/brocha-premium-3"/g)).toHaveLength(3);
     expect(html).toContain('aria-label="Ver producto: Brocha Premium 3&quot;"');
   });
 

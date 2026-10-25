@@ -14,20 +14,6 @@ export type DiaSemana =
   | 'sabado'
   | 'domingo';
 
-export interface PreguntaFrecuentePublica {
-  idPregunta: number;
-  tema: string;
-  pregunta: string;
-  respuesta: string;
-  orden: number;
-}
-
-export interface PreguntaFrecuente extends PreguntaFrecuentePublica {
-  activa: boolean;
-  fechaCreacion: string;
-  fechaActualizacion: string;
-}
-
 export interface RemitenteSolicitud {
   nombre: string;
   correo: string;
@@ -82,11 +68,6 @@ export interface Paginacion {
   limite: number;
   total: number;
   totalPaginas: number;
-}
-
-export interface PaginaFaqs {
-  items: PreguntaFrecuente[];
-  pagination: Paginacion;
 }
 
 export interface PaginaSolicitudes {

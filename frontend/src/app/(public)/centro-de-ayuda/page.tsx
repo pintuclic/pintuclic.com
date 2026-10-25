@@ -1,12 +1,22 @@
 import type { Metadata } from 'next';
-import { CentroAyudaView } from '@/modules/m15-atencion/components/publico/CentroAyudaView';
+import { CentroAyudaFaqView } from '@/modules/m16-contenido/components/publico/CentroAyudaFaqView';
+import { ContactoYHorarioView } from '@/modules/m15-atencion/components/publico/ContactoYHorarioView';
 
 export const metadata: Metadata = {
-  title: 'Centro de ayuda — Pintu Clic',
+  title: 'Centro de Ayuda y Preguntas Frecuentes — Pintu Clic',
   description:
-    'Preguntas frecuentes sobre pedidos, envíos, garantías y color, horario de atención y contacto directo con un asesor.',
+    'Respuestas a las preguntas frecuentes sobre compras, colores entonados, envíos y cuentas empresa en Pintu Clic, con el horario de atención y el contacto directo con un asesor.',
 };
 
+/**
+ * Las preguntas frecuentes las sirve M16, dueño del contenido. Debajo, M15 suma
+ * el contacto con el equipo: formulario, horario de atención y WhatsApp.
+ */
 export default function CentroDeAyudaPage() {
-  return <CentroAyudaView />;
+  return (
+    <>
+      <CentroAyudaFaqView />
+      <ContactoYHorarioView />
+    </>
+  );
 }
