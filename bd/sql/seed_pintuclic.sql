@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 4.4 (alineado con schema_pintuclic.sql v4.4 - equivalencia en galones)
+-- VERSIÓN: 4.11 (alineado con schema_pintuclic.sql v4.11 - atención al cliente M15)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -61,7 +61,11 @@ INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     (21, 'empresas.validar',               'Aprobar o rechazar solicitudes de cuenta empresa, ascenso y renovación de NIT', 'activo'),
     -- Notificaciones y Comunicaciones (M18 HU-NOT-03)
     (22, 'notificaciones.ver',             'Ver plantillas de comunicación y el registro de envíos y rebotes', 'activo'),
-    (23, 'notificaciones.editar',          'Editar el contenido de las plantillas de comunicación',            'activo')
+    (23, 'notificaciones.editar',          'Editar el contenido de las plantillas de comunicación',            'activo'),
+    -- Atención al cliente (M15 HU-ATC-02, HU-ATC-03, HU-ATC-04, HU-ATC-05)
+    (24, 'atencion.ver',                   'Ver solicitudes de contacto, horario y canal de atención',         'activo'),
+    (25, 'atencion.editar',                'Gestionar el horario de atención y el canal de WhatsApp',          'activo'),
+    (26, 'atencion.atender_clientes',      'Atender las consultas escaladas a un asesor humano',               'activo')
 ON CONFLICT (id_permiso) DO NOTHING;
 
 -- 1.5 Asignación de Permisos a Roles
@@ -725,6 +729,31 @@ INSERT INTO faq_entrada (id_faq, pregunta, respuesta_markdown, orden, estado, id
 ON CONFLICT (id_faq) DO NOTHING;
 
 -- ==============================================================================
+-- 9F. MÓDULO DE ATENCIÓN AL CLIENTE (2 Tablas - M15 - HU-ATC-03, HU-ATC-04)
+-- Las preguntas frecuentes se siembran arriba, en M16: son suyas.
+-- ==============================================================================
+
+-- 9F.1 Horario de atención humana, una fila por día (HU-ATC-04).
+-- Domingo cerrado: sin horas, como exige ck_horario_franja_coherente.
+INSERT INTO horario_atencion (dia_semana, abierto, hora_inicio, hora_fin) VALUES
+    ('lunes',     TRUE,  '08:00', '18:00'),
+    ('martes',    TRUE,  '08:00', '18:00'),
+    ('miercoles', TRUE,  '08:00', '18:00'),
+    ('jueves',    TRUE,  '08:00', '18:00'),
+    ('viernes',   TRUE,  '08:00', '18:00'),
+    ('sabado',    TRUE,  '08:00', '13:00'),
+    ('domingo',   FALSE, NULL,    NULL)
+ON CONFLICT (dia_semana) DO NOTHING;
+
+-- 9F.2 Canal de contacto directo por WhatsApp, fila única (HU-ATC-03).
+-- Hoy apunta al canal de difusión de la empresa: es temporal, solo para verificar la redirección,
+-- y un canal no acepta texto prellenado. `mensaje_base` queda listo para cuando el destino sea un
+-- número de WhatsApp Business y el botón arme el enlace wa.me con la referencia del producto.
+INSERT INTO configuracion_atencion_whatsapp (id_configuracion, destino, mensaje_base) VALUES
+    (1, 'https://whatsapp.com/channel/0029VbDzCHgGehEKg98m4J3X', 'Hola, quiero información sobre sus productos.')
+ON CONFLICT (id_configuracion) DO NOTHING;
+
+-- ==============================================================================
 -- 10. ACTUALIZACIÓN AUTOMÁTICA DE SECUENCIAS (EVITA COLISIONES DE IDs)
 -- ==============================================================================
 
@@ -772,5 +801,6 @@ SELECT setval('usuario_identidad_externa_id_identidad_seq',      COALESCE((SELEC
 SELECT setval('parametro_sistema_id_parametro_seq',              COALESCE((SELECT MAX(id_parametro) FROM parametro_sistema), 1));
 SELECT setval('pagina_institucional_id_pagina_seq',              COALESCE((SELECT MAX(id_pagina) FROM pagina_institucional), 1));
 SELECT setval('faq_entrada_id_faq_seq',                          COALESCE((SELECT MAX(id_faq) FROM faq_entrada), 1));
+SELECT setval('horario_atencion_id_horario_seq',                 COALESCE((SELECT MAX(id_horario) FROM horario_atencion), 1));
 
 COMMIT;

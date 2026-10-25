@@ -10,6 +10,21 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.9] - 2026-10-25
+### Esquema 4.11 (67 Tablas) - M15 Atención al cliente
+- **Alcance General:** Tres tablas nuevas pedidas por el contrato de M15 (`contracts/m15-atencion.contract.ts`). Cambio puramente aditivo. **Las preguntas frecuentes NO están aquí:** son de M16 (`faq_entrada`, esquema 4.9) y M15 las consume por el puerto que M16 expone.
+  - **`solicitud_contacto`**: solicitudes del formulario de contacto, que exige sesión (HU-ATC-02). Guarda `tipo` (`consulta`, `cotizacion`, `reclamo`), `descripcion` y `estado`; **no duplica los datos de contacto**, que se leen de la cuenta al mostrarla (RF-ATC-02-04). `ON DELETE CASCADE` sobre `usuario`.
+  - **`horario_atencion`**: una fila por día de la semana (`dia_semana` UNIQUE, HU-ATC-04). Las horas son texto `"HH:mm"` en 24h —no `TIME`— para que coincidan con el contrato sin convertir husos; `ck_horario_formato_horas` valida el formato y `ck_horario_franja_coherente` exige que un día cerrado no lleve horas y que uno abierto tenga `hora_fin > hora_inicio`.
+  - **`configuracion_atencion_whatsapp`**: fila única (`ck_whatsapp_fila_unica`) con el `destino` del botón de contacto directo (HU-ATC-03). Admite una URL completa —hoy el canal de difusión, que no acepta texto prellenado— o un número de WhatsApp Business cuando exista; de ahí que el campo no se llame `numero`.
+  - **ENUMs nuevos:** `enum_tipo_solicitud_contacto`, `enum_estado_solicitud_contacto` y `enum_dia_semana`.
+  - **Índices:** `id_usuario` y `(estado, fecha_creacion DESC)` para la bandeja de solicitudes.
+  - **Permisos nuevos (24-26):** `atencion.ver`, `atencion.editar` y `atencion.atender_clientes`, con área funcional `atencion` y dependencia `editar → ver` en M17. El último queda reservado al escalamiento de HU-ATC-05, bloqueado por M03.
+  - **Seed:** la semana completa de horario (lunes a viernes 08:00-18:00, sábado 08:00-13:00, domingo cerrado) y el canal de WhatsApp vigente.
+  - **Bases existentes en 4.10:** el DDL crea los tipos y las tablas con `IF NOT EXISTS`. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` y `npm run db:seed`.
+  - **Verificado en PostgreSQL 18:** esquema y seed ejecutados sobre una base nueva y repetidos sin errores (idempotentes); las pruebas negativas de los `CHECK` y la FK rechazan los datos inválidos.
+
+---
+
 ## [v3.8] - 2026-10-25
 ### Esquema 4.10 (64 Tablas) - M13: movimientos de existencia de combos por orden
 - **Alcance General:** Valores de ENUM y una columna pedidos por el puerto `ExistenciaComboPort` (`contracts/m01-catalogo-entrega3.contract.ts`, D8; `contracts/m13-inventario.contract.ts`). Cambio puramente aditivo; no agrega tablas.

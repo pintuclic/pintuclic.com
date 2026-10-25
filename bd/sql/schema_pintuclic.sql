@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.10 (v4.9 + M13: movimientos de existencia de combos por orden)
+-- VERSIÓN: 4.11 (v4.10 + M15: contacto, horario y canal de atención)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 64
+-- TOTAL TABLAS: 67
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -148,6 +148,20 @@ BEGIN
     -- Estado editorial de una página institucional (M16 - HU-CON-01 / HU-CON-03)
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_contenido') THEN
         CREATE TYPE enum_estado_contenido AS ENUM ('borrador', 'publicado', 'archivado');
+    END IF;
+
+    -- Tipo y estado de una solicitud del formulario de contacto (M15 - HU-ATC-02).
+    -- 'cotizacion' es solo intención: el camino formal es el carrito (RF-ATC-02-07).
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_solicitud_contacto') THEN
+        CREATE TYPE enum_tipo_solicitud_contacto AS ENUM ('consulta', 'cotizacion', 'reclamo');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_solicitud_contacto') THEN
+        CREATE TYPE enum_estado_solicitud_contacto AS ENUM ('pendiente', 'atendida');
+    END IF;
+
+    -- Día de la semana del horario de atención humana (M15 - HU-ATC-04)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_dia_semana') THEN
+        CREATE TYPE enum_dia_semana AS ENUM ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo');
     END IF;
 END $$;
 
@@ -1709,6 +1723,76 @@ COMMENT ON COLUMN faq_entrada.estado IS 'Visibilidad pública de la entrada: act
 COMMENT ON COLUMN faq_entrada.id_autor IS 'Último usuario administrador/empleado que creó o modificó la entrada';
 
 -- ==============================================================================
+-- 9F. MÓDULO DE ATENCIÓN AL CLIENTE (M15 - HU-ATC-02, HU-ATC-03, HU-ATC-04)
+-- Las preguntas frecuentes NO viven aquí: son de M16 (`faq_entrada`), que las
+-- expone por puerto. M15 aporta el contacto, el horario y el canal directo.
+-- ==============================================================================
+
+-- Tabla: solicitud_contacto
+-- Solicitudes enviadas desde el formulario de contacto por un usuario autenticado (M15 · HU-ATC-02).
+-- Los datos de contacto NO se guardan aquí: se resuelven desde la cuenta al mostrarlas (RF-ATC-02-04).
+-- Una solicitud de tipo 'cotizacion' es un mensaje de intención y nunca genera una cotización (RF-ATC-02-07).
+CREATE TABLE IF NOT EXISTS solicitud_contacto (
+    id_solicitud UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario INT NOT NULL,
+    tipo enum_tipo_solicitud_contacto NOT NULL,
+    descripcion VARCHAR(2000) NOT NULL,
+    estado enum_estado_solicitud_contacto NOT NULL DEFAULT 'pendiente',
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_solicitud_contacto_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+COMMENT ON TABLE solicitud_contacto IS 'Solicitudes del formulario de contacto (consulta, cotización o reclamo) dirigidas al administrador (M15 · HU-ATC-02)';
+COMMENT ON COLUMN solicitud_contacto.tipo IS 'cotizacion = intención de cotizar; el camino formal es el carrito (RF-ATC-02-07)';
+
+-- Tabla: horario_atencion
+-- Horario de atención humana configurable, una fila por día de la semana (M15 · HU-ATC-04).
+-- Un día con abierto = FALSE está cerrado toda la jornada y no lleva horas. Solo condiciona los
+-- canales atendidos por personas; los automatizados operan igual fuera de él (RF-ATC-04-04).
+CREATE TABLE IF NOT EXISTS horario_atencion (
+    id_horario SERIAL PRIMARY KEY,
+    dia_semana enum_dia_semana NOT NULL UNIQUE,
+    abierto BOOLEAN NOT NULL DEFAULT TRUE,
+    hora_inicio VARCHAR(5),
+    hora_fin VARCHAR(5),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_horario_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_horario_formato_horas CHECK (
+        (hora_inicio IS NULL OR hora_inicio ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        AND (hora_fin IS NULL OR hora_fin ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ),
+    CONSTRAINT ck_horario_franja_coherente CHECK (
+        (abierto = FALSE AND hora_inicio IS NULL AND hora_fin IS NULL)
+        OR (abierto = TRUE AND hora_inicio IS NOT NULL AND hora_fin IS NOT NULL AND hora_fin > hora_inicio)
+    )
+);
+
+COMMENT ON TABLE horario_atencion IS 'Horario de atención humana por día de la semana, configurable desde el panel (M15 · HU-ATC-04)';
+COMMENT ON COLUMN horario_atencion.hora_inicio IS 'Hora local "HH:mm" en 24h; NULL cuando el día está cerrado';
+
+-- Tabla: configuracion_atencion_whatsapp
+-- Destino del botón de contacto directo por WhatsApp, de fila única (M15 · HU-ATC-03).
+-- `destino` admite una URL completa (hoy el canal de difusión de la empresa, que no acepta texto
+-- prellenado) o un número de WhatsApp Business cuando exista; en ese caso el botón arma el enlace
+-- wa.me con el mensaje base y la referencia del producto (RF-ATC-03-02, RF-ATC-03-03).
+CREATE TABLE IF NOT EXISTS configuracion_atencion_whatsapp (
+    id_configuracion SMALLINT PRIMARY KEY DEFAULT 1,
+    destino VARCHAR(300) NOT NULL,
+    mensaje_base VARCHAR(300),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_whatsapp_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_whatsapp_fila_unica CHECK (id_configuracion = 1)
+);
+
+COMMENT ON TABLE configuracion_atencion_whatsapp IS 'Destino y mensaje base del botón de contacto directo por WhatsApp; fila única (M15 · HU-ATC-03)';
+COMMENT ON COLUMN configuracion_atencion_whatsapp.destino IS 'URL completa (canal de difusión) o número de WhatsApp Business; el enlace se arma según cuál sea';
+
+-- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
 -- ==============================================================================
 
@@ -1843,6 +1927,10 @@ CREATE INDEX IF NOT EXISTS idx_pagina_institucional_autor ON pagina_instituciona
 CREATE INDEX IF NOT EXISTS idx_faq_entrada_estado_orden ON faq_entrada(estado, orden, id_faq);
 CREATE INDEX IF NOT EXISTS idx_faq_entrada_autor ON faq_entrada(id_autor);
 
+-- M15: bandeja de solicitudes de contacto
+CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_usuario ON solicitud_contacto(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_estado_fecha ON solicitud_contacto(estado, fecha_creacion DESC);
+
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (53 TABLAS - v4.2)
+-- FIN DEL SCRIPT DDL (67 TABLAS - v4.11)
 -- ==============================================================================

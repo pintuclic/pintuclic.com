@@ -1,8 +1,8 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.8 — esquema 4.10 (M13: movimientos de existencia de combos por orden).  
+> **Versión Actual:** 3.9 — esquema 4.11 (M15 Atención al cliente: contacto, horario y canal directo).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
-> **Total de Tablas:** 64  
+> **Total de Tablas:** 67  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script de Mocks / Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Guía Oficial de Mocks y Datos de Prueba:** [`./GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./GUIA_MOCKS_Y_DATOS_PRUEBA.md)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.9** (esquema 4.11) | 2026-10-25 | `solicitud_contacto`, `horario_atencion`, `configuracion_atencion_whatsapp` (3) | Ninguna | M15 Atención al cliente: solicitudes del formulario de contacto sin duplicar datos de contacto, horario de atención humana por día con franja coherente y destino del botón de WhatsApp en fila única. Tres ENUMs nuevos y los permisos `atencion.*`. Las preguntas frecuentes son de M16. Total 67 tablas. | [Ver v3.9](./CHANGELOG_DATABASE.md#v39---2026-10-25) |
 | **v3.8** (esquema 4.10) | 2026-10-25 | Ninguna | Ninguna | M13: `ajuste_inventario.referencia` (única por variante y motivo) y valores `orden`, `venta` y `devolucion` en sus ENUMs, para descontar y reponer la existencia de los combos de forma idempotente. Total 64 tablas. | [Ver v3.8](./CHANGELOG_DATABASE.md#v38---2026-10-25) |
 | **v3.7** (esquema 4.9) | 2026-10-25 | Ninguna | Ninguna | M01 entrega 3: `producto.es_combo` y `excluido_de_descuentos`; `subcategoria.id_categoria_complementaria`; `imagen.miniatura` y `mediana` (+ una imagen se asocia a variante o a color, no a ambos). Total 64 tablas. | [Ver v3.7](./CHANGELOG_DATABASE.md#v37---2026-10-25) |
 | **v3.6** (esquema 4.8) | 2026-10-25 | `pagina_institucional`, `faq_entrada` (2) | Ninguna | M16: páginas institucionales administrables (`sobre-nosotros`, `terminos-y-condiciones`, `politica-de-privacidad`, `politicas-de-envio`) con ciclo editorial (`enum_estado_contenido`) y catálogo de preguntas frecuentes (FAQ) ordenadas para el Centro de Ayuda y puerto hacia M15. Total 64 tablas. | [Ver v3.6](./CHANGELOG_DATABASE.md#v36---2026-10-25) |
@@ -566,7 +567,7 @@ erDiagram
 
 ---
 
-## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (62 Tablas)
+## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (67 Tablas)
 
 ### Módulo 1: Seguridad, Roles y Descuentos (5 Tablas)
 | Tabla | PK | FKs | Descripción |
@@ -675,11 +676,21 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | :--- | :--- | :--- | :--- |
 | **`ajuste_inventario`** *(v3.5)* | `id_ajuste` | `id_variante` $\rightarrow$ `variante` (RESTRICT), `id_usuario` $\rightarrow$ `usuario` (SET NULL) | Historial inmutable de cambios de `variante.existencia_referencial`: existencia anterior y nueva (≥ 0 y distintas), `motivo`, `origen` (`manual`, `carga_masiva`, `samit`), nota opcional, `id_carga` (UUID del cliente que agrupa una carga masiva, sin tabla propia) y `fecha`. Solo se inserta, en la misma transacción que el cambio de la variante. El inventario es referencial y no bloquea ventas, salvo en los combos, cuya existencia baja al crearse la orden y vuelve al cancelarse (`origen = orden`, con su `referencia`, v3.8). |
 
+### Módulo 13: Atención al Cliente — M15 (3 Tablas, esquema 4.11)
+Las preguntas frecuentes no están aquí: son de M16 (`faq_entrada`), que las expone por puerto.
+
+| Tabla | PK | FKs | Descripción |
+| :--- | :--- | :--- | :--- |
+| **`solicitud_contacto`** *(v3.9)* | `id_solicitud` (**UUID**) | `id_usuario` $\rightarrow$ `usuario` (CASCADE) | Solicitudes del formulario de contacto, que exige sesión (HU-ATC-02): `tipo` (`consulta`, `cotizacion`, `reclamo`), `descripcion` y `estado` (`pendiente`, `atendida`) para la bandeja del administrador. **No duplica los datos de contacto**: se leen de la cuenta al mostrarla (RF-ATC-02-04). Una solicitud de tipo `cotizacion` es solo intención y nunca genera una cotización formal (RF-ATC-02-07). |
+| **`horario_atencion`** *(v3.9)* | `id_horario` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Horario de atención humana, una fila por día de la semana (`dia_semana` UNIQUE, HU-ATC-04). Las horas son `"HH:mm"` en 24h validadas por `ck_horario_formato_horas`, y `ck_horario_franja_coherente` exige que un día cerrado no lleve horas y que uno abierto tenga `hora_fin > hora_inicio`. Solo condiciona los canales atendidos por personas (RF-ATC-04-04). |
+| **`configuracion_atencion_whatsapp`** *(v3.9)* | `id_configuracion` (**fila única**, `ck_whatsapp_fila_unica`) | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Destino del botón de contacto directo por WhatsApp (HU-ATC-03). Admite una URL completa —hoy el canal de difusión, que no acepta texto prellenado— o un número de WhatsApp Business cuando exista; en ese caso el botón arma el enlace `wa.me` con `mensaje_base` y la referencia del producto. Es un enlace saliente: el sistema no recibe, almacena ni responde conversaciones (RF-ATC-03-04). |
+
 ---
 
 ## 🛡️ 4. Tipos Enumerados (ENUMs)
 
-Para asegurar la máxima robustez en PostgreSQL, el esquema utiliza 21 tipos enumerados nativos:
+Para asegurar la máxima robustez en PostgreSQL, el esquema utiliza 28 tipos enumerados nativos.
+`enum_clase_color` aparece abajo pero **todavía no existe en el DDL**: queda pendiente de la Entrega 2 de M01.
 
 ```sql
 enum_estado_general     -- ('activo', 'inactivo')
@@ -719,6 +730,19 @@ enum_clase_color              -- ('entonable', 'colores_fijos', 'sin_color')
 -- Inventario referencial (M13)
 enum_motivo_ajuste_inventario -- ('conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva', 'venta', 'devolucion')
 enum_origen_ajuste_inventario -- ('manual', 'carga_masiva', 'samit', 'orden')
+
+-- Notificaciones y comunicaciones (M18)
+enum_tipo_comunicacion  -- ('registro_otp', 'recuperacion_password', 'activacion_empleado',
+                        --  'cambio_correo_otp', 'cambio_correo_confirmado', 'dictamen_empresa')
+enum_estado_envio_notificacion -- ('pendiente', 'enviado', 'fallido')
+
+-- Contenido institucional (M16)
+enum_estado_contenido   -- ('borrador', 'publicado', 'archivado')
+
+-- Atención al cliente (M15)
+enum_tipo_solicitud_contacto   -- ('consulta', 'cotizacion', 'reclamo')
+enum_estado_solicitud_contacto -- ('pendiente', 'atendida')
+enum_dia_semana         -- ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo')
 ```
 
 ---
