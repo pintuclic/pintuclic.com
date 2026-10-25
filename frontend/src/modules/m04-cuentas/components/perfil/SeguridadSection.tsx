@@ -62,7 +62,7 @@ function CambioContrasena({ onSesionInvalidada }: { onSesionInvalidada: (mensaje
       titulo="Contraseña"
       descripcion="Al cambiarla cerraremos tu sesión en todos los dispositivos."
     >
-      <form onSubmit={enviar} noValidate className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={enviar} noValidate autoComplete="off" className="grid gap-4 sm:grid-cols-2">
         {errorServidor && (
           <div className="sm:col-span-2">
             <Alert variant="error">{errorServidor}</Alert>
@@ -72,7 +72,7 @@ function CambioContrasena({ onSesionInvalidada }: { onSesionInvalidada: (mensaje
           <PasswordInput
             id="seg-actual"
             label="Contraseña actual"
-            autoComplete="current-password"
+            autoComplete="new-password"
             error={errors.contrasenaActual?.message}
             {...register('contrasenaActual')}
           />
@@ -201,7 +201,7 @@ function CambioCorreo({
           </div>
         </div>
       ) : (
-        <form onSubmit={solicitar} noValidate className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={solicitar} noValidate autoComplete="off" className="grid gap-4 sm:grid-cols-2">
           {errorServidor && (
             <div className="sm:col-span-2">
               <Alert variant="error">{errorServidor}</Alert>
@@ -211,7 +211,7 @@ function CambioCorreo({
             id="correo-nuevo"
             label="Correo nuevo"
             type="email"
-            autoComplete="email"
+            autoComplete="off"
             placeholder="correo@ejemplo.com"
             error={errors.nuevoCorreo?.message}
             {...register('nuevoCorreo')}
@@ -219,7 +219,7 @@ function CambioCorreo({
           <PasswordInput
             id="correo-contrasena"
             label="Tu contraseña"
-            autoComplete="current-password"
+            autoComplete="new-password"
             helperText="La pedimos para confirmar que eres tú."
             error={errors.contrasena?.message}
             {...register('contrasena')}
