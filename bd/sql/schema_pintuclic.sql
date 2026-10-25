@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.6 (v4.5 + M18: plantillas, registro de envíos y rebotes de notificaciones)
+-- VERSIÓN: 4.7 (v4.6 + M13: historial de ajustes de inventario referencial)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 61
+-- TOTAL TABLAS: 62
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -135,6 +135,14 @@ BEGIN
     -- Resultado de un intento de envío transaccional (M18 - RF-NOT-01-03, RF-NOT-01-04)
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_envio_notificacion') THEN
         CREATE TYPE enum_estado_envio_notificacion AS ENUM ('pendiente', 'enviado', 'fallido');
+    END IF;
+
+    -- Motivo y origen de un ajuste de existencia referencial (M13 - HU-INV)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_motivo_ajuste_inventario') THEN
+        CREATE TYPE enum_motivo_ajuste_inventario AS ENUM ('conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_origen_ajuste_inventario') THEN
+        CREATE TYPE enum_origen_ajuste_inventario AS ENUM ('manual', 'carga_masiva', 'samit');
     END IF;
 END $$;
 
@@ -1576,6 +1584,34 @@ CREATE TABLE IF NOT EXISTS rebote_notificacion (
 
 COMMENT ON TABLE rebote_notificacion IS 'Rebotes de entrega de correo para diagnóstico (M18 · HU-NOT-04, RF-NOT-04-04)';
 
+-- Tabla: ajuste_inventario
+-- Historial inmutable de cada cambio de la existencia referencial de una variante (M13). Se escribe en la
+-- misma transacción que el cambio de variante.existencia_referencial; solo se inserta, nunca se edita ni se borra.
+-- id_usuario queda NULL si el usuario se elimina; la variante no se puede eliminar mientras tenga historial.
+CREATE TABLE IF NOT EXISTS ajuste_inventario (
+    id_ajuste SERIAL PRIMARY KEY,
+    id_variante INT NOT NULL,
+    existencia_anterior INT NOT NULL,
+    existencia_nueva INT NOT NULL,
+    motivo enum_motivo_ajuste_inventario NOT NULL DEFAULT 'correccion',
+    nota VARCHAR(500),
+    origen enum_origen_ajuste_inventario NOT NULL DEFAULT 'manual',
+    id_carga UUID,
+    id_usuario INT,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_ajuste_variante FOREIGN KEY (id_variante)
+        REFERENCES variante (id_variante) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_ajuste_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_ajuste_existencia_anterior CHECK (existencia_anterior >= 0),
+    CONSTRAINT ck_ajuste_existencia_nueva CHECK (existencia_nueva >= 0),
+    CONSTRAINT ck_ajuste_cambio_real CHECK (existencia_anterior <> existencia_nueva)
+);
+
+COMMENT ON TABLE ajuste_inventario IS 'Historial inmutable de ajustes de la existencia referencial por variante (M13); el inventario no bloquea ventas';
+COMMENT ON COLUMN ajuste_inventario.id_carga IS 'Identificador generado por el cliente para agrupar los ajustes de una misma carga masiva; sin tabla propia';
+COMMENT ON COLUMN ajuste_inventario.origen IS 'manual = ajuste en pantalla; carga_masiva = plantilla CSV; samit = integración futura';
+
 -- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
 -- ==============================================================================
@@ -1694,6 +1730,11 @@ CREATE INDEX IF NOT EXISTS idx_control_intento_bloqueo ON control_intento_acceso
 CREATE INDEX IF NOT EXISTS idx_envio_destinatario_tipo ON envio_notificacion(destinatario, tipo);
 CREATE INDEX IF NOT EXISTS idx_envio_estado ON envio_notificacion(estado);
 CREATE INDEX IF NOT EXISTS idx_rebote_envio ON rebote_notificacion(id_envio);
+
+-- M13: historial de ajustes por variante (más reciente primero), por carga y por usuario
+CREATE INDEX IF NOT EXISTS idx_ajuste_variante_fecha ON ajuste_inventario(id_variante, fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_ajuste_carga ON ajuste_inventario(id_carga);
+CREATE INDEX IF NOT EXISTS idx_ajuste_usuario ON ajuste_inventario(id_usuario);
 
 -- Índices en Analítica de Búsqueda (M02 - HU-BUS-06): filtro por periodo y agrupación por término
 CREATE INDEX IF NOT EXISTS idx_bsr_fecha ON busqueda_sin_resultado(fecha);

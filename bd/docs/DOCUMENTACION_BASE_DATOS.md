@@ -1,8 +1,8 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.4 — esquema 4.5 (M01 Catálogo: manos del rendimiento e imagen de la medida).  
+> **Versión Actual:** 3.5 — esquema 4.7 (M13 Inventario referencial: historial de ajustes; incluye las tablas de M18 del esquema 4.6).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
-> **Total de Tablas:** 58  
+> **Total de Tablas:** 62  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script de Mocks / Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Guía Oficial de Mocks y Datos de Prueba:** [`./GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./GUIA_MOCKS_Y_DATOS_PRUEBA.md)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.5** (esquema 4.7) | 2026-10-25 | `ajuste_inventario` (+ `envio_notificacion`, `rebote_notificacion`, `plantilla_notificacion` de M18, esquema 4.6) | Ninguna | M13: historial inmutable de cada cambio de la existencia referencial de una variante, con motivo, origen, nota, usuario y `id_carga` para agrupar cargas masivas. Dos ENUMs nuevos. Total 62 tablas. | [Ver v3.5](./CHANGELOG_DATABASE.md#v35---2026-10-25) |
 | **v3.4** (esquema 4.5) | 2026-10-24 | Ninguna | Ninguna | `ficha_recubrimiento.manos` (opcional, 1 a 10): manos con las que se logra el rendimiento. `medida.imagen` e `imagen_mime_type` (opcionales, siempre juntas): imagen de la medida para la galería del producto. Total 58 tablas. | [Ver v3.4](./CHANGELOG_DATABASE.md#v34---2026-10-24) |
 | **v3.3** (esquema 4.4) | 2026-10-24 | Ninguna | Ninguna | `tipo_medida.equivalencia_galones` (opcional, mayor que 0): galones que equivale una unidad (litro = 0,264172052). Permite derivar el rendimiento por medida a partir del rendimiento por galón (`RF-CAT-10-03`). Seed: galón, litro y mililitro. Total 58 tablas. | [Ver v3.3](./CHANGELOG_DATABASE.md#v33---2026-10-24) |
 | **v3.2** (esquema 4.3) | 2026-10-24 | `superficie`, `acabado`, `familia_color`, `tipo_medida`, `medida`, `ficha_recubrimiento`, `producto_superficie`, `producto_acabado`, `producto_color`, `producto_caracteristica` (10) | `sub_subcategorias`, `tonos`, `presentacion`, `caracteristica`, `producto_subcategoria` (5) | M01 Catálogo rediseñado con las reglas del Tech Lead: color con base opcional, acabado y familia; bases globales; variante = producto + medida con su precio; producto en una subcategoría con superficies y ambiente; color en `linea_carrito` y `sku_vendido` en `linea_orden`. Total 58 tablas. | [Ver v3.2](./CHANGELOG_DATABASE.md#v32---2026-10-24) |
@@ -562,7 +563,7 @@ erDiagram
 
 ---
 
-## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (58 Tablas)
+## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (62 Tablas)
 
 ### Módulo 1: Seguridad, Roles y Descuentos (5 Tablas)
 | Tabla | PK | FKs | Descripción |
@@ -666,6 +667,11 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | :--- | :--- | :--- | :--- |
 | **`busqueda_sin_resultado`** | `id_busqueda` (**BIGSERIAL**) | Ninguna | Analítica de búsquedas sin resultado (M02 HU-BUS-06): una fila por evento, con el `termino` normalizado y su `fecha`, **sin identidad de usuario** (M20 HU-SEG-06). Permite acotar por periodo y agregar repeticiones con `GROUP BY termino`. |
 
+### Módulo 12: Inventario Referencial — M13 (1 Tabla)
+| Tabla | PK | FKs | Descripción |
+| :--- | :--- | :--- | :--- |
+| **`ajuste_inventario`** *(v3.5)* | `id_ajuste` | `id_variante` $\rightarrow$ `variante` (RESTRICT), `id_usuario` $\rightarrow$ `usuario` (SET NULL) | Historial inmutable de cambios de `variante.existencia_referencial`: existencia anterior y nueva (≥ 0 y distintas), `motivo`, `origen` (`manual`, `carga_masiva`, `samit`), nota opcional, `id_carga` (UUID del cliente que agrupa una carga masiva, sin tabla propia) y `fecha`. Solo se inserta, en la misma transacción que el cambio de la variante. El inventario es referencial y no bloquea ventas. |
+
 ---
 
 ## 🛡️ 4. Tipos Enumerados (ENUMs)
@@ -706,6 +712,10 @@ enum_tipo_dato_parametro      -- ('numero', 'texto', 'booleano')
 
 -- Catálogo (M01 - HU-CAT-02, RF-CAT-02-03)
 enum_clase_color              -- ('entonable', 'colores_fijos', 'sin_color')
+
+-- Inventario referencial (M13)
+enum_motivo_ajuste_inventario -- ('conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva')
+enum_origen_ajuste_inventario -- ('manual', 'carga_masiva', 'samit')
 ```
 
 ---

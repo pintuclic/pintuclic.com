@@ -10,6 +10,17 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.5] - 2026-10-25
+### Esquema 4.7 (62 Tablas) - M13 Inventario referencial: historial de ajustes
+- **Alcance General:** Tabla nueva pedida por el contrato de M13 (`contracts/m13-inventario.contract.ts`). Cambio puramente aditivo.
+  - **`ajuste_inventario`**: una fila por cada cambio real de `variante.existencia_referencial` (anterior y nueva ≥ 0 y distintas), con `motivo`, `origen`, `nota` (hasta 500), `id_carga` (UUID del cliente para agrupar una carga masiva, sin tabla propia), `id_usuario` (NULL si el usuario se elimina) y `fecha`. Nunca se edita ni se borra; la variante no se puede eliminar mientras tenga historial (`ON DELETE RESTRICT`).
+  - **ENUMs nuevos:** `enum_motivo_ajuste_inventario` (`conteo_fisico`, `ingreso_mercancia`, `salida`, `correccion`, `otro`, `carga_masiva`) y `enum_origen_ajuste_inventario` (`manual`, `carga_masiva`, `samit`; este último queda reservado a la integración futura).
+  - **Índices:** `(id_variante, fecha DESC)` para el historial de una variante, `id_carga` para una carga y `id_usuario`.
+  - **Esquema 4.6 (M18):** las 3 tablas de notificaciones (`envio_notificacion`, `rebote_notificacion`, `plantilla_notificacion`) ya estaban en el DDL pero no en estos documentos; el total de 62 las incluye.
+  - **Bases existentes en 4.6:** el DDL crea los tipos y la tabla con `IF NOT EXISTS`; no requiere seed. Uso: `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql`.
+
+---
+
 ## [v3.4] - 2026-10-24
 ### Esquema 4.5 (58 Tablas) - M01 Catálogo: manos del rendimiento e imagen de la medida
 - **Alcance General:** Dos cambios aditivos pedidos por el contrato de M01.
