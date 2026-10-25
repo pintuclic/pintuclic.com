@@ -227,6 +227,31 @@ export const configuracionWhatsappSchema = z.object({
 });
 export type ConfiguracionWhatsapp = z.infer<typeof configuracionWhatsappSchema>;
 
+/**
+ * Vista pública del canal: lo mínimo para armar el botón. `destinoEsUrl` lo
+ * resuelve el servidor para que el frontend no repita la regla R7.
+ */
+export const canalWhatsappPublicoSchema = z.object({
+  destino: z.string(),
+  mensajeBase: z.string().nullable(),
+  destinoEsUrl: z.boolean(),
+});
+export type CanalWhatsappPublico = z.infer<typeof canalWhatsappPublicoSchema>;
+
+/**
+ * Respuesta de `POST /atencion/contacto`. El aviso de horario y la remisión al
+ * carrito los decide el servidor: son reglas del módulo (R4, R9) y no deben
+ * reimplementarse en el frontend.
+ */
+export const confirmacionContactoSchema = z.object({
+  solicitud: solicitudContactoSchema,
+  /** R9: null dentro del horario; el aviso cuando la solicitud llega fuera de él. */
+  avisoHorario: z.string().nullable(),
+  /** R4: true en una cotización, para que el frontend remita al carrito. */
+  remitirAlCarrito: z.boolean(),
+});
+export type ConfirmacionContacto = z.infer<typeof confirmacionContactoSchema>;
+
 /* ───────────────────────────────────────────────────────────────────────────
  * 3. PETICIONES
  * ─────────────────────────────────────────────────────────────────────────── */
@@ -239,8 +264,12 @@ export const listarFaqsPublicoResponseSchema = z.object({
 
 /** GET /admin/atencion/faqs — incluye inactivas, paginado. */
 export const listarFaqsAdminRequestSchema = paginacionQuerySchema.extend({
+  /** Booleano en query string: `z.coerce.boolean()` trataría "false" como true. */
+  incluirInactivas: z
+    .enum(['true', 'false'])
+    .transform((valor) => valor === 'true')
+    .default(true),
   tema: temaFaqSchema.optional(),
-  incluirInactivas: z.coerce.boolean().default(true),
 });
 export type ListarFaqsAdminRequest = z.infer<typeof listarFaqsAdminRequestSchema>;
 
@@ -316,6 +345,16 @@ export type ListarFaqsAdminResponseEnvelope = z.infer<typeof listarFaqsAdminResp
 export const solicitudContactoResponseEnvelopeSchema = respuestaUno(solicitudContactoSchema);
 export type SolicitudContactoResponseEnvelope = z.infer<typeof solicitudContactoResponseEnvelopeSchema>;
 
+/** POST /atencion/contacto. */
+export const confirmacionContactoResponseEnvelopeSchema = respuestaUno(confirmacionContactoSchema);
+export type ConfirmacionContactoResponseEnvelope = z.infer<
+  typeof confirmacionContactoResponseEnvelopeSchema
+>;
+
+/** GET /atencion/whatsapp (público). */
+export const canalWhatsappResponseEnvelopeSchema = respuestaUno(canalWhatsappPublicoSchema);
+export type CanalWhatsappResponseEnvelope = z.infer<typeof canalWhatsappResponseEnvelopeSchema>;
+
 export const listarSolicitudesResponseEnvelopeSchema = respuestaPaginada(solicitudContactoSchema);
 export type ListarSolicitudesResponseEnvelope = z.infer<typeof listarSolicitudesResponseEnvelopeSchema>;
 
@@ -373,8 +412,8 @@ export interface EscalamientoConsultasPort {
  * ───────────────────────────────────────────────────────────────────────────
  *  GET   /atencion/faqs                                   público              → listarFaqsPublico
  *  GET   /atencion/horario                                 público              → horario + abiertoAhora
- *  GET   /atencion/whatsapp                                público              → destino + mensajeBase
- *  POST  /atencion/contacto                                sesión               → crearSolicitudContacto
+ *  GET   /atencion/whatsapp                                público              → canalWhatsappPublico
+ *  POST  /atencion/contacto                                sesión               → confirmacionContacto
  *
  *  GET    /admin/atencion/faqs                             atencion.ver     → listarFaqsAdmin (paginado)
  *  POST   /admin/atencion/faqs                             atencion.editar  → crearFaq
