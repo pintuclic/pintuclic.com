@@ -1,5 +1,8 @@
 import type { BadgeVariant } from '@/core/components';
-import type { EstadoOrden, ModoEntrega } from '../dtos/m08-ordenes.dto';
+import { ESTADOS_FINALIZADOS, ESTADOS_ORDEN, type EstadoOrden, type ModoEntrega } from '../dtos/m08-ordenes.dto';
+
+/** Estados que esperan atención del personal, en el orden del ciclo (los de la bandeja y su contador). */
+export const ESTADOS_EN_CURSO: readonly EstadoOrden[] = ESTADOS_ORDEN.filter((e) => !ESTADOS_FINALIZADOS.includes(e));
 
 export const ETIQUETA_ESTADO: Record<EstadoOrden, string> = {
   orden_confirmada: 'Confirmado',

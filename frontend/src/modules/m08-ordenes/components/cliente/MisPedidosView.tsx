@@ -5,10 +5,11 @@ import { ArrowLeft, CircleCheck, Clock, Package, Search } from 'lucide-react';
 import { Alert, Button, ButtonLink, Container, Skeleton } from '@/core/components';
 import type { FiltroEstadoPedidos } from '../../interfaces/ordenes.interface';
 import { pedidosVisibles, useMisPedidosStore } from '../../store/misPedidosStore';
+import { FiltroPildoras, type OpcionPildora } from '../FiltroPildoras';
 import { PaginacionPedidos } from '../PaginacionPedidos';
 import { PedidoCard } from './PedidoCard';
 
-const FILTROS: ReadonlyArray<{ valor: FiltroEstadoPedidos; etiqueta: string; icono: React.ReactNode }> = [
+const FILTROS: ReadonlyArray<OpcionPildora<FiltroEstadoPedidos>> = [
   { valor: 'todos', etiqueta: 'Todos', icono: <Package className="h-3.5 w-3.5" aria-hidden="true" /> },
   { valor: 'en_curso', etiqueta: 'En curso', icono: <Clock className="h-3.5 w-3.5" aria-hidden="true" /> },
   { valor: 'finalizados', etiqueta: 'Finalizados', icono: <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" /> },
@@ -62,27 +63,7 @@ export function MisPedidosView() {
             </Button>
           </form>
 
-          <div role="group" aria-label="Filtrar pedidos" className="flex flex-wrap gap-2">
-            {FILTROS.map((f) => {
-              const activo = f.valor === filtro;
-              return (
-                <button
-                  key={f.valor}
-                  type="button"
-                  aria-pressed={activo}
-                  onClick={() => establecerFiltro(f.valor)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-title text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
-                    activo
-                      ? 'border-action bg-action text-neutral-white'
-                      : 'border-neutral-light bg-neutral-white text-neutral-dark hover:border-action'
-                  }`}
-                >
-                  {f.icono}
-                  {f.etiqueta}
-                </button>
-              );
-            })}
-          </div>
+          <FiltroPildoras opciones={FILTROS} valor={filtro} onCambiar={establecerFiltro} ariaLabel="Filtrar pedidos" />
 
           {error && (
             <Alert variant="error" title="No pudimos cargar tus pedidos">
