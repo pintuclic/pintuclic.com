@@ -4,7 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Power, RotateCcw } from 'lucide-react';
-import { Alert, Button, Input, Modal, Select } from '@/core/components';
+import { Alert, Button, FileInput, Input, Modal, Select } from '@/core/components';
 import type { Medida, TipoMedida } from '../../dtos/m01-catalogo.dto';
 import {
   formMedidaSchema,
@@ -13,9 +13,11 @@ import {
   type FormTipoMedida,
 } from '../../dtos/formularios.dto';
 import { useCargar } from '../../hooks/useCargar';
-import { medidasApi, tiposMedidaApi } from '../../services/catalogo-api';
+import { leerImagen, validarImagen } from '../../services/archivos';
+import { imagenMedidaApi, medidasApi, tiposMedidaApi } from '../../services/catalogo-api';
 import { aCuerpoMedida, aCuerpoTipoMedida } from '../../services/formularios';
 import { leerErrorCatalogo } from '../../services/mensaje-error';
+import { SelectorBuscable } from './campos';
 import {
   AvisoAccion,
   Cargando,
@@ -101,9 +103,14 @@ const ModalMedida: React.FC<{
   onGuardada: (t: string) => void;
 }> = ({ medida, tipos, onClose, onGuardada }) => {
   const [error, setError] = useState<string | null>(null);
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
+  const [quitarImagen, setQuitarImagen] = useState(false);
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormMedida>({
     resolver: zodResolver(formMedidaSchema),
@@ -112,18 +119,33 @@ const ModalMedida: React.FC<{
       valor: medida === null ? '' : String(medida.valor),
     },
   });
+  const idTipoMedida = watch('idTipoMedida');
+
+  const elegirArchivo = (nuevo: File | null) => {
+    setArchivo(nuevo);
+    setErrorArchivo(nuevo === null ? null : validarImagen(nuevo));
+    if (nuevo !== null) setQuitarImagen(false);
+  };
+
   const enviar = handleSubmit(async (valores) => {
     setError(null);
+    if (archivo !== null && validarImagen(archivo) !== null) return;
     try {
       const cuerpo = aCuerpoMedida(valores);
-      if (medida === null) await medidasApi.crear(cuerpo);
-      else await medidasApi.editar(medida.idMedida, { valor: cuerpo.valor });
+      const guardada =
+        medida === null
+          ? await medidasApi.crear(cuerpo)
+          : await medidasApi.editar(medida.idMedida, { idTipoMedida: cuerpo.idTipoMedida, valor: cuerpo.valor });
+      if (archivo !== null) await imagenMedidaApi.reemplazar(guardada.idMedida, await leerImagen(archivo));
+      else if (quitarImagen && guardada.tieneImagen) await imagenMedidaApi.quitar(guardada.idMedida);
       onGuardada(medida === null ? 'Medida creada.' : 'Medida actualizada.');
       onClose();
     } catch (err: unknown) {
       setError(leerErrorCatalogo(err, 'No se pudo guardar la medida.').message);
     }
   });
+  const imagenActual = medida?.tieneImagen === true && !quitarImagen && archivo === null;
+
   return (
     <Modal
       isOpen
@@ -134,18 +156,17 @@ const ModalMedida: React.FC<{
     >
       <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-4 py-2">
         {error !== null && <Alert variant="error">{error}</Alert>}
-        <Select
+        <SelectorBuscable
           label="Tipo de medida"
-          disabled={medida !== null}
-          options={[
-            { value: '', label: 'Elija…' },
-            ...tipos
-              .filter((t) => t.estado === 'activo' || t.idTipoMedida === medida?.idTipoMedida)
-              .map((t) => ({ value: String(t.idTipoMedida), label: `${t.nombre} (${t.abreviatura})` })),
-          ]}
-          {...register('idTipoMedida')}
+          value={idTipoMedida}
+          onChange={(v) => setValue('idTipoMedida', v, { shouldValidate: true })}
+          options={tipos
+            .filter((t) => t.estado === 'activo' || t.idTipoMedida === medida?.idTipoMedida)
+            .map((t) => ({ value: String(t.idTipoMedida), label: `${t.nombre} (${t.abreviatura})` }))}
           error={errors.idTipoMedida?.message}
-          helperText={medida !== null ? 'El tipo no cambia: para otro tipo se crea otra medida.' : undefined}
+          helperText={
+            medida !== null ? 'Si cambia el tipo, el nombre generado se recalcula con su abreviatura.' : undefined
+          }
         />
         <Input
           label="Valor"
@@ -154,6 +175,30 @@ const ModalMedida: React.FC<{
           error={errors.valor?.message}
           helperText="Por ejemplo 3.78 o 0.25. El nombre se genera: “0.25 gal”."
         />
+        <div className="space-y-2">
+          {imagenActual && medida !== null && (
+            <div className="flex items-center gap-3 rounded-card border border-neutral-light bg-neutral-lightest p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imagenMedidaApi.url(medida.idMedida)}
+                alt={`Imagen de ${medida.nombre}`}
+                className="h-16 w-16 object-contain"
+              />
+              <Button variant="ghost" size="sm" onClick={() => setQuitarImagen(true)}>
+                Quitar imagen
+              </Button>
+            </div>
+          )}
+          {quitarImagen && <p className="font-sans text-xs text-neutral-medium">La imagen se quitará al guardar.</p>}
+          <FileInput
+            label={medida?.tieneImagen === true ? 'Reemplazar imagen (opcional)' : 'Imagen de la medida (opcional)'}
+            accept="image/jpeg,image/png,image/webp"
+            value={archivo}
+            onChange={elegirArchivo}
+            helperText="Por ejemplo la silueta del envase; se muestra junto a la galería del producto. JPEG, PNG o WebP de hasta 5 MB."
+            {...(errorArchivo !== null ? { error: errorArchivo } : {})}
+          />
+        </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" type="button" onClick={onClose}>
             Cancelar
@@ -338,9 +383,20 @@ export const MedidasView: React.FC = () => {
               key={m.idMedida}
               className="flex items-center justify-between gap-2 rounded-card border border-neutral-light bg-neutral-white px-4 py-3"
             >
-              <span className="font-sans text-sm text-neutral-black">
-                {m.nombre} <span className="text-xs text-neutral-medium">{nombreTipo(m.idTipoMedida)}</span>{' '}
-                <EstadoBadge estado={m.estado} />
+              <span className="flex items-center gap-2 font-sans text-sm text-neutral-black">
+                {m.tieneImagen && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imagenMedidaApi.url(m.idMedida)}
+                    alt=""
+                    className="h-8 w-8 shrink-0 object-contain"
+                    loading="lazy"
+                  />
+                )}
+                <span>
+                  {m.nombre} <span className="text-xs text-neutral-medium">{nombreTipo(m.idTipoMedida)}</span>{' '}
+                  <EstadoBadge estado={m.estado} />
+                </span>
               </span>
               <span className="flex gap-1">
                 <Button

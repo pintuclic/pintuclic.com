@@ -3,7 +3,6 @@ import { prisma } from '../../../core/db/client';
 import type {
   EditarLineaRequest,
   EditarMarcaRequest,
-  EditarMedidaRequest,
   Estado,
   ImpactoDesactivacion,
   Linea,
@@ -15,6 +14,8 @@ import type {
 } from '../dtos/m01-catalogo.dto';
 import type {
   ClaveMedida,
+  EditarMedidaDatos,
+  ImagenBytes,
   CrearLineaDatos,
   CrearMarcaDatos,
   CrearMedidaDatos,
@@ -238,7 +239,17 @@ export class LineasRepository implements LineasRepositoryPort {
 
 /* ─── Medidas ────────────────────────────────────────────────────────────── */
 
-type FilaMedida = Prisma.MedidaGetPayload<Record<string, never>>;
+/** Nunca se leen los bytes de la imagen salvo en `obtenerImagen`. */
+const SELECCION_MEDIDA = {
+  idMedida: true,
+  idTipoMedida: true,
+  valor: true,
+  nombre: true,
+  estado: true,
+  imagenMimeType: true,
+} satisfies Prisma.MedidaSelect;
+
+type FilaMedida = Prisma.MedidaGetPayload<{ select: typeof SELECCION_MEDIDA }>;
 
 function aMedida(f: FilaMedida): Medida {
   return {
@@ -247,6 +258,7 @@ function aMedida(f: FilaMedida): Medida {
     valor: f.valor.toNumber(),
     nombre: f.nombre,
     estado: f.estado,
+    tieneImagen: f.imagenMimeType !== null,
   };
 }
 
@@ -260,6 +272,7 @@ export class MedidasRepository implements MedidasRepositoryPort {
     const [filas, total] = await Promise.all([
       prisma.medida.findMany({
         where,
+        select: SELECCION_MEDIDA,
         orderBy: [{ idTipoMedida: 'asc' }, { valor: 'asc' }],
         ...desplazamiento(query.pagina, query.limite),
       }),
@@ -269,7 +282,7 @@ export class MedidasRepository implements MedidasRepositoryPort {
   }
 
   async obtener(id: number): Promise<Medida | null> {
-    const f = await prisma.medida.findUnique({ where: { idMedida: id } });
+    const f = await prisma.medida.findUnique({ where: { idMedida: id }, select: SELECCION_MEDIDA });
     return f === null ? null : aMedida(f);
   }
 
@@ -277,21 +290,49 @@ export class MedidasRepository implements MedidasRepositoryPort {
     return aMedida(
       await prisma.medida.create({
         data: { idTipoMedida: datos.idTipoMedida, valor: datos.valor, nombre: datos.nombre },
+        select: SELECCION_MEDIDA,
       }),
     );
   }
 
-  async editar(id: number, datos: EditarMedidaRequest): Promise<Medida> {
+  async editar(id: number, datos: EditarMedidaDatos): Promise<Medida> {
     return aMedida(
       await prisma.medida.update({
         where: { idMedida: id },
-        data: sinIndefinidos({ valor: datos.valor, nombre: datos.nombre }),
+        data: { idTipoMedida: datos.idTipoMedida, valor: datos.valor, nombre: datos.nombre },
+        select: SELECCION_MEDIDA,
       }),
     );
   }
 
   async cambiarEstado(id: number, estado: Estado): Promise<Medida> {
-    return aMedida(await prisma.medida.update({ where: { idMedida: id }, data: { estado } }));
+    return aMedida(await prisma.medida.update({ where: { idMedida: id }, data: { estado }, select: SELECCION_MEDIDA }));
+  }
+
+  async reemplazarImagen(id: number, imagen: Buffer, mimeType: ImagenBytes['mimeType']): Promise<Medida> {
+    return aMedida(
+      await prisma.medida.update({
+        where: { idMedida: id },
+        data: { imagen: new Uint8Array(imagen), imagenMimeType: mimeType },
+        select: SELECCION_MEDIDA,
+      }),
+    );
+  }
+
+  async quitarImagen(id: number): Promise<Medida> {
+    return aMedida(
+      await prisma.medida.update({
+        where: { idMedida: id },
+        data: { imagen: null, imagenMimeType: null },
+        select: SELECCION_MEDIDA,
+      }),
+    );
+  }
+
+  async obtenerImagen(id: number): Promise<ImagenBytes | null> {
+    const f = await prisma.medida.findUnique({ where: { idMedida: id }, select: { imagen: true, imagenMimeType: true } });
+    if (f === null || f.imagen === null || f.imagenMimeType === null) return null;
+    return { bytes: Buffer.from(f.imagen), mimeType: f.imagenMimeType as ImagenBytes['mimeType'] };
   }
 
   async contarImpacto(id: number): Promise<ImpactoDesactivacion> {

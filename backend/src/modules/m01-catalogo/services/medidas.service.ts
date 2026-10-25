@@ -6,8 +6,15 @@ import type {
   ListarMedidasRequest,
   Medida,
 } from '../dtos/m01-catalogo.dto';
-import type { MedidasRepositoryPort, Pagina, TiposMedidaRepositoryPort } from '../interfaces/catalogo.interface';
+import type { SubirImagenRequest } from '../dtos/m01-catalogo-productos.dto';
+import type {
+  ImagenBytes,
+  MedidasRepositoryPort,
+  Pagina,
+  TiposMedidaRepositoryPort,
+} from '../interfaces/catalogo.interface';
 import { errores, ServicioCatalogoBase } from './catalogo-base.service';
+import { decodificarImagenCatalogo } from './logotipo';
 
 /** R12: nombre generado con la abreviatura: "1 gal", "0.25 gal", "2 in". */
 export function nombreDeMedida(valor: number, abreviatura: string): string {
@@ -47,16 +54,41 @@ export class MedidasService extends ServicioCatalogoBase {
    */
   async editar(id: number, datos: EditarMedidaRequest): Promise<Medida> {
     const actual = this.exigir(await this.medidas.obtener(id));
-    const tipo = this.exigir(await this.tipos.obtener(actual.idTipoMedida));
+    const tipoActual = this.exigir(await this.tipos.obtener(actual.idTipoMedida));
+    const idTipoMedida = datos.idTipoMedida ?? actual.idTipoMedida;
+    let tipo = tipoActual;
+    if (idTipoMedida !== actual.idTipoMedida) {
+      tipo = this.exigir(await this.tipos.obtener(idTipoMedida));
+      if (tipo.estado !== 'activo') {
+        throw errores.padreInactivo('el tipo de medida');
+      }
+    }
     const valor = datos.valor ?? actual.valor;
-    const eraGenerado = actual.nombre === nombreDeMedida(actual.valor, tipo.abreviatura);
+    const cambioElNombreGenerado = datos.valor !== undefined || idTipoMedida !== actual.idTipoMedida;
+    const eraGenerado = actual.nombre === nombreDeMedida(actual.valor, tipoActual.abreviatura);
     const nombre =
-      datos.nombre ?? (datos.valor !== undefined && eraGenerado ? nombreDeMedida(valor, tipo.abreviatura) : actual.nombre);
+      datos.nombre ?? (cambioElNombreGenerado && eraGenerado ? nombreDeMedida(valor, tipo.abreviatura) : actual.nombre);
     await this.exigirNombreLibre(
-      this.medidas.existeDuplicado({ idTipoMedida: actual.idTipoMedida, valor, nombre }, id),
+      this.medidas.existeDuplicado({ idTipoMedida, valor, nombre }, id),
       'una medida con ese valor, tipo o nombre',
     );
-    return this.medidas.editar(id, { valor, nombre });
+    return this.medidas.editar(id, { idTipoMedida, valor, nombre });
+  }
+
+  /** I4: la imagen de una medida (por ejemplo la silueta del envase). */
+  async reemplazarImagen(id: number, datos: SubirImagenRequest): Promise<Medida> {
+    this.exigir(await this.medidas.obtener(id));
+    const imagen = decodificarImagenCatalogo(datos.imagenBase64, datos.imagenMimeType);
+    return this.medidas.reemplazarImagen(id, imagen, datos.imagenMimeType);
+  }
+
+  async quitarImagen(id: number): Promise<Medida> {
+    this.exigir(await this.medidas.obtener(id));
+    return this.medidas.quitarImagen(id);
+  }
+
+  async obtenerImagen(id: number): Promise<ImagenBytes> {
+    return this.exigir(await this.medidas.obtenerImagen(id));
   }
 
   async cambiarEstado(id: number, peticion: CambiarEstadoRequest): Promise<Medida> {

@@ -47,7 +47,8 @@ import { z } from 'zod';
  *      puede desactivar ni renombrar (se identifica por su nombre).
  *  R12 Una medida es valor + tipo de medida (ej. 1 + galón). Si no se envía el nombre
  *      se genera con la abreviatura ("1 gal", "0.25 gal", "2 in"). Una medida o un
- *      tipo de medida con variantes solo se desactiva.
+ *      tipo de medida con variantes solo se desactiva. El tipo de una medida se puede
+ *      cambiar a otro tipo activo; si el nombre era el generado, se vuelve a generar.
  *  R13 La familia de color lleva un hexadecimal #RRGGBB para su muestra.
  *  R14 Autorización siempre en servidor. Toda denegación (sin sesión, sin permiso) responde
  *      404 RECURSO_NO_DISPONIBLE, idéntica a la de un recurso inexistente (ADR-003).
@@ -194,6 +195,8 @@ export const medidaSchema = z.object({
   valor: z.number().positive(),
   nombre: z.string(),
   estado: estadoSchema,
+  /** Los bytes se piden aparte: GET /medidas/:idMedida/imagen (entrega 2). */
+  tieneImagen: z.boolean(),
 });
 export type Medida = z.infer<typeof medidaSchema>;
 
@@ -368,9 +371,13 @@ export const crearMedidaRequestSchema = z.object({
   nombre: z.string().trim().min(1).max(60).optional(),
 });
 export type CrearMedidaRequest = z.infer<typeof crearMedidaRequestSchema>;
-/** El tipo no cambia; para otro tipo se crea otra medida. */
+/** Se puede cambiar el tipo (debe estar activo) y el valor; el nombre generado se recalcula (R12). */
 export const editarMedidaRequestSchema = z
-  .object({ valor: z.number().positive().max(9_999_999).optional(), nombre: z.string().trim().min(1).max(60).optional() })
+  .object({
+    idTipoMedida: idSchema.optional(),
+    valor: z.number().positive().max(9_999_999).optional(),
+    nombre: z.string().trim().min(1).max(60).optional(),
+  })
   .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
 export type EditarMedidaRequest = z.infer<typeof editarMedidaRequestSchema>;
 

@@ -11,9 +11,10 @@ import type {
   RendimientoAproximado,
   VariantePublica,
 } from '../dtos/m01-catalogo-productos.dto';
-import type { LogotipoMarca, Pagina } from '../interfaces/catalogo.interface';
+import type { ImagenBytes, LogotipoMarca, Pagina } from '../interfaces/catalogo.interface';
 import type { ConsultaPublicaRepositoryPort } from '../interfaces/consulta-publica.interface';
 import type { ColoresDeProducto } from '../interfaces/productos.interface';
+import { ORDEN_GALERIA } from './imagenes.repository';
 import { productoVisible } from './prisma-comun';
 import { consultarColoresOfrecidos, derivarClaseColor } from './productos.repository';
 
@@ -22,6 +23,11 @@ const contiene = (texto: string): Prisma.StringFilter => ({ contains: texto, mod
 /** U1 + algo que comprar: un producto sin variantes activas no se muestra aunque quede publicado. */
 const visible = (extra: Prisma.ProductoWhereInput = {}): Prisma.ProductoWhereInput =>
   productoVisible({ AND: [{ variantes: { some: { estado: 'activo' } } }, extra] });
+
+/** La imagen de portada de una tarjeta: la principal o, si no hay, la primera de la galería. */
+function portada(imagenes: ReadonlyArray<{ idImagen: number; esPrincipal: boolean }>): number | null {
+  return (imagenes.find((i) => i.esPrincipal) ?? imagenes[0])?.idImagen ?? null;
+}
 
 const disponibilidad = (existencias: readonly number[]): Disponibilidad =>
   existencias.some((e) => e > 0) ? 'disponible' : 'agotado';
@@ -135,7 +141,7 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
     }
     if (idsPagina.length === 0) return { items: [], total };
 
-    const [productos, variantes] = await Promise.all([
+    const [productos, variantes, imagenes] = await Promise.all([
       prisma.producto.findMany({
         where: { idProducto: { in: idsPagina } },
         select: {
@@ -150,6 +156,11 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
       prisma.variante.findMany({
         where: { idProducto: { in: idsPagina }, estado: 'activo' },
         select: { idProducto: true, precioVigente: true, existenciaReferencial: true },
+      }),
+      prisma.imagen.findMany({
+        where: { idProducto: { in: idsPagina } },
+        select: { idImagen: true, idProducto: true, esPrincipal: true },
+        orderBy: ORDEN_GALERIA,
       }),
     ]);
     const porId = new Map(productos.map((p) => [p.idProducto, p]));
@@ -169,7 +180,7 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
           precioDesde: precios.length === 0 ? null : Math.min(...precios),
           tieneColor: derivarClaseColor(p._count.bases, p._count.coloresFabrica) !== 'sin_color',
           disponibilidad: disponibilidad(suyas.map((v) => v.existenciaReferencial)),
-          imagenPrincipalUrl: null,
+          idImagenPrincipal: portada(imagenes.filter((i) => i.idProducto === id)),
         },
       ];
     });
@@ -187,9 +198,19 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
         superficies: { include: { superficie: true }, where: { superficie: { estado: 'activo' } } },
         acabados: { include: { acabado: true }, where: { acabado: { estado: 'activo' } } },
         caracteristicas: { orderBy: [{ orden: 'asc' }, { idCaracteristica: 'asc' }] },
+        imagenes: { select: { idImagen: true, esPrincipal: true }, orderBy: ORDEN_GALERIA },
         variantes: {
           where: { estado: 'activo' },
-          include: { medida: { include: { tipoMedida: true } } },
+          include: {
+            medida: {
+              select: {
+                nombre: true,
+                valor: true,
+                imagenMimeType: true,
+                tipoMedida: { select: { nombre: true, equivalenciaGalones: true } },
+              },
+            },
+          },
         },
         _count: { select: { bases: true, coloresFabrica: true } },
       },
@@ -213,6 +234,7 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
           valor: v.medida.valor.toNumber(),
           equivalenciaGalones: v.medida.tipoMedida.equivalenciaGalones?.toNumber() ?? null,
         }),
+        tieneImagenMedida: v.medida.imagenMimeType !== null,
         orden: v.medida.valor.toNumber() * (v.medida.tipoMedida.equivalenciaGalones?.toNumber() ?? 1),
       }))
       .sort((a, b) => a.orden - b.orden || a.idVariante - b.idVariante)
@@ -231,6 +253,7 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
       claseColor: derivarClaseColor(p._count.bases, p._count.coloresFabrica),
       tipoResina: p.ficha?.tipoResina.nombre ?? null,
       tipoCalidad: p.ficha?.tipoCalidad == null ? null : (p.ficha.tipoCalidad as 1 | 2 | 3),
+      manos: p.ficha?.manos ?? null,
       superficies: p.superficies
         .map((s) => s.superficie)
         .sort((a, b) => a.orden - b.orden)
@@ -241,8 +264,29 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
         .map((a) => ({ id: a.idAcabado, nombre: a.nombre })),
       caracteristicas: p.caracteristicas.map((c) => ({ nombre: c.nombre, valor: c.valor, orden: c.orden })),
       variantes,
-      imagenPrincipalUrl: null,
+      imagenes: [...p.imagenes.filter((i) => i.esPrincipal), ...p.imagenes.filter((i) => !i.esPrincipal)].map((i) => ({
+        idImagen: i.idImagen,
+      })),
     };
+  }
+
+  /** U1: solo sirve imágenes de productos visibles. */
+  async imagen(idImagen: number): Promise<ImagenBytes | null> {
+    const f = await prisma.imagen.findFirst({
+      where: { idImagen, producto: visible() },
+      select: { datos: true, mimeType: true },
+    });
+    return f === null ? null : { bytes: Buffer.from(f.datos), mimeType: f.mimeType as ImagenBytes['mimeType'] };
+  }
+
+  /** La imagen de una medida se sirve si alguna variante activa de un producto visible la usa. */
+  async imagenMedida(idMedida: number): Promise<ImagenBytes | null> {
+    const f = await prisma.medida.findFirst({
+      where: { idMedida, imagen: { not: null }, variantes: { some: { estado: 'activo', producto: visible() } } },
+      select: { imagen: true, imagenMimeType: true },
+    });
+    if (f === null || f.imagen === null || f.imagenMimeType === null) return null;
+    return { bytes: Buffer.from(f.imagen), mimeType: f.imagenMimeType as ImagenBytes['mimeType'] };
   }
 
   async colores(idProducto: number, query: ListarColoresProductoRequest): Promise<ColoresDeProducto | null> {

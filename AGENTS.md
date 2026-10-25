@@ -50,6 +50,15 @@ si falta un predecesor, avisa al usuario y propone una alternativa; decide el Te
   **Nunca agregues funciones, botones o secciones porque aparecen en un mockup.** Lo que se construye es lo que
   el contrato del módulo define; si un mockup muestra algo fuera de él (carrito, calculadora, asesoría de color…),
   pertenece a otro módulo y se deja fuera.
+  **Textos de la interfaz:** describen lo que el usuario puede hacer, nunca el desarrollo (sin códigos de historia
+  de usuario, reglas, decisiones ni referencias al contrato). Las descripciones se conservan; la jerga interna no.
+  **Navegación didáctica:** donde una pantalla muestra algo que tiene elementos relacionados en otra (una marca y sus
+  productos, una categoría y sus productos…), ofrece un enlace "Ver …" que abre esa lista ya filtrada. Los filtros viajan
+  en la URL y la lista destino tiene el filtro correspondiente.
+  **Selectores nuevos:** todo selector nuevo con más de unas pocas opciones lleva buscador (lista desplegable con
+  búsqueda). Si dos selectores se relacionan (categoría y subcategoría), filtran uno al otro.
+  **Obligatorios:** un campo requerido se valida en el formulario con un mensaje que diga qué falta; nunca se deja
+  llegar un error genérico de validación.
 - **Datos iniciales:** solo en `bd/sql/seed_pintuclic.sql` (`npm run db:seed`, ver [`GUIA_MOCKS_Y_DATOS_PRUEBA.md`](bd/docs/GUIA_MOCKS_Y_DATOS_PRUEBA.md)). Prohibido sembrar desde código.
 - **Interfaces:** `interfaces/` solo tipos, cero runtime.
 
@@ -74,6 +83,9 @@ En la raíz: `npm run test:contracts`. Es lo mismo que corre el CI.
 - Nunca `push --force` a `main`. Todo entra por PR.
 - PR: título `tipo(scope): descripcion` (sin versión); descripción de máximo 10 líneas (qué hace, qué tocó fuera del módulo, cómo se probó).
 - Un compañero revisa; CI en verde y 1 aprobación para fusionar. El tag de versión lo crea `release.yml`.
+- **Un PR fusionado está terminado.** No se le agregan commits: los PR se fusionan rápido y lo que se empuje después a su
+  rama se pierde. Todo cambio posterior sale de `main` en una rama nueva con su PR nuevo. Antes de dar una rama por
+  entregada, comprueba que `origin/main` ya contiene lo que se prometió.
 - Backend, frontend y QA no editan `.github/workflows/`, `docker-compose.yml`, `Dockerfile*` ni `.env.example`: es dominio del DevOps.
 
 ## Ya no existen

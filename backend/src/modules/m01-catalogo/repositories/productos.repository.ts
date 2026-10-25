@@ -22,6 +22,7 @@ import type {
   ProductosRepositoryPort,
   RelacionesAVerificar,
 } from '../interfaces/productos.interface';
+import { ORDEN_GALERIA, SELECCION_IMAGEN, aImagen } from './imagenes.repository';
 import { impactoVacio } from './prisma-comun';
 
 const igualSinMayusculas = (texto: string): Prisma.StringFilter => ({
@@ -66,6 +67,7 @@ const INCLUIR_DETALLE = {
   bases: { include: { base: { select: { nombre: true, orden: true } } } },
   coloresFabrica: { include: { color: { select: { nombre: true } } } },
   caracteristicas: { orderBy: [{ orden: 'asc' }, { idCaracteristica: 'asc' }] },
+  imagenes: { select: SELECCION_IMAGEN, orderBy: ORDEN_GALERIA },
   variantes: {
     include: {
       medida: {
@@ -176,6 +178,7 @@ function aDetalle(f: FilaDetalle): ProductoDetalle {
             tipoCalidad: f.ficha.tipoCalidad === null ? null : (f.ficha.tipoCalidad as 1 | 2 | 3),
             rendimientoMin: f.ficha.rendimientoMin?.toNumber() ?? null,
             rendimientoMax: f.ficha.rendimientoMax?.toNumber() ?? null,
+            manos: f.ficha.manos,
           },
     superficies: referencias(
       f.superficies.map((r) => ({
@@ -210,6 +213,7 @@ function aDetalle(f: FilaDetalle): ProductoDetalle {
       valor: c.valor,
       orden: c.orden,
     })),
+    imagenes: f.imagenes.map(aImagen),
     variantes,
   };
 }
@@ -219,12 +223,14 @@ function columnasFicha(f: FichaRecubrimientoDatos): {
   tipoCalidad: number | null;
   rendimientoMin: number | null;
   rendimientoMax: number | null;
+  manos: number | null;
 } {
   return {
     idTipoResina: f.idTipoResina,
     tipoCalidad: f.tipoCalidad,
     rendimientoMin: f.rendimientoMin,
     rendimientoMax: f.rendimientoMax,
+    manos: f.manos,
   };
 }
 
@@ -500,6 +506,10 @@ export class ProductosRepository implements ProductosRepositoryPort {
   async contarImpacto(id: number): Promise<ImpactoDesactivacion> {
     const variantes = await this.contarVariantesActivas(id);
     return { ...impactoVacio(), variantes };
+  }
+
+  contarImagenes(idProducto: number): Promise<number> {
+    return prisma.imagen.count({ where: { idProducto } });
   }
 
   contarVariantesActivas(idProducto: number): Promise<number> {

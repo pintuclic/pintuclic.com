@@ -63,7 +63,7 @@ export interface ServidorPrueba {
   };
   peticion: (
     actor: NombreActor | null,
-    metodo: 'GET' | 'POST' | 'PUT' | 'PATCH',
+    metodo: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     ruta: string,
     cuerpo?: unknown,
   ) => Promise<RespuestaHttp>;

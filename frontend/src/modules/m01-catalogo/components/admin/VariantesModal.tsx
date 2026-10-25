@@ -4,15 +4,16 @@ import React, { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil, Plus, Power, RotateCcw } from 'lucide-react';
-import { Alert, Button, Input, Modal, Select } from '@/core/components';
+import { Alert, Button, Input, Modal } from '@/core/components';
 import { formVarianteSchema, type FormVariante } from '../../dtos/formularios.dto';
 import type { Variante } from '../../dtos/m01-catalogo-productos.dto';
 import { useCargar } from '../../hooks/useCargar';
 import type { Referencias } from '../../hooks/useReferencias';
-import { productosApi, variantesApi } from '../../services/catalogo-api';
+import { medidasApi, productosApi, variantesApi } from '../../services/catalogo-api';
 import { aCuerpoVariante, aCuerpoVarianteEditada } from '../../services/formularios';
 import { leerErrorCatalogo } from '../../services/mensaje-error';
 import { formatCOP } from '@/core/utils/moneda';
+import { SelectorBuscable } from './campos';
 import { AvisoAccion, Cargando, EstadoBadge, MensajeVacio, ModalDesactivar, reactivar, type Aviso } from './comunes';
 
 interface FormularioVarianteProps {
@@ -33,13 +34,20 @@ const FormularioVariante: React.FC<FormularioVarianteProps> = ({
   onGuardada,
 }) => {
   const [error, setError] = useState<string | null>(null);
+  const tipoInicial =
+    variante === null
+      ? ''
+      : (referencias.tiposMedida.find((t) => t.nombre === variante.tipoMedida)?.idTipoMedida ?? '');
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormVariante>({
     resolver: zodResolver(formVarianteSchema),
     defaultValues: {
+      idTipoMedida: tipoInicial === '' ? '' : String(tipoInicial),
       idMedida: variante === null ? '' : String(variante.idMedida),
       precio: variante === null ? '' : String(variante.precio),
       sku: variante?.sku ?? '',
@@ -47,7 +55,21 @@ const FormularioVariante: React.FC<FormularioVarianteProps> = ({
       codigoProveedor: variante?.codigoProveedor ?? '',
     },
   });
-  const disponibles = referencias.medidas.filter(
+  const idTipoMedida = watch('idTipoMedida');
+  const idMedida = watch('idMedida');
+  const poner = (campo: keyof FormVariante, valor: string) =>
+    setValue(campo, valor, { shouldValidate: true, shouldDirty: true });
+
+  // Solo las medidas del tipo elegido: así no aparecen todas mezcladas.
+  const cargarMedidas = useCallback(
+    () =>
+      idTipoMedida === ''
+        ? Promise.resolve(null)
+        : medidasApi.listar({ idTipoMedida: Number(idTipoMedida), estado: 'activo', limite: 100 }),
+    [idTipoMedida],
+  );
+  const medidas = useCargar(cargarMedidas, 'No se pudieron cargar las medidas.');
+  const disponibles = (medidas.datos?.items ?? []).filter(
     (m) => !usadas.includes(m.idMedida) || m.idMedida === variante?.idMedida,
   );
 
@@ -80,19 +102,29 @@ const FormularioVariante: React.FC<FormularioVarianteProps> = ({
     >
       <form onSubmit={(e) => void enviar(e)} noValidate className="space-y-4 py-2">
         {error !== null && <Alert variant="error">{error}</Alert>}
-        <Select
-          label="Medida"
+        <SelectorBuscable
+          label="Tipo de medida"
+          value={idTipoMedida}
+          onChange={(v) => {
+            poner('idTipoMedida', v);
+            poner('idMedida', '');
+          }}
+          options={referencias.tiposMedida.map((t) => ({ value: String(t.idTipoMedida), label: t.nombre }))}
           disabled={variante !== null}
-          options={[
-            { value: '', label: 'Elija…' },
-            ...disponibles.map((m) => ({ value: String(m.idMedida), label: m.nombre })),
-          ]}
-          {...register('idMedida')}
+          error={errors.idTipoMedida?.message}
+        />
+        <SelectorBuscable
+          label="Medida"
+          value={idMedida}
+          onChange={(v) => poner('idMedida', v)}
+          options={disponibles.map((m) => ({ value: String(m.idMedida), label: m.nombre }))}
+          placeholder={idTipoMedida === '' ? 'Elija primero el tipo de medida' : 'Elija…'}
+          disabled={variante !== null || idTipoMedida === ''}
           error={errors.idMedida?.message}
           helperText={
             variante !== null
               ? 'La medida no cambia: para otra medida cree otra variante.'
-              : 'Solo se listan las medidas que el producto aún no tiene.'
+              : 'Solo salen las medidas de ese tipo que el producto aún no tiene.'
           }
         />
         <Input
