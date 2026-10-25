@@ -96,22 +96,21 @@ describe('M01 · formularios → cuerpos del contrato', () => {
     expect(r.ok && 'idMarca' in r.valor).toBe(false);
   });
 
-  it('variante: precio con coma, existencia y SKU opcionales', () => {
+  it('variante: precio con coma y SKU opcional', () => {
     const f: FormVariante = {
       idTipoMedida: '1',
       idMedida: '4',
       precio: '98900',
       sku: '',
-      existenciaReferencial: '',
       codigoProveedor: '',
     };
     expect(aCuerpoVariante(f)).toEqual({
       ok: true,
-      valor: { idMedida: 4, precio: 98900, existenciaReferencial: 0, codigoProveedor: null },
+      valor: { idMedida: 4, precio: 98900, codigoProveedor: null },
     });
-    expect(aCuerpoVariante({ ...f, precio: '10,5', sku: 'AB-1', existenciaReferencial: '7' })).toMatchObject({
+    expect(aCuerpoVariante({ ...f, precio: '10,5', sku: 'AB-1' })).toMatchObject({
       ok: true,
-      valor: { precio: 10.5, sku: 'AB-1', existenciaReferencial: 7 },
+      valor: { precio: 10.5, sku: 'AB-1' },
     });
     expect(aCuerpoVariante({ ...f, precio: '10,123' }).ok).toBe(false);
     expect(aCuerpoVariante({ ...f, sku: 'con espacio' }).ok).toBe(false);

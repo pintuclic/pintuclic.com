@@ -109,14 +109,12 @@ export interface CrearVarianteDatos {
   precio: number;
   /** null → el repositorio genera `P{idProducto}-V{idVariante}` (V3). */
   sku: string | null;
-  existenciaReferencial: number;
   codigoProveedor: string | null;
 }
 
 export interface EditarVarianteDatos {
   precio?: number;
   sku?: string;
-  existenciaReferencial?: number;
   codigoProveedor?: string | null;
 }
 

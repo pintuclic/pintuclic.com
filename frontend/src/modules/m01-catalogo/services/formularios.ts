@@ -110,7 +110,6 @@ export function aCuerpoVariante(f: FormVariante): Resultado<CrearVarianteRequest
     idMedida: Number(f.idMedida),
     precio: aNumero(f.precio),
     ...(f.sku.trim() === '' ? {} : { sku: f.sku.trim() }),
-    ...(f.existenciaReferencial.trim() === '' ? {} : { existenciaReferencial: Number(f.existenciaReferencial) }),
     codigoProveedor: textoONulo(f.codigoProveedor),
   });
   return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
@@ -121,7 +120,6 @@ export function aCuerpoVarianteEditada(f: FormVariante): Resultado<EditarVariant
   const r = editarVarianteRequestSchema.safeParse({
     precio: aNumero(f.precio),
     sku: f.sku.trim(),
-    existenciaReferencial: f.existenciaReferencial.trim() === '' ? 0 : Number(f.existenciaReferencial),
     codigoProveedor: textoONulo(f.codigoProveedor),
   });
   return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };

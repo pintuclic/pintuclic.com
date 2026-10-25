@@ -48,7 +48,6 @@ export class VariantesService extends ServicioCatalogoBase {
         idMedida: peticion.idMedida,
         precio: peticion.precio,
         sku,
-        existenciaReferencial: peticion.existenciaReferencial,
         codigoProveedor,
       })
       .catch(traducirUnico);
@@ -69,9 +68,6 @@ export class VariantesService extends ServicioCatalogoBase {
     const cambios: EditarVarianteDatos = {
       ...(peticion.precio !== undefined ? { precio: peticion.precio } : {}),
       ...(peticion.sku !== undefined ? { sku: peticion.sku } : {}),
-      ...(peticion.existenciaReferencial !== undefined
-        ? { existenciaReferencial: peticion.existenciaReferencial }
-        : {}),
       ...(peticion.codigoProveedor !== undefined ? { codigoProveedor: peticion.codigoProveedor } : {}),
     };
     return this.variantes.editar(id, cambios).catch(traducirUnico);

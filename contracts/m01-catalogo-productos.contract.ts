@@ -94,7 +94,7 @@ import {
  *      la variante + color (ej. P1-V2-ROJO) (RC-21).
  *  V3  El SKU es único. Si no se envía, se genera `P{idProducto}-V{idVariante}`.
  *  V4  Existencia referencial: entero ≥ 0, solo informativa; no bloquea ventas.
- *      Desde M13 sus ajustes pasan por M13 (D10).
+ *      Una variante nace en 0 y M01 solo la lee: la escribe únicamente M13 (D10).
  *  V5  La medida debe estar activa. La medida de una variante no cambia: para
  *      otra medida se crea otra variante.
  *  V6  Estados usados: activo e inactivo (D12).
@@ -138,7 +138,8 @@ import {
  *      luminosidad); el algoritmo es del servicio. Quien administra puede corregirla.
  *  D9  Publicar exige al menos una imagen (RF-CAT-02-05); los productos ya publicados
  *      sin imagen siguen visibles hasta que se despublican.
- *  D10 La existencia se edita aquí mientras M13 no exista; después, solo por M13.
+ *  D10 La existencia solo se escribe en M13 (inventario): crear o editar una variante en M01
+ *      no la recibe (si llega, se ignora) y una variante nueva nace en 0.
  *  D11 Las relaciones del producto se reemplazan completas al editarlas.
  *  D12 Los estados `agotado` y `descontinuado` del enum de la BD no se usan.
  *  D13 Un producto puede estar en un solo ambiente o en ambos; no se exige ninguno.
@@ -570,7 +571,6 @@ export const crearVarianteRequestSchema = z.object({
   idMedida: idSchema,
   precio: precioSchema,
   sku: skuSchema.optional(),
-  existenciaReferencial: existenciaSchema.default(0),
   codigoProveedor: codigoProveedorSchema.nullable().optional(),
 });
 export type CrearVarianteRequest = z.infer<typeof crearVarianteRequestSchema>;
@@ -580,7 +580,6 @@ export const editarVarianteRequestSchema = z
   .object({
     precio: precioSchema.optional(),
     sku: skuSchema.optional(),
-    existenciaReferencial: existenciaSchema.optional(),
     codigoProveedor: codigoProveedorSchema.nullable().optional(),
   })
   .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
