@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { CircleCheck, Clock, Package, Search } from 'lucide-react';
-import { Alert, Button, Container, Skeleton } from '@/core/components';
+import { ArrowLeft, CircleCheck, Clock, Package, Search } from 'lucide-react';
+import { Alert, Button, ButtonLink, Container, Skeleton } from '@/core/components';
 import type { FiltroEstadoPedidos } from '../../interfaces/ordenes.interface';
 import { pedidosVisibles, useMisPedidosStore } from '../../store/misPedidosStore';
 import { PaginacionPedidos } from '../PaginacionPedidos';
@@ -39,6 +39,9 @@ export function MisPedidosView() {
     <div className="bg-neutral-lightest py-8">
       <Container>
         <div className="mx-auto max-w-3xl space-y-4">
+          <ButtonLink href="/perfil" variant="ghost" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />}>
+            Mi cuenta
+          </ButtonLink>
           <h1 className="font-title text-2xl font-bold text-neutral-black">Mis pedidos</h1>
 
           <form onSubmit={buscar} role="search" className="flex gap-2">
