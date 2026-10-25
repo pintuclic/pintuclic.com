@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 4.4 (alineado con schema_pintuclic.sql v4.4 - equivalencia en galones)
+-- VERSIÓN: 4.8 (alineado con schema_pintuclic.sql v4.8 - atención al cliente M15)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -61,7 +61,11 @@ INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     (21, 'empresas.validar',               'Aprobar o rechazar solicitudes de cuenta empresa, ascenso y renovación de NIT', 'activo'),
     -- Notificaciones y Comunicaciones (M18 HU-NOT-03)
     (22, 'notificaciones.ver',             'Ver plantillas de comunicación y el registro de envíos y rebotes', 'activo'),
-    (23, 'notificaciones.editar',          'Editar el contenido de las plantillas de comunicación',            'activo')
+    (23, 'notificaciones.editar',          'Editar el contenido de las plantillas de comunicación',            'activo'),
+    -- Atención al cliente (M15 HU-ATC-01, HU-ATC-05)
+    (24, 'atencion.ver',                   'Ver preguntas frecuentes, solicitudes de contacto, horario y canal de atención', 'activo'),
+    (25, 'atencion.editar',                'Gestionar preguntas frecuentes, el horario de atención y el canal de WhatsApp', 'activo'),
+    (26, 'atencion.atender_clientes',      'Atender las consultas escaladas a un asesor humano',               'activo')
 ON CONFLICT (id_permiso) DO NOTHING;
 
 -- 1.5 Asignación de Permisos a Roles
@@ -576,6 +580,55 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
 ON CONFLICT (tipo) DO NOTHING;
 
 -- ==============================================================================
+-- 9E. MÓDULO DE ATENCIÓN AL CLIENTE (3 Tablas - M15 - HU-ATC-01, 03, 04)
+-- ==============================================================================
+
+-- 9E.1 Preguntas frecuentes públicas, agrupadas por tema y ordenadas (HU-ATC-01).
+-- Contenido inicial editable desde el panel; sin esto el Centro de ayuda nace vacío.
+INSERT INTO pregunta_frecuente (id_pregunta, tema, pregunta, respuesta, orden, activa) VALUES
+    (1, 'Pedidos y pagos', '¿Qué métodos de pago aceptan?',
+        'Aceptamos tarjeta de crédito, tarjeta débito, PSE y transferencia bancaria. El pago se confirma antes de despachar el pedido.', 1, TRUE),
+    (2, 'Pedidos y pagos', '¿Puedo cotizar un pedido grande antes de comprar?',
+        'Sí. Agrega al carrito los productos y las cantidades que necesitas y solicita la cotización desde allí. Si se trata de una obra completa, también puedes escribirnos por WhatsApp para que un asesor te acompañe.', 2, TRUE),
+    (3, 'Envíos y entregas', '¿A qué ciudades hacen envíos?',
+        'Por el momento tenemos cobertura en todo el departamento del Caquetá. Estamos trabajando para ampliarla a otros departamentos.', 1, TRUE),
+    (4, 'Envíos y entregas', '¿Cuánto tarda en llegar mi pedido?',
+        'En Florencia los pedidos se entregan normalmente el siguiente día hábil. En el resto del departamento del Caquetá, entre dos y cuatro días hábiles.', 2, TRUE),
+    (5, 'Cuenta y empresa', '¿Cómo creo una cuenta?',
+        'Entra a Registrarse, ingresa tu nombre, tu correo y una contraseña, y confirma el código de verificación que enviamos a tu correo.', 1, TRUE),
+    (6, 'Cuenta y empresa', '¿Puedo comprar como empresa con NIT?',
+        'Sí. Al registrarte puedes solicitar una cuenta de empresa adjuntando el RUT. Una vez aprobada, tus compras quedan a nombre de la empresa con su NIT.', 2, TRUE),
+    (7, 'Garantías y devoluciones', '¿Puedo devolver un producto si no era el color que esperaba?',
+        'Los productos sin abrir y en su empaque original admiten devolución. Los colores entonados a pedido no, porque se preparan exclusivamente para ti; por eso recomendamos confirmar el color antes de ordenar.', 1, TRUE),
+    (8, 'Garantías y devoluciones', '¿Qué cubre la garantía de un producto?',
+        'La garantía cubre defectos de fabricación. No cubre fallas por una aplicación distinta a la indicada en la ficha técnica ni por preparación inadecuada de la superficie.', 2, TRUE),
+    (9, 'Productos y color', '¿Cómo sé qué pintura usar en cada superficie?',
+        'Cada producto indica las superficies para las que está recomendado y su rendimiento. Si tienes dudas, escríbenos por WhatsApp y te orientamos.', 1, TRUE),
+    (10, 'Productos y color', '¿Puedo pedir un color personalizado?',
+        'Sí. Varias de nuestras líneas se entonan en el color que necesites a partir de la base correspondiente. Consulta la disponibilidad en la ficha del producto.', 2, TRUE)
+ON CONFLICT (id_pregunta) DO NOTHING;
+
+-- 9E.2 Horario de atención humana, una fila por día (HU-ATC-04).
+-- Domingo cerrado: sin horas, como exige ck_horario_franja_coherente.
+INSERT INTO horario_atencion (dia_semana, abierto, hora_inicio, hora_fin) VALUES
+    ('lunes',     TRUE,  '08:00', '18:00'),
+    ('martes',    TRUE,  '08:00', '18:00'),
+    ('miercoles', TRUE,  '08:00', '18:00'),
+    ('jueves',    TRUE,  '08:00', '18:00'),
+    ('viernes',   TRUE,  '08:00', '18:00'),
+    ('sabado',    TRUE,  '08:00', '13:00'),
+    ('domingo',   FALSE, NULL,    NULL)
+ON CONFLICT (dia_semana) DO NOTHING;
+
+-- 9E.3 Canal de contacto directo por WhatsApp, fila única (HU-ATC-03).
+-- Hoy apunta al canal de difusión de la empresa: es temporal, solo para verificar la redirección,
+-- y un canal no acepta texto prellenado. `mensaje_base` queda listo para cuando el destino sea un
+-- número de WhatsApp Business y el botón arme el enlace wa.me con la referencia del producto.
+INSERT INTO configuracion_atencion_whatsapp (id_configuracion, destino, mensaje_base) VALUES
+    (1, 'https://whatsapp.com/channel/0029VbDzCHgGehEKg98m4J3X', 'Hola, quiero información sobre sus productos.')
+ON CONFLICT (id_configuracion) DO NOTHING;
+
+-- ==============================================================================
 -- 10. ACTUALIZACIÓN AUTOMÁTICA DE SECUENCIAS (EVITA COLISIONES DE IDs)
 -- ==============================================================================
 
@@ -621,5 +674,7 @@ SELECT setval('consentimiento_usuario_id_consentimiento_seq',    COALESCE((SELEC
 SELECT setval('solicitud_supresion_id_solicitud_supresion_seq',  COALESCE((SELECT MAX(id_solicitud_supresion) FROM solicitud_supresion), 1));
 SELECT setval('usuario_identidad_externa_id_identidad_seq',      COALESCE((SELECT MAX(id_identidad) FROM usuario_identidad_externa), 1));
 SELECT setval('parametro_sistema_id_parametro_seq',              COALESCE((SELECT MAX(id_parametro) FROM parametro_sistema), 1));
+SELECT setval('pregunta_frecuente_id_pregunta_seq',              COALESCE((SELECT MAX(id_pregunta) FROM pregunta_frecuente), 1));
+SELECT setval('horario_atencion_id_horario_seq',                 COALESCE((SELECT MAX(id_horario) FROM horario_atencion), 1));
 
 COMMIT;

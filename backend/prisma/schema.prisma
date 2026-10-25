@@ -170,6 +170,36 @@ enum OrigenAjusteInventario {
   @@map("enum_origen_ajuste_inventario")
 }
 
+/// Tipo de solicitud del formulario de contacto (M15 · HU-ATC-02); cotizacion es solo intención (RF-ATC-02-07)
+enum TipoSolicitudContacto {
+  consulta
+  cotizacion
+  reclamo
+
+  @@map("enum_tipo_solicitud_contacto")
+}
+
+/// Estado de una solicitud de contacto en la bandeja del administrador (M15 · HU-ATC-02)
+enum EstadoSolicitudContacto {
+  pendiente
+  atendida
+
+  @@map("enum_estado_solicitud_contacto")
+}
+
+/// Día de la semana del horario de atención humana (M15 · HU-ATC-04)
+enum DiaSemana {
+  lunes
+  martes
+  miercoles
+  jueves
+  viernes
+  sabado
+  domingo
+
+  @@map("enum_dia_semana")
+}
+
 /// Estado comercial de una variante (M01 · HU-CAT-03)
 enum EstadoProducto {
   activo
@@ -215,6 +245,9 @@ model Usuario {
 
   // M13 Relaciones
   ajustesInventario AjusteInventario[]
+
+  // M15 Relaciones
+  solicitudesContacto SolicitudContacto[]
 
   @@map("usuario")
 }
@@ -594,6 +627,72 @@ model AjusteInventario {
   @@index([idCarga], map: "idx_ajuste_carga")
   @@index([idUsuario], map: "idx_ajuste_usuario")
   @@map("ajuste_inventario")
+}
+
+// =============================================================================
+// MÓDULO M15 — ATENCIÓN AL CLIENTE (esquema 4.8)
+// Contrato: contracts/m15-atencion.contract.ts
+// =============================================================================
+
+/// Pregunta frecuente administrable, agrupada por tema y ordenada (M15 · HU-ATC-01)
+model PreguntaFrecuente {
+  idPregunta         Int      @id @default(autoincrement()) @map("id_pregunta")
+  tema               String   @db.VarChar(60)
+  pregunta           String   @db.VarChar(300)
+  respuesta          String   @db.VarChar(2000)
+  orden              Int      @default(0)
+  /// false la oculta al público sin eliminarla (CA-ATC-01-02)
+  activa             Boolean  @default(true)
+  fechaCreacion      DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  @@index([tema, orden], map: "idx_faq_tema_orden")
+  @@index([activa], map: "idx_faq_activa")
+  @@map("pregunta_frecuente")
+}
+
+/// Solicitud del formulario de contacto dirigida al administrador (M15 · HU-ATC-02).
+/// Los datos de contacto no se guardan: se leen de la cuenta al mostrarla (RF-ATC-02-04).
+model SolicitudContacto {
+  idSolicitud   String                  @id @default(uuid()) @map("id_solicitud") @db.Uuid
+  idUsuario     Int                     @map("id_usuario")
+  tipo          TipoSolicitudContacto
+  descripcion   String                  @db.VarChar(2000)
+  estado        EstadoSolicitudContacto @default(pendiente)
+  fechaCreacion DateTime                @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade, map: "fk_solicitud_contacto_usuario")
+
+  @@index([idUsuario], map: "idx_solicitud_contacto_usuario")
+  @@index([estado, fechaCreacion(sort: Desc)], map: "idx_solicitud_contacto_estado_fecha")
+  @@map("solicitud_contacto")
+}
+
+/// Franja de atención humana de un día de la semana (M15 · HU-ATC-04).
+/// `abierto = false` cierra el día completo y deja las horas en null.
+model HorarioAtencion {
+  idHorario          Int       @id @default(autoincrement()) @map("id_horario")
+  diaSemana          DiaSemana @unique @map("dia_semana")
+  abierto            Boolean   @default(true)
+  /// Hora local "HH:mm" en 24h; null cuando el día está cerrado
+  horaInicio         String?   @map("hora_inicio") @db.VarChar(5)
+  horaFin            String?   @map("hora_fin") @db.VarChar(5)
+  fechaActualizacion DateTime  @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?      @map("id_usuario_actualizo")
+
+  @@map("horario_atencion")
+}
+
+/// Destino del botón de contacto directo por WhatsApp; fila única (M15 · HU-ATC-03)
+model ConfiguracionAtencionWhatsapp {
+  idConfiguracion    Int      @id @default(1) @map("id_configuracion") @db.SmallInt
+  /// URL completa (hoy el canal de difusión) o número de WhatsApp Business cuando exista
+  destino            String   @db.VarChar(300)
+  mensajeBase        String?  @map("mensaje_base") @db.VarChar(300)
+  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?     @map("id_usuario_actualizo")
+
+  @@map("configuracion_atencion_whatsapp")
 }
 
 // =============================================================================

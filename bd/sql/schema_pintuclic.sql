@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.7 (v4.6 + M13: historial de ajustes de inventario referencial)
+-- VERSIÓN: 4.8 (v4.7 + M15: preguntas frecuentes, contacto, horario y canal de atención)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 62
+-- TOTAL TABLAS: 66
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -143,6 +143,20 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_origen_ajuste_inventario') THEN
         CREATE TYPE enum_origen_ajuste_inventario AS ENUM ('manual', 'carga_masiva', 'samit');
+    END IF;
+
+    -- Tipo y estado de una solicitud del formulario de contacto (M15 - HU-ATC-02).
+    -- 'cotizacion' es solo intención: el camino formal es el carrito (RF-ATC-02-07).
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_solicitud_contacto') THEN
+        CREATE TYPE enum_tipo_solicitud_contacto AS ENUM ('consulta', 'cotizacion', 'reclamo');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_solicitud_contacto') THEN
+        CREATE TYPE enum_estado_solicitud_contacto AS ENUM ('pendiente', 'atendida');
+    END IF;
+
+    -- Día de la semana del horario de atención humana (M15 - HU-ATC-04)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_dia_semana') THEN
+        CREATE TYPE enum_dia_semana AS ENUM ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo');
     END IF;
 END $$;
 
@@ -1613,6 +1627,93 @@ COMMENT ON COLUMN ajuste_inventario.id_carga IS 'Identificador generado por el c
 COMMENT ON COLUMN ajuste_inventario.origen IS 'manual = ajuste en pantalla; carga_masiva = plantilla CSV; samit = integración futura';
 
 -- ==============================================================================
+-- 9E. MÓDULO DE ATENCIÓN AL CLIENTE (M15)
+-- ==============================================================================
+
+-- Tabla: pregunta_frecuente
+-- Preguntas frecuentes administrables desde el panel y públicas para el visitante (M15 · HU-ATC-01).
+-- Se agrupan por `tema` y se ordenan por `orden` dentro de cada tema. Desactivar no borra: la fila
+-- queda pero deja de mostrarse al público (CA-ATC-01-02).
+CREATE TABLE IF NOT EXISTS pregunta_frecuente (
+    id_pregunta SERIAL PRIMARY KEY,
+    tema VARCHAR(60) NOT NULL,
+    pregunta VARCHAR(300) NOT NULL,
+    respuesta VARCHAR(2000) NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    activa BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_faq_orden_no_negativo CHECK (orden >= 0)
+);
+
+COMMENT ON TABLE pregunta_frecuente IS 'Preguntas frecuentes administrables, agrupadas por tema y ordenadas (M15 · HU-ATC-01)';
+COMMENT ON COLUMN pregunta_frecuente.activa IS 'FALSE oculta la pregunta al público sin eliminarla (CA-ATC-01-02)';
+
+-- Tabla: solicitud_contacto
+-- Solicitudes enviadas desde el formulario de contacto por un usuario autenticado (M15 · HU-ATC-02).
+-- Los datos de contacto NO se guardan aquí: se resuelven desde la cuenta al mostrarlas (RF-ATC-02-04).
+-- Una solicitud de tipo 'cotizacion' es un mensaje de intención y nunca genera una cotización (RF-ATC-02-07).
+CREATE TABLE IF NOT EXISTS solicitud_contacto (
+    id_solicitud UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario INT NOT NULL,
+    tipo enum_tipo_solicitud_contacto NOT NULL,
+    descripcion VARCHAR(2000) NOT NULL,
+    estado enum_estado_solicitud_contacto NOT NULL DEFAULT 'pendiente',
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_solicitud_contacto_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+COMMENT ON TABLE solicitud_contacto IS 'Solicitudes del formulario de contacto (consulta, cotización o reclamo) dirigidas al administrador (M15 · HU-ATC-02)';
+COMMENT ON COLUMN solicitud_contacto.tipo IS 'cotizacion = intención de cotizar; el camino formal es el carrito (RF-ATC-02-07)';
+
+-- Tabla: horario_atencion
+-- Horario de atención humana configurable, una fila por día de la semana (M15 · HU-ATC-04).
+-- Un día con abierto = FALSE está cerrado toda la jornada y no lleva horas. Solo condiciona los
+-- canales atendidos por personas; los automatizados operan igual fuera de él (RF-ATC-04-04).
+CREATE TABLE IF NOT EXISTS horario_atencion (
+    id_horario SERIAL PRIMARY KEY,
+    dia_semana enum_dia_semana NOT NULL UNIQUE,
+    abierto BOOLEAN NOT NULL DEFAULT TRUE,
+    hora_inicio VARCHAR(5),
+    hora_fin VARCHAR(5),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_horario_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_horario_formato_horas CHECK (
+        (hora_inicio IS NULL OR hora_inicio ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        AND (hora_fin IS NULL OR hora_fin ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ),
+    CONSTRAINT ck_horario_franja_coherente CHECK (
+        (abierto = FALSE AND hora_inicio IS NULL AND hora_fin IS NULL)
+        OR (abierto = TRUE AND hora_inicio IS NOT NULL AND hora_fin IS NOT NULL AND hora_fin > hora_inicio)
+    )
+);
+
+COMMENT ON TABLE horario_atencion IS 'Horario de atención humana por día de la semana, configurable desde el panel (M15 · HU-ATC-04)';
+COMMENT ON COLUMN horario_atencion.hora_inicio IS 'Hora local "HH:mm" en 24h; NULL cuando el día está cerrado';
+
+-- Tabla: configuracion_atencion_whatsapp
+-- Destino del botón de contacto directo por WhatsApp, de fila única (M15 · HU-ATC-03).
+-- `destino` admite una URL completa (hoy el canal de difusión de la empresa, que no acepta texto
+-- prellenado) o un número de WhatsApp Business cuando exista; en ese caso el botón arma el enlace
+-- wa.me con el mensaje base y la referencia del producto (RF-ATC-03-02, RF-ATC-03-03).
+CREATE TABLE IF NOT EXISTS configuracion_atencion_whatsapp (
+    id_configuracion SMALLINT PRIMARY KEY DEFAULT 1,
+    destino VARCHAR(300) NOT NULL,
+    mensaje_base VARCHAR(300),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_whatsapp_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_whatsapp_fila_unica CHECK (id_configuracion = 1)
+);
+
+COMMENT ON TABLE configuracion_atencion_whatsapp IS 'Destino y mensaje base del botón de contacto directo por WhatsApp; fila única (M15 · HU-ATC-03)';
+COMMENT ON COLUMN configuracion_atencion_whatsapp.destino IS 'URL completa (canal de difusión) o número de WhatsApp Business; el enlace se arma según cuál sea';
+
+-- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
 -- ==============================================================================
 
@@ -1740,6 +1841,12 @@ CREATE INDEX IF NOT EXISTS idx_ajuste_usuario ON ajuste_inventario(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_bsr_fecha ON busqueda_sin_resultado(fecha);
 CREATE INDEX IF NOT EXISTS idx_bsr_termino ON busqueda_sin_resultado(termino);
 
+-- M15: listado público de FAQs (agrupado y ordenado) y bandeja de solicitudes de contacto
+CREATE INDEX IF NOT EXISTS idx_faq_tema_orden ON pregunta_frecuente(tema, orden);
+CREATE INDEX IF NOT EXISTS idx_faq_activa ON pregunta_frecuente(activa);
+CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_usuario ON solicitud_contacto(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_estado_fecha ON solicitud_contacto(estado, fecha_creacion DESC);
+
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (53 TABLAS - v4.2)
+-- FIN DEL SCRIPT DDL (66 TABLAS - v4.8)
 -- ==============================================================================
