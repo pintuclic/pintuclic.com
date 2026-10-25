@@ -13,6 +13,7 @@ import { RecuperarForm } from '../components/auth/RecuperarForm';
 import { RegistroFlow } from '../components/auth/RegistroFlow';
 import { RestablecerForm } from '../components/auth/RestablecerForm';
 import { DireccionForm } from '../components/perfil/DireccionForm';
+import { SeguridadSection } from '../components/perfil/SeguridadSection';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),
@@ -214,5 +215,30 @@ describe('Header con sesión (M04 → Core)', () => {
       sublabel: 'Panel admin',
       href: '/admin',
     });
+  });
+});
+
+describe('Seguridad del perfil (HU-CUE-06)', () => {
+  const salida = html(
+    <SeguridadSection
+      perfil={{
+        idUsuario: 1,
+        nombre: 'Cliente Prueba',
+        correo: 'cliente@pintuclic.com',
+        telefono: '3000000000',
+        tipo: 'normal',
+        estado: 'activo',
+        cambioContrasenaPendiente: false,
+      }}
+      onCorreoCambiado={nada}
+      onSesionInvalidada={nada}
+    />,
+  );
+
+  it('desactiva el autocompletado de credenciales guardadas en cambio de correo y contraseña', () => {
+    expect(salida).not.toContain('autoComplete="current-password"');
+    expect(salida).not.toContain('autoComplete="email"');
+    expect(salida).toContain('id="correo-nuevo"');
+    expect(salida).toContain('id="correo-contrasena"');
   });
 });
