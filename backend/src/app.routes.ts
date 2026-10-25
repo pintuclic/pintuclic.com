@@ -4,6 +4,7 @@ import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
 import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
+import { construirModuloM15 } from './modules/m15-atencion/m15.routes';
 import { construirModuloM16 } from './modules/m16-contenido/m16.routes';
 import { construirModuloM17 } from './modules/m17-permisos/m17.routes';
 import { construirModuloM18 } from './modules/m18-notificaciones/m18.routes';
@@ -100,6 +101,20 @@ export function construirAppRoutes(): Router {
   const landing = construirRutasLandingBanners(m17.autorizacionService);
   router.use('/admin/landing', exigirSesionSalvo(auth, []), landing.adminRouter);
   router.use('/landing', landing.publicRouter);
+
+  // M15: atención al cliente. El horario y el canal son públicos; el formulario de
+  // contacto exige sesión (RF-ATC-02-01). Las preguntas frecuentes no son de M15:
+  // las sirve M16 en /contenido/faq. Va antes de `/admin` por lo mismo que M01.
+  const m15 = construirModuloM15(m17.autorizacionService);
+  router.use('/admin/atencion', exigirSesionSalvo(auth, []), m15.adminRouter);
+  router.use(
+    '/atencion',
+    exigirSesionSalvo(auth, [
+      { metodo: 'GET', ruta: '/horario' },
+      { metodo: 'GET', ruta: '/whatsapp' },
+    ]),
+    m15.publicRouter,
+  );
 
   // M17: la confirmación del cambio de correo del admin llega desde un enlace y es
   // pública (HU-ADM-06); el resto de endpoints administrativos exige sesión.

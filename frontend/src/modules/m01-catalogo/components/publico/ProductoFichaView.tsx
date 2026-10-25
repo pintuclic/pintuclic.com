@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Alert, Badge, Container, Skeleton } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
+import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import type { ColorOfrecido, ProductoPublicoFicha } from '../../dtos/m01-catalogo-productos.dto';
 import { leerErrorCatalogo } from '../../services/mensaje-error';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
@@ -205,6 +206,11 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
               {p.acabados.map((a) => a.nombre).join(', ')}
             </p>
           )}
+
+          {/* Contacto directo de M15 con la referencia del producto (HU-ATC-03). */}
+          <BotonContactoDirecto
+            referencia={`Me interesa ${p.marca} ${p.nombre}${variante === null ? '' : ` (${variante.medida})`}.`}
+          />
 
           {datosTecnicos.length > 0 && (
             <details className="rounded-card border border-neutral-light bg-neutral-white" open>

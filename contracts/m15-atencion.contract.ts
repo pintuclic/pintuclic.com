@@ -14,14 +14,19 @@ import { z } from 'zod';
  * Fuente funcional: docs/02_MODULOS_FUNCIONALES/M15_ESPECIFICACION_ATENCION.md
  *
  * ── Qué es M15 ──────────────────────────────────────────────────────────────
- *  Centraliza la orientación y la atención al cliente: preguntas frecuentes
- *  administrables y públicas (HU-ATC-01), formulario de contacto para usuarios
- *  autenticados (HU-ATC-02), un botón de contacto directo por WhatsApp
- *  («Megaconstrucción», HU-ATC-03), el horario de atención humana configurable
- *  (HU-ATC-04) y la base para escalar una consulta automatizada a un empleado
- *  (HU-ATC-05).
+ *  Atiende al cliente que ya no encontró su respuesta: formulario de contacto
+ *  para usuarios autenticados (HU-ATC-02), botón de contacto directo por
+ *  WhatsApp («Megaconstrucción», HU-ATC-03), horario de atención humana
+ *  configurable (HU-ATC-04) y la base para escalar una consulta automatizada a
+ *  un empleado (HU-ATC-05).
  *
  * ── Qué NO hace ─────────────────────────────────────────────────────────────
+ *  · No gestiona las preguntas frecuentes. HU-ATC-01 la cumple M16, dueño del
+ *    contenido: su contrato (`contracts/m16-contenido.contract.ts`, HU-CON-02 y
+ *    HU-CON-04) las administra, las publica en `/contenido/faq` y las expone por
+ *    `ContenidoFaqPort`. La spec de M15 dice lo contrario en RF-ATC-01-06, pero
+ *    M16 llegó antes a `main` y el equipo resolvió a su favor: queda pendiente
+ *    corregir esa línea de la spec.
  *  · No integra la API de WhatsApp Business: el botón es un enlace saliente.
  *    Hoy ese enlace es el canal de difusión de la empresa (temporal, solo para
  *    confirmar que redirige bien); cuando exista un número Business real se
@@ -36,10 +41,6 @@ import { z } from 'zod';
  *    (D2), para no tocar el contrato de otro módulo.
  *
  * ── Reglas ──────────────────────────────────────────────────────────────────
- *  R1  Una pregunta frecuente desactivada no se borra ni aparece en el listado
- *      público; solo se oculta (CA-ATC-01-02).
- *  R2  El listado público de FAQs se agrupa por `tema` y se ordena por `orden`
- *      dentro de cada tema (CA-ATC-01-03).
  *  R3  `POST /atencion/contacto` exige sesión vigente; sin ella, el servidor
  *      responde la denegación estándar y el frontend lleva a login (CA-ATC-02-04).
  *  R4  El tipo `cotizacion` nunca genera una cotización: se guarda como mensaje
@@ -70,28 +71,24 @@ import { z } from 'zod';
  *      `RECURSO_NO_DISPONIBLE`, idéntico al de un recurso inexistente (ADR-003).
  *
  * ── Pantallas ────────────────────────────────────────────────────────────────
- *  Admin (`/admin/atencion`): Preguntas frecuentes (lista, crear/editar,
- *  activar/desactivar, reordenar) · Solicitudes de contacto (lista, filtro por
- *  tipo/estado, marcar atendida) · Configuración (destino y mensaje de
- *  WhatsApp, horario semanal).
- *  Público: sección de preguntas frecuentes y formulario de contacto en
- *  `/centro-de-ayuda` (ruta ya enlazada en el footer y, con este módulo, también
- *  en el nav del header); aviso de horario donde aplique; botón de contacto
- *  directo por WhatsApp embebido en catálogo y ficha de producto (M01) y,
- *  cuando exista, en el carrito (M05).
+ *  Admin (`/admin/atencion`): Solicitudes de contacto (lista, filtro por
+ *  tipo/estado, marcar atendida) · Horario y canal (horario semanal, destino y
+ *  mensaje de WhatsApp). Las preguntas frecuentes se administran en Contenido (M16).
+ *  Público: en `/centro-de-ayuda`, debajo de las preguntas frecuentes de M16,
+ *  M15 agrega el formulario de contacto, el horario vigente y el botón de
+ *  contacto directo. Ese botón va además en el catálogo y la ficha de producto
+ *  (M01) y, cuando exista, en el carrito (M05).
  *
  * ── Autorización ────────────────────────────────────────────────────────────
  *  GET público → sin permiso. `POST /atencion/contacto` → solo sesión.
  *  Bajo `/admin/atencion/*`: los GET exigen `atencion.ver` y toda escritura
  *  exige `atencion.editar` (que depende de `atencion.ver`, como el resto del
- *  catálogo de M17). Ese par ES el permiso «Gestión de preguntas frecuentes»
- *  de RF-ATC-01-06 y cubre además las solicitudes y la configuración del canal
- *  y del horario. El puerto de escalamiento reserva `atencion.atender_clientes`
+ *  catálogo de M17). El puerto de escalamiento reserva `atencion.atender_clientes`
  *  (RF-ATC-05-01) para cuando M03 exista.
  *
  * ── Decisiones por defecto (el Tech Lead puede vetarlas) ────────────────────
- *  D1  Ids: `PreguntaFrecuente` y `HorarioAtencion` son enteros autoincrementales
- *      (estilo catálogo); `SolicitudContacto` es UUID (estilo `Solicitud*` de M04).
+ *  D1  Ids: `HorarioAtencion` es entero autoincremental (estilo catálogo);
+ *      `SolicitudContacto` es UUID (estilo `Solicitud*` de M04).
  *  D2  La configuración de WhatsApp y el horario viven en tablas propias de M15
  *      (`ConfiguracionAtencionWhatsapp`, fila única; `HorarioAtencion`, 7 filas),
  *      no en `parametro_sistema` de M17: esa tabla está acotada por RF-ADM-07-02/
@@ -119,9 +116,9 @@ import { z } from 'zod';
  *  D8  HU-ATC-05: solo se contrata `EscalamientoConsultasPort` (sección 6) y el
  *      permiso `atencion.atender_clientes`. Sin pantalla ni cola de atención:
  *      no hay nada que las alimente hasta que M03 exista (ver nota en el PR).
- *  D9  Seed de FAQs con preguntas frecuentes de un e-commerce de pinturas
- *      (pagos, envíos, cuenta/empresa, garantías, color). La de envíos declara
- *      cobertura solo al departamento del Caquetá por ahora.
+ *  D9  HU-ATC-01 la cumple M16 y M15 no la duplica: ni tabla, ni CRUD, ni
+ *      pantalla de preguntas frecuentes. El centro de ayuda sigue siendo de M16
+ *      y M15 le suma debajo el contacto, el horario y el canal directo.
  *
  * Regla de Oro #1: Cero código sin contrato previo.
  * Regla de Oro #11: Tolerancia Cero al tipo `any`.
@@ -134,10 +131,6 @@ import { z } from 'zod';
 
 export const idSchema = z.number().int().positive();
 export const idSolicitudSchema = z.string().uuid();
-
-export const temaFaqSchema = z.string().trim().min(1).max(60);
-export const preguntaFaqSchema = z.string().trim().min(1).max(300);
-export const respuestaFaqSchema = z.string().trim().min(1).max(2000);
 
 export const TIPOS_SOLICITUD_CONTACTO = ['consulta', 'cotizacion', 'reclamo'] as const;
 export const tipoSolicitudContactoSchema = z.enum(TIPOS_SOLICITUD_CONTACTO);
@@ -165,28 +158,6 @@ export const paginacionQuerySchema = z.object({
 /* ───────────────────────────────────────────────────────────────────────────
  * 2. ENTIDADES
  * ─────────────────────────────────────────────────────────────────────────── */
-
-export const preguntaFrecuenteSchema = z.object({
-  idPregunta: idSchema,
-  tema: temaFaqSchema,
-  pregunta: preguntaFaqSchema,
-  respuesta: respuestaFaqSchema,
-  orden: z.number().int().nonnegative(),
-  activa: z.boolean(),
-  fechaCreacion: z.string().datetime(),
-  fechaActualizacion: z.string().datetime(),
-});
-export type PreguntaFrecuente = z.infer<typeof preguntaFrecuenteSchema>;
-
-/** Igual que `preguntaFrecuenteSchema` sin los metadatos administrativos (listado público, R1/R2). */
-export const preguntaFrecuentePublicaSchema = preguntaFrecuenteSchema.pick({
-  idPregunta: true,
-  tema: true,
-  pregunta: true,
-  respuesta: true,
-  orden: true,
-});
-export type PreguntaFrecuentePublica = z.infer<typeof preguntaFrecuentePublicaSchema>;
 
 export const remitenteSolicitudSchema = z.object({
   nombre: z.string(),
@@ -227,42 +198,34 @@ export const configuracionWhatsappSchema = z.object({
 });
 export type ConfiguracionWhatsapp = z.infer<typeof configuracionWhatsappSchema>;
 
+/**
+ * Vista pública del canal: lo mínimo para armar el botón. `destinoEsUrl` lo
+ * resuelve el servidor para que el frontend no repita la regla R7.
+ */
+export const canalWhatsappPublicoSchema = z.object({
+  destino: z.string(),
+  mensajeBase: z.string().nullable(),
+  destinoEsUrl: z.boolean(),
+});
+export type CanalWhatsappPublico = z.infer<typeof canalWhatsappPublicoSchema>;
+
+/**
+ * Respuesta de `POST /atencion/contacto`. El aviso de horario y la remisión al
+ * carrito los decide el servidor: son reglas del módulo (R4, R9) y no deben
+ * reimplementarse en el frontend.
+ */
+export const confirmacionContactoSchema = z.object({
+  solicitud: solicitudContactoSchema,
+  /** R9: null dentro del horario; el aviso cuando la solicitud llega fuera de él. */
+  avisoHorario: z.string().nullable(),
+  /** R4: true en una cotización, para que el frontend remita al carrito. */
+  remitirAlCarrito: z.boolean(),
+});
+export type ConfirmacionContacto = z.infer<typeof confirmacionContactoSchema>;
+
 /* ───────────────────────────────────────────────────────────────────────────
  * 3. PETICIONES
  * ─────────────────────────────────────────────────────────────────────────── */
-
-/** GET /atencion/faqs — público, solo activas, agrupadas por tema (R1/R2). */
-export const listarFaqsPublicoResponseSchema = z.object({
-  success: z.literal(true),
-  data: z.array(preguntaFrecuentePublicaSchema),
-});
-
-/** GET /admin/atencion/faqs — incluye inactivas, paginado. */
-export const listarFaqsAdminRequestSchema = paginacionQuerySchema.extend({
-  tema: temaFaqSchema.optional(),
-  incluirInactivas: z.coerce.boolean().default(true),
-});
-export type ListarFaqsAdminRequest = z.infer<typeof listarFaqsAdminRequestSchema>;
-
-/** POST /admin/atencion/faqs */
-export const crearFaqRequestSchema = z.object({
-  tema: temaFaqSchema,
-  pregunta: preguntaFaqSchema,
-  respuesta: respuestaFaqSchema,
-  orden: z.number().int().nonnegative().default(0),
-});
-export type CrearFaqRequest = z.infer<typeof crearFaqRequestSchema>;
-
-/** PUT /admin/atencion/faqs/:idPregunta */
-export const editarFaqRequestSchema = crearFaqRequestSchema.partial();
-export type EditarFaqRequest = z.infer<typeof editarFaqRequestSchema>;
-
-/** PUT /admin/atencion/faqs/orden — reordena dentro de un mismo tema. */
-export const reordenarFaqsRequestSchema = z.object({
-  tema: temaFaqSchema,
-  ordenIds: z.array(idSchema).min(1),
-});
-export type ReordenarFaqsRequest = z.infer<typeof reordenarFaqsRequestSchema>;
 
 /** POST /atencion/contacto — requiere sesión (R3/R5); remitente se resuelve en servidor. */
 export const crearSolicitudContactoRequestSchema = z.object({
@@ -307,14 +270,18 @@ export const respuestaUno = <T extends z.ZodType>(item: T) => z.object({ success
 export const respuestaPaginada = <T extends z.ZodType>(item: T) =>
   z.object({ success: z.literal(true), data: z.array(item), pagination: paginacionSchema });
 
-export const faqResponseEnvelopeSchema = respuestaUno(preguntaFrecuenteSchema);
-export type FaqResponseEnvelope = z.infer<typeof faqResponseEnvelopeSchema>;
-
-export const listarFaqsAdminResponseEnvelopeSchema = respuestaPaginada(preguntaFrecuenteSchema);
-export type ListarFaqsAdminResponseEnvelope = z.infer<typeof listarFaqsAdminResponseEnvelopeSchema>;
-
 export const solicitudContactoResponseEnvelopeSchema = respuestaUno(solicitudContactoSchema);
 export type SolicitudContactoResponseEnvelope = z.infer<typeof solicitudContactoResponseEnvelopeSchema>;
+
+/** POST /atencion/contacto. */
+export const confirmacionContactoResponseEnvelopeSchema = respuestaUno(confirmacionContactoSchema);
+export type ConfirmacionContactoResponseEnvelope = z.infer<
+  typeof confirmacionContactoResponseEnvelopeSchema
+>;
+
+/** GET /atencion/whatsapp (público). */
+export const canalWhatsappResponseEnvelopeSchema = respuestaUno(canalWhatsappPublicoSchema);
+export type CanalWhatsappResponseEnvelope = z.infer<typeof canalWhatsappResponseEnvelopeSchema>;
 
 export const listarSolicitudesResponseEnvelopeSchema = respuestaPaginada(solicitudContactoSchema);
 export type ListarSolicitudesResponseEnvelope = z.infer<typeof listarSolicitudesResponseEnvelopeSchema>;
@@ -371,18 +338,10 @@ export interface EscalamientoConsultasPort {
 /* ───────────────────────────────────────────────────────────────────────────
  * 7. MAPA DE RUTAS (montaje: /api/v1/atencion y /api/v1/admin/atencion)
  * ───────────────────────────────────────────────────────────────────────────
- *  GET   /atencion/faqs                                   público              → listarFaqsPublico
- *  GET   /atencion/horario                                 público              → horario + abiertoAhora
- *  GET   /atencion/whatsapp                                público              → destino + mensajeBase
- *  POST  /atencion/contacto                                sesión               → crearSolicitudContacto
+ *  GET   /atencion/horario                                 público          → horario + abiertoAhora
+ *  GET   /atencion/whatsapp                                público          → canalWhatsappPublico
+ *  POST  /atencion/contacto                                sesión           → confirmacionContacto
  *
- *  GET    /admin/atencion/faqs                             atencion.ver     → listarFaqsAdmin (paginado)
- *  POST   /admin/atencion/faqs                             atencion.editar  → crearFaq
- *  PUT    /admin/atencion/faqs/orden                       atencion.editar  → reordenarFaqs
- *  PUT    /admin/atencion/faqs/:idPregunta                 atencion.editar  → editarFaq
- *  DELETE /admin/atencion/faqs/:idPregunta                 atencion.editar  → eliminarFaq
- *  PATCH  /admin/atencion/faqs/:idPregunta/activar         atencion.editar  → activarFaq
- *  PATCH  /admin/atencion/faqs/:idPregunta/desactivar      atencion.editar  → desactivarFaq
  *  GET    /admin/atencion/solicitudes-contacto             atencion.ver     → listarSolicitudes (paginado)
  *  PATCH  /admin/atencion/solicitudes-contacto/:idSolicitud/atender  atencion.editar → marcarAtendida
  *  GET    /admin/atencion/horario                          atencion.ver     → verHorario
@@ -390,6 +349,6 @@ export interface EscalamientoConsultasPort {
  *  GET    /admin/atencion/whatsapp                         atencion.ver     → verWhatsapp
  *  PUT    /admin/atencion/whatsapp                         atencion.editar  → actualizarWhatsapp
  *
- *  `/faqs/orden` se registra ANTES de `/faqs/:idPregunta`: Express resuelve por
- *  orden de registro y, al revés, `:idPregunta` capturaría la palabra "orden".
+ *  Las preguntas frecuentes las sirve M16: `GET /contenido/faq` (público) y
+ *  `/admin/contenido/faq` (administración).
  * ─────────────────────────────────────────────────────────────────────────── */
