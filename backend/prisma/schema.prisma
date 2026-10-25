@@ -149,6 +149,27 @@ enum EstadoEnvioNotificacion {
   @@map("enum_estado_envio_notificacion")
 }
 
+/// Motivo de un ajuste de existencia referencial (M13)
+enum MotivoAjusteInventario {
+  conteo_fisico
+  ingreso_mercancia
+  salida
+  correccion
+  otro
+  carga_masiva
+
+  @@map("enum_motivo_ajuste_inventario")
+}
+
+/// Origen de un ajuste de existencia referencial (M13); samit queda reservado a la integración futura
+enum OrigenAjusteInventario {
+  manual
+  carga_masiva
+  samit
+
+  @@map("enum_origen_ajuste_inventario")
+}
+
 /// Estado comercial de una variante (M01 · HU-CAT-03)
 enum EstadoProducto {
   activo
@@ -191,6 +212,9 @@ model Usuario {
   solicitudesNit              SolicitudActualizacionNit[] @relation("SolicitudesNitUsuario")
   solicitudesNitRevisadas     SolicitudActualizacionNit[] @relation("SolicitudesNitRevisadas")
   identidadesExternas         UsuarioIdentidadExterna[]
+
+  // M13 Relaciones
+  ajustesInventario AjusteInventario[]
 
   @@map("usuario")
 }
@@ -549,6 +573,33 @@ model RebotesNotificacion {
 }
 
 // =============================================================================
+// MÓDULO M13 — INVENTARIO REFERENCIAL (esquema 4.7)
+// =============================================================================
+
+/// Historial inmutable de ajustes de la existencia referencial de una variante (M13)
+model AjusteInventario {
+  idAjuste           Int                    @id @default(autoincrement()) @map("id_ajuste")
+  idVariante         Int                    @map("id_variante")
+  existenciaAnterior Int                    @map("existencia_anterior")
+  existenciaNueva    Int                    @map("existencia_nueva")
+  motivo             MotivoAjusteInventario @default(correccion)
+  nota               String?                @db.VarChar(500)
+  origen             OrigenAjusteInventario @default(manual)
+  /// Agrupa los ajustes de una misma carga masiva; lo genera el cliente, sin tabla propia
+  idCarga            String?                @map("id_carga") @db.Uuid
+  idUsuario          Int?                   @map("id_usuario")
+  fecha              DateTime               @default(now()) @db.Timestamptz(6)
+
+  variante Variante @relation(fields: [idVariante], references: [idVariante], onDelete: Restrict, map: "fk_ajuste_variante")
+  usuario  Usuario? @relation(fields: [idUsuario], references: [idUsuario], onDelete: SetNull, map: "fk_ajuste_usuario")
+
+  @@index([idVariante, fecha(sort: Desc)], map: "idx_ajuste_variante_fecha")
+  @@index([idCarga], map: "idx_ajuste_carga")
+  @@index([idUsuario], map: "idx_ajuste_usuario")
+  @@map("ajuste_inventario")
+}
+
+// =============================================================================
 // MÓDULO M01 — CATÁLOGO (esquema 4.3)
 // Reglas: docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md
 // =============================================================================
@@ -879,6 +930,7 @@ model Variante {
   medida   Medida          @relation(fields: [idMedida], references: [idMedida], onDelete: Restrict, map: "fk_variante_medida")
   imagenes Imagen[]
   combos   VarianteCombo[]
+  ajustes  AjusteInventario[]
 
   @@unique([idProducto, idMedida], map: "uq_variante_producto_medida")
   @@index([idProducto], map: "idx_variante_producto")
