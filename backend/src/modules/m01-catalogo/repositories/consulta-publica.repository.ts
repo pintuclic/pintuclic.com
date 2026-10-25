@@ -14,7 +14,8 @@ import type {
 import type { ImagenBytes, LogotipoMarca, Pagina } from '../interfaces/catalogo.interface';
 import type { ConsultaPublicaRepositoryPort } from '../interfaces/consulta-publica.interface';
 import type { ColoresDeProducto } from '../interfaces/productos.interface';
-import { ORDEN_GALERIA } from './imagenes.repository';
+import type { DerivadaGuardada, ImagenesRepositoryPort, TamanoDerivado } from '../interfaces/imagenes.interface';
+import { ImagenesRepository, ORDEN_GALERIA } from './imagenes.repository';
 import { productoVisible } from './prisma-comun';
 import { consultarColoresOfrecidos, derivarClaseColor } from './productos.repository';
 
@@ -48,7 +49,27 @@ export function rendimientoDeMedida(args: {
   return min > 0 && max > 0 ? { min, max, aproximado: true } : null;
 }
 
+/** Tope de candidatos que se traen (solo ids) antes de sortear los complementarios. */
+const CANDIDATOS_MAXIMOS = 500;
+
+/** Fisher–Yates; `aleatorio` se inyecta para poder probarlo con valores fijos. */
+export function barajar<T>(lista: readonly T[], aleatorio: () => number): T[] {
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(aleatorio() * (i + 1));
+    const actual = copia[i];
+    const otro = copia[j];
+    if (actual !== undefined && otro !== undefined) {
+      copia[i] = otro;
+      copia[j] = actual;
+    }
+  }
+  return copia;
+}
+
 export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort {
+  constructor(private readonly imagenes: ImagenesRepositoryPort = new ImagenesRepository()) {}
+
   async categorias(): Promise<CategoriaPublica[]> {
     const grupos = await prisma.producto.groupBy({
       by: ['idSubcategoria'],
@@ -139,14 +160,19 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
       });
       idsPagina = grupos.map((g) => g.idProducto);
     }
-    if (idsPagina.length === 0) return { items: [], total };
+    return { items: await this.tarjetas(idsPagina), total };
+  }
 
+  /** Tarjetas de los productos pedidos, en el mismo orden (los que ya no son visibles se omiten). */
+  private async tarjetas(ids: readonly number[]): Promise<ProductoPublicoTarjeta[]> {
+    if (ids.length === 0) return [];
     const [productos, variantes, imagenes] = await Promise.all([
       prisma.producto.findMany({
-        where: { idProducto: { in: idsPagina } },
+        where: { idProducto: { in: [...ids] } },
         select: {
           idProducto: true,
           nombre: true,
+          esCombo: true,
           marca: { select: { nombre: true } },
           linea: { select: { nombre: true } },
           subcategoria: { select: { nombre: true, categoria: { select: { nombre: true } } } },
@@ -154,21 +180,22 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
         },
       }),
       prisma.variante.findMany({
-        where: { idProducto: { in: idsPagina }, estado: 'activo' },
+        where: { idProducto: { in: [...ids] }, estado: 'activo' },
         select: { idProducto: true, precioVigente: true, existenciaReferencial: true },
       }),
       prisma.imagen.findMany({
-        where: { idProducto: { in: idsPagina } },
+        where: { idProducto: { in: [...ids] } },
         select: { idImagen: true, idProducto: true, esPrincipal: true },
         orderBy: ORDEN_GALERIA,
       }),
     ]);
     const porId = new Map(productos.map((p) => [p.idProducto, p]));
-    const items: ProductoPublicoTarjeta[] = idsPagina.flatMap((id) => {
+    return ids.flatMap((id) => {
       const p = porId.get(id);
       if (p === undefined) return [];
       const suyas = variantes.filter((v) => v.idProducto === id);
       const precios = suyas.map((v) => v.precioVigente.toNumber());
+      const disponible = disponibilidad(suyas.map((v) => v.existenciaReferencial));
       return [
         {
           idProducto: p.idProducto,
@@ -179,12 +206,14 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
           subcategoria: p.subcategoria.nombre,
           precioDesde: precios.length === 0 ? null : Math.min(...precios),
           tieneColor: derivarClaseColor(p._count.bases, p._count.coloresFabrica) !== 'sin_color',
-          disponibilidad: disponibilidad(suyas.map((v) => v.existenciaReferencial)),
+          disponibilidad: disponible,
           idImagenPrincipal: portada(imagenes.filter((i) => i.idProducto === id)),
+          esCombo: p.esCombo,
+          // K5: un combo agotado se ve pero no se compra; el resto de productos siempre se puede comprar.
+          compraBloqueada: p.esCombo && disponible === 'agotado',
         },
       ];
     });
-    return { items, total };
   }
 
   async ficha(idProducto: number): Promise<ProductoPublicoFicha | null> {
@@ -198,7 +227,10 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
         superficies: { include: { superficie: true }, where: { superficie: { estado: 'activo' } } },
         acabados: { include: { acabado: true }, where: { acabado: { estado: 'activo' } } },
         caracteristicas: { orderBy: [{ orden: 'asc' }, { idCaracteristica: 'asc' }] },
-        imagenes: { select: { idImagen: true, esPrincipal: true }, orderBy: ORDEN_GALERIA },
+        imagenes: {
+          select: { idImagen: true, esPrincipal: true, idVariante: true, idColor: true },
+          orderBy: ORDEN_GALERIA,
+        },
         variantes: {
           where: { estado: 'activo' },
           include: {
@@ -228,6 +260,7 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
         sku: v.sku,
         precio: v.precioVigente.toNumber(),
         disponibilidad: disponibilidad([v.existenciaReferencial]),
+        compraBloqueada: p.esCombo && v.existenciaReferencial === 0,
         rendimiento: rendimientoDeMedida({
           rendimientoMin,
           rendimientoMax,
@@ -264,8 +297,12 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
         .map((a) => ({ id: a.idAcabado, nombre: a.nombre })),
       caracteristicas: p.caracteristicas.map((c) => ({ nombre: c.nombre, valor: c.valor, orden: c.orden })),
       variantes,
+      esCombo: p.esCombo,
+      compraBloqueada: p.esCombo && variantes.every((v) => v.compraBloqueada),
       imagenes: [...p.imagenes.filter((i) => i.esPrincipal), ...p.imagenes.filter((i) => !i.esPrincipal)].map((i) => ({
         idImagen: i.idImagen,
+        idVariante: i.idVariante,
+        idColor: i.idColor,
       })),
     };
   }
@@ -277,6 +314,61 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
       select: { datos: true, mimeType: true },
     });
     return f === null ? null : { bytes: Buffer.from(f.datos), mimeType: f.mimeType as ImagenBytes['mimeType'] };
+  }
+
+  /** Versión reducida de una imagen visible (I7); `derivada` es null en imágenes anteriores a la entrega 3. */
+  async imagenDerivada(idImagen: number, tamano: TamanoDerivado): Promise<DerivadaGuardada | null> {
+    const visibleLa = await prisma.imagen.count({ where: { idImagen, producto: visible() } });
+    if (visibleLa === 0) return null;
+    return this.imagenes.obtenerDerivada(idImagen, tamano);
+  }
+
+  guardarDerivada(idImagen: number, tamano: TamanoDerivado, bytes: Buffer): Promise<void> {
+    return this.imagenes.guardarDerivada(idImagen, tamano, bytes);
+  }
+
+  /**
+   * X1–X4: hasta `limite` productos para la ficha de `idProducto`. null si ese producto no es visible (U1).
+   * Con categoría complementaria: patrocinados primero y luego el resto, cada grupo al azar. Sin ella:
+   * solo patrocinados. Se excluyen el propio producto, los no visibles y los combos agotados.
+   */
+  async complementarios(
+    idProducto: number,
+    limite: number,
+    aleatorio: () => number = Math.random,
+  ): Promise<ProductoPublicoTarjeta[] | null> {
+    const origen = await prisma.producto.findFirst({
+      where: visible({ idProducto }),
+      select: { idCategoriaComplementaria: true, subcategoria: { select: { idCategoriaComplementaria: true } } },
+    });
+    if (origen === null) return null;
+    const idCategoria = origen.idCategoriaComplementaria ?? origen.subcategoria.idCategoriaComplementaria;
+
+    const vendiblesAhora: Prisma.ProductoWhereInput = {
+      idProducto: { not: idProducto },
+      // Un combo sin ninguna unidad no se sugiere (RF-CAT-13-04).
+      NOT: { esCombo: true, variantes: { none: { estado: 'activo', existenciaReferencial: { gt: 0 } } } },
+    };
+    const ids = async (extra: Prisma.ProductoWhereInput): Promise<number[]> =>
+      (
+        await prisma.producto.findMany({
+          where: visible({ AND: [vendiblesAhora, extra] }),
+          select: { idProducto: true },
+          take: CANDIDATOS_MAXIMOS,
+        })
+      ).map((f) => f.idProducto);
+
+    const elegidos: number[] = [];
+    const patrocinados = barajar(
+      await ids(idCategoria === null ? { patrocinado: true } : { patrocinado: true, subcategoria: { idCategoria } }),
+      aleatorio,
+    );
+    elegidos.push(...patrocinados.slice(0, limite));
+    if (idCategoria !== null && elegidos.length < limite) {
+      const resto = barajar(await ids({ patrocinado: false, subcategoria: { idCategoria } }), aleatorio);
+      elegidos.push(...resto.slice(0, limite - elegidos.length));
+    }
+    return this.tarjetas(elegidos);
   }
 
   /** La imagen de una medida se sirve si alguna variante activa de un producto visible la usa. */

@@ -264,45 +264,24 @@ export const cambiarAsociacionImagenRequestSchema = z
   });
 export type CambiarAsociacionImagenRequest = z.infer<typeof cambiarAsociacionImagenRequestSchema>;
 
-export const imagenAsociadaSchema = imagenProductoSchema.extend({
-  idVariante: idSchema.nullable(),
-  idColor: idSchema.nullable(),
-});
-export type ImagenAsociada = z.infer<typeof imagenAsociadaSchema>;
-export const imagenAsociadaResponseEnvelopeSchema = respuestaUno(imagenAsociadaSchema);
-export const imagenesAsociadasResponseEnvelopeSchema = respuestaLista(imagenAsociadaSchema);
-
-/** Elemento de la galería de la ficha pública (reemplaza a `{ idImagen }`). */
-export const imagenPublicaSchema = z.object({
-  idImagen: idSchema,
-  idVariante: idSchema.nullable(),
-  idColor: idSchema.nullable(),
-});
-export type ImagenPublica = z.infer<typeof imagenPublicaSchema>;
+export const imagenAsociadaResponseEnvelopeSchema = respuestaUno(imagenProductoSchema);
+export const imagenesAsociadasResponseEnvelopeSchema = respuestaLista(imagenProductoSchema);
 
 /* ───────────────────────────────────────────────────────────────────────────
- * 5. AMPLIACIONES A LAS RESPUESTAS DE LA ENTREGA 2
+ * 5. AMPLIACIONES A LAS ENTREGAS 1 Y 2 (ya aplicadas en sus contratos)
  * ───────────────────────────────────────────────────────────────────────────
- * Se aplican en el PR de código (y se resincronizan los espejos); aquí se fija su forma.
+ * Se aplican en los contratos de esas entregas (y en sus espejos); aquí queda el resumen.
  *
  *  Administración — productoResumen y productoDetalle ganan:
  *    esCombo: boolean · excluidoDeDescuentos: boolean
  *  Administración — GET /productos gana el filtro esCombo=true|false (por defecto: todos).
  *  Público — productoPublicoTarjeta, variantePublica y productoPublicoFicha ganan:
  *    esCombo: boolean · compraBloqueada: boolean   (true = combo agotado: se ve, no se compra)
+ *  Administración — imagenProducto gana idVariante e idColor.
  *  Público — productoPublicoFicha.imagenes pasa de `{ idImagen }` a imagenPublicaSchema.
  *  Entrega 1 — subcategoría (crear, editar y respuesta) gana
  *    idCategoriaComplementaria: id | null  (D6).
  * ─────────────────────────────────────────────────────────────────────────── */
-
-export const ampliacionProductoAdminSchema = z.object({
-  esCombo: z.boolean(),
-  excluidoDeDescuentos: z.boolean(),
-});
-export const ampliacionPublicaSchema = z.object({
-  esCombo: z.boolean(),
-  compraBloqueada: z.boolean(),
-});
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 6. PUERTO CatalogoParaCompraPort (lo implementa M01; lo consumen M05, M07, M08, M06, M21)
@@ -338,7 +317,8 @@ export const lineaParaCompraSchema = z.object({
   precioBase: z.number().nonnegative().nullable(),
   excluidoDeDescuentos: z.boolean(),
   disponibilidad: disponibilidadSchema.nullable(),
-  /** P5: lo que M08 copia a la línea de la orden. */
+  /** P5: lo que M08 copia a la línea de la orden. El color se informa si existe, aunque el producto ya no lo ofrezca
+   * (así el carrito puede avisar qué color dejó de estar disponible); null si no hay color o no existe. */
   nombreProducto: z.string().nullable(),
   marca: z.string().nullable(),
   medida: z.string().nullable(),

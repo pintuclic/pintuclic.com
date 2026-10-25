@@ -109,6 +109,8 @@ export const subcategoriaSchema = z.object({
   nombre: z.string(),
   orden: ordenSchema,
   estado: estadoSchema,
+  /** Categoría de la que se sugieren complementarios a sus productos sin una propia (entrega 3, D6). */
+  idCategoriaComplementaria: idSchema.nullable(),
 });
 export type Subcategoria = z.infer<typeof subcategoriaSchema>;
 
@@ -271,9 +273,17 @@ export const editarCategoriaRequestSchema = z
 export type EditarCategoriaRequest = z.infer<typeof editarCategoriaRequestSchema>;
 
 /** POST /categorias/:idCategoria/subcategorias — el padre va en la ruta. */
-export const crearSubcategoriaRequestSchema = crearCategoriaRequestSchema;
+export const crearSubcategoriaRequestSchema = crearCategoriaRequestSchema.extend({
+  idCategoriaComplementaria: idSchema.nullable().optional(),
+});
 export type CrearSubcategoriaRequest = z.infer<typeof crearSubcategoriaRequestSchema>;
-export const editarSubcategoriaRequestSchema = editarCategoriaRequestSchema;
+export const editarSubcategoriaRequestSchema = z
+  .object({
+    nombre: nombreSchema.optional(),
+    orden: ordenSchema.optional(),
+    idCategoriaComplementaria: idSchema.nullable().optional(),
+  })
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
 export type EditarSubcategoriaRequest = z.infer<typeof editarSubcategoriaRequestSchema>;
 
 /** Superficies, acabados y bases comparten forma: nombre corto y orden. */

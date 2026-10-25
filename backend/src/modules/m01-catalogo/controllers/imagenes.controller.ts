@@ -1,16 +1,30 @@
 import type { Request, Response } from 'express';
 import { responderExito } from '../../../core/utils/apiResponse';
+import {
+  cambiarAsociacionImagenRequestSchema,
+  subirImagenAsociadaRequestSchema,
+  tamanoImagenQuerySchema,
+} from '../dtos/m01-catalogo-entrega3.dto';
 import { ordenarImagenesRequestSchema, subirImagenRequestSchema } from '../dtos/m01-catalogo-productos.dto';
 import type { ImagenesService } from '../services/imagenes.service';
 import type { MedidasService } from '../services/medidas.service';
 import { leerId, manejar, responderParametroInvalido, validar } from './catalogo-http';
 
-/** Entrega los bytes de una imagen con su tipo; no es JSON. `publico` permite la caché compartida. */
-export function enviarImagen(res: Response, imagen: { bytes: Buffer; mimeType: string }, publico: boolean): void {
+/**
+ * Entrega los bytes de una imagen con su tipo; no es JSON. `publico` permite la caché compartida.
+ * `inmutable` es para imágenes de producto: nunca se editan en su lugar (reemplazar = subir otra con
+ * otro id), así que el navegador puede conservarlas un día en vez de cinco minutos (I7).
+ */
+export function enviarImagen(
+  res: Response,
+  imagen: { bytes: Buffer; mimeType: string },
+  publico: boolean,
+  inmutable = false,
+): void {
   res
     .status(200)
     .type(imagen.mimeType)
-    .set('Cache-Control', `${publico ? 'public' : 'private'}, max-age=300`)
+    .set('Cache-Control', `${publico ? 'public' : 'private'}, max-age=${inmutable ? 86400 : 300}`)
     .send(imagen.bytes);
 }
 
@@ -39,9 +53,17 @@ export class ImagenesController {
   subir = manejar(async (req, res) => {
     const id = this.idProducto(req, res);
     if (id === null) return;
-    const datos = validar(res, subirImagenRequestSchema, req.body);
+    const datos = validar(res, subirImagenAsociadaRequestSchema, req.body);
     if (datos === null) return;
     responderExito(res, await this.servicio.subir(id, datos), 'Imagen agregada', 201);
+  });
+
+  cambiarAsociacion = manejar(async (req, res) => {
+    const id = this.idImagen(req, res);
+    if (id === null) return;
+    const datos = validar(res, cambiarAsociacionImagenRequestSchema, req.body);
+    if (datos === null) return;
+    responderExito(res, await this.servicio.cambiarAsociacion(id, datos));
   });
 
   ordenar = manejar(async (req, res) => {
@@ -68,7 +90,9 @@ export class ImagenesController {
   bytes = manejar(async (req, res) => {
     const id = this.idImagen(req, res);
     if (id === null) return;
-    enviarImagen(res, await this.servicio.obtenerBytes(id), false);
+    const consulta = validar(res, tamanoImagenQuerySchema, req.query);
+    if (consulta === null) return;
+    enviarImagen(res, await this.servicio.obtenerBytes(id, consulta.tamano), false);
   });
 }
 

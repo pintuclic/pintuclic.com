@@ -97,6 +97,8 @@ export interface ProductosRepositoryPort extends RecursoCatalogoPort<
   cambiarPublicacion(id: number, publicado: boolean): Promise<ProductoDetalle>;
   contarVariantesActivas(idProducto: number): Promise<number>;
   contarImagenes(idProducto: number): Promise<number>;
+  /** Entrega 3 (I5, P2): ¿está el color en la carta o entre los colores de fábrica del producto? */
+  colorOfrecido(idProducto: number, idColor: number): Promise<boolean>;
   /** P5: colores que ofrece el producto, paginados, con las familias presentes. */
   listarColores(idProducto: number, query: ListarColoresProductoRequest): Promise<ColoresDeProducto>;
 }

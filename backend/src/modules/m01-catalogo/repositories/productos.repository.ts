@@ -45,6 +45,8 @@ const SELECCION_RESUMEN = {
   estado: true,
   publicado: true,
   patrocinado: true,
+  esCombo: true,
+  excluidoDeDescuentos: true,
   marca: { select: { nombre: true } },
   linea: { select: { nombre: true } },
   subcategoria: {
@@ -138,6 +140,8 @@ function aResumen(f: FilaResumen, variantesActivas: number): ProductoResumen {
     estado: f.estado,
     publicado: f.publicado,
     patrocinado: f.patrocinado,
+    esCombo: f.esCombo,
+    excluidoDeDescuentos: f.excluidoDeDescuentos,
     variantesActivas,
   };
 }
@@ -166,6 +170,8 @@ function aDetalle(f: FilaDetalle): ProductoDetalle {
     estado: f.estado,
     publicado: f.publicado,
     patrocinado: f.patrocinado,
+    esCombo: f.esCombo,
+    excluidoDeDescuentos: f.excluidoDeDescuentos,
     variantesActivas: variantes.filter((v) => v.estado === 'activo').length,
     descripcion: f.descripcion,
     idCategoriaComplementaria: f.idCategoriaComplementaria,
@@ -342,6 +348,7 @@ export class ProductosRepository implements ProductosRepositoryPort {
       ...(query.idSubcategoria !== undefined ? { idSubcategoria: query.idSubcategoria } : {}),
       ...(query.estado !== undefined ? { estado: query.estado } : {}),
       ...(query.publicado !== undefined ? { publicado: query.publicado } : {}),
+      ...(query.esCombo !== undefined ? { esCombo: query.esCombo } : {}),
       ...(busqueda !== undefined && busqueda !== '' ? { nombre: contiene(busqueda) } : {}),
     };
     const [filas, total] = await Promise.all([
@@ -367,6 +374,15 @@ export class ProductosRepository implements ProductosRepositoryPort {
       items: filas.map((f) => aResumen(f, porProducto.get(f.idProducto) ?? 0)),
       total,
     };
+  }
+
+  async colorOfrecido(idProducto: number, idColor: number): Promise<boolean> {
+    const producto = await prisma.producto.findUnique({ where: { idProducto }, select: { idMarca: true } });
+    if (producto === null) return false;
+    const total = await prisma.color.count({
+      where: { AND: [filtroColoresOfrecidos(idProducto, producto.idMarca), { idColor }] },
+    });
+    return total > 0;
   }
 
   async obtener(id: number): Promise<ProductoDetalle | null> {

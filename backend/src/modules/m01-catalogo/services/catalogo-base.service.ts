@@ -53,6 +53,12 @@ export const errores = {
   imagenInvalida: (mensaje: string): CatalogoError => new CatalogoError('IMAGEN_INVALIDA', mensaje, 400),
   limiteImagenes: (maximo: number): CatalogoError =>
     new CatalogoError('LIMITE_IMAGENES', `Un producto admite hasta ${maximo} imágenes.`, 409),
+  /** Entrega 3 (K9): un combo se crea y se edita solo por /combos. */
+  comboSoloPorCombos: (): CatalogoError =>
+    errores.relacionInvalida(
+      'Un combo se edita desde la pantalla de combos, no como producto ni como variante.',
+      'idProducto',
+    ),
   acabadoProtegido: (): CatalogoError =>
     new CatalogoError('ACABADO_PROTEGIDO', 'El acabado por defecto no se puede renombrar ni desactivar.', 409),
 };
