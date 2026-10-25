@@ -83,6 +83,7 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
                   subTotal={detalle.subTotal}
                   descuento={detalle.descuento}
                   costoEntrega={detalle.costoEntrega}
+                  baseSinImpuesto={detalle.baseSinImpuesto}
                   tasaIva={detalle.tasaIva}
                   importeIva={detalle.importeIva}
                   total={detalle.total}

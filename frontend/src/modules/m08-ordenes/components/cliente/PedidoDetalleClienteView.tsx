@@ -73,6 +73,7 @@ export function PedidoDetalleClienteView({ codigo }: { codigo: string }) {
                   subTotal={orden.subTotal}
                   descuento={orden.descuento}
                   costoEntrega={orden.costoEntrega}
+                  baseSinImpuesto={orden.baseSinImpuesto}
                   tasaIva={orden.tasaIva}
                   importeIva={orden.importeIva}
                   total={orden.total}

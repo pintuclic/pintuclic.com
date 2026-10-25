@@ -1,4 +1,5 @@
 import type { BadgeVariant } from '@/core/components';
+import { formatCOP } from '@/core/utils/moneda';
 import { ESTADOS_FINALIZADOS, ESTADOS_ORDEN, type EstadoOrden, type ModoEntrega } from '../dtos/m08-ordenes.dto';
 
 /** Estados que esperan atención del personal, en el orden del ciclo (los de la bandeja y su contador). */
@@ -52,6 +53,43 @@ export function formatearFechaHora(iso: string): string {
     minute: '2-digit',
     timeZone: 'America/Bogota',
   }).format(new Date(iso));
+}
+
+export interface ImportesOrden {
+  subTotal: number;
+  descuento: number;
+  costoEntrega: number;
+  baseSinImpuesto: number | null;
+  importeIva: number | null;
+  tasaIva: number | null;
+  total: number;
+}
+
+export interface DesgloseTotales {
+  /** Filas que llevan al total: subtotal, descuentos y envío. El IVA no es una de ellas. */
+  filas: Array<{ etiqueta: string; valor: string }>;
+  total: string;
+  /** El IVA ya va dentro del total (los precios son con IVA incluido): se muestra aparte, como nota. */
+  ivaIncluido: string | null;
+}
+
+/**
+ * Desglose del importe cobrado. `subTotal` es la suma de los precios con IVA incluido antes de
+ * descuentos; por eso el IVA no se presenta como un sumando: subtotal − descuentos + envío = total, y
+ * base sin IVA + IVA = total (RF-ORD-02-02).
+ */
+export function desgloseTotales(importes: ImportesOrden): DesgloseTotales {
+  const filas = [{ etiqueta: 'Subtotal', valor: formatCOP(importes.subTotal) }];
+  if (importes.descuento > 0) filas.push({ etiqueta: 'Descuentos', valor: `−${formatCOP(importes.descuento)}` });
+  if (importes.costoEntrega > 0) filas.push({ etiqueta: 'Envío', valor: formatCOP(importes.costoEntrega) });
+
+  let ivaIncluido: string | null = null;
+  if (importes.importeIva !== null) {
+    const tasa = importes.tasaIva === null ? '' : ` (${importes.tasaIva} %)`;
+    const base = importes.baseSinImpuesto === null ? '' : ` · Base sin IVA: ${formatCOP(importes.baseSinImpuesto)}`;
+    ivaIncluido = `Incluye IVA${tasa}: ${formatCOP(importes.importeIva)}${base}`;
+  }
+  return { filas, total: formatCOP(importes.total), ivaIncluido };
 }
 
 /** Cuánto lleva una orden en su estado: «3 d 2 h», «5 h», «12 min» o «menos de 1 min». */

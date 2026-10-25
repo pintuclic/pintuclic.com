@@ -1,35 +1,27 @@
-import { formatCOP } from '@/core/utils/moneda';
+import { desgloseTotales, type ImportesOrden } from '../services/presentacion';
 
-export interface TotalesOrdenProps {
-  subTotal: number;
-  descuento: number;
-  costoEntrega: number;
-  tasaIva: number | null;
-  importeIva: number | null;
-  total: number;
-}
-
-/** Importes congelados de la orden: el IVA conserva el porcentaje de ese día (CA-ORD-02-05). */
-export function TotalesOrden({ subTotal, descuento, costoEntrega, tasaIva, importeIva, total }: TotalesOrdenProps) {
-  const filas: Array<[string, string]> = [
-    ['Subtotal', formatCOP(subTotal)],
-    ...(descuento > 0 ? ([['Descuentos', `−${formatCOP(descuento)}`]] as Array<[string, string]>) : []),
-    ...(costoEntrega > 0 ? ([['Envío', formatCOP(costoEntrega)]] as Array<[string, string]>) : []),
-    ...(importeIva !== null ? ([[`IVA${tasaIva !== null ? ` (${tasaIva} %)` : ''}`, formatCOP(importeIva)]] as Array<[string, string]>) : []),
-  ];
+/**
+ * Importes congelados de la orden (RF-ORD-02-02). Los precios incluyen IVA: el total es subtotal −
+ * descuentos + envío, y el IVA se muestra como nota de lo que el total ya contiene, no como un sumando.
+ */
+export function TotalesOrden(importes: ImportesOrden) {
+  const { filas, total, ivaIncluido } = desgloseTotales(importes);
 
   return (
-    <dl className="space-y-1 text-sm">
-      {filas.map(([etiqueta, valor]) => (
-        <div key={etiqueta} className="flex justify-between text-neutral-dark">
-          <dt>{etiqueta}</dt>
-          <dd>{valor}</dd>
+    <div>
+      <dl className="space-y-1 text-sm">
+        {filas.map((fila) => (
+          <div key={fila.etiqueta} className="flex justify-between text-neutral-dark">
+            <dt>{fila.etiqueta}</dt>
+            <dd>{fila.valor}</dd>
+          </div>
+        ))}
+        <div className="flex justify-between border-t border-neutral-light pt-2 font-title text-base font-bold text-corporate">
+          <dt>Total</dt>
+          <dd>{total}</dd>
         </div>
-      ))}
-      <div className="flex justify-between border-t border-neutral-light pt-2 font-title text-base font-bold text-corporate">
-        <dt>Total</dt>
-        <dd>{formatCOP(total)}</dd>
-      </div>
-    </dl>
+      </dl>
+      {ivaIncluido && <p className="pt-1 text-xs text-neutral-medium">{ivaIncluido}</p>}
+    </div>
   );
 }
