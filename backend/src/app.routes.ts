@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
+import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
 import { construirModuloM17 } from './modules/m17-permisos/m17.routes';
 import { construirModuloM18 } from './modules/m18-notificaciones/m18.routes';
 import { construirModuloM20 } from './modules/m20-seguridad/m20.routes';
@@ -80,6 +81,11 @@ export function construirAppRoutes(): Router {
   const m01 = construirModuloM01(m17.autorizacionService);
   router.use('/admin/catalogo', exigirSesionSalvo(auth, []), m01.adminRouter);
   router.use('/catalogo', m01.publicRouter);
+
+  // M13: inventario referencial (existencias, historial y carga masiva). Exige sesión y los permisos
+  // `catalogo.ver` / `catalogo.editar`, resueltos en servidor. Va antes de `/admin` por la misma razón.
+  const m13 = construirModuloM13(m17.autorizacionService);
+  router.use('/admin/inventario', exigirSesionSalvo(auth, []), m13.router);
 
   // M17: la confirmación del cambio de correo del admin llega desde un enlace y es
   // pública (HU-ADM-06); el resto de endpoints administrativos exige sesión.
