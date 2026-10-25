@@ -85,6 +85,24 @@ export const formVarianteSchema = z.object({
 });
 export type FormVariante = z.infer<typeof formVarianteSchema>;
 
+/** Combo (entrega 3): un producto con una sola variante. La existencia inicial solo se usa al crear. */
+export const formComboSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(150, 'Máximo 150 caracteres'),
+  idMarca: z.string().min(1, 'Elija la marca'),
+  idSubcategoria: z.string().min(1, 'Elija la subcategoría'),
+  idMedida: z.string().min(1, 'Elija la unidad del combo'),
+  precio: numeroTexto('Use un número, por ejemplo 59900').refine((v) => v !== '', {
+    message: 'El precio es obligatorio',
+  }),
+  sku: z.string().trim().max(60, 'Máximo 60 caracteres'),
+  descripcion: z.string().trim().max(5000, 'Máximo 5000 caracteres'),
+  excluidoDeDescuentos: z.boolean(),
+  patrocinado: z.boolean(),
+  idCategoriaComplementaria: z.string(),
+  existenciaInicial: enteroTexto('La existencia es un número entero'),
+});
+export type FormCombo = z.infer<typeof formComboSchema>;
+
 export const formProductoSchema = z
   .object({
     idMarca: z.string().min(1, 'Elija la marca'),

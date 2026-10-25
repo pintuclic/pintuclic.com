@@ -55,6 +55,8 @@ export const ProductosView: React.FC = () => {
         claseColor: clase,
         estado,
         publicado,
+        // Los combos tienen su propia sección: se crean y editan allí, no como productos.
+        esCombo: false,
         busqueda: termino,
         pagina,
         limite: 15,

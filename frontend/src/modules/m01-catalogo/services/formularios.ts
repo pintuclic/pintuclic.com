@@ -7,6 +7,13 @@ import type {
   EditarTipoMedidaRequest,
 } from '../dtos/m01-catalogo.dto';
 import {
+  crearComboRequestSchema,
+  editarComboRequestSchema,
+  type Combo,
+  type CrearComboRequest,
+  type EditarComboRequest,
+} from '../dtos/m01-catalogo-entrega3.dto';
+import {
   crearColorRequestSchema,
   crearProductoRequestSchema,
   crearVarianteRequestSchema,
@@ -24,6 +31,7 @@ import {
 import type {
   FilaCaracteristica,
   FormColor,
+  FormCombo,
   FormFamiliaColor,
   FormLinea,
   FormMedida,
@@ -239,4 +247,57 @@ export function formDesdeProducto(p: ProductoDetalle): { form: FormProducto; rel
       caracteristicas: p.caracteristicas.map((c) => ({ nombre: c.nombre, valor: c.valor })),
     },
   };
+}
+
+/** Entrega 3: el formulario de un combo, listo para editar. */
+export function formDeCombo(c: Combo): FormCombo {
+  return {
+    nombre: c.nombre,
+    idMarca: String(c.idMarca),
+    idSubcategoria: String(c.idSubcategoria),
+    idMedida: String(c.idMedida),
+    precio: String(c.precio),
+    sku: c.sku,
+    descripcion: c.descripcion ?? '',
+    excluidoDeDescuentos: c.excluidoDeDescuentos,
+    patrocinado: c.patrocinado,
+    idCategoriaComplementaria: c.idCategoriaComplementaria === null ? '' : String(c.idCategoriaComplementaria),
+    existenciaInicial: '',
+  };
+}
+
+export function aCuerpoCombo(f: FormCombo): Resultado<CrearComboRequest> {
+  const r = crearComboRequestSchema.safeParse({
+    idMarca: Number(f.idMarca),
+    idSubcategoria: Number(f.idSubcategoria),
+    nombre: f.nombre.trim(),
+    descripcion: textoONulo(f.descripcion),
+    idMedida: Number(f.idMedida),
+    precio: aNumero(f.precio),
+    ...(f.sku.trim() === '' ? {} : { sku: f.sku.trim() }),
+    excluidoDeDescuentos: f.excluidoDeDescuentos,
+    patrocinado: f.patrocinado,
+    idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
+  });
+  return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
+}
+
+/** La marca y la medida de un combo no cambian. */
+export function aCuerpoComboEditado(f: FormCombo): Resultado<EditarComboRequest> {
+  const r = editarComboRequestSchema.safeParse({
+    idSubcategoria: Number(f.idSubcategoria),
+    nombre: f.nombre.trim(),
+    descripcion: textoONulo(f.descripcion),
+    precio: aNumero(f.precio),
+    sku: f.sku.trim(),
+    excluidoDeDescuentos: f.excluidoDeDescuentos,
+    patrocinado: f.patrocinado,
+    idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
+  });
+  return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
+}
+
+/** Existencia inicial opcional del formulario de alta: vacío = no fijarla ahora. */
+export function existenciaInicialDe(f: FormCombo): number | null {
+  return f.existenciaInicial.trim() === '' ? null : Number(f.existenciaInicial);
 }

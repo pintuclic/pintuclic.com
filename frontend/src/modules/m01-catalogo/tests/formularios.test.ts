@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { FormColor, FormProducto, FormVariante } from '../dtos/formularios.dto';
+import type { FormColor, FormCombo, FormProducto, FormVariante } from '../dtos/formularios.dto';
 import {
+  aCuerpoCombo,
+  aCuerpoComboEditado,
+  existenciaInicialDe,
+  formDeCombo,
   aCuerpoColor,
   aCuerpoColorEditado,
   aCuerpoMedida,
@@ -13,7 +17,8 @@ import {
   formDesdeProducto,
   type RelacionesProductoForm,
 } from '../services/formularios';
-import { formColorSchema, formMedidaSchema, formProductoSchema } from '../dtos/formularios.dto';
+import { formColorSchema, formComboSchema, formMedidaSchema, formProductoSchema } from '../dtos/formularios.dto';
+import type { Combo } from '../dtos/m01-catalogo-entrega3.dto';
 import type { ProductoDetalle } from '../dtos/m01-catalogo-productos.dto';
 
 const colorBase: FormColor = {
@@ -237,6 +242,8 @@ describe('M01 · formularios → cuerpos del contrato', () => {
       categoria: 'Pinturas',
       usoInterior: true,
       usoExterior: false,
+      esCombo: false,
+      excluidoDeDescuentos: false,
       claseColor: 'entonable',
       estado: 'activo',
       publicado: false,
@@ -270,5 +277,98 @@ describe('M01 · formularios → cuerpos del contrato', () => {
         caracteristicas: [{ nombre: 'Secado', valor: '2 h', orden: 0 }],
       },
     });
+  });
+});
+
+describe('M01 · formulario de combos (entrega 3)', () => {
+  const f: FormCombo = {
+    nombre: '  Combo 3 brochas ',
+    idMarca: '1',
+    idSubcategoria: '4',
+    idMedida: '7',
+    precio: '59.900',
+    sku: '',
+    descripcion: '',
+    excluidoDeDescuentos: true,
+    patrocinado: false,
+    idCategoriaComplementaria: '',
+    existenciaInicial: '',
+  };
+
+  it('arma el cuerpo de alta: sin SKU ni descripción vacíos y con las banderas', () => {
+    expect(aCuerpoCombo({ ...f, precio: '59900' })).toEqual({
+      ok: true,
+      valor: {
+        idMarca: 1,
+        idSubcategoria: 4,
+        nombre: 'Combo 3 brochas',
+        descripcion: null,
+        idMedida: 7,
+        precio: 59900,
+        excluidoDeDescuentos: true,
+        patrocinado: false,
+        idCategoriaComplementaria: null,
+      },
+    });
+    expect(aCuerpoCombo({ ...f, precio: '10,5', sku: ' CB-1 ', idCategoriaComplementaria: '3' })).toMatchObject({
+      ok: true,
+      valor: { precio: 10.5, sku: 'CB-1', idCategoriaComplementaria: 3 },
+    });
+  });
+
+  it('rechaza precios y SKU inválidos con el mensaje del contrato', () => {
+    expect(aCuerpoCombo({ ...f, precio: '10,123' }).ok).toBe(false);
+    expect(aCuerpoCombo({ ...f, precio: '59900', sku: 'con espacio' }).ok).toBe(false);
+  });
+
+  it('la edición no envía la marca ni la medida (no cambian)', () => {
+    const r = aCuerpoComboEditado({ ...f, precio: '59900', sku: 'CB-1' });
+    expect(r.ok).toBe(true);
+    expect(r.ok && ('idMarca' in r.valor || 'idMedida' in r.valor)).toBe(false);
+    expect(r).toMatchObject({ valor: { precio: 59900, sku: 'CB-1', idSubcategoria: 4, descripcion: null } });
+  });
+
+  it('formDeCombo es el inverso de la edición', () => {
+    const combo: Combo = {
+      idProducto: 9,
+      idVariante: 11,
+      nombre: 'Combo',
+      descripcion: null,
+      idMarca: 1,
+      marca: 'Pintuco',
+      idSubcategoria: 4,
+      subcategoria: 'Brochas',
+      idCategoriaComplementaria: 2,
+      patrocinado: true,
+      excluidoDeDescuentos: false,
+      idMedida: 7,
+      medida: '1 unidad',
+      sku: 'P9-V11',
+      precio: 59900,
+      existenciaReferencial: 0,
+      disponibilidad: 'agotado',
+      estado: 'activo',
+      publicado: false,
+      cantidadImagenes: 0,
+    };
+    const form = formDeCombo(combo);
+    expect(form).toMatchObject({ idMarca: '1', idMedida: '7', precio: '59900', idCategoriaComplementaria: '2' });
+    expect(aCuerpoComboEditado(form)).toMatchObject({
+      ok: true,
+      valor: { nombre: 'Combo', precio: 59900, sku: 'P9-V11', patrocinado: true, idCategoriaComplementaria: 2 },
+    });
+  });
+
+  it('la existencia inicial es opcional y entera', () => {
+    expect(existenciaInicialDe(f)).toBeNull();
+    expect(existenciaInicialDe({ ...f, existenciaInicial: ' 12 ' })).toBe(12);
+    expect(formComboSchema.safeParse({ ...f, precio: '59900', existenciaInicial: '1,5' }).success).toBe(false);
+    expect(formComboSchema.safeParse({ ...f, precio: '59900', existenciaInicial: '' }).success).toBe(true);
+  });
+
+  it('exige nombre, marca, subcategoría, unidad y precio', () => {
+    for (const campo of ['nombre', 'idMarca', 'idSubcategoria', 'idMedida', 'precio'] as const) {
+      expect(formComboSchema.safeParse({ ...f, precio: '59900', [campo]: '' }).success).toBe(false);
+    }
   });
 });
