@@ -13,7 +13,13 @@ import { z } from 'zod';
 export const CODIGO_ORDEN_PATRON = /^PC-\d{4}-\d{5,}$/;
 export const CODIGO_SOLICITUD_PATRON = /^SOL-\d{4}-\d{5,}$/;
 
-export const codigoOrdenSchema = z.string().regex(CODIGO_ORDEN_PATRON, 'Use el formato PC-AAAA-NNNNN');
+/**
+ * Código de una orden al LEER o buscarla. No exige el patrón: existen órdenes anteriores a
+ * `PC-AAAA-NNNNN` (p. ej. `ORD-2026-0001` del seed) y rechazarlas en una lectura rompería toda la
+ * bandeja. El formato `CODIGO_ORDEN_PATRON` lo genera el servicio de creación (R4); `codigo_visible`
+ * es VARCHAR(50).
+ */
+export const codigoOrdenSchema = z.string().trim().min(1, 'Indique el código del pedido').max(50, 'Máximo 50 caracteres');
 export const codigoSolicitudSchema = z.string().regex(CODIGO_SOLICITUD_PATRON, 'Use el formato SOL-AAAA-NNNNN');
 /** Importe en pesos con hasta dos decimales, como lo entrega la solicitud (D07). */
 export const importeSchema = z.number().nonnegative();

@@ -226,8 +226,16 @@ describe('Mis pedidos · HTTP (HU-ORD-04, HU-ORD-07)', () => {
     expect(ajena.texto).toBe(inexistente.texto);
   });
 
-  it('un código con formato inválido responde 400 sin consultar', async () => {
-    const r = await pedir('/mis-pedidos/abc', 'cliente');
+  it('un código que no existe, sea cual sea su formato, responde el mismo 404 opaco', async () => {
+    const abc = await pedir('/mis-pedidos/abc', 'cliente');
+    const inexistente = await pedir('/mis-pedidos/PC-2026-99999', 'cliente');
+
+    expect(abc.status).toBe(404);
+    expect(abc.texto).toBe(inexistente.texto);
+  });
+
+  it('un código de más de 50 caracteres responde 400 sin consultar', async () => {
+    const r = await pedir(`/mis-pedidos/${'X'.repeat(51)}`, 'cliente');
     expect(r.status).toBe(400);
   });
 

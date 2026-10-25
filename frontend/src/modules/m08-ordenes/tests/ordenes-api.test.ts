@@ -66,6 +66,17 @@ describe('servicio HTTP de M08', () => {
     expect(grupos[0]?.estado).toBe('orden_confirmada');
   });
 
+  it('acepta órdenes anteriores a PC-AAAA-NNNNN, como las del seed (ORD-2026-0001)', async () => {
+    const heredada = { ...RESUMEN, codigo: 'ORD-2026-0001', cliente: 'Ana Pérez', segundosEnEstado: 60 };
+    cliente.get.mockResolvedValue({
+      data: { success: true, data: [{ estado: 'orden_confirmada', ordenes: [heredada] }] },
+    });
+
+    const grupos = await listarBandejaAgrupada();
+
+    expect(grupos[0]?.ordenes[0]?.codigo).toBe('ORD-2026-0001');
+  });
+
   it('listarBandeja devuelve filas con cliente y tiempo en el estado', async () => {
     cliente.get.mockResolvedValue({
       data: { success: true, data: [{ ...RESUMEN, cliente: 'Ana Pérez', segundosEnEstado: 3600 }], pagination: PAGINACION },

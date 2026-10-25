@@ -274,6 +274,19 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
       });
     });
 
+    it('una orden anterior al formato PC-AAAA-NNNNN (ORD-2026-0001, del seed) aparece en la bandeja y se puede abrir', async () => {
+      repo.ordenes.push(detalle('ORD-2026-0001', 'orden_confirmada'));
+
+      const bandeja = await llamar('GET', '/gestion?agruparPorEstado=true', 'lector');
+      const abierta = await llamar('GET', '/gestion/ORD-2026-0001', 'lector');
+
+      expect(bandeja.status).toBe(200);
+      const { data } = bandejaAgrupadaResponseEnvelopeSchema.parse(json(bandeja));
+      expect(data[0]?.ordenes.map((o) => o.codigo)).toContain('ORD-2026-0001');
+      expect(abierta.status).toBe(200);
+      expect(ordenGestionResponseEnvelopeSchema.parse(json(abierta)).data.codigo).toBe('ORD-2026-0001');
+    });
+
     it('rechaza un rango de fechas invertido con 400', async () => {
       const r = await llamar('GET', '/gestion?desde=2026-10-10&hasta=2026-10-01', 'lector');
       expect(r.status).toBe(400);
