@@ -19,7 +19,7 @@ export const topbarItems: ReadonlyArray<TopbarItem> = [
   { icon: 'envio', label: 'Envíos a toda Colombia', href: '/politicas-de-envio' },
   { icon: 'calidad', label: 'Productos de calidad', href: '/productos' },
   { icon: 'asesoria', label: 'Asesoría experta', href: '/centro-de-ayuda' },
-  { icon: 'ayuda', label: '¿Necesitas ayuda?', href: '/faq' },
+  { icon: 'ayuda', label: '¿Necesitas ayuda?', href: '/centro-de-ayuda' },
   { icon: 'telefono', label: '322 123 4567', href: 'tel:+573221234567' },
 ];
 
@@ -35,8 +35,7 @@ export const header: HeaderProps = {
     { label: 'Inicio', href: '/' },
     { label: 'Productos', href: '/productos' },
     { label: 'Ofertas', href: '/productos?ordenar=precio_asc', variant: 'pill' },
-    { label: 'Ayuda', href: '/centro-de-ayuda' },
-    { label: 'FAQ', href: '/faq' },
+    { label: 'Ayuda y FAQ', href: '/centro-de-ayuda' },
     { label: 'Sobre Nosotros', href: '/sobre-nosotros' },
   ],
   megaMenu: {
@@ -110,7 +109,7 @@ export const footer: FooterProps = {
       links: [
         { label: 'Catálogo completo', href: '/productos' },
         { label: 'Centro de ayuda', href: '/centro-de-ayuda' },
-        { label: 'Preguntas frecuentes', href: '/faq' },
+        { label: 'Preguntas frecuentes', href: '/centro-de-ayuda#preguntas-frecuentes' },
         { label: 'Sobre nosotros', href: '/sobre-nosotros' },
       ],
     },
