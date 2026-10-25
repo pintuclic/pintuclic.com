@@ -10,6 +10,17 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.6] - 2026-10-25
+### Esquema 4.8 (64 Tablas) - M16 Contenido institucional y Centro de Ayuda / FAQ
+- **Alcance General:** Dos tablas nuevas y un ENUM pedidos por el contrato de M16 (`contracts/m16-contenido.contract.ts`). Cambio puramente aditivo.
+  - **`pagina_institucional`**: páginas estáticas e institucionales administrables (`slug` único en `kebab-case`, `titulo`, `resumen` opcional, `cuerpo_markdown`, `estado` en `enum_estado_contenido`, `id_autor` con `ON DELETE SET NULL`, `fecha_creacion` y `fecha_actualizacion`). Separada de `aviso_privacidad` (M20 Habeas Data).
+  - **`faq_entrada`**: preguntas frecuentes del Centro de Ayuda público y puerto de lectura hacia M15 (`pregunta`, `respuesta_markdown`, `orden` >= 0, `estado` en `enum_estado_general`, `id_autor` con `ON DELETE SET NULL`, `fecha_creacion` y `fecha_actualizacion`).
+  - **ENUM nuevo:** `enum_estado_contenido` (`borrador`, `publicado`, `archivado`).
+  - **Índices:** `idx_pagina_institucional_estado`, `idx_pagina_institucional_autor`, `idx_faq_entrada_estado_orden` (`(estado, orden, id_faq)`) e `idx_faq_entrada_autor`.
+  - **Seed:** 4 páginas institucionales publicadas (`sobre-nosotros`, `terminos-y-condiciones`, `politica-de-privacidad`, `politicas-de-envio`) y 5 entradas FAQ activas iniciales.
+
+---
+
 ## [v3.5] - 2026-10-25
 ### Esquema 4.7 (62 Tablas) - M13 Inventario referencial: historial de ajustes
 - **Alcance General:** Tabla nueva pedida por el contrato de M13 (`contracts/m13-inventario.contract.ts`). Cambio puramente aditivo.

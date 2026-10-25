@@ -180,6 +180,15 @@ enum EstadoProducto {
   @@map("enum_estado_producto")
 }
 
+/// Estado editorial de una página institucional (M16 · HU-CON-01 / HU-CON-03)
+enum EstadoContenido {
+  borrador
+  publicado
+  archivado
+
+  @@map("enum_estado_contenido")
+}
+
 // =============================================================================
 // MÓDULO M04 — USUARIO
 // =============================================================================
@@ -215,6 +224,10 @@ model Usuario {
 
   // M13 Relaciones
   ajustesInventario AjusteInventario[]
+
+  // M16 Relaciones
+  paginasInstitucionales PaginaInstitucional[] @relation("PaginaInstitucionalAutor")
+  entradasFaq            FaqEntrada[]          @relation("FaqEntradaAutor")
 
   @@map("usuario")
 }
@@ -982,4 +995,45 @@ model VarianteCombo {
   @@index([idVariante], map: "idx_varcombo_variante")
   @@index([idCombo], map: "idx_varcombo_combo")
   @@map("variante_combo")
+}
+
+// =============================================================================
+// MÓDULO M16 — CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (HU-CON-01 a HU-CON-04)
+// =============================================================================
+
+/// Página institucional administrable (Sobre Nosotros, Términos, Privacidad, Envíos)
+model PaginaInstitucional {
+  idPagina           Int             @id @default(autoincrement()) @map("id_pagina")
+  slug               String          @unique @db.VarChar(120)
+  titulo             String          @db.VarChar(160)
+  resumen            String?         @db.VarChar(300)
+  cuerpoMarkdown     String          @map("cuerpo_markdown")
+  estado             EstadoContenido @default(borrador)
+  idAutor            Int?            @map("id_autor")
+  fechaCreacion      DateTime        @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime        @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  autor Usuario? @relation("PaginaInstitucionalAutor", fields: [idAutor], references: [idUsuario], onDelete: SetNull, map: "fk_pagina_institucional_autor")
+
+  @@index([estado], map: "idx_pagina_institucional_estado")
+  @@index([idAutor], map: "idx_pagina_institucional_autor")
+  @@map("pagina_institucional")
+}
+
+/// Entrada del catálogo de preguntas frecuentes (FAQ) para el Centro de Ayuda y puerto hacia M15
+model FaqEntrada {
+  idFaq              Int           @id @default(autoincrement()) @map("id_faq")
+  pregunta           String        @db.VarChar(240)
+  respuestaMarkdown  String        @map("respuesta_markdown")
+  orden              Int           @default(0)
+  estado             EstadoGeneral @default(activo)
+  idAutor            Int?          @map("id_autor")
+  fechaCreacion      DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime      @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  autor Usuario? @relation("FaqEntradaAutor", fields: [idAutor], references: [idUsuario], onDelete: SetNull, map: "fk_faq_entrada_autor")
+
+  @@index([estado, orden, idFaq], map: "idx_faq_entrada_estado_orden")
+  @@index([idAutor], map: "idx_faq_entrada_autor")
+  @@map("faq_entrada")
 }
