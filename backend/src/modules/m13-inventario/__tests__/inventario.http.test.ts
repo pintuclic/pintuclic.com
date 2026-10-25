@@ -430,6 +430,32 @@ describe.skipIf(URL_BD === undefined)('M13 · inventario referencial (HTTP + Pos
       });
     });
 
+    it('los movimientos de una orden los hace el "Sistema" y muestran su referencia (D8)', async () => {
+      await prisma.ajusteInventario.create({
+        data: {
+          idVariante: v.v1,
+          existenciaAnterior: 10,
+          existenciaNueva: 8,
+          motivo: 'venta',
+          origen: 'orden',
+          referencia: `ORD-${ALEATORIO}`,
+        },
+      });
+      const fila = lista(await historial(`idVariante=${v.v1}&origen=orden`))[0];
+      expect(fila).toMatchObject({
+        origen: 'orden',
+        motivo: 'venta',
+        idUsuario: null,
+        usuario: 'Sistema',
+        referencia: `ORD-${ALEATORIO}`,
+        existenciaNueva: 8,
+      });
+      // Los demás movimientos no llevan referencia.
+      await editor('PUT', `/variantes/${v.v1}/existencia`, { existencia: 11 });
+      const manual = lista(await historial(`idVariante=${v.v1}&origen=manual`))[0];
+      expect(manual).toMatchObject({ referencia: null, usuario: `Persona editor ${ALEATORIO}` });
+    });
+
     it('el historial es inmutable: no hay rutas para editarlo ni borrarlo, y la variante con historial no se borra', async () => {
       await editor('PUT', `/variantes/${v.v1}/existencia`, { existencia: 11 });
       for (const metodo of ['PUT', 'PATCH', 'POST', 'DELETE'] as const) {

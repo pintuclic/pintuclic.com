@@ -144,6 +144,7 @@ export const HistorialView: React.FC<HistorialViewProps> = ({ idVariante, idCarg
                       <span className="block text-neutral-dark">{ETIQUETAS_MOTIVO[a.motivo]}</span>
                       <span className="block text-xs text-neutral-medium">
                         {ETIQUETAS_ORIGEN[a.origen]}
+                        {a.referencia !== null && ` ${a.referencia}`}
                         {a.nota !== null && ` · ${a.nota}`}
                       </span>
                     </td>

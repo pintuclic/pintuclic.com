@@ -1,6 +1,6 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.7 — esquema 4.9 (M01 entrega 3: combos, complementarios por subcategoría e imágenes con miniaturas).  
+> **Versión Actual:** 3.8 — esquema 4.10 (M13: movimientos de existencia de combos por orden).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
 > **Total de Tablas:** 64  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.8** (esquema 4.10) | 2026-10-25 | Ninguna | Ninguna | M13: `ajuste_inventario.referencia` (única por variante y motivo) y valores `orden`, `venta` y `devolucion` en sus ENUMs, para descontar y reponer la existencia de los combos de forma idempotente. Total 64 tablas. | [Ver v3.8](./CHANGELOG_DATABASE.md#v38---2026-10-25) |
 | **v3.7** (esquema 4.9) | 2026-10-25 | Ninguna | Ninguna | M01 entrega 3: `producto.es_combo` y `excluido_de_descuentos`; `subcategoria.id_categoria_complementaria`; `imagen.miniatura` y `mediana` (+ una imagen se asocia a variante o a color, no a ambos). Total 64 tablas. | [Ver v3.7](./CHANGELOG_DATABASE.md#v37---2026-10-25) |
 | **v3.6** (esquema 4.8) | 2026-10-25 | `pagina_institucional`, `faq_entrada` (2) | Ninguna | M16: páginas institucionales administrables (`sobre-nosotros`, `terminos-y-condiciones`, `politica-de-privacidad`, `politicas-de-envio`) con ciclo editorial (`enum_estado_contenido`) y catálogo de preguntas frecuentes (FAQ) ordenadas para el Centro de Ayuda y puerto hacia M15. Total 64 tablas. | [Ver v3.6](./CHANGELOG_DATABASE.md#v36---2026-10-25) |
 | **v3.5** (esquema 4.7) | 2026-10-25 | `ajuste_inventario` (+ `envio_notificacion`, `rebote_notificacion`, `plantilla_notificacion` de M18, esquema 4.6) | Ninguna | M13: historial inmutable de cada cambio de la existencia referencial de una variante, con motivo, origen, nota, usuario y `id_carga` para agrupar cargas masivas. Dos ENUMs nuevos. Total 62 tablas. | [Ver v3.5](./CHANGELOG_DATABASE.md#v35---2026-10-25) |
@@ -672,7 +673,7 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 ### Módulo 12: Inventario Referencial — M13 (1 Tabla)
 | Tabla | PK | FKs | Descripción |
 | :--- | :--- | :--- | :--- |
-| **`ajuste_inventario`** *(v3.5)* | `id_ajuste` | `id_variante` $\rightarrow$ `variante` (RESTRICT), `id_usuario` $\rightarrow$ `usuario` (SET NULL) | Historial inmutable de cambios de `variante.existencia_referencial`: existencia anterior y nueva (≥ 0 y distintas), `motivo`, `origen` (`manual`, `carga_masiva`, `samit`), nota opcional, `id_carga` (UUID del cliente que agrupa una carga masiva, sin tabla propia) y `fecha`. Solo se inserta, en la misma transacción que el cambio de la variante. El inventario es referencial y no bloquea ventas. |
+| **`ajuste_inventario`** *(v3.5)* | `id_ajuste` | `id_variante` $\rightarrow$ `variante` (RESTRICT), `id_usuario` $\rightarrow$ `usuario` (SET NULL) | Historial inmutable de cambios de `variante.existencia_referencial`: existencia anterior y nueva (≥ 0 y distintas), `motivo`, `origen` (`manual`, `carga_masiva`, `samit`), nota opcional, `id_carga` (UUID del cliente que agrupa una carga masiva, sin tabla propia) y `fecha`. Solo se inserta, en la misma transacción que el cambio de la variante. El inventario es referencial y no bloquea ventas, salvo en los combos, cuya existencia baja al crearse la orden y vuelve al cancelarse (`origen = orden`, con su `referencia`, v3.8). |
 
 ---
 
@@ -716,8 +717,8 @@ enum_tipo_dato_parametro      -- ('numero', 'texto', 'booleano')
 enum_clase_color              -- ('entonable', 'colores_fijos', 'sin_color')
 
 -- Inventario referencial (M13)
-enum_motivo_ajuste_inventario -- ('conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva')
-enum_origen_ajuste_inventario -- ('manual', 'carga_masiva', 'samit')
+enum_motivo_ajuste_inventario -- ('conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva', 'venta', 'devolucion')
+enum_origen_ajuste_inventario -- ('manual', 'carga_masiva', 'samit', 'orden')
 ```
 
 ---
