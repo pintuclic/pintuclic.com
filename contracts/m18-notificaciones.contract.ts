@@ -52,7 +52,6 @@ const limiteSchema = z.coerce.number().int().min(1).max(100).default(20);
 export const CODIGOS_ERROR_M18 = {
   ACCESO_DENEGADO: 'ACCESO_DENEGADO',
   PLANTILLA_NO_ENCONTRADA: 'PLANTILLA_NO_ENCONTRADA',
-  VARIABLE_OBLIGATORIA_REQUERIDA: 'VARIABLE_OBLIGATORIA_REQUERIDA',
   PARAMETRO_INVALIDO: 'PARAMETRO_INVALIDO',
   ERROR_INTERNO: 'ERROR_INTERNO',
 } as const;
@@ -60,7 +59,6 @@ export const CODIGOS_ERROR_M18 = {
 export const codigoErrorM18Schema = z.enum([
   CODIGOS_ERROR_M18.ACCESO_DENEGADO,
   CODIGOS_ERROR_M18.PLANTILLA_NO_ENCONTRADA,
-  CODIGOS_ERROR_M18.VARIABLE_OBLIGATORIA_REQUERIDA,
   CODIGOS_ERROR_M18.PARAMETRO_INVALIDO,
   CODIGOS_ERROR_M18.ERROR_INTERNO,
 ]);
@@ -92,10 +90,7 @@ export const RESPUESTA_ACCESO_DENEGADO_OPACA: ErrorResponseEnvelope = {
 export const plantillaNotificacionSchema = z.object({
   tipo: tipoComunicacionSchema,
   asunto: z.string(),
-  contenidoHtml: z.string(),
   contenidoTexto: z.string(),
-  variablesDisponibles: z.array(z.string()),
-  variablesObligatorias: z.array(z.string()),
   fechaActualizacion: z.string().datetime(),
 });
 export type PlantillaNotificacion = z.infer<typeof plantillaNotificacionSchema>;
@@ -106,18 +101,20 @@ export const listarPlantillasOutputSchema = z.object({
 export type ListarPlantillasOutput = z.infer<typeof listarPlantillasOutputSchema>;
 
 /**
- * RF-NOT-03-04: el backend rechaza el guardado si el contenido nuevo ya no
- * incluye el placeholder `{{variable}}` de cada variable obligatoria.
+ * Decisión de producto: el admin nunca edita HTML ni variables `{{}}` — solo el
+ * asunto y una copia introductoria en texto plano. El maquetado y los datos
+ * dinámicos quedan fijos en el backend (adapters/plantillas-html.ts).
  */
 export const actualizarPlantillaInputSchema = z.object({
   asunto: z.string().trim().min(1).max(200).optional(),
-  contenidoHtml: z.string().trim().min(1).optional(),
   contenidoTexto: z.string().trim().min(1).optional(),
 });
 export type ActualizarPlantillaInput = z.infer<typeof actualizarPlantillaInputSchema>;
 
+/** Permite previsualizar cambios de asunto/texto sin guardarlos todavía. */
 export const previsualizarPlantillaInputSchema = z.object({
-  datosEjemplo: z.record(z.string(), z.string()).optional(),
+  asunto: z.string().trim().min(1).max(200).optional(),
+  contenidoTexto: z.string().trim().min(1).optional(),
 });
 export type PrevisualizarPlantillaInput = z.infer<typeof previsualizarPlantillaInputSchema>;
 

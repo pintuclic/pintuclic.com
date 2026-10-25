@@ -90,10 +90,7 @@ export class PlantillasController {
         return;
       }
 
-      const resultado = await this.plantillasService.previsualizar(
-        parseoTipo.data,
-        parseoBody.data.datosEjemplo,
-      );
+      const resultado = await this.plantillasService.previsualizar(parseoTipo.data, parseoBody.data);
       responderExito(res, resultado);
     } catch (err: unknown) {
       this.manejarError(res, err);

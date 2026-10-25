@@ -11,10 +11,7 @@ export type EstadoEnvio = 'pendiente' | 'enviado' | 'fallido';
 export interface PlantillaNotificacion {
   tipo: TipoComunicacion;
   asunto: string;
-  contenidoHtml: string;
   contenidoTexto: string;
-  variablesDisponibles: string[];
-  variablesObligatorias: string[];
   fechaActualizacion: string;
 }
 
