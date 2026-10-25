@@ -447,7 +447,6 @@ export const crearVarianteRequestSchema = z.object({
   idMedida: idSchema,
   precio: precioSchema,
   sku: skuSchema.optional(),
-  existenciaReferencial: existenciaSchema.default(0),
   codigoProveedor: codigoProveedorSchema.nullable().optional(),
 });
 export type CrearVarianteRequest = z.infer<typeof crearVarianteRequestSchema>;
@@ -457,7 +456,6 @@ export const editarVarianteRequestSchema = z
   .object({
     precio: precioSchema.optional(),
     sku: skuSchema.optional(),
-    existenciaReferencial: existenciaSchema.optional(),
     codigoProveedor: codigoProveedorSchema.nullable().optional(),
   })
   .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);

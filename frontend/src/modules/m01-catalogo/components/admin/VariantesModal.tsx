@@ -51,7 +51,6 @@ const FormularioVariante: React.FC<FormularioVarianteProps> = ({
       idMedida: variante === null ? '' : String(variante.idMedida),
       precio: variante === null ? '' : String(variante.precio),
       sku: variante?.sku ?? '',
-      existenciaReferencial: variante === null ? '0' : String(variante.existenciaReferencial),
       codigoProveedor: variante?.codigoProveedor ?? '',
     },
   });
@@ -139,13 +138,6 @@ const FormularioVariante: React.FC<FormularioVarianteProps> = ({
           {...register('sku')}
           error={errors.sku?.message}
           helperText={variante === null ? 'Opcional. Si lo deja vacío se genera: P{producto}-V{variante}.' : undefined}
-        />
-        <Input
-          label="Existencia referencial"
-          inputMode="numeric"
-          {...register('existenciaReferencial')}
-          error={errors.existenciaReferencial?.message}
-          helperText="Solo informativa: no bloquea ventas."
         />
         <Input
           label="Código de proveedor"

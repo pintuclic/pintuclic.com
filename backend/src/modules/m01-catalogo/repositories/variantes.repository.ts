@@ -41,7 +41,6 @@ export class VariantesRepository implements VariantesRepositoryPort {
           // Provisional y único; se reemplaza antes de terminar la transacción.
           sku: datos.sku ?? `tmp-${datos.idProducto}-${datos.idMedida}-${Date.now()}`,
           precioVigente: datos.precio,
-          existenciaReferencial: datos.existenciaReferencial,
           codigoProveedor: datos.codigoProveedor,
         },
         select: { idVariante: true },
@@ -70,7 +69,6 @@ export class VariantesRepository implements VariantesRepositoryPort {
       data: {
         ...(datos.precio !== undefined ? { precioVigente: datos.precio } : {}),
         ...(datos.sku !== undefined ? { sku: datos.sku } : {}),
-        ...(datos.existenciaReferencial !== undefined ? { existenciaReferencial: datos.existenciaReferencial } : {}),
         ...(datos.codigoProveedor !== undefined ? { codigoProveedor: datos.codigoProveedor } : {}),
       },
     });

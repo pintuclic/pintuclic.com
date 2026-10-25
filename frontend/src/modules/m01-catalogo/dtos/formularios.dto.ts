@@ -81,7 +81,6 @@ export const formVarianteSchema = z.object({
     message: 'El precio es obligatorio',
   }),
   sku: z.string().trim().max(60, 'Máximo 60 caracteres'),
-  existenciaReferencial: enteroTexto('La existencia es un número entero'),
   codigoProveedor: z.string().trim().max(100, 'Máximo 100 caracteres'),
 });
 export type FormVariante = z.infer<typeof formVarianteSchema>;

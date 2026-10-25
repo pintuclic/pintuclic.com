@@ -604,7 +604,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
   });
 
   describe('variantes (V1–V6)', () => {
-    it('crea con SKU generado P{producto}-V{variante}, precio y existencia 0 por defecto', async () => {
+    it('crea con SKU generado P{producto}-V{variante}, precio y existencia 0', async () => {
       const p = await crearProducto();
       const v = await crearVariante(p.idProducto, { precio: 123456.5 });
       expect(v).toMatchObject({
@@ -622,7 +622,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       expect(dato(detalle).variantesActivas).toBe(1);
     });
 
-    it('acepta SKU, existencia y código de proveedor propios', async () => {
+    it('acepta SKU y código de proveedor propios, e ignora una existencia enviada (la escribe M13)', async () => {
       const p = await crearProducto();
       const v = await crearVariante(p.idProducto, {
         sku: `S${ALEATORIO}-1`,
@@ -631,7 +631,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       });
       expect(v).toMatchObject({
         sku: `S${ALEATORIO}-1`,
-        existenciaReferencial: 7,
+        existenciaReferencial: 0,
         codigoProveedor: `CP${ALEATORIO}-1`,
       });
     });
@@ -641,8 +641,6 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       ['precio con tres decimales', { precio: 10.123 }],
       ['precio ausente', { precio: undefined }],
       ['SKU con caracteres inválidos', { sku: 'a b!' }],
-      ['existencia negativa', { existenciaReferencial: -1 }],
-      ['existencia decimal', { existenciaReferencial: 1.5 }],
       ['medida ausente', { idMedida: undefined }],
     ])('rechaza %s con 400', async (_n, extra) => {
       const p = await crearProducto();
@@ -725,7 +723,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       expect([prodInactivo.status, prodInactivo.cuerpo.error?.code]).toEqual([409, 'PADRE_INACTIVO']);
     });
 
-    it('edita precio, SKU, existencia y código; la medida no cambia', async () => {
+    it('edita precio, SKU y código; la medida no cambia y la existencia enviada se ignora', async () => {
       const p = await crearProducto();
       const v = await crearVariante(p.idProducto, {
         codigoProveedor: `ED${ALEATORIO}`,
@@ -740,7 +738,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       expect(dato(r)).toMatchObject({
         precio: 99.99,
         sku: `N${ALEATORIO}-1`,
-        existenciaReferencial: 12,
+        existenciaReferencial: 0,
         idMedida: fx.medidaGalon,
       });
       const limpio = await admin('PUT', `/variantes/${v.idVariante}`, {

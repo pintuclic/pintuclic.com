@@ -143,9 +143,16 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: consulta pública (HTTP
     });
     expect(r.status, JSON.stringify(r.cuerpo)).toBe(201);
     const id = dato(r).idProducto as number;
-    for (const v of variantes) {
+    for (const { existenciaReferencial, ...v } of variantes) {
       const rv = await admin('POST', `/productos/${id}/variantes`, v);
       expect(rv.status, JSON.stringify(rv.cuerpo)).toBe(201);
+      // M01 ya no escribe la existencia (la escribe M13): se fija directo para probar la disponibilidad pública.
+      if (typeof existenciaReferencial === 'number') {
+        await prisma.variante.update({
+          where: { idVariante: dato(rv).idVariante as number },
+          data: { existenciaReferencial },
+        });
+      }
     }
     await subirImagen(id);
     const p = await admin('PATCH', `/productos/${id}/publicacion`, { publicado: true });
