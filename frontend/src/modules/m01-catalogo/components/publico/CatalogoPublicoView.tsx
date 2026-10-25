@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SlidersHorizontal } from 'lucide-react';
 import { Alert, Button, Container, Input, ProductCard, Select, Skeleton } from '@/core/components';
+import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { useCargar, useRetardo } from '../../hooks/useCargar';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
 import {
@@ -263,6 +264,17 @@ export const CatalogoPublicoView: React.FC = () => {
           {productos.datos !== null && (
             <Paginador paginacion={productos.datos.paginacion} onCambiar={(pagina) => aplicar({ pagina })} />
           )}
+
+          {/* Contacto directo de M15: el catálogo es uno de los puntos donde surge la duda (HU-ATC-03). */}
+          <div className="rounded-card border border-neutral-light bg-neutral-white p-5">
+            <h2 className="font-title text-base font-semibold text-corporate">
+              ¿No sabes cuál elegir?
+            </h2>
+            <p className="mt-1 mb-3 font-sans text-sm text-neutral-dark">
+              Escríbele a un asesor y te orientamos según la superficie y el tamaño de tu proyecto.
+            </p>
+            <BotonContactoDirecto referencia="Escribo desde el catálogo de productos." />
+          </div>
         </div>
       </div>
     </Container>
