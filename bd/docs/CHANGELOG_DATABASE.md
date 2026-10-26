@@ -10,6 +10,22 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.16] - 2026-10-26
+### Esquema 4.16 (78 Tablas) - M14: campañas de patrocinio, anuncios publicitarios y su medición
+- **Alcance General:** cinco tablas nuevas pedidas por el contrato `contracts/m14-patrocinios.contract.ts` (C2). Cambio puramente aditivo.
+  - **`campania_patrocinio`**: campaña con vigencia (`fecha_fin` obligatoria, A1), `prioridad` 0-100 (A4) y `ubicaciones` (`enum_ubicacion_patrocinio[]`: listado, inicio, complementarios; entre 1 y 3). Nombre único sin distinguir mayúsculas ni espacios de los bordes (`uq_campania_nombre`).
+  - **`campania_objetivo`**: producto, línea o marca que patrocina la campaña (A3). `id_referencia` no es FK porque apunta a tres tablas según `tipo`; `uq_campania_objetivo (id_campania, tipo, id_referencia)` evita repetidos.
+  - **`anuncio_publicitario`**: anuncio de un espacio (`enum_espacio_publicitario`: inicio, catalogo, ficha), con `texto_alternativo` obligatorio, vigencia y `orden`. `ck_anuncio_enlace` solo admite `https://…` o una ruta interna que empiece por una sola `/` (nunca `javascript:`, `data:`, `http://` ni `//host`).
+  - **`anuncio_imagen`**: imágenes del anuncio por `(variante, tamano)`: escritorio o móvil, original o reducida. Solo JPEG, PNG o WEBP (`ck_anuncio_imagen_mime`); el SVG queda fuera a propósito. `ON DELETE CASCADE` desde el anuncio.
+  - **`medicion_patrocinio`**: impresiones y clics por día, de una campaña o un anuncio, con clave compuesta `(fecha, entidad, id_entidad, lugar, evento)` para sumar con `INSERT … ON CONFLICT DO UPDATE`. **Solo totales, sin datos personales** (M20). Sin FK (apunta a dos tablas) y sin vencimiento: se conservan siempre.
+  - **ENUMs nuevos (7):** `enum_ubicacion_patrocinio`, `enum_tipo_objetivo_patrocinio`, `enum_espacio_publicitario`, `enum_variante_imagen_anuncio`, `enum_tamano_imagen_anuncio`, `enum_entidad_medicion` y `enum_evento_medicion`.
+  - **Índices:** `(estado, fecha_inicio, fecha_fin)` en campañas, `(tipo, id_referencia)` en objetivos, `(espacio, estado, fecha_inicio, fecha_fin)` en anuncios y `(entidad, id_entidad, fecha)` en la medición.
+  - **Prisma:** modelos `CampaniaPatrocinio`, `CampaniaObjetivo`, `AnuncioPublicitario`, `AnuncioImagen` y `MedicionPatrocinio`. El índice único sobre `lower(btrim(nombre))` vive solo en el DDL (Prisma no expresa índices sobre funciones).
+  - **Pendiente (PR aparte, al final):** eliminar `producto.patrocinado` cuando M01 deje de usarlo (contrato M14 · A13). Esta versión NO la toca.
+  - **Bases existentes en 4.15:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente: `IF NOT EXISTS`).
+
+---
+
 ## [v3.15] - 2026-10-26
 ### Esquema 4.15 (73 Tablas, sin cambios de tablas) - M14: permisos de patrocinios
 - **Alcance General:** solo datos semilla, pedidos por el contrato `contracts/m14-patrocinios.contract.ts` (C1). No cambia ninguna tabla ni columna.

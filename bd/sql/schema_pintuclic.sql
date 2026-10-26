@@ -180,6 +180,29 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_dia_semana') THEN
         CREATE TYPE enum_dia_semana AS ENUM ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo');
     END IF;
+
+    -- Patrocinios y publicidad (M14 - contracts/m14-patrocinios.contract.ts)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ubicacion_patrocinio') THEN
+        CREATE TYPE enum_ubicacion_patrocinio AS ENUM ('listado', 'inicio', 'complementarios');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_objetivo_patrocinio') THEN
+        CREATE TYPE enum_tipo_objetivo_patrocinio AS ENUM ('producto', 'linea', 'marca');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_espacio_publicitario') THEN
+        CREATE TYPE enum_espacio_publicitario AS ENUM ('inicio', 'catalogo', 'ficha');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_variante_imagen_anuncio') THEN
+        CREATE TYPE enum_variante_imagen_anuncio AS ENUM ('escritorio', 'movil');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tamano_imagen_anuncio') THEN
+        CREATE TYPE enum_tamano_imagen_anuncio AS ENUM ('original', 'mediano', 'pequeno');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_entidad_medicion') THEN
+        CREATE TYPE enum_entidad_medicion AS ENUM ('campania', 'anuncio');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_evento_medicion') THEN
+        CREATE TYPE enum_evento_medicion AS ENUM ('impresion', 'clic');
+    END IF;
 END $$;
 
 -- ------------------------------------------------------------------------------
@@ -2038,6 +2061,126 @@ COMMENT ON TABLE cupon_uso IS 'Usos de cupones por orden; los liberados (orden c
 COMMENT ON COLUMN cupon_uso.referencia IS 'Identificador de la orden; único, para que registrar dos veces lo mismo no consuma dos usos';
 
 -- ==============================================================================
+-- 9.y PATROCINIOS Y PUBLICIDAD (M14 · contracts/m14-patrocinios.contract.ts)
+-- ==============================================================================
+
+-- Tabla: campania_patrocinio
+-- Campaña que pone productos por delante en el sitio (M14 · A1-A13). Fechas de calendario en hora de Colombia; fecha_fin
+-- es obligatoria: toda campaña caduca. `ubicaciones` repite el conjunto cerrado del contrato (sin duplicados: lo valida la API).
+CREATE TABLE IF NOT EXISTS campania_patrocinio (
+    id_campania SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(500),
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL,
+    prioridad SMALLINT NOT NULL DEFAULT 0,
+    ubicaciones enum_ubicacion_patrocinio[] NOT NULL,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_campania_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_campania_nombre CHECK (length(btrim(nombre)) >= 3),
+    CONSTRAINT ck_campania_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT ck_campania_prioridad CHECK (prioridad BETWEEN 0 AND 100),
+    CONSTRAINT ck_campania_ubicaciones CHECK (cardinality(ubicaciones) BETWEEN 1 AND 3)
+);
+
+COMMENT ON TABLE campania_patrocinio IS 'Campañas de patrocinio de productos con vigencia, prioridad y ubicaciones (M14 · A1-A7)';
+COMMENT ON COLUMN campania_patrocinio.prioridad IS '0 a 100; el mayor va primero y es el único criterio entre campañas (M14 · A4)';
+COMMENT ON COLUMN campania_patrocinio.ubicaciones IS 'Dónde se ve: listado, inicio o complementarios (M14 · A7)';
+
+-- Tabla: campania_objetivo
+-- Qué patrocina una campaña: un producto, una línea o una marca (M14 · A3). `id_referencia` NO es una clave foránea:
+-- apunta a tres tablas según `tipo` y, si el objetivo deja de existir, la campaña lo ignora y el panel lo marca.
+CREATE TABLE IF NOT EXISTS campania_objetivo (
+    id_campania_objetivo SERIAL PRIMARY KEY,
+    id_campania INT NOT NULL,
+    tipo enum_tipo_objetivo_patrocinio NOT NULL,
+    id_referencia INT NOT NULL,
+    CONSTRAINT fk_campania_objetivo_campania FOREIGN KEY (id_campania)
+        REFERENCES campania_patrocinio (id_campania) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_campania_objetivo UNIQUE (id_campania, tipo, id_referencia),
+    CONSTRAINT ck_campania_objetivo_referencia CHECK (id_referencia > 0)
+);
+
+COMMENT ON TABLE campania_objetivo IS 'Productos, líneas o marcas que patrocina una campaña; se resuelven al consultar (M14 · A3)';
+COMMENT ON COLUMN campania_objetivo.id_referencia IS 'Id del producto, línea o marca según `tipo`; sin FK a propósito (polimórfico)';
+
+-- Tabla: anuncio_publicitario
+-- Anuncio de un espacio publicitario: una imagen con un enlace que lleva al anunciante (M14 · B1-B9). Las imágenes viven
+-- en `anuncio_imagen`. El enlace es https:// o una ruta interna que empieza por una sola "/" (B6).
+CREATE TABLE IF NOT EXISTS anuncio_publicitario (
+    id_anuncio SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    anunciante VARCHAR(100) NOT NULL,
+    espacio enum_espacio_publicitario NOT NULL,
+    texto_alternativo VARCHAR(150) NOT NULL,
+    enlace VARCHAR(500),
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL,
+    orden SMALLINT NOT NULL DEFAULT 0,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_anuncio_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_anuncio_nombre CHECK (length(btrim(nombre)) >= 3),
+    CONSTRAINT ck_anuncio_anunciante CHECK (length(btrim(anunciante)) >= 2),
+    CONSTRAINT ck_anuncio_texto_alternativo CHECK (length(btrim(texto_alternativo)) >= 3),
+    CONSTRAINT ck_anuncio_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT ck_anuncio_orden CHECK (orden BETWEEN 0 AND 999),
+    CONSTRAINT ck_anuncio_enlace CHECK (
+        enlace IS NULL
+        OR enlace ~* '^https://[^[:space:]]+$'
+        OR enlace ~ '^/([^/[:space:]][^[:space:]]*)?$'
+    )
+);
+
+COMMENT ON TABLE anuncio_publicitario IS 'Anuncios (imagen y enlace) de los espacios publicitarios del sitio, con vigencia y orden (M14 · B1-B9)';
+COMMENT ON COLUMN anuncio_publicitario.enlace IS 'https://… o ruta interna (/…); nunca javascript:, data: ni http:// (M14 · B6)';
+
+-- Tabla: anuncio_imagen
+-- Imágenes de un anuncio: la de escritorio (obligatoria) y la móvil (opcional), cada una con su original y sus
+-- versiones reducidas en WEBP (M14 · B7, B11). Se guardan en la base y las sirve Pintu Clic (nunca un tercero).
+CREATE TABLE IF NOT EXISTS anuncio_imagen (
+    id_anuncio INT NOT NULL,
+    variante enum_variante_imagen_anuncio NOT NULL,
+    tamano enum_tamano_imagen_anuncio NOT NULL,
+    contenido BYTEA NOT NULL,
+    mime_type VARCHAR(20) NOT NULL,
+    ancho INT NOT NULL,
+    alto INT NOT NULL,
+    PRIMARY KEY (id_anuncio, variante, tamano),
+    CONSTRAINT fk_anuncio_imagen_anuncio FOREIGN KEY (id_anuncio)
+        REFERENCES anuncio_publicitario (id_anuncio) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_anuncio_imagen_mime CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+    CONSTRAINT ck_anuncio_imagen_dimensiones CHECK (ancho > 0 AND alto > 0)
+);
+
+COMMENT ON TABLE anuncio_imagen IS 'Imagen de escritorio y móvil de un anuncio, original y reducidas (M14 · B7, B11)';
+
+-- Tabla: medicion_patrocinio
+-- Impresiones y clics por día de una campaña o de un anuncio (M14 · M1-M9). SOLO totales: ni IP, ni sesión, ni navegador (M20).
+-- `lugar` es la ubicación de la campaña (listado, inicio, complementarios) o el espacio del anuncio (inicio, catalogo, ficha).
+-- Sin claves foráneas: apunta a dos tablas según `entidad` y las cifras se conservan siempre.
+CREATE TABLE IF NOT EXISTS medicion_patrocinio (
+    fecha DATE NOT NULL,
+    entidad enum_entidad_medicion NOT NULL,
+    id_entidad INT NOT NULL,
+    lugar VARCHAR(20) NOT NULL,
+    evento enum_evento_medicion NOT NULL,
+    total BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (fecha, entidad, id_entidad, lugar, evento),
+    CONSTRAINT ck_medicion_total CHECK (total >= 0),
+    CONSTRAINT ck_medicion_entidad CHECK (id_entidad > 0)
+);
+
+COMMENT ON TABLE medicion_patrocinio IS 'Totales diarios de impresiones y clics de campañas y anuncios; sin datos personales (M14 · M1)';
+
+-- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
 -- ==============================================================================
 
@@ -2201,6 +2344,13 @@ CREATE INDEX IF NOT EXISTS idx_cupon_estado_fechas ON cupon(estado, fecha_inicio
 CREATE INDEX IF NOT EXISTS idx_cupon_uso_cupon_usuario ON cupon_uso(id_cupon, id_usuario) WHERE liberado_en IS NULL;
 CREATE INDEX IF NOT EXISTS idx_cuenta_empresa_sub_rol ON cuenta_empresa(id_sub_rol_empresa);
 
+-- M14: campañas, anuncios y medición
+CREATE INDEX IF NOT EXISTS idx_campania_estado_fechas ON campania_patrocinio(estado, fecha_inicio, fecha_fin);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_campania_nombre ON campania_patrocinio (lower(btrim(nombre)));
+CREATE INDEX IF NOT EXISTS idx_campania_objetivo_referencia ON campania_objetivo(tipo, id_referencia);
+CREATE INDEX IF NOT EXISTS idx_anuncio_espacio_vigencia ON anuncio_publicitario(espacio, estado, fecha_inicio, fecha_fin);
+CREATE INDEX IF NOT EXISTS idx_medicion_entidad_fecha ON medicion_patrocinio(entidad, id_entidad, fecha);
+
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (73 TABLAS - v4.15)
+-- FIN DEL SCRIPT DDL (78 TABLAS - v4.16)
 -- ==============================================================================
