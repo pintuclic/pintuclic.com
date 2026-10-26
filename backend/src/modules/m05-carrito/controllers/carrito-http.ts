@@ -31,7 +31,7 @@ export function aplicarCookie(res: Response, accion: AccionCookie): void {
   if (accion.tipo === 'fijar') {
     res.cookie(ATRIBUTOS_COOKIE_CARRITO.nombre, accion.token, {
       ...opcionesCookie(),
-      maxAge: ATRIBUTOS_COOKIE_CARRITO.maxAgeSegundos * 1000,
+      maxAge: accion.diasVigencia * 24 * 60 * 60 * 1000,
     });
   } else if (accion.tipo === 'borrar') {
     res.clearCookie(ATRIBUTOS_COOKIE_CARRITO.nombre, opcionesCookie());

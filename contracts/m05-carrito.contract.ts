@@ -88,9 +88,12 @@ import type { PreciosPort } from './m06-precios.contract';
  *      La disponibilidad sale de M01 (`CatalogoParaCompraPort`: vendible, disponibilidad y tope de combo).
  *  C12 CONCURRENCIA. Última escritura gana (política de M20 en la spec): cambiar la cantidad fija el valor
  *      absoluto, no suma; agregar suma. Dos pestañas ven el mismo carrito en el siguiente GET.
- *  C13 ACTIVIDAD. Cada escritura actualiza `fecha_ultima_actividad`. Un carrito de visitante sin
- *      actividad en DIAS_VIGENCIA_CARRITO_VISITANTE (30) se considera vencido: se ignora y se reemplaza al
- *      agregar. Su limpieza física queda fuera de este contrato (Q4).
+ *  C13 ACTIVIDAD Y LIMPIEZA (Q4). Cada escritura actualiza `fecha_ultima_actividad`. Los días de vigencia
+ *      salen del parámetro CLAVE_DIAS_VIGENCIA de M17 (Configuración, de 1 a 365; si no se puede leer,
+ *      DIAS_VIGENCIA_CARRITO_VISITANTE). Un carrito de VISITANTE sin actividad en esos días está vencido: se
+ *      ignora, se reemplaza al agregar y SE BORRA de la base con sus líneas. El borrado corre solo, en segundo
+ *      plano, como máximo cada INTERVALO_LIMPIEZA_MINUTOS, cuando llega una petición al carrito; nunca demora
+ *      ni hace fallar la respuesta. Los carritos de una CUENTA no vencen ni se borran.
  *  C14 ERRORES OPACOS. Una línea que no es del carrito de quien llama responde 404 RECURSO_NO_DISPONIBLE,
  *      igual que una que no existe (ADR-003). Nunca se devuelven trazas, SQL ni el token.
  *
@@ -112,6 +115,7 @@ import type { PreciosPort } from './m06-precios.contract';
  *    empresa, cupón aceptado y rechazado, línea no vendible).
  *  · CatalogoParaCompraPort (M01, ya existe): nombre, marca, medida, SKU, color, imagen, vendible,
  *    disponibilidad y tope de combo de cada línea.
+ *  · ParametrosCarritoPort (M17): lee CLAVE_DIAS_VIGENCIA de la configuración general (C13).
  *
  * ── Decisiones por defecto (el Tech Lead puede vetarlas) ────────────────────
  *  D1  Cantidad por línea de 1 a 9 999 (pendiente RF-CAR-02-07), el mismo tope que M06.
@@ -119,7 +123,7 @@ import type { PreciosPort } from './m06-precios.contract';
  *      sin preguntar. Alternativas: reemplazar o preguntar al cliente.
  *  D3  La unión se hace en la primera petición al carrito con sesión (C9), sin tocar el login de M04/M20.
  *  D4  Cookie `pc_cart` HttpOnly, Secure, SameSite=Lax (para que el carrito siga al volver desde un enlace
- *      externo), 30 días. El token se guarda con SHA-256.
+ *      externo); vence a los mismos días del parámetro de C13. El token se guarda con SHA-256.
  *  D5  El cupón vive en la pantalla y viaja en cada consulta (C8): no hace falta columna nueva.
  *  D6  La revalidación compara con lo que el cliente tenía en pantalla (C11): el carrito no guarda precios.
  *  D7  `cantidadItems` = suma de las cantidades de las líneas vendibles (es lo que muestra el contador).
@@ -135,12 +139,12 @@ import type { PreciosPort } from './m06-precios.contract';
  *      `POST /carrito/lineas`.
  *  P4  Core Kit: el contador del Header lee `GET /carrito/resumen` en vez del valor fijo de `shell.content.ts`.
  *
- * ── Preguntas abiertas para el Tech Lead ────────────────────────────────────
- *  Q1  ¿Unir los carritos al iniciar sesión (D2) o preguntar al cliente?
- *  Q2  ¿El botón "Agregar al carrito" de la ficha lo hace M05 (tocando M01, P3) o el equipo de M01?
- *  Q3  ¿Se puede ir a pagar con líneas no vendibles en el carrito si el resto está bien? Por defecto: no;
- *      hay que quitarlas antes (C11).
- *  Q4  ¿Quién borra los carritos de visitante vencidos (C13)? ¿Tarea programada de DevOps o al vuelo?
+ * ── Preguntas al Tech Lead (respondidas) ────────────────────────────────────
+ *  Q1  Unir los carritos al iniciar sesión (D2): confirmado.
+ *  Q2  El botón "Agregar al carrito" de la ficha (P3): lo hizo M05, ya está en main.
+ *  Q3  No se paga con líneas no vendibles en el carrito; hay que quitarlas antes (C11): confirmado.
+ *  Q4  Los carritos de visitante vencidos se borran según un parámetro de días editable en Configuración
+ *      (M17): C13.
  *
  * Regla de Oro #1: Cero código sin contrato previo.
  * Regla de Oro #11: Tolerancia Cero al tipo `any`.
@@ -155,17 +159,22 @@ import type { PreciosPort } from './m06-precios.contract';
 export const MAXIMO_LINEAS_CARRITO = MAXIMO_LINEAS_CALCULO;
 /** C4 */
 export const CANTIDAD_MAXIMA_POR_LINEA = CANTIDAD_MAXIMA_LINEA;
-/** C13 */
+/** C13: parámetro de M17 con los días de vigencia del carrito de visitante. */
+export const CLAVE_DIAS_VIGENCIA = 'comercial.dias_vigencia_carrito_visitante';
+/** C13: valor si el parámetro no se puede leer (es también su valor inicial en el seed). */
 export const DIAS_VIGENCIA_CARRITO_VISITANTE = 30;
+/** C13: rango del parámetro (igual al de `parametro_sistema`). */
+export const diasVigenciaSchema = z.number().int().min(1).max(365);
+/** C13: cada cuánto, como máximo, se borran los carritos de visitante vencidos. */
+export const INTERVALO_LIMPIEZA_MINUTOS = 60;
 
-/** C2 / D4: cookie del carrito de visitante. */
+/** C2 / D4: cookie del carrito de visitante. Su vida (`maxAge`) son los días de C13. */
 export const atributosCookieCarritoSchema = z.object({
   nombre: z.literal('pc_cart'),
   httpOnly: z.literal(true),
   secure: z.literal(true),
   sameSite: z.literal('lax'),
   path: z.literal('/'),
-  maxAgeSegundos: z.literal(DIAS_VIGENCIA_CARRITO_VISITANTE * 24 * 60 * 60),
 });
 export type AtributosCookieCarrito = z.infer<typeof atributosCookieCarritoSchema>;
 
@@ -175,7 +184,6 @@ export const ATRIBUTOS_COOKIE_CARRITO: AtributosCookieCarrito = {
   secure: true,
   sameSite: 'lax',
   path: '/',
-  maxAgeSegundos: DIAS_VIGENCIA_CARRITO_VISITANTE * 24 * 60 * 60,
 };
 
 /** Id de una línea del carrito en la URL (`:idLinea`). */
@@ -394,6 +402,11 @@ export type PreciosCarritoPort = Pick<PreciosPort, 'calcular'>;
 
 /** Lo que M05 usa de M01 (ya implementado). */
 export type CatalogoCarritoPort = CatalogoParaCompraPort;
+
+/** Lo que M05 usa de M17 (C13): null si el parámetro no se pudo leer. */
+export interface ParametrosCarritoPort {
+  obtenerNumero(clave: typeof CLAVE_DIAS_VIGENCIA): Promise<number | null>;
+}
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 6. MAPA DE RUTAS

@@ -54,6 +54,8 @@ export interface CarritoRepositoryPort {
   pasarACuenta(idCarritoVisitante: number, idUsuario: number): Promise<void>;
   /** C9: en una transacción aplica el plan y borra el carrito del visitante. */
   unir(plan: PlanUnion): Promise<void>;
+  /** C13: borra los carritos de VISITANTE sin actividad desde `antesDe` (con sus líneas). Devuelve cuántos. */
+  borrarVisitantesVencidos(antesDe: Date): Promise<number>;
 }
 
 /** Quién pide: la sesión (si la hay) y el token crudo de la cookie `pc_cart` (si lo hay). */
@@ -63,7 +65,11 @@ export interface Solicitante {
 }
 
 /** Qué hacer con la cookie `pc_cart` después de responder. */
-export type AccionCookie = { readonly tipo: 'ninguna' } | { readonly tipo: 'fijar'; readonly token: string } | { readonly tipo: 'borrar' };
+export type AccionCookie =
+  | { readonly tipo: 'ninguna' }
+  /** D4: la cookie vive los mismos días que el carrito de visitante (C13). */
+  | { readonly tipo: 'fijar'; readonly token: string; readonly diasVigencia: number }
+  | { readonly tipo: 'borrar' };
 
 export interface ConCookie<T> {
   readonly datos: T;

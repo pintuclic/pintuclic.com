@@ -144,11 +144,19 @@ export function construirAppRoutes(): Router {
   router.use('/precios', m06.publicRouter);
 
   // M05: carrito de compras. Público con sesión opcional: el dueño sale de la sesión o de la cookie `pc_cart` del
-  // visitante, nunca del cliente. Los precios los calcula M06 y los datos de cada línea vienen de M01.
+  // visitante, nunca del cliente. Los precios los calcula M06 y los datos de cada línea vienen de M01. Los días tras
+  // los que se borra un carrito de visitante abandonado se editan en la configuración general (M17).
   const m05 = construirModuloM05({
     sesiones: m20.sesionService,
     precios: m06.precios,
     catalogo: m01.catalogoParaCompra,
+    parametros: {
+      obtenerNumero: async (clave) => {
+        const { parametros } = await m17.configService.obtenerCatalogo();
+        const valor = parametros.find((p) => p.clave === clave)?.valor;
+        return typeof valor === 'number' ? valor : null;
+      },
+    },
   });
   router.use('/carrito', m05.publicRouter);
 

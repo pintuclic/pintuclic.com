@@ -337,6 +337,74 @@ describe('M05 · C11 revalidación (HU-CAR-05)', () => {
   });
 });
 
+describe('M05 · C13 vigencia y limpieza de carritos de visitante (Q4)', () => {
+  const conParametro = (valor: number | null, reloj: () => Date = () => AHORA): CarritoService =>
+    new CarritoService({
+      repo,
+      precios,
+      catalogo,
+      reloj,
+      parametros: { obtenerNumero: () => Promise.resolve(valor) },
+    });
+  const hace = (dias: number): Date => new Date(AHORA.getTime() - dias * 24 * 60 * 60 * 1000);
+
+  it('usa los días del parámetro de M17 para saber si un carrito venció', async () => {
+    const token = generarTokenVisitante();
+    repo.sembrar({ tipo: 'visitante', hashToken: hashTokenVisitante(token) }, [{ idVariante: 2, idColor: null, cantidad: 1 }], hace(8));
+    expect((await conParametro(10).consultar(visitante(token))).datos.lineas).toHaveLength(1);
+    expect((await conParametro(7).consultar(visitante(token))).datos.lineas).toHaveLength(0);
+  });
+
+  it('borra los de visitante vencidos y deja los vigentes y los de una cuenta', async () => {
+    const vencido = repo.sembrar({ tipo: 'visitante', hashToken: 'a'.repeat(64) }, [{ idVariante: 2, idColor: null, cantidad: 1 }], hace(8));
+    const vigente = repo.sembrar({ tipo: 'visitante', hashToken: 'b'.repeat(64) }, [{ idVariante: 2, idColor: null, cantidad: 1 }], hace(3));
+    const cuenta = repo.sembrar({ tipo: 'cuenta', idUsuario: ID_USUARIO_PARTICULAR }, [{ idVariante: 1, idColor: 13, cantidad: 1 }], hace(400));
+    await conParametro(7).consultar(visitante());
+    await Promise.resolve();
+    expect(repo.limpiezas.map((d) => d.toISOString())).toEqual([hace(7).toISOString()]);
+    expect(repo.carritos.map((c) => c.idCarrito).sort()).toEqual([vigente, cuenta].sort());
+    expect(repo.lineas.some((l) => l.idCarrito === vencido)).toBe(false);
+  });
+
+  it('limpia como máximo una vez por hora', async () => {
+    let ahora = AHORA.getTime();
+    const servicio = conParametro(7, () => new Date(ahora));
+    await servicio.consultar(visitante());
+    ahora += 30 * 60 * 1000;
+    await servicio.consultar(visitante());
+    expect(repo.limpiezas).toHaveLength(1);
+    ahora += 31 * 60 * 1000;
+    await servicio.consultar(visitante());
+    expect(repo.limpiezas).toHaveLength(2);
+  });
+
+  it('si el parámetro no se puede leer o está fuera de rango, usa 30 días', async () => {
+    for (const valor of [null, 0, 500, 2.5]) {
+      repo.limpiezas.length = 0;
+      await conParametro(valor).consultar(visitante());
+      expect(repo.limpiezas[0]?.toISOString()).toBe(hace(30).toISOString());
+    }
+    const fallo = new CarritoService({
+      repo,
+      precios,
+      catalogo,
+      reloj: () => AHORA,
+      parametros: { obtenerNumero: () => Promise.reject(new Error('M17 no responde')) },
+    });
+    await expect(fallo.consultar(visitante())).resolves.toBeDefined();
+  });
+
+  it('si borrar falla, el cliente igual recibe su carrito', async () => {
+    repo.borrarVisitantesVencidos = () => Promise.reject(new Error('BD caída'));
+    await expect(conParametro(7).consultar(visitante())).resolves.toMatchObject({ datos: { lineas: [] } });
+  });
+
+  it('la cookie nueva vive los días del parámetro', async () => {
+    const r = await conParametro(45).agregar(visitante(), { idVariante: 2, cantidad: 1 });
+    expect(r.cookie).toMatchObject({ tipo: 'fijar', diasVigencia: 45 });
+  });
+});
+
 describe('M05 · resumen para el contador del Header', () => {
   it('cantidad de unidades vendibles y total sin cupón', async () => {
     const yo = cliente(ID_USUARIO_PARTICULAR);
