@@ -6,44 +6,53 @@ import { FormularioContacto } from './FormularioContacto';
 import { HorarioDeAtencion } from './HorarioDeAtencion';
 
 /**
- * Lo que M15 aporta al centro de ayuda: escribirle al equipo, saber cuándo hay
- * alguien atendiendo y hablar con un asesor. Abre la página; las preguntas
- * frecuentes van debajo y son de M16.
+ * Canales de atención al cliente (M15) en el centro de ayuda: formulario de
+ * contacto a la izquierda (8 columnas) y horario + WhatsApp a la derecha
+ * (4 columnas), alineados con la cuadrícula de preguntas frecuentes.
  */
 export function ContactoYHorarioView() {
   return (
-    <Container className="pb-10">
-      {/*
-        El formulario manda y ocupa el ancho: sin sesión se reduce a un aviso
-        corto, así que una columna lateral fija dejaría un hueco. El horario y
-        el canal directo van debajo, en dos tarjetas del mismo alto.
-      */}
-      <section aria-labelledby="titulo-contacto" className="mb-8 max-w-2xl">
-        <h2
-          id="titulo-contacto"
-          className="mb-2 font-title text-xl font-semibold text-neutral-black"
-        >
-          Escríbenos
-        </h2>
-        <p className="mb-4 font-sans text-sm text-neutral-dark">
-          Cuéntanos qué necesitas y te respondemos al correo de tu cuenta.
-        </p>
-        <FormularioContacto />
-      </section>
+    <section
+      id="contacto-equipo"
+      aria-labelledby="titulo-contacto"
+      className="scroll-mt-24 pb-4"
+    >
+      <Container>
+        <div className="grid grid-cols-1 gap-8 items-start lg:grid-cols-12">
+          <div className="lg:col-span-8 rounded-card border border-neutral-light bg-neutral-white p-6 shadow-card sm:p-8">
+            <h2
+              id="titulo-contacto"
+              className="mb-2 font-title text-xl font-bold text-corporate sm:text-2xl"
+            >
+              Escríbenos
+            </h2>
+            <p className="mb-5 font-sans text-sm text-neutral-medium sm:text-base">
+              Cuéntanos qué necesitas y te respondemos al correo de tu cuenta.
+            </p>
+            <FormularioContacto />
+          </div>
 
-      <div className="grid items-start gap-6 sm:grid-cols-2">
-        <HorarioDeAtencion />
+          <aside
+            aria-label="Horario de atención y contacto por WhatsApp"
+            className="lg:col-span-4 space-y-6"
+          >
+            <HorarioDeAtencion />
 
-        <div className="rounded-card border border-neutral-light bg-neutral-white p-5">
-          <h3 className="mb-2 font-title text-lg font-semibold text-corporate">
-            ¿Vas a pintar una obra entera?
-          </h3>
-          <p className="mb-4 font-sans text-sm text-neutral-dark">
-            Escríbele directamente a un asesor y te orientamos antes de armar el pedido.
-          </p>
-          <BotonContactoDirecto referencia="Escribo desde el centro de ayuda." />
+            <div className="rounded-card border border-neutral-light bg-neutral-white p-6 shadow-card">
+              <h3 className="mb-2 font-title text-base font-semibold text-corporate">
+                ¿Vas a pintar una obra entera?
+              </h3>
+              <p className="mb-4 font-sans text-sm text-neutral-dark">
+                Escríbele directamente a un asesor y te orientamos antes de armar el pedido.
+              </p>
+              <BotonContactoDirecto
+                referencia="Escribo desde el centro de ayuda."
+                mostrarAvisoNoDisponible
+              />
+            </div>
+          </aside>
         </div>
-      </div>
-    </Container>
+      </Container>
+    </section>
   );
 }

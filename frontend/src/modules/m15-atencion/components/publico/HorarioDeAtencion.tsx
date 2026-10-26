@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Clock } from 'lucide-react';
 import { Badge, Skeleton } from '@/core/components';
 import { DIAS_SEMANA } from '../../dtos/m15-atencion.dto';
 import type { HorarioAtencion } from '../../interfaces/atencion.interface';
@@ -29,18 +30,34 @@ export function HorarioDeAtencion() {
     };
   }, []);
 
-  if (fallo) {
-    return null;
+  if (!fallo && horario === null) {
+    return <Skeleton className="h-56 w-full rounded-card" aria-label="Cargando el horario de atención" />;
   }
 
-  if (horario === null) {
-    return <Skeleton className="h-48 w-full" aria-label="Cargando el horario de atención" />;
+  if (fallo || horario === null) {
+    return (
+      <div className="rounded-card border border-neutral-light bg-neutral-white p-6 shadow-card">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="flex items-center gap-2 font-title text-base font-semibold text-corporate">
+            <Clock className="h-4 w-4 text-action" aria-hidden="true" />
+            Horario de atención
+          </h3>
+          <Badge variant="neutral">Por confirmar</Badge>
+        </div>
+        <p className="font-sans text-sm text-neutral-dark">
+          No pudimos consultar el horario en este instante. Puedes enviarnos tu solicitud en cualquier momento y te responderemos en jornada hábil.
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="rounded-card border border-neutral-light bg-neutral-white p-5">
+    <div className="rounded-card border border-neutral-light bg-neutral-white p-6 shadow-card">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="font-title text-lg font-semibold text-corporate">Horario de atención</h3>
+        <h3 className="flex items-center gap-2 font-title text-base font-semibold text-corporate">
+          <Clock className="h-4 w-4 text-action" aria-hidden="true" />
+          Horario de atención
+        </h3>
         <Badge variant={horario.abiertoAhora ? 'success' : 'neutral'}>
           {horario.abiertoAhora ? 'Atendiendo ahora' : 'Fuera de horario'}
         </Badge>
