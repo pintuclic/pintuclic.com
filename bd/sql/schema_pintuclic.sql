@@ -156,7 +156,10 @@ BEGIN
         CREATE TYPE enum_tipo_solicitud_contacto AS ENUM ('consulta', 'cotizacion', 'reclamo');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_solicitud_contacto') THEN
-        CREATE TYPE enum_estado_solicitud_contacto AS ENUM ('pendiente', 'atendida');
+        CREATE TYPE enum_estado_solicitud_contacto AS ENUM ('en_revision', 'atendida', 'rechazada');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_rol_autor_mensaje_solicitud') THEN
+        CREATE TYPE enum_rol_autor_mensaje_solicitud AS ENUM ('cliente', 'equipo');
     END IF;
 
     -- Día de la semana del horario de atención humana (M15 - HU-ATC-04)
@@ -197,6 +200,19 @@ ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'devuelto' AFTER 'cancelado
 ALTER TYPE enum_origen_ajuste_inventario ADD VALUE IF NOT EXISTS 'orden' AFTER 'samit';
 ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'venta' AFTER 'carga_masiva';
 ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'devolucion' AFTER 'venta';
+
+-- M15 (v4.12): migración idempotente de enum_estado_solicitud_contacto ('pendiente' -> 'en_revision') y adición de 'rechazada'
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+               WHERE t.typname = 'enum_estado_solicitud_contacto' AND e.enumlabel = 'pendiente')
+       AND NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+               WHERE t.typname = 'enum_estado_solicitud_contacto' AND e.enumlabel = 'en_revision') THEN
+        ALTER TYPE enum_estado_solicitud_contacto RENAME VALUE 'pendiente' TO 'en_revision';
+    END IF;
+END $$;
+
+ALTER TYPE enum_estado_solicitud_contacto ADD VALUE IF NOT EXISTS 'rechazada' AFTER 'atendida';
 
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS
@@ -1737,14 +1753,49 @@ CREATE TABLE IF NOT EXISTS solicitud_contacto (
     id_usuario INT NOT NULL,
     tipo enum_tipo_solicitud_contacto NOT NULL,
     descripcion VARCHAR(2000) NOT NULL,
-    estado enum_estado_solicitud_contacto NOT NULL DEFAULT 'pendiente',
+    estado enum_estado_solicitud_contacto NOT NULL DEFAULT 'en_revision',
+    calificacion SMALLINT,
+    fecha_calificacion TIMESTAMPTZ,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT fk_solicitud_contacto_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_solicitud_contacto_calificacion CHECK (
+        calificacion IS NULL OR (calificacion >= 1 AND calificacion <= 5)
+    )
+);
+
+-- Evolución idempotente para bases creadas en v4.11
+ALTER TABLE solicitud_contacto ALTER COLUMN estado SET DEFAULT 'en_revision';
+ALTER TABLE solicitud_contacto ADD COLUMN IF NOT EXISTS calificacion SMALLINT;
+ALTER TABLE solicitud_contacto ADD COLUMN IF NOT EXISTS fecha_calificacion TIMESTAMPTZ;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_solicitud_contacto_calificacion') THEN
+        ALTER TABLE solicitud_contacto ADD CONSTRAINT ck_solicitud_contacto_calificacion
+            CHECK (calificacion IS NULL OR (calificacion >= 1 AND calificacion <= 5));
+    END IF;
+END $$;
+
+COMMENT ON TABLE solicitud_contacto IS 'Solicitudes del formulario de contacto (consulta, cotización o reclamo) con hilo de conversación y calificación (M15 · HU-ATC-02)';
+COMMENT ON COLUMN solicitud_contacto.tipo IS 'cotizacion = intención de cotizar; el camino formal es el carrito (RF-ATC-02-07)';
+COMMENT ON COLUMN solicitud_contacto.calificacion IS 'Valoración de 1 a 5 estrellas otorgada por el cliente cuando la solicitud pasa a atendida (R13)';
+
+-- Tabla: mensaje_solicitud_contacto
+-- Mensajes del hilo de conversación ("ping-pong" libre) entre el cliente titular y el equipo (M15 · R12).
+CREATE TABLE IF NOT EXISTS mensaje_solicitud_contacto (
+    id_mensaje UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_solicitud UUID NOT NULL,
+    id_autor INT NOT NULL,
+    rol_autor enum_rol_autor_mensaje_solicitud NOT NULL,
+    contenido VARCHAR(2000) NOT NULL,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_mensaje_solicitud_contacto FOREIGN KEY (id_solicitud)
+        REFERENCES solicitud_contacto (id_solicitud) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_mensaje_solicitud_autor FOREIGN KEY (id_autor)
         REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-COMMENT ON TABLE solicitud_contacto IS 'Solicitudes del formulario de contacto (consulta, cotización o reclamo) dirigidas al administrador (M15 · HU-ATC-02)';
-COMMENT ON COLUMN solicitud_contacto.tipo IS 'cotizacion = intención de cotizar; el camino formal es el carrito (RF-ATC-02-07)';
+COMMENT ON TABLE mensaje_solicitud_contacto IS 'Mensajes del hilo de conversación de una solicitud de contacto entre el cliente y el equipo (M15 · R12)';
 
 -- Tabla: horario_atencion
 -- Horario de atención humana configurable, una fila por día de la semana (M15 · HU-ATC-04).
@@ -1927,10 +1978,12 @@ CREATE INDEX IF NOT EXISTS idx_pagina_institucional_autor ON pagina_instituciona
 CREATE INDEX IF NOT EXISTS idx_faq_entrada_estado_orden ON faq_entrada(estado, orden, id_faq);
 CREATE INDEX IF NOT EXISTS idx_faq_entrada_autor ON faq_entrada(id_autor);
 
--- M15: bandeja de solicitudes de contacto
+-- M15: bandeja de solicitudes de contacto e hilo de mensajes
 CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_usuario ON solicitud_contacto(id_usuario);
 CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_estado_fecha ON solicitud_contacto(estado, fecha_creacion DESC);
+CREATE INDEX IF NOT EXISTS idx_mensaje_solicitud_fecha ON mensaje_solicitud_contacto(id_solicitud, fecha_creacion ASC);
+CREATE INDEX IF NOT EXISTS idx_mensaje_solicitud_autor ON mensaje_solicitud_contacto(id_autor);
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (67 TABLAS - v4.11)
+-- FIN DEL SCRIPT DDL (68 TABLAS - v4.12)
 -- ==============================================================================

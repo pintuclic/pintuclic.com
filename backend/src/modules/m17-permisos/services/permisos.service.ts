@@ -25,6 +25,7 @@ const DEPENDENCIAS_CONSULTA: Record<string, string> = {
   'configuracion.editar': 'configuracion.ver',
   'notificaciones.editar': 'notificaciones.ver',
   'atencion.editar': 'atencion.ver',
+  'atencion.atender_clientes': 'atencion.ver',
 };
 
 export class PermisosService {

@@ -182,12 +182,21 @@ enum TipoSolicitudContacto {
   @@map("enum_tipo_solicitud_contacto")
 }
 
-/// Estado de una solicitud de contacto en la bandeja del administrador (M15 · HU-ATC-02)
+/// Estado de una solicitud de contacto en la bandeja de atención (M15 · HU-ATC-02, R12)
 enum EstadoSolicitudContacto {
-  pendiente
+  en_revision
   atendida
+  rechazada
 
   @@map("enum_estado_solicitud_contacto")
+}
+
+/// Rol del autor de un mensaje dentro del hilo de una solicitud de contacto (M15 · R12)
+enum RolAutorMensajeSolicitud {
+  cliente
+  equipo
+
+  @@map("enum_rol_autor_mensaje_solicitud")
 }
 
 /// Día de la semana del horario de atención humana (M15 · HU-ATC-04)
@@ -259,7 +268,8 @@ model Usuario {
   ajustesInventario AjusteInventario[]
 
   // M15 Relaciones
-  solicitudesContacto SolicitudContacto[]
+  solicitudesContacto        SolicitudContacto[]
+  mensajesSolicitudContacto  MensajeSolicitudContacto[]
 
   // M16 Relaciones
   paginasInstitucionales PaginaInstitucional[] @relation("PaginaInstitucionalAutor")
@@ -658,18 +668,38 @@ model AjusteInventario {
 /// Solicitud del formulario de contacto dirigida al administrador (M15 · HU-ATC-02).
 /// Los datos de contacto no se guardan: se leen de la cuenta al mostrarla (RF-ATC-02-04).
 model SolicitudContacto {
-  idSolicitud   String                  @id @default(uuid()) @map("id_solicitud") @db.Uuid
-  idUsuario     Int                     @map("id_usuario")
-  tipo          TipoSolicitudContacto
-  descripcion   String                  @db.VarChar(2000)
-  estado        EstadoSolicitudContacto @default(pendiente)
-  fechaCreacion DateTime                @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  idSolicitud       String                  @id @default(uuid()) @map("id_solicitud") @db.Uuid
+  idUsuario         Int                     @map("id_usuario")
+  tipo              TipoSolicitudContacto
+  descripcion       String                  @db.VarChar(2000)
+  estado            EstadoSolicitudContacto @default(en_revision)
+  calificacion      Int?                    @db.SmallInt
+  fechaCalificacion DateTime?               @map("fecha_calificacion") @db.Timestamptz(6)
+  fechaCreacion     DateTime                @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
 
-  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade, map: "fk_solicitud_contacto_usuario")
+  usuario  Usuario                    @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade, map: "fk_solicitud_contacto_usuario")
+  mensajes MensajeSolicitudContacto[]
 
   @@index([idUsuario], map: "idx_solicitud_contacto_usuario")
   @@index([estado, fechaCreacion(sort: Desc)], map: "idx_solicitud_contacto_estado_fecha")
   @@map("solicitud_contacto")
+}
+
+/// Mensaje dentro del hilo de conversación de una solicitud de contacto (M15 · R12)
+model MensajeSolicitudContacto {
+  idMensaje     String                   @id @default(uuid()) @map("id_mensaje") @db.Uuid
+  idSolicitud   String                   @map("id_solicitud") @db.Uuid
+  idAutor       Int                      @map("id_autor")
+  rolAutor      RolAutorMensajeSolicitud @map("rol_autor")
+  contenido     String                   @db.VarChar(2000)
+  fechaCreacion DateTime                 @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+
+  solicitud SolicitudContacto @relation(fields: [idSolicitud], references: [idSolicitud], onDelete: Cascade, map: "fk_mensaje_solicitud_contacto")
+  autor     Usuario           @relation(fields: [idAutor], references: [idUsuario], onDelete: Cascade, map: "fk_mensaje_solicitud_autor")
+
+  @@index([idSolicitud, fechaCreacion(sort: Asc)], map: "idx_mensaje_solicitud_fecha")
+  @@index([idAutor], map: "idx_mensaje_solicitud_autor")
+  @@map("mensaje_solicitud_contacto")
 }
 
 /// Franja de atención humana de un día de la semana (M15 · HU-ATC-04).
