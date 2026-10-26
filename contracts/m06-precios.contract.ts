@@ -168,6 +168,9 @@ import { z } from 'zod';
  *  D11 El `nombre` del evento se muestra al cliente y se congela como `origen` del descuento en la orden.
  *  D12 PROPUESTAS incluidas, que se pueden quitar sin afectar el resto: el simulador y la vista previa de
  *      "qué productos entran en este evento" (útil para comprobar las excepciones antes de publicar).
+ *  D14 El editor de eventos busca marcas, líneas, productos, colores… por nombre con una ruta propia de M06
+ *      (`GET /referencias`, solo lectura, catalogo.ver) en vez de usar las de M01: así M06 no depende de su
+ *      frontend ni de sus formas de respuesta.
  *  D13 Los cupones se conservan (el campo está en el mockup del carrito); no estaban en tu lista, di si sobran.
  *
  * ── Piezas en otros módulos (cada una en su PR pequeño, con visto bueno del Tech Lead) ──
@@ -277,6 +280,12 @@ export const codigoCuponSchema = z
   .trim()
   .toUpperCase()
   .regex(/^[A-Z0-9_-]{6,30}$/);
+
+/**
+ * Lo que escribe el cliente en el campo de cupón: cualquier texto corto. No se valida el formato aquí: un código
+ * mal escrito responde `cupon_no_valido` en el cálculo (R14) en vez de un 400 que el carrito tendría que traducir.
+ */
+export const codigoCuponEntradaSchema = z.string().trim().min(1).max(60);
 
 /** Booleano en query string ("true"/"false"): z.coerce.boolean() trataría "false" como true. */
 const booleanoQuerySchema = z.enum(['true', 'false']).transform((v) => v === 'true');
@@ -424,6 +433,14 @@ export const productoAfectadoSchema = z.object({
   variantesTotales: z.number().int().nonnegative(),
 });
 export type ProductoAfectado = z.infer<typeof productoAfectadoSchema>;
+
+/** GET /referencias — buscador del editor de eventos (D14): activos cuyo nombre contiene el texto. */
+export const buscarReferenciasRequestSchema = z.object({
+  tipo: tipoExclusionSchema,
+  busqueda: z.string().trim().max(100).optional(),
+  limite: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type BuscarReferenciasRequest = z.infer<typeof buscarReferenciasRequestSchema>;
 
 /** Evento en curso, tal como se enseña al público (pestaña Promociones). */
 export const eventoPublicoSchema = z.object({
@@ -580,7 +597,7 @@ export type LineaCalculoInterna = z.infer<typeof lineaCalculoInternaSchema>;
 export const calcularRequestSchema = z.object({
   lineas: z.array(lineaCalculoSchema).min(1).max(MAXIMO_LINEAS_CALCULO),
   /** El código que escribió el cliente; se normaliza (R14). */
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type CalcularRequest = z.infer<typeof calcularRequestSchema>;
 
@@ -810,6 +827,9 @@ export type ListarEventosResponseEnvelope = z.infer<typeof listarEventosResponse
 export const vistaPreviaEventoResponseEnvelopeSchema = respuestaPaginada(productoAfectadoSchema);
 export type VistaPreviaEventoResponseEnvelope = z.infer<typeof vistaPreviaEventoResponseEnvelopeSchema>;
 
+export const buscarReferenciasResponseEnvelopeSchema = respuestaLista(referenciaCatalogoSchema);
+export type BuscarReferenciasResponseEnvelope = z.infer<typeof buscarReferenciasResponseEnvelopeSchema>;
+
 export const cuponResponseEnvelopeSchema = respuestaUno(cuponSchema);
 export type CuponResponseEnvelope = z.infer<typeof cuponResponseEnvelopeSchema>;
 export const listarCuponesResponseEnvelopeSchema = respuestaPaginada(cuponSchema);
@@ -845,7 +865,7 @@ export type ContextoPrecio = z.infer<typeof contextoPrecioSchema>;
 
 export const calculoEntradaSchema = z.object({
   lineas: z.array(lineaCalculoInternaSchema).min(1).max(MAXIMO_LINEAS_CALCULO),
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
   contexto: contextoPrecioSchema,
 });
 export type CalculoEntrada = z.infer<typeof calculoEntradaSchema>;
@@ -941,6 +961,7 @@ export type ErrorPreciosEnvelope = z.infer<typeof errorPreciosEnvelopeSchema>;
  *   GET   /eventos                         catalogo.ver     → listarEventos (paginado)
  *   POST  /eventos                         catalogo.editar  → crearEvento
  *   POST  /eventos/vista-previa            catalogo.ver     → productos que entran (paginado; no escribe)
+ *   GET   /referencias                     catalogo.ver     → buscarReferencias (lista sin paginar, D14)
  *   GET   /eventos/:idEvento               catalogo.ver
  *   PUT   /eventos/:idEvento               catalogo.editar  → actualizarEvento
  *   PATCH /eventos/:idEvento/estado        catalogo.editar  → cambiarEstado

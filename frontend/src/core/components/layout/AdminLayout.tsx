@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Bell,
   Boxes,
+  Percent,
   Building2,
   ChevronDown,
   ChevronRight,
@@ -64,6 +65,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Inventario',
     href: '/admin/inventario',
     icon: <Boxes className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Promociones',
+    href: '/admin/promociones',
+    icon: <Percent className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
