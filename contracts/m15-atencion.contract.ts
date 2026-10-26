@@ -72,12 +72,15 @@ import { z } from 'zod';
  *      en el detalle de solicitudes del cliente. Toda denegación (sin sesión, sin
  *      permiso o consulta de una solicitud ajena) responde 404 opaco
  *      `RECURSO_NO_DISPONIBLE`, idéntico al de un recurso inexistente (ADR-003).
- *  R12 Ciclo de vida e hilo de conversación ("ping-pong" libre):
+ *  R12 Ciclo de vida e hilo de conversación ("ping-pong"):
  *      · Toda solicitud nace en estado `en_revision`.
- *      · Mientras la solicitud está en `en_revision`, tanto el cliente titular
- *        como el admin/empleado con permiso `atencion.atender_clientes` (o
- *        `atencion.editar`) pueden enviar mensajes consecutivos en el hilo sin
- *        restricción de turnos.
+ *      · Mientras la solicitud está en `en_revision`, el cliente titular puede
+ *        enviar como máximo 1 mensaje si el equipo aún no ha respondido; si el
+ *        último mensaje del hilo ya es del cliente, debe esperar la respuesta
+ *        del equipo (`409 ESPERANDO_RESPUESTA_EQUIPO`) antes de poder enviar otro.
+ *      · El admin/empleado con permiso `atencion.atender_clientes` (o
+ *        `atencion.editar`) puede responder cuando quiera, incluso con varios
+ *        mensajes consecutivos sin importar si el cliente ha respondido o no.
  *      · El admin/empleado puede cambiar el estado entre `en_revision`,
  *        `atendida` y `rechazada` (p. ej., cuando la consulta es ajena a Pintu Clic).
  *      · Cuando la solicitud está en estado `atendida` o `rechazada`, el cliente
@@ -158,9 +161,10 @@ import { z } from 'zod';
  * 1. PRIMITIVAS
  * ─────────────────────────────────────────────────────────────────────────── */
 
+const PATRON_UUID_PG = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const idSchema = z.number().int().positive();
-export const idSolicitudSchema = z.string().uuid();
-export const idMensajeSolicitudSchema = z.string().uuid();
+export const idSolicitudSchema = z.string().regex(PATRON_UUID_PG, 'Identificador UUID inválido');
+export const idMensajeSolicitudSchema = z.string().regex(PATRON_UUID_PG, 'Identificador UUID inválido');
 
 export const TIPOS_SOLICITUD_CONTACTO = ['consulta', 'cotizacion', 'reclamo'] as const;
 export const tipoSolicitudContactoSchema = z.enum(TIPOS_SOLICITUD_CONTACTO);
@@ -392,6 +396,7 @@ export const CODIGOS_ERROR_ATENCION = [
   'PARAMETRO_INVALIDO',
   'RECURSO_NO_DISPONIBLE',
   'SOLICITUD_CERRADA',
+  'ESPERANDO_RESPUESTA_EQUIPO',
   'SOLICITUD_NO_CALIFICABLE',
   'LIMITE_SOLICITUDES_EXCEDIDO',
   'ERROR_INTERNO',
