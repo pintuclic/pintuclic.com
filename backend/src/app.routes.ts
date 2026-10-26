@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import { construirRutasLandingBanners } from './core/landing/banners.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
+import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
 import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
 import { construirModuloM15 } from './modules/m15-atencion/m15.routes';
@@ -84,6 +85,11 @@ export function construirAppRoutes(): Router {
   const m01 = construirModuloM01(m17.autorizacionService);
   router.use('/admin/catalogo', exigirSesionSalvo(auth, []), m01.adminRouter);
   router.use('/catalogo', m01.publicRouter);
+
+  // M02: búsqueda, filtros y descubrimiento (público) y analítica de búsquedas sin resultado (admin).
+  const m02 = construirModuloM02(m17.autorizacionService);
+  router.use('/admin/busqueda', exigirSesionSalvo(auth, []), m02.adminRouter);
+  router.use('/busqueda', m02.publicRouter);
 
   // M13: inventario referencial (existencias, historial y carga masiva). Exige sesión y los permisos
   // `catalogo.ver` / `catalogo.editar`, resueltos en servidor. Va antes de `/admin` por la misma razón.

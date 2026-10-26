@@ -12,6 +12,12 @@ export const TIPOS_SOLICITUD = [
   { valor: 'reclamo', etiqueta: 'Reclamo' },
 ] as const;
 
+export const ESTADOS_SOLICITUD = [
+  { valor: 'en_revision', etiqueta: 'En revisión' },
+  { valor: 'atendida', etiqueta: 'Atendida' },
+  { valor: 'rechazada', etiqueta: 'Rechazada' },
+] as const;
+
 export const DIAS_SEMANA = [
   { valor: 'lunes', etiqueta: 'Lunes' },
   { valor: 'martes', etiqueta: 'Martes' },
@@ -21,6 +27,9 @@ export const DIAS_SEMANA = [
   { valor: 'sabado', etiqueta: 'Sábado' },
   { valor: 'domingo', etiqueta: 'Domingo' },
 ] as const;
+
+/** R7/D6: un destino que empieza así es una URL HTTP/HTTPS completa y se usa tal cual. */
+export const DESTINO_ES_URL = /^https?:\/\//i;
 
 const horaSchema = z
   .string()
@@ -38,6 +47,26 @@ export const contactoFormSchema = z.object({
     .max(2000, 'La solicitud no puede superar los 2000 caracteres'),
 });
 export type ContactoFormData = z.infer<typeof contactoFormSchema>;
+
+/** Envío de mensaje dentro del hilo de una solicitud (HU-ATC-02, HU-ATC-05, HU-ATC-06). */
+export const mensajeSolicitudFormSchema = z.object({
+  contenido: z
+    .string()
+    .trim()
+    .min(1, 'Escribe un mensaje antes de enviarlo')
+    .max(2000, 'El mensaje no puede superar los 2000 caracteres'),
+});
+export type MensajeSolicitudFormData = z.infer<typeof mensajeSolicitudFormSchema>;
+
+/** Calificación de 1 a 5 estrellas sobre una solicitud atendida (HU-ATC-06, R10). */
+export const calificacionSolicitudSchema = z.object({
+  calificacion: z
+    .number({ message: 'Selecciona una calificación de 1 a 5 estrellas' })
+    .int('La calificación debe ser un número entero de 1 a 5')
+    .min(1, 'Selecciona al menos 1 estrella')
+    .max(5, 'La calificación máxima es de 5 estrellas'),
+});
+export type CalificacionSolicitudFormData = z.infer<typeof calificacionSolicitudSchema>;
 
 /** Canal de contacto directo (HU-ATC-03). */
 export const canalFormSchema = z.object({

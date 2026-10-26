@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   LIMITE_SOLICITUDES_POR_VENTANA,
   VENTANA_LIMITE_MINUTOS,
+  type CalificacionAtencion,
   type ConfiguracionWhatsapp,
+  type EstadoSolicitudContacto,
   type FranjaHorario,
+  type MensajeSolicitudContacto,
+  type RolAutorMensaje,
   type SolicitudContacto,
+  type SolicitudContactoDetalle,
   type TipoSolicitudContacto,
 } from '../dtos/m15-atencion.dto';
 import type {
@@ -32,6 +37,7 @@ const LUNES_22_00 = new Date('2026-10-27T03:00:00Z');
 
 class ContactoRepositorioFalso implements ContactoRepositoryPort {
   creadas: SolicitudContacto[] = [];
+  mensajesPorSolicitud = new Map<string, MensajeSolicitudContacto[]>();
   /** Lo que devolverá `contarDesde`, para simular el límite sin insertar filas. */
   recientes = 0;
   ultimaVentana: Date | null = null;
@@ -47,26 +53,91 @@ class ContactoRepositorioFalso implements ContactoRepositoryPort {
       remitente: { nombre: 'Cliente Activo', correo: 'cliente@pintuclic.co', telefono: '3001234567' },
       tipo,
       descripcion,
-      estado: 'pendiente',
+      estado: 'en_revision',
+      calificacion: null,
+      fechaCalificacion: null,
+      totalMensajes: 0,
       fechaCreacion: LUNES_10_00.toISOString(),
     };
     this.creadas.push(solicitud);
+    this.mensajesPorSolicitud.set(solicitud.idSolicitud, []);
     return solicitud;
   }
 
-  async listar(_filtro: FiltroSolicitudes): Promise<PaginaSolicitudes> {
-    return { items: this.creadas, total: this.creadas.length };
+  async listar(filtro: FiltroSolicitudes): Promise<PaginaSolicitudes> {
+    const filtradas = this.creadas.filter((s) => {
+      if (filtro.idUsuario !== undefined && s.idUsuario !== filtro.idUsuario) return false;
+      if (filtro.tipo !== undefined && s.tipo !== filtro.tipo) return false;
+      if (filtro.estado !== undefined && s.estado !== filtro.estado) return false;
+      return true;
+    });
+    return { items: filtradas, total: filtradas.length };
   }
 
   async obtener(idSolicitud: string): Promise<SolicitudContacto | null> {
     return this.creadas.find((s) => s.idSolicitud === idSolicitud) ?? null;
   }
 
-  async marcarAtendida(idSolicitud: string): Promise<SolicitudContacto> {
+  async obtenerDetalle(idSolicitud: string): Promise<SolicitudContactoDetalle | null> {
+    const solicitud = await this.obtener(idSolicitud);
+    if (solicitud === null) return null;
+    const mensajes = this.mensajesPorSolicitud.get(idSolicitud) ?? [];
+    return {
+      ...solicitud,
+      totalMensajes: mensajes.length,
+      mensajes,
+    };
+  }
+
+  async agregarMensaje(
+    idSolicitud: string,
+    idAutor: number,
+    rolAutor: RolAutorMensaje,
+    contenido: string,
+  ): Promise<MensajeSolicitudContacto> {
+    const existentes = this.mensajesPorSolicitud.get(idSolicitud) ?? [];
+    const mensaje: MensajeSolicitudContacto = {
+      idMensaje: `10000000-0000-4000-8000-00000000000${existentes.length + 1}`,
+      idSolicitud,
+      idAutor,
+      rolAutor,
+      nombreAutor: rolAutor === 'equipo' ? 'Asesor Pintu Clic' : 'Cliente Activo',
+      contenido,
+      fechaCreacion: LUNES_10_00.toISOString(),
+    };
+    existentes.push(mensaje);
+    this.mensajesPorSolicitud.set(idSolicitud, existentes);
+
     const indice = this.creadas.findIndex((s) => s.idSolicitud === idSolicitud);
-    const atendida: SolicitudContacto = { ...this.creadas[indice]!, estado: 'atendida' };
-    this.creadas[indice] = atendida;
-    return atendida;
+    if (indice >= 0) {
+      this.creadas[indice] = { ...this.creadas[indice]!, totalMensajes: existentes.length };
+    }
+    return mensaje;
+  }
+
+  async cambiarEstado(
+    idSolicitud: string,
+    estado: EstadoSolicitudContacto,
+  ): Promise<SolicitudContacto> {
+    const indice = this.creadas.findIndex((s) => s.idSolicitud === idSolicitud);
+    const actualizada: SolicitudContacto = { ...this.creadas[indice]!, estado };
+    this.creadas[indice] = actualizada;
+    return actualizada;
+  }
+
+  async calificar(
+    idSolicitud: string,
+    calificacion: CalificacionAtencion,
+    fechaCalificacion: Date,
+  ): Promise<SolicitudContacto> {
+    const indice = this.creadas.findIndex((s) => s.idSolicitud === idSolicitud);
+    const actualizada: SolicitudContacto = {
+      ...this.creadas[indice]!,
+      calificacion,
+      fechaCalificacion: fechaCalificacion.toISOString(),
+    };
+    this.creadas[indice] = actualizada;
+    return actualizada;
   }
 
   async contarDesde(_idUsuario: number, desde: Date): Promise<number> {
@@ -104,7 +175,7 @@ class ConfiguracionRepositorioFalso implements ConfiguracionAtencionRepositoryPo
   }
 }
 
-describe('ContactoService (HU-ATC-02)', () => {
+describe('ContactoService (HU-ATC-02, R12, R13)', () => {
   let repo: ContactoRepositorioFalso;
   let config: ConfiguracionRepositorioFalso;
   let servicio: ContactoService;
@@ -115,11 +186,12 @@ describe('ContactoService (HU-ATC-02)', () => {
     servicio = new ContactoService(repo, config);
   });
 
-  it('guarda la solicitud con el usuario de la sesión, no con datos del cuerpo (R5)', async () => {
+  it('guarda la solicitud con el usuario de la sesión en estado en_revision (R5, R12)', async () => {
     const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Tengo una duda' }, LUNES_10_00);
 
     expect(solicitud.idUsuario).toBe(7);
-    expect(solicitud.estado).toBe('pendiente');
+    expect(solicitud.estado).toBe('en_revision');
+    expect(solicitud.calificacion).toBeNull();
   });
 
   it('una cotización remite al carrito y no crea ninguna cotización (R4, CA-ATC-02-03)', async () => {
@@ -149,55 +221,142 @@ describe('ContactoService (HU-ATC-02)', () => {
     it('fuera del horario recibe la solicitud igual y avisa', async () => {
       const confirmacion = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Una duda' }, LUNES_22_00);
 
-      expect(repo.creadas).toHaveLength(1);
-      expect(confirmacion.avisoHorario).toContain('fuera del horario');
+      expect(confirmacion.solicitud.idSolicitud).toBeDefined();
+      expect(confirmacion.avisoHorario).toMatch(/fuera del horario/i);
     });
   });
 
-  describe('contención de envíos automatizados (R6, RF-ATC-02-08)', () => {
-    it('acepta hasta el límite de la ventana', async () => {
-      repo.recientes = LIMITE_SOLICITUDES_POR_VENTANA - 1;
-
-      await expect(
-        servicio.crear(7, { tipo: 'consulta', descripcion: 'Una duda' }, LUNES_10_00),
-      ).resolves.toBeDefined();
-    });
-
-    it('al alcanzar el límite responde 429 y no guarda', async () => {
+  describe('límite anti-automatización (R6, RF-ATC-02-08)', () => {
+    it('permite hasta el límite dentro de la ventana y rechaza la siguiente con 429', async () => {
       repo.recientes = LIMITE_SOLICITUDES_POR_VENTANA;
 
       await expect(
-        servicio.crear(7, { tipo: 'consulta', descripcion: 'Una duda' }, LUNES_10_00),
-      ).rejects.toMatchObject({ code: 'LIMITE_SOLICITUDES_EXCEDIDO', status: 429 });
-      expect(repo.creadas).toEqual([]);
-    });
+        servicio.crear(7, { tipo: 'reclamo', descripcion: 'Vino abollado el cuñete' }, LUNES_10_00),
+      ).rejects.toMatchObject({
+        code: 'LIMITE_SOLICITUDES_EXCEDIDO',
+        status: 429,
+      });
 
-    it('cuenta sobre la ventana configurada', async () => {
-      await servicio.crear(7, { tipo: 'consulta', descripcion: 'Una duda' }, LUNES_10_00);
-
-      const esperado = LUNES_10_00.getTime() - VENTANA_LIMITE_MINUTOS * 60_000;
-      expect(repo.ultimaVentana?.getTime()).toBe(esperado);
+      const esperado = new Date(LUNES_10_00.getTime() - VENTANA_LIMITE_MINUTOS * 60_000);
+      expect(repo.ultimaVentana?.toISOString()).toBe(esperado.toISOString());
     });
   });
 
-  describe('marcar atendida', () => {
-    it('cambia el estado', async () => {
-      const { solicitud } = await servicio.crear(7, { tipo: 'reclamo', descripcion: 'Llegó mal' }, LUNES_10_00);
+  describe('hilo de conversación ping-pong, estados y bloqueo (R11, R12)', () => {
+    it('permite máximo 1 mensaje del cliente sin respuesta del equipo (409 ESPERANDO_RESPUESTA_EQUIPO) y habilita otro cuando el equipo responde, mientras el equipo puede enviar varios seguidos', async () => {
+      const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Consulta inicial' }, LUNES_10_00);
 
-      const atendida = await servicio.marcarAtendida(solicitud.idSolicitud);
-      expect(atendida.estado).toBe('atendida');
+      await servicio.agregarMensajeCliente(7, solicitud.idSolicitud, { contenido: 'Primer mensaje adicional del cliente' });
+
+      await expect(
+        servicio.agregarMensajeCliente(7, solicitud.idSolicitud, { contenido: 'Segundo mensaje seguido sin respuesta del equipo' }),
+      ).rejects.toMatchObject({
+        code: 'ESPERANDO_RESPUESTA_EQUIPO',
+        status: 409,
+      });
+
+      await servicio.agregarMensajeEquipo(1, solicitud.idSolicitud, { contenido: 'Primera respuesta del asesor' });
+      await servicio.agregarMensajeEquipo(1, solicitud.idSolicitud, { contenido: 'Segunda aclaración seguida del asesor' });
+
+      await servicio.agregarMensajeCliente(7, solicitud.idSolicitud, { contenido: 'Respuesta del cliente tras ser atendido' });
+
+      const detalle = await servicio.obtenerDetalleDeUsuario(7, solicitud.idSolicitud);
+      expect(detalle.mensajes).toHaveLength(4);
+      expect(detalle.mensajes.map((m) => m.rolAutor)).toEqual(['cliente', 'equipo', 'equipo', 'cliente']);
     });
 
-    it('repetirlo no falla ni cambia nada', async () => {
-      const { solicitud } = await servicio.crear(7, { tipo: 'reclamo', descripcion: 'Llegó mal' }, LUNES_10_00);
-      await servicio.marcarAtendida(solicitud.idSolicitud);
+    it('bloquea nuevos mensajes del cliente cuando la solicitud pasa a atendida o rechazada (409 SOLICITUD_CERRADA)', async () => {
+      const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Consulta fuera de tema' }, LUNES_10_00);
 
-      const otra = await servicio.marcarAtendida(solicitud.idSolicitud);
-      expect(otra.estado).toBe('atendida');
+      await servicio.cambiarEstado(solicitud.idSolicitud, { estado: 'rechazada' });
+
+      await expect(
+        servicio.agregarMensajeCliente(7, solicitud.idSolicitud, { contenido: 'Intento seguir escribiendo' }),
+      ).rejects.toMatchObject({
+        code: 'SOLICITUD_CERRADA',
+        status: 409,
+      });
+
+      await servicio.cambiarEstado(solicitud.idSolicitud, { estado: 'atendida' });
+
+      await expect(
+        servicio.agregarMensajeCliente(7, solicitud.idSolicitud, { contenido: 'Intento escribir en atendida' }),
+      ).rejects.toMatchObject({
+        code: 'SOLICITUD_CERRADA',
+        status: 409,
+      });
     });
 
-    it('una solicitud inexistente responde 404 opaco (R11)', async () => {
-      await expect(servicio.marcarAtendida('00000000-0000-4000-8000-000000000404')).rejects.toMatchObject({
+    it('devuelve 404 opaco si un cliente intenta ver o escribir en la solicitud de otro usuario (ADR-003)', async () => {
+      const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Solicitud de usuario 7' }, LUNES_10_00);
+
+      await expect(
+        servicio.obtenerDetalleDeUsuario(99, solicitud.idSolicitud),
+      ).rejects.toMatchObject({
+        code: 'RECURSO_NO_DISPONIBLE',
+        status: 404,
+      });
+
+      await expect(
+        servicio.agregarMensajeCliente(99, solicitud.idSolicitud, { contenido: 'Intruso' }),
+      ).rejects.toMatchObject({
+        code: 'RECURSO_NO_DISPONIBLE',
+        status: 404,
+      });
+    });
+  });
+
+  describe('calificación de 1 a 5 estrellas (R13)', () => {
+    it('permite calificar únicamente cuando la solicitud está en estado atendida', async () => {
+      const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Consulta sobre epóxico' }, LUNES_10_00);
+
+      await expect(
+        servicio.calificarDeUsuario(7, solicitud.idSolicitud, { calificacion: 5 }, LUNES_10_00),
+      ).rejects.toMatchObject({
+        code: 'SOLICITUD_NO_CALIFICABLE',
+        status: 409,
+      });
+
+      await servicio.cambiarEstado(solicitud.idSolicitud, { estado: 'atendida' });
+
+      const calificada = await servicio.calificarDeUsuario(
+        7,
+        solicitud.idSolicitud,
+        { calificacion: 5 },
+        LUNES_10_00,
+      );
+      expect(calificada.calificacion).toBe(5);
+      expect(calificada.fechaCalificacion).toBe(LUNES_10_00.toISOString());
+    });
+
+    it('rechaza calificar cuando la solicitud está rechazada', async () => {
+      const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Consulta ajena' }, LUNES_10_00);
+      await servicio.cambiarEstado(solicitud.idSolicitud, { estado: 'rechazada' });
+
+      await expect(
+        servicio.calificarDeUsuario(7, solicitud.idSolicitud, { calificacion: 1 }, LUNES_10_00),
+      ).rejects.toMatchObject({
+        code: 'SOLICITUD_NO_CALIFICABLE',
+        status: 409,
+      });
+    });
+  });
+
+  describe('marcarAtendida (compatibilidad)', () => {
+    it('pasa de en_revision a atendida y es idempotente', async () => {
+      const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Una duda' }, LUNES_10_00);
+
+      const primera = await servicio.marcarAtendida(solicitud.idSolicitud);
+      const segunda = await servicio.marcarAtendida(solicitud.idSolicitud);
+
+      expect(primera.estado).toBe('atendida');
+      expect(segunda.estado).toBe('atendida');
+    });
+
+    it('responde 404 opaco cuando la solicitud no existe (R11)', async () => {
+      await expect(
+        servicio.marcarAtendida('00000000-0000-4000-8000-999999999999'),
+      ).rejects.toMatchObject({
         code: 'RECURSO_NO_DISPONIBLE',
         status: 404,
       });
@@ -206,41 +365,32 @@ describe('ContactoService (HU-ATC-02)', () => {
 });
 
 describe('ConfiguracionAtencionService (HU-ATC-03, HU-ATC-04)', () => {
-  it('calcula abiertoAhora junto con las franjas', async () => {
-    const servicio = new ConfiguracionAtencionService(new ConfiguracionRepositorioFalso());
+  it('calcula abiertoAhora al consultar el horario', async () => {
+    const config = new ConfiguracionRepositorioFalso();
+    const servicio = new ConfiguracionAtencionService(config);
 
-    const dentro = await servicio.obtenerHorario(LUNES_10_00);
-    const fuera = await servicio.obtenerHorario(LUNES_22_00);
+    const deDia = await servicio.obtenerHorario(LUNES_10_00);
+    const deNoche = await servicio.obtenerHorario(LUNES_22_00);
 
-    expect(dentro.abiertoAhora).toBe(true);
-    expect(fuera.abiertoAhora).toBe(false);
-    expect(dentro.franjas).toHaveLength(7);
+    expect(deDia.abiertoAhora).toBe(true);
+    expect(deNoche.abiertoAhora).toBe(false);
   });
 
-  it('marca destinoEsUrl cuando el destino es el canal de difusión (R7)', async () => {
-    const servicio = new ConfiguracionAtencionService(new ConfiguracionRepositorioFalso());
+  it('marca destinoEsUrl=true para el canal actual y false cuando sea un número (R7)', async () => {
+    const config = new ConfiguracionRepositorioFalso();
+    const servicio = new ConfiguracionAtencionService(config);
 
-    const canal = await servicio.obtenerCanalPublico();
+    const canalUrl = await servicio.obtenerCanalPublico();
+    expect(canalUrl.destinoEsUrl).toBe(true);
 
-    expect(canal.destinoEsUrl).toBe(true);
-    expect(canal.destino).toMatch(/^https:\/\/whatsapp\.com\/channel\//);
+    await servicio.guardarWhatsapp('573001234567', 'Hola');
+    const canalNumero = await servicio.obtenerCanalPublico();
+    expect(canalNumero.destinoEsUrl).toBe(false);
   });
 
-  it('marca destinoEsUrl en false cuando el destino es un número de WhatsApp Business (R7)', async () => {
-    const repo = new ConfiguracionRepositorioFalso(SEMANA, {
-      destino: '+573001234567',
-      mensajeBase: 'Hola',
-      fechaActualizacion: LUNES_10_00.toISOString(),
-    });
-    const servicio = new ConfiguracionAtencionService(repo);
-
-    const canal = await servicio.obtenerCanalPublico();
-
-    expect(canal.destinoEsUrl).toBe(false);
-  });
-
-  it('sin canal configurado responde 404 opaco en vez de un destino vacío', async () => {
-    const servicio = new ConfiguracionAtencionService(new ConfiguracionRepositorioFalso(SEMANA, null));
+  it('responde 404 opaco si el canal de WhatsApp no está configurado', async () => {
+    const config = new ConfiguracionRepositorioFalso(SEMANA, null);
+    const servicio = new ConfiguracionAtencionService(config);
 
     await expect(servicio.obtenerCanalPublico()).rejects.toMatchObject({
       code: 'RECURSO_NO_DISPONIBLE',

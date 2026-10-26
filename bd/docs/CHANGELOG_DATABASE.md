@@ -10,6 +10,15 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.10] - 2026-10-25
+### Esquema 4.12 (68 Tablas) - M15: hilo de conversación, estados y calificación de solicitudes
+- **Alcance General:** Una tabla nueva, un ENUM nuevo y evolución de `solicitud_contacto` pedidos por el contrato de M15 (`contracts/m15-atencion.contract.ts`, R12 y R13).
+  - **`enum_estado_solicitud_contacto`**: pasa a `('en_revision', 'atendida', 'rechazada')` con migración idempotente de `'pendiente'` a `'en_revision'`.
+  - **`solicitud_contacto`**: agrega `calificacion` (`SMALLINT` opcional, 1 a 5 estrellas con `ck_solicitud_contacto_calificacion`) y `fecha_calificacion` (`TIMESTAMPTZ` opcional).
+  - **`mensaje_solicitud_contacto`**: mensajes del hilo de conversación ("ping-pong" libre) entre el cliente titular y el equipo (`rol_autor` en `enum_rol_autor_mensaje_solicitud`: `'cliente' | 'equipo'`), con `ON DELETE CASCADE` e índice `(id_solicitud, fecha_creacion ASC)`.
+
+---
+
 ## [v3.9] - 2026-10-25
 ### Esquema 4.11 (67 Tablas) - M15 Atención al cliente
 - **Alcance General:** Tres tablas nuevas pedidas por el contrato de M15 (`contracts/m15-atencion.contract.ts`). Cambio puramente aditivo. **Las preguntas frecuentes NO están aquí:** son de M16 (`faq_entrada`, esquema 4.9) y M15 las consume por el puerto que M16 expone.

@@ -12,16 +12,26 @@ import { z } from 'zod';
  * 1. PRIMITIVAS
  * ─────────────────────────────────────────────────────────────────────────── */
 
+const PATRON_UUID_PG = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const idSchema = z.number().int().positive();
-export const idSolicitudSchema = z.string().uuid();
+export const idSolicitudSchema = z.string().regex(PATRON_UUID_PG, 'Identificador UUID inválido');
+export const idMensajeSolicitudSchema = z.string().regex(PATRON_UUID_PG, 'Identificador UUID inválido');
 
 export const TIPOS_SOLICITUD_CONTACTO = ['consulta', 'cotizacion', 'reclamo'] as const;
 export const tipoSolicitudContactoSchema = z.enum(TIPOS_SOLICITUD_CONTACTO);
 export type TipoSolicitudContacto = z.infer<typeof tipoSolicitudContactoSchema>;
 
-export const ESTADOS_SOLICITUD_CONTACTO = ['pendiente', 'atendida'] as const;
+export const ESTADOS_SOLICITUD_CONTACTO = ['en_revision', 'atendida', 'rechazada'] as const;
 export const estadoSolicitudContactoSchema = z.enum(ESTADOS_SOLICITUD_CONTACTO);
 export type EstadoSolicitudContacto = z.infer<typeof estadoSolicitudContactoSchema>;
+
+export const ROLES_AUTOR_MENSAJE = ['cliente', 'equipo'] as const;
+export const rolAutorMensajeSchema = z.enum(ROLES_AUTOR_MENSAJE);
+export type RolAutorMensaje = z.infer<typeof rolAutorMensajeSchema>;
+
+/** Valoración de 1 a 5 estrellas cuando la solicitud pasa a estado `atendida` (R13). */
+export const calificacionAtencionSchema = z.number().int().min(1).max(5);
+export type CalificacionAtencion = z.infer<typeof calificacionAtencionSchema>;
 
 export const DIAS_SEMANA = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 export const diaSemanaSchema = z.enum(DIAS_SEMANA);
@@ -53,6 +63,17 @@ export const remitenteSolicitudSchema = z.object({
 });
 export type RemitenteSolicitud = z.infer<typeof remitenteSolicitudSchema>;
 
+export const mensajeSolicitudContactoSchema = z.object({
+  idMensaje: idMensajeSolicitudSchema,
+  idSolicitud: idSolicitudSchema,
+  idAutor: idSchema,
+  rolAutor: rolAutorMensajeSchema,
+  nombreAutor: z.string(),
+  contenido: z.string().trim().min(1).max(2000),
+  fechaCreacion: z.string().datetime(),
+});
+export type MensajeSolicitudContacto = z.infer<typeof mensajeSolicitudContactoSchema>;
+
 export const solicitudContactoSchema = z.object({
   idSolicitud: idSolicitudSchema,
   idUsuario: idSchema,
@@ -60,9 +81,17 @@ export const solicitudContactoSchema = z.object({
   tipo: tipoSolicitudContactoSchema,
   descripcion: z.string(),
   estado: estadoSolicitudContactoSchema,
+  calificacion: calificacionAtencionSchema.nullable(),
+  fechaCalificacion: z.string().datetime().nullable(),
+  totalMensajes: z.number().int().nonnegative(),
   fechaCreacion: z.string().datetime(),
 });
 export type SolicitudContacto = z.infer<typeof solicitudContactoSchema>;
+
+export const solicitudContactoDetalleSchema = solicitudContactoSchema.extend({
+  mensajes: z.array(mensajeSolicitudContactoSchema),
+});
+export type SolicitudContactoDetalle = z.infer<typeof solicitudContactoDetalleSchema>;
 
 export const franjaHorarioSchema = z.object({
   diaSemana: diaSemanaSchema,
@@ -85,11 +114,6 @@ export const configuracionWhatsappSchema = z.object({
 });
 export type ConfiguracionWhatsapp = z.infer<typeof configuracionWhatsappSchema>;
 
-/**
- * Lo que necesita el botón público. `destinoEsUrl` evita que el frontend repita
- * la regla R7: si el destino ya es una URL (el canal), el botón la abre tal cual
- * y no le anexa texto; si es un número, arma el enlace wa.me con el mensaje.
- */
 export const canalWhatsappPublicoSchema = z.object({
   destino: z.string(),
   mensajeBase: z.string().nullable(),
@@ -97,12 +121,9 @@ export const canalWhatsappPublicoSchema = z.object({
 });
 export type CanalWhatsappPublico = z.infer<typeof canalWhatsappPublicoSchema>;
 
-/** Respuesta de POST /atencion/contacto. */
 export const confirmacionContactoSchema = z.object({
   solicitud: solicitudContactoSchema,
-  /** R9: null dentro del horario; el aviso cuando la solicitud llega fuera de él. */
   avisoHorario: z.string().nullable(),
-  /** R4: true en una cotización, para que el frontend remita al carrito. */
   remitirAlCarrito: z.boolean(),
 });
 export type ConfirmacionContacto = z.infer<typeof confirmacionContactoSchema>;
@@ -118,12 +139,33 @@ export const crearSolicitudContactoRequestSchema = z.object({
 });
 export type CrearSolicitudContactoRequest = z.infer<typeof crearSolicitudContactoRequestSchema>;
 
-/** GET /admin/atencion/solicitudes-contacto */
+/** GET /atencion/mis-solicitudes y GET /admin/atencion/solicitudes-contacto */
 export const listarSolicitudesRequestSchema = paginacionQuerySchema.extend({
   tipo: tipoSolicitudContactoSchema.optional(),
   estado: estadoSolicitudContactoSchema.optional(),
 });
 export type ListarSolicitudesRequest = z.infer<typeof listarSolicitudesRequestSchema>;
+
+/**
+ * POST /atencion/mis-solicitudes/:idSolicitud/mensajes
+ * POST /admin/atencion/solicitudes-contacto/:idSolicitud/mensajes
+ */
+export const crearMensajeSolicitudRequestSchema = z.object({
+  contenido: z.string().trim().min(1).max(2000),
+});
+export type CrearMensajeSolicitudRequest = z.infer<typeof crearMensajeSolicitudRequestSchema>;
+
+/** PATCH /admin/atencion/solicitudes-contacto/:idSolicitud/estado */
+export const actualizarEstadoSolicitudRequestSchema = z.object({
+  estado: estadoSolicitudContactoSchema,
+});
+export type ActualizarEstadoSolicitudRequest = z.infer<typeof actualizarEstadoSolicitudRequestSchema>;
+
+/** PATCH /atencion/mis-solicitudes/:idSolicitud/calificacion (solo cuando estado === 'atendida', R13) */
+export const calificarSolicitudRequestSchema = z.object({
+  calificacion: calificacionAtencionSchema,
+});
+export type CalificarSolicitudRequest = z.infer<typeof calificarSolicitudRequestSchema>;
 
 /** PUT /admin/atencion/horario — reemplaza la semana completa (R10). */
 export const actualizarHorarioRequestSchema = z.object({
@@ -183,6 +225,9 @@ export type ActualizarWhatsappRequest = z.infer<typeof actualizarWhatsappRequest
 export const CODIGOS_ERROR_ATENCION = [
   'PARAMETRO_INVALIDO',
   'RECURSO_NO_DISPONIBLE',
+  'SOLICITUD_CERRADA',
+  'ESPERANDO_RESPUESTA_EQUIPO',
+  'SOLICITUD_NO_CALIFICABLE',
   'LIMITE_SOLICITUDES_EXCEDIDO',
   'ERROR_INTERNO',
 ] as const;

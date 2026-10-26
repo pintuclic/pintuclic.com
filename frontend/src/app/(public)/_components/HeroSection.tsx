@@ -83,7 +83,7 @@ export function HeroSection() {
           aria-hidden="true"
           className="absolute inset-0 bg-corporate/70 lg:bg-transparent lg:bg-linear-to-r lg:from-corporate/80 lg:via-corporate/35 lg:to-transparent"
         />
-        <div className="relative z-10 flex h-full max-w-xl flex-col justify-center gap-4 px-6 sm:px-10 lg:max-w-2xl lg:px-14">
+        <div className="relative z-10 flex h-full max-w-xl flex-col justify-center gap-4 pl-12 pr-6 sm:pl-16 sm:pr-10 lg:max-w-2xl lg:pl-16 lg:pr-14">
           <Titulo className="font-title text-3xl font-bold leading-tight text-neutral-white sm:text-4xl lg:text-[2.5rem]">
             {slide.titleLine1}
             <br />

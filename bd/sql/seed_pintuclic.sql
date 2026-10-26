@@ -74,7 +74,7 @@ INSERT INTO asignacion_permiso (id_rol, id_permiso) VALUES
     (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
     (1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
     (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
-    (1, 21),
+    (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26),
     (3, 4), (3, 10)
 ON CONFLICT (id_rol, id_permiso) DO NOTHING;
 
@@ -752,6 +752,18 @@ ON CONFLICT (dia_semana) DO NOTHING;
 INSERT INTO configuracion_atencion_whatsapp (id_configuracion, destino, mensaje_base) VALUES
     (1, 'https://whatsapp.com/channel/0029VbDzCHgGehEKg98m4J3X', 'Hola, quiero información sobre sus productos.')
 ON CONFLICT (id_configuracion) DO NOTHING;
+
+-- 9F.3 Solicitudes de contacto con hilo de conversación y calificación (HU-ATC-02, R12, R13).
+INSERT INTO solicitud_contacto (id_solicitud, id_usuario, tipo, descripcion, estado, calificacion, fecha_calificacion, fecha_creacion) VALUES
+    ('d0000000-0000-0000-0000-000000000001', 2, 'consulta', 'Hola, necesito confirmar si el vinilo tipo 1 rinde igual sobre estuco plástico nuevo en sala y comedor.', 'en_revision', NULL, NULL, now() - interval '3 hours'),
+    ('d0000000-0000-0000-0000-000000000002', 2, 'cotizacion', 'Requiero orientación para pintar una bodega de 450 m2 con recubrimiento de alta resistencia.', 'atendida', 5, now() - interval '30 minutes', now() - interval '1 day')
+ON CONFLICT (id_solicitud) DO NOTHING;
+
+INSERT INTO mensaje_solicitud_contacto (id_mensaje, id_solicitud, id_autor, rol_autor, contenido, fecha_creacion) VALUES
+    ('d1000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 1, 'equipo', '¡Hola! Sobre estuco plástico nuevo recomendamos aplicar primero una mano de sellador acrílico o diluir la primera mano al 20 % para asegurar adherencia y rendimiento.', now() - interval '2 hours'),
+    ('d1000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000001', 2, 'cliente', 'Perfecto, ¿cuántos galones necesitaría para unos 85 metros cuadrados a dos manos?', now() - interval '1 hour'),
+    ('d1000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000002', 1, 'equipo', 'Para piso y muros de bodega te sugerimos nuestra línea epóxica poliamida de dos componentes. Ya puedes agregar las presentaciones de 1 galón o cuñete desde el carrito para formalizar tu cotización.', now() - interval '18 hours')
+ON CONFLICT (id_mensaje) DO NOTHING;
 
 -- ==============================================================================
 -- 10. ACTUALIZACIÓN AUTOMÁTICA DE SECUENCIAS (EVITA COLISIONES DE IDs)
