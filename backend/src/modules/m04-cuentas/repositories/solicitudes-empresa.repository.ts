@@ -13,6 +13,8 @@ export interface DecisionAdministrativa {
   idAdminRevisor: number;
   motivoRechazo?: string | null;
   fechaRevision?: Date;
+  /** Tipo de cliente empresa con el que nace la cuenta al aprobar un registro o un ascenso (M06 · D8). */
+  idSubRolEmpresa?: number | null;
 }
 
 /**
@@ -224,6 +226,7 @@ export class PrismaSolicitudesEmpresaRepository implements SolicitudesEmpresaRep
               correoEmpresarial: solicitud.correoEmpresarial.trim().toLowerCase(),
               telefono: solicitud.telefono.trim(),
               idSolicitudOrigen: solicitud.idSolicitud,
+              idSubRolEmpresa: decision.idSubRolEmpresa ?? null,
             },
           });
           // DP-12: una cuenta empresa no tiene acceso con Google.

@@ -91,6 +91,9 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
       } as UsuarioIdentidadExterna),
       buscarCuentaEmpresaPorNit: vi.fn().mockResolvedValue(null),
       buscarCuentaEmpresaPorIdUsuario: vi.fn().mockResolvedValue(null),
+      listarCuentasEmpresa: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+      buscarCuentaEmpresaConTipo: vi.fn().mockResolvedValue(null),
+      asignarTipoCuentaEmpresa: vi.fn().mockResolvedValue(true),
     };
 
     codigosRepo = {

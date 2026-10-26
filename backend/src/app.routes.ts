@@ -67,6 +67,12 @@ export function construirAppRoutes(): Router {
     },
     // ADR-009 (migrado a M18): M04 ya no construye su propio adapter SMTP.
     notificaciones: m18.notificaciones,
+    // M06 · D8: los tipos de cliente empresa los administra M06. M06 se construye más abajo (necesita M01); la
+    // llamada ocurre por petición, cuando `m06` ya existe.
+    tiposCliente: {
+      listarActivos: () => m06.tiposCliente.listarActivos(),
+      existeActivo: (idSubRolEmpresa) => m06.tiposCliente.existeActivo(idSubRolEmpresa),
+    },
   });
 
   // M20: El aviso de privacidad es público (RF-SEG-05-03); el resto exige sesión vigente.
