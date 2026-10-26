@@ -45,7 +45,7 @@ import type { PreciosPort } from './m06-precios.contract';
  *  · No reserva cupones ni existencias: calcular no reserva nada (R15 de M06). El uso del cupón lo
  *    registra M07 al crear la orden.
  *  · No cobra ni crea la orden (M07 y M08). No calcula envío (M12).
- *  · No trae líneas de cotización (M21): ese módulo no existe; cuando exista se amplía este contrato.
+ *  · No crea cotizaciones: las líneas con precio acordado solo llegan desde M21 al aceptar una (C15).
  *  · No guarda precios: el carrito es una referencia viva (RF-CAR-05-04).
  *  · No edita catálogo, inventario ni cuentas.
  *
@@ -96,6 +96,12 @@ import type { PreciosPort } from './m06-precios.contract';
  *      ni hace fallar la respuesta. Los carritos de una CUENTA no vencen ni se borran.
  *  C14 ERRORES OPACOS. Una línea que no es del carrito de quien llama responde 404 RECURSO_NO_DISPONIBLE,
  *      igual que una que no existe (ADR-003). Nunca se devuelven trazas, SQL ni el token.
+ *  C15 LÍNEAS DE COTIZACIÓN (M21). Al aceptar una cotización, M21 pone sus líneas en el carrito de la cuenta
+ *      con `idCotizacion` y `precioAcordado` (puerto interno, sin ruta HTTP); si ya había una línea igual
+ *      (variante + color), la reemplaza. Esas líneas van a M06 con `precioAcordado` (R3: sin descuentos) y la
+ *      revalidación no compara su precio (RF-CAR-05-06), aunque sí avisa si dejan de venderse. Su cantidad
+ *      no se cambia ni se suma: PATCH o agregar la misma variante y color responde 409 LINEA_COTIZADA; se
+ *      pueden quitar. Solo existen en carritos de cuenta.
  *
  * ── Pantalla /carrito ───────────────────────────────────────────────────────
  *  Lista de líneas: imagen, nombre, marca, medida, color (muestra y nombre), cantidad con − / + y campo
@@ -275,6 +281,10 @@ export const lineaCarritoSchema = z.object({
   producto: productoLineaSchema,
   /** La línea correspondiente del cálculo de M06 (mismo orden). Null si el carrito no se pudo calcular. */
   precio: lineaCalculadaSchema.nullable(),
+  /** C15: la cotización de la que viene; null en una línea normal. */
+  idCotizacion: idSchema.nullable(),
+  /** C15: precio unitario pactado; null en una línea normal. */
+  precioAcordado: dineroSchema.nullable(),
 });
 export type LineaCarrito = z.infer<typeof lineaCarritoSchema>;
 
@@ -366,7 +376,8 @@ export type RevalidacionResponseEnvelope = z.infer<typeof revalidacionResponseEn
  * Envelope global del backend: `{ success: false, error: { code, message, details } }`.
  * 400 PARAMETRO_INVALIDO · 400 CANTIDAD_FUERA_DE_RANGO (C4) · 400 LIMITE_LINEAS_ALCANZADO (C5) ·
  * 404 RECURSO_NO_DISPONIBLE (línea ajena o inexistente, C14) · 409 PRODUCTO_NO_DISPONIBLE (C6, con el
- * motivo en `details`) · 409 SIN_EXISTENCIA_SUFICIENTE (tope de combo, C4) · 500 ERROR_INTERNO (sin detalles).
+ * motivo en `details`) · 409 SIN_EXISTENCIA_SUFICIENTE (tope de combo, C4) · 409 LINEA_COTIZADA (C15) ·
+ * 500 ERROR_INTERNO (sin detalles).
  */
 export const CODIGOS_ERROR_CARRITO = [
   'PARAMETRO_INVALIDO',
@@ -375,6 +386,7 @@ export const CODIGOS_ERROR_CARRITO = [
   'RECURSO_NO_DISPONIBLE',
   'PRODUCTO_NO_DISPONIBLE',
   'SIN_EXISTENCIA_SUFICIENTE',
+  'LINEA_COTIZADA',
   'ERROR_INTERNO',
 ] as const;
 export type CodigoErrorCarrito = (typeof CODIGOS_ERROR_CARRITO)[number];
