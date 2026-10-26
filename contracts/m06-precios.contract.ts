@@ -278,6 +278,12 @@ export const codigoCuponSchema = z
   .toUpperCase()
   .regex(/^[A-Z0-9_-]{6,30}$/);
 
+/**
+ * Lo que escribe el cliente en el campo de cupón: cualquier texto corto. No se valida el formato aquí: un código
+ * mal escrito responde `cupon_no_valido` en el cálculo (R14) en vez de un 400 que el carrito tendría que traducir.
+ */
+export const codigoCuponEntradaSchema = z.string().trim().min(1).max(60);
+
 /** Booleano en query string ("true"/"false"): z.coerce.boolean() trataría "false" como true. */
 const booleanoQuerySchema = z.enum(['true', 'false']).transform((v) => v === 'true');
 
@@ -580,7 +586,7 @@ export type LineaCalculoInterna = z.infer<typeof lineaCalculoInternaSchema>;
 export const calcularRequestSchema = z.object({
   lineas: z.array(lineaCalculoSchema).min(1).max(MAXIMO_LINEAS_CALCULO),
   /** El código que escribió el cliente; se normaliza (R14). */
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type CalcularRequest = z.infer<typeof calcularRequestSchema>;
 
@@ -845,7 +851,7 @@ export type ContextoPrecio = z.infer<typeof contextoPrecioSchema>;
 
 export const calculoEntradaSchema = z.object({
   lineas: z.array(lineaCalculoInternaSchema).min(1).max(MAXIMO_LINEAS_CALCULO),
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
   contexto: contextoPrecioSchema,
 });
 export type CalculoEntrada = z.infer<typeof calculoEntradaSchema>;

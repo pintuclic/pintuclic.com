@@ -4,6 +4,7 @@ import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
+import { construirModuloM06 } from './modules/m06-precios/m06.routes';
 import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
 import { construirModuloM15 } from './modules/m15-atencion/m15.routes';
 import { construirModuloM16 } from './modules/m16-contenido/m16.routes';
@@ -95,6 +96,23 @@ export function construirAppRoutes(): Router {
   // `catalogo.ver` / `catalogo.editar`, resueltos en servidor. Va antes de `/admin` por la misma razón.
   const m13 = construirModuloM13(m17.autorizacionService);
   router.use('/admin/inventario', exigirSesionSalvo(auth, []), m13.router);
+
+  // M06: precios, eventos de descuento, cupones y descuentos de empresa. La administración exige sesión y los
+  // permisos `catalogo.*`; el cálculo y los eventos en curso son públicos (la sesión es opcional y solo sirve para
+  // saber quién es el cliente). Lee el precio base de M01 y el IVA de M17. Va antes de `/admin` por lo mismo que M01.
+  const m06 = construirModuloM06(m17.autorizacionService, {
+    sesiones: m20.sesionService,
+    catalogoCompra: m01.catalogoParaCompra,
+    parametros: {
+      obtenerNumero: async (clave) => {
+        const { parametros } = await m17.configService.obtenerCatalogo();
+        const valor = parametros.find((p) => p.clave === clave)?.valor;
+        return typeof valor === 'number' ? valor : null;
+      },
+    },
+  });
+  router.use('/admin/precios', exigirSesionSalvo(auth, []), m06.adminRouter);
+  router.use('/precios', m06.publicRouter);
 
   // M16: gestión administrativa de contenido institucional y FAQ (exige sesión y permisos
   // `configuracion.*`) y consulta pública de páginas publicadas y FAQ activas (sin sesión).
