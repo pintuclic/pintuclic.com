@@ -10,6 +10,15 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.13] - 2026-10-26
+### Esquema 4.14 (73 Tablas, sin cambios de tablas) - M04: una sola dirección por cliente
+- **Alcance General:** El cliente guarda como máximo una dirección de entrega (HU-CUE-07). No cambia ninguna tabla ni columna.
+  - **`uq_direccion_una_por_usuario`**: índice único sobre `direccion_cliente (id_usuario)` que impide a nivel de BD una segunda dirección por cuenta.
+  - **Migración de datos:** antes de crear el índice, el DDL elimina las direcciones sobrantes de las cuentas que ya tenían varias y conserva la predeterminada (o la más reciente si ninguna lo era).
+  - **Seed:** se retira la segunda dirección del cliente de pruebas (`d0000000-0000-0000-0000-000000000002`), que ahora violaría el índice.
+
+---
+
 ## [v3.12] - 2026-10-26
 ### Esquema 4.13 (73 Tablas, sin cambios de DDL) - M17: parámetro `comercial.umbral_sugerir_empresa`
 - **Seed:** parámetro 12 `comercial.umbral_sugerir_empresa` (área `comercial`, número, 500 000 por defecto, mínimo 0, sin máximo): total del carrito desde el que M06 invita a un cliente registrado a solicitar la cuenta empresa (R12 del contrato de M06). Es editable desde la configuración general; el valor inicial está por confirmar.

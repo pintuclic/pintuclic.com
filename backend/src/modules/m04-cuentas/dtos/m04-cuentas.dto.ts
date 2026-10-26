@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { telefonoSchema } from '../../../core/dtos/telefono.dto';
 
 /**
  * ============================================================================
@@ -25,11 +26,8 @@ export const correoSchema = z
   .max(150, 'El correo no puede exceder 150 caracteres')
   .toLowerCase();
 
-export const telefonoSchema = z
-  .string()
-  .trim()
-  .min(7, 'El teléfono debe tener al menos 7 dígitos')
-  .max(20, 'El teléfono no puede exceder 20 caracteres');
+/** Regla transversal del teléfono (registro, perfil, empresa y direcciones): vive en `core/dtos`. */
+export { telefonoSchema };
 
 export const nombreSchema = z
   .string()
@@ -386,7 +384,11 @@ export const crearDireccionRequestSchema = z.object({
 });
 export type CrearDireccionRequest = z.infer<typeof crearDireccionRequestSchema>;
 
-export const actualizarDireccionRequestSchema = crearDireccionRequestSchema.partial();
+/** Al editar, `null` en las coordenadas las borra (el cliente quita su ubicación); ausentes se conservan. */
+export const actualizarDireccionRequestSchema = crearDireccionRequestSchema.partial().extend({
+  latitud: z.number().min(-90).max(90).nullable().optional(),
+  longitud: z.number().min(-180).max(180).nullable().optional(),
+});
 export type ActualizarDireccionRequest = z.infer<typeof actualizarDireccionRequestSchema>;
 
 export const listarDireccionesResponseSchema = z.array(direccionClienteItemSchema);

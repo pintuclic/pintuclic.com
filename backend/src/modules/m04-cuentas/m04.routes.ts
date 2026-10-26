@@ -157,7 +157,6 @@ export function construirModuloM04(
   cuentasRouter.post('/direcciones', authMiddleware, direccionesController.crear as RequestHandler);
   cuentasRouter.put('/direcciones/:idDireccion', authMiddleware, direccionesController.actualizar as RequestHandler);
   cuentasRouter.delete('/direcciones/:idDireccion', authMiddleware, direccionesController.eliminar as RequestHandler);
-  cuentasRouter.patch('/direcciones/:idDireccion/predeterminada', authMiddleware, direccionesController.establecerPredeterminada as RequestHandler);
 
   cuentasRouter.get('/empresas/solicitudes/mias', authMiddleware, empresasController.misSolicitudes as RequestHandler);
   cuentasRouter.post('/empresas/ascenso', authMiddleware, empresasController.solicitarAscenso as RequestHandler);
