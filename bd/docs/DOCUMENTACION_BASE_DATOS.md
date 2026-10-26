@@ -1,8 +1,8 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.9 — esquema 4.11 (M15 Atención al cliente: contacto, horario y canal directo).  
+> **Versión Actual:** 3.11 — esquema 4.13 (M06 Precios: eventos de descuento, cupones y tipo de cliente empresa).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
-> **Total de Tablas:** 67  
+> **Total de Tablas:** 73  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script de Mocks / Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Guía Oficial de Mocks y Datos de Prueba:** [`./GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./GUIA_MOCKS_Y_DATOS_PRUEBA.md)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.11** (esquema 4.13) | 2026-10-26 | `evento_descuento`, `evento_regla`, `evento_exclusion`, `cupon`, `cupon_uso` (5) | Ninguna | M06: eventos de descuento con calendario (fechas, días de la semana, horas), reglas con porcentaje propio por objetivo y excepciones (incluidos color y familia de color); cupones con usos; `descuento.monto_minimo_compra`; `cuenta_empresa.id_sub_rol_empresa` (tipo de cliente empresa). Cuatro ENUMs nuevos. Total 73 tablas. | [Ver v3.11](./CHANGELOG_DATABASE.md#v311---2026-10-26) |
 | **v3.9** (esquema 4.11) | 2026-10-25 | `solicitud_contacto`, `horario_atencion`, `configuracion_atencion_whatsapp` (3) | Ninguna | M15 Atención al cliente: solicitudes del formulario de contacto sin duplicar datos de contacto, horario de atención humana por día con franja coherente y destino del botón de WhatsApp en fila única. Tres ENUMs nuevos y los permisos `atencion.*`. Las preguntas frecuentes son de M16. Total 67 tablas. | [Ver v3.9](./CHANGELOG_DATABASE.md#v39---2026-10-25) |
 | **v3.8** (esquema 4.10) | 2026-10-25 | Ninguna | Ninguna | M13: `ajuste_inventario.referencia` (única por variante y motivo) y valores `orden`, `venta` y `devolucion` en sus ENUMs, para descontar y reponer la existencia de los combos de forma idempotente. Total 64 tablas. | [Ver v3.8](./CHANGELOG_DATABASE.md#v38---2026-10-25) |
 | **v3.7** (esquema 4.9) | 2026-10-25 | Ninguna | Ninguna | M01 entrega 3: `producto.es_combo` y `excluido_de_descuentos`; `subcategoria.id_categoria_complementaria`; `imagen.miniatura` y `mediana` (+ una imagen se asocia a variante o a color, no a ambos). Total 64 tablas. | [Ver v3.7](./CHANGELOG_DATABASE.md#v37---2026-10-25) |
@@ -567,7 +568,7 @@ erDiagram
 
 ---
 
-## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (67 Tablas)
+## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (73 Tablas)
 
 ### Módulo 1: Seguridad, Roles y Descuentos (5 Tablas)
 | Tabla | PK | FKs | Descripción |
@@ -685,6 +686,17 @@ Las preguntas frecuentes no están aquí: son de M16 (`faq_entrada`), que las ex
 | **`horario_atencion`** *(v3.9)* | `id_horario` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Horario de atención humana, una fila por día de la semana (`dia_semana` UNIQUE, HU-ATC-04). Las horas son `"HH:mm"` en 24h validadas por `ck_horario_formato_horas`, y `ck_horario_franja_coherente` exige que un día cerrado no lleve horas y que uno abierto tenga `hora_fin > hora_inicio`. Solo condiciona los canales atendidos por personas (RF-ATC-04-04). |
 | **`configuracion_atencion_whatsapp`** *(v3.9)* | `id_configuracion` (**fila única**, `ck_whatsapp_fila_unica`) | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Destino del botón de contacto directo por WhatsApp (HU-ATC-03). Admite una URL completa —hoy el canal de difusión, que no acepta texto prellenado— o un número de WhatsApp Business cuando exista; en ese caso el botón arma el enlace `wa.me` con `mensaje_base` y la referencia del producto. Es un enlace saliente: el sistema no recibe, almacena ni responde conversaciones (RF-ATC-03-04). |
 
+### Módulo 14: Precios, Eventos de Descuento y Cupones — M06 (5 Tablas, esquema 4.13)
+Además amplía `descuento` (`monto_minimo_compra`) y `cuenta_empresa` (`id_sub_rol_empresa`, el tipo de cliente empresa). El IVA no está aquí: es el parámetro `comercial.iva_porcentaje` de M17.
+
+| Tabla | PK | FKs | Descripción |
+| :--- | :--- | :--- | :--- |
+| **`evento_descuento`** *(v3.11)* | `id_evento` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Evento con calendario: fechas (DATE), `dias_semana` (ISO 1-7, vacío = todos) y horas `"HH:mm"` (las dos o ninguna). Hora de Colombia. |
+| **`evento_regla`** *(v3.11)* | `id_regla` | `id_evento` $\rightarrow$ `evento_descuento` (CASCADE) | Objetivo (marca, línea, categoría, subcategoría, producto o variante; NULL = todo el catálogo) y su porcentaje propio. Sin FK en `id_objetivo` (apunta a seis tablas). |
+| **`evento_exclusion`** *(v3.11)* | `id_exclusion` | `(id_regla, id_evento)` $\rightarrow$ `evento_regla` (CASCADE); `id_evento` $\rightarrow$ `evento_descuento` (CASCADE) | Excepciones de una regla o de todo el evento: marca, línea, categoría, subcategoría, producto, variante, color o familia de color. |
+| **`cupon`** *(v3.11)* | `id_cupon` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Código único en mayúsculas, porcentaje o importe fijo, mínimo de compra, límites de uso, audiencia y vigencia. |
+| **`cupon_uso`** *(v3.11)* | `id_cupon_uso` | `id_cupon` $\rightarrow$ `cupon` (RESTRICT); `id_usuario` $\rightarrow$ `usuario` (SET NULL) | Un uso por orden (`referencia` única, idempotente); `liberado_en` marca la orden cancelada. |
+
 ---
 
 ## 🛡️ 4. Tipos Enumerados (ENUMs)
@@ -730,6 +742,10 @@ enum_clase_color              -- ('entonable', 'colores_fijos', 'sin_color')
 -- Inventario referencial (M13)
 enum_motivo_ajuste_inventario -- ('conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva', 'venta', 'devolucion')
 enum_origen_ajuste_inventario -- ('manual', 'carga_masiva', 'samit', 'orden')
+enum_tipo_valor_descuento -- ('porcentaje', 'importe_fijo')
+enum_audiencia_descuento -- ('todos', 'particular', 'empresa')
+enum_tipo_objetivo_evento -- ('marca', 'linea', 'categoria', 'subcategoria', 'producto', 'variante')
+enum_tipo_exclusion_evento -- ('marca', 'linea', 'categoria', 'subcategoria', 'producto', 'variante', 'color', 'familia_color')
 
 -- Notificaciones y comunicaciones (M18)
 enum_tipo_comunicacion  -- ('registro_otp', 'recuperacion_password', 'activacion_empleado',
