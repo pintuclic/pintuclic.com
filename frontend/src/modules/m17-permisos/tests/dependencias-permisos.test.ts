@@ -57,6 +57,18 @@ describe('alternarPermiso — cascadas de la matriz de permisos (ADR-008)', () =
     expect([...resultado].sort()).toEqual(['atencion.atender_clientes', 'atencion.ver']);
   });
 
+  it('patrocinios.editar concede patrocinios.ver (M14 · HU-PAT-01)', () => {
+    const resultado = alternarPermiso(conjunto(), 'patrocinios.editar');
+
+    expect([...resultado].sort()).toEqual(['patrocinios.editar', 'patrocinios.ver']);
+  });
+
+  it('quitar patrocinios.ver revoca patrocinios.editar', () => {
+    const resultado = alternarPermiso(conjunto('patrocinios.ver', 'patrocinios.editar'), 'patrocinios.ver');
+
+    expect([...resultado]).toEqual([]);
+  });
+
   it('no muta el conjunto recibido', () => {
     const inicial = conjunto('atencion.ver');
 

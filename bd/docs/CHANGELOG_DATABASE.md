@@ -10,6 +10,14 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.15] - 2026-10-26
+### Esquema 4.15 (73 Tablas, sin cambios de tablas) - M14: permisos de patrocinios
+- **Alcance General:** solo datos semilla, pedidos por el contrato `contracts/m14-patrocinios.contract.ts` (C1). No cambia ninguna tabla ni columna.
+  - **Permisos nuevos (27-28):** `patrocinios.ver` y `patrocinios.editar`, con área funcional `patrocinios` y dependencia `editar → ver` en M17. Ambos quedan asignados al rol `administrador`. `catalogo.*` no da acceso a patrocinios, ni al revés.
+  - **Bases existentes en 4.15:** `npm run db:seed` (los `INSERT` son idempotentes: `ON CONFLICT DO NOTHING`).
+
+---
+
 ## [v3.14] - 2026-10-26
 ### Esquema 4.15 (73 Tablas) - M05: un carrito por dueño y modelos Prisma del carrito
 - **Alcance General:** pedido por el contrato `contracts/m05-carrito.contract.ts` (P1). Sin tablas nuevas.

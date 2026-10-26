@@ -9,6 +9,7 @@ import {
   Headset,
   Lock,
   Mail,
+  Megaphone,
   Save,
   Settings2,
   ShieldCheck,
@@ -76,6 +77,11 @@ const AREAS_METADATA: Record<string, AreaInfo> = {
     titulo: 'Atención al Cliente',
     descripcion: 'Preguntas frecuentes, solicitudes de contacto, horario y canal de WhatsApp',
     icon: <Headset className="w-4 h-4 text-corporate" />,
+  },
+  patrocinios: {
+    titulo: 'Patrocinios y Publicidad',
+    descripcion: 'Campañas de productos patrocinados, anuncios en los espacios del sitio y su medición',
+    icon: <Megaphone className="w-4 h-4 text-highlight" />,
   },
 };
 
