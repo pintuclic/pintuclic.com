@@ -1327,7 +1327,7 @@ CREATE TABLE IF NOT EXISTS direccion_cliente (
         REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-COMMENT ON TABLE direccion_cliente IS 'Libreta de direcciones de entrega guardadas por cada cliente (HU-CUE-07)';
+COMMENT ON TABLE direccion_cliente IS 'Dirección de entrega guardada por el cliente: una sola por cuenta (HU-CUE-07)';
 COMMENT ON COLUMN direccion_cliente.id_direccion IS 'UUID único de la dirección; referenciado en órdenes de despacho';
 COMMENT ON COLUMN direccion_cliente.es_predeterminada IS 'Bandera de dirección principal seleccionada para compras rápidas';
 COMMENT ON COLUMN direccion_cliente.latitud IS 'Coordenada geográfica de latitud para geolocalización precisa';
@@ -1932,6 +1932,17 @@ CREATE INDEX IF NOT EXISTS idx_direccion_predeterminada ON direccion_cliente(id_
 -- C-4: Dirección predeterminada única por usuario y prevención de duplicados (RN-CUE-21)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_predeterminada_unica ON direccion_cliente (id_usuario) WHERE es_predeterminada;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_no_duplicada ON direccion_cliente (id_usuario, lower(direccion), lower(barrio), lower(coalesce(apartamento_casa, '')));
+-- M04 (v4.13): una sola dirección por cliente (HU-CUE-07). Antes de crear el índice se retiran las
+-- direcciones sobrantes de las cuentas que ya tenían varias, conservando la predeterminada
+-- (o, si ninguna lo es, la más reciente).
+DELETE FROM direccion_cliente d
+USING (
+    SELECT id_direccion,
+           row_number() OVER (PARTITION BY id_usuario ORDER BY es_predeterminada DESC, fecha_creacion DESC, id_direccion) AS posicion
+    FROM direccion_cliente
+) r
+WHERE d.id_direccion = r.id_direccion AND r.posicion > 1;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_una_por_usuario ON direccion_cliente (id_usuario);
 
 CREATE INDEX IF NOT EXISTS idx_solicitud_empresa_nit ON solicitud_empresa(nit);
 CREATE INDEX IF NOT EXISTS idx_solicitud_empresa_usuario ON solicitud_empresa(id_usuario);
@@ -1985,5 +1996,5 @@ CREATE INDEX IF NOT EXISTS idx_mensaje_solicitud_fecha ON mensaje_solicitud_cont
 CREATE INDEX IF NOT EXISTS idx_mensaje_solicitud_autor ON mensaje_solicitud_contacto(id_autor);
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (68 TABLAS - v4.12)
+-- FIN DEL SCRIPT DDL (68 TABLAS - v4.13)
 -- ==============================================================================

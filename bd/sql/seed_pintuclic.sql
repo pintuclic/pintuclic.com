@@ -473,7 +473,6 @@ ON CONFLICT (id_solicitud_supresion) DO NOTHING;
 -- 9.1 Direcciones de Cliente (HU-CUE-07)
 INSERT INTO direccion_cliente (id_direccion, id_usuario, direccion, barrio, apartamento_casa, nombre_apellido, telefono, es_predeterminada, latitud, longitud) VALUES
     ('d0000000-0000-0000-0000-000000000001', 2, 'Carrera 7 # 45-23', 'Chapinero', 'Apto 402', 'Cliente Activo', '3001234567', true, 4.6300000, -74.0650000),
-    ('d0000000-0000-0000-0000-000000000002', 2, 'Calle 100 # 15-20', 'Chicó', 'Oficina 501', 'Cliente Activo', '3001234567', false, 4.6850000, -74.0500000),
     ('d0000000-0000-0000-0000-000000000003', 4, 'Zona Industrial Acopi Cl 15 # 22-10', 'Acopi', 'Bodega 3', 'Pinturas del Valle S.A.S.', '3157778899', true, 3.5100000, -76.5100000)
 ON CONFLICT (id_direccion) DO NOTHING;
 

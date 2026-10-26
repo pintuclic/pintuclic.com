@@ -10,6 +10,15 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.11] - 2026-10-25
+### Esquema 4.13 (68 Tablas) - M04: una sola dirección por cliente
+- **Alcance General:** El cliente guarda como máximo una dirección de entrega (HU-CUE-07). No cambia ninguna tabla ni columna.
+  - **`uq_direccion_una_por_usuario`**: índice único sobre `direccion_cliente (id_usuario)` que impide a nivel de BD una segunda dirección por cuenta.
+  - **Migración de datos:** antes de crear el índice, el DDL elimina las direcciones sobrantes de las cuentas que ya tenían varias y conserva la predeterminada (o la más reciente si ninguna lo era).
+  - **Seed:** se retira la segunda dirección del cliente de pruebas (`d0000000-0000-0000-0000-000000000002`), que ahora violaría el índice.
+
+---
+
 ## [v3.10] - 2026-10-25
 ### Esquema 4.12 (68 Tablas) - M15: hilo de conversación, estados y calificación de solicitudes
 - **Alcance General:** Una tabla nueva, un ENUM nuevo y evolución de `solicitud_contacto` pedidos por el contrato de M15 (`contracts/m15-atencion.contract.ts`, R12 y R13).

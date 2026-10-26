@@ -462,7 +462,7 @@ model DocumentoSoporte {
   @@map("documento_soporte")
 }
 
-/// Libreta de direcciones de entrega de los clientes (HU-CUE-07, RFC-M04-001 C-4)
+/// Dirección de entrega del cliente, una sola por cuenta (HU-CUE-07, RFC-M04-001 C-4)
 model DireccionCliente {
   idDireccion        String   @id @default(uuid()) @map("id_direccion") @db.Uuid
   idUsuario          Int      @map("id_usuario")
@@ -479,6 +479,7 @@ model DireccionCliente {
 
   usuario            Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
 
+  @@unique([idUsuario], map: "uq_direccion_una_por_usuario")
   @@index([idUsuario], map: "idx_direccion_usuario")
   @@index([idUsuario, esPredeterminada], map: "idx_direccion_predeterminada")
   @@map("direccion_cliente")

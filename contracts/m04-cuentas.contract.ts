@@ -363,7 +363,12 @@ export const solicitarAscensoEmpresaRequestSchema = z.object({
 export type SolicitarAscensoEmpresaRequest = z.infer<typeof solicitarAscensoEmpresaRequestSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
- * 9. SCHEMAS: HU-CUE-07 LIBRETA DE DIRECCIONES DE ENTREGA
+ * 9. SCHEMAS: HU-CUE-07 DIRECCIÓN DE ENTREGA DEL CLIENTE
+ *
+ * Regla: cada cuenta guarda como máximo UNA dirección (RF-CUE-07-04). Un segundo
+ * POST responde 400 LIMITE_DIRECCIONES_ALCANZADO y la BD lo impide con el índice
+ * único uq_direccion_una_por_usuario. Como es la única, siempre queda marcada como
+ * predeterminada. Para cambiarla el cliente la edita o la elimina y crea otra.
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export const direccionClienteItemSchema = z.object({
