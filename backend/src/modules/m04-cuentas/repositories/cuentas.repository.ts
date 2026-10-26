@@ -1,4 +1,13 @@
-import type { Prisma, Usuario, CuentaEmpresa, UsuarioIdentidadExterna, EstadoUsuario, TipoUsuario } from '@prisma/client';
+import type {
+  Prisma,
+  Usuario,
+  CuentaEmpresa,
+  Descuento,
+  SubRolEmpresa,
+  UsuarioIdentidadExterna,
+  EstadoUsuario,
+  TipoUsuario,
+} from '@prisma/client';
 import { prisma } from '../../../core/db/client';
 
 export type UsuarioConRol = Usuario & { usuarioRol?: { idRol: number } | null };
@@ -9,10 +18,22 @@ export function esUsuarioAdministrativo(usuario: UsuarioConRol): boolean {
   return idRolEfectivo !== null && idRolEfectivo !== 2 && idRolEfectivo !== 3;
 }
 
+/** Cuenta empresa con su tipo de cliente y la política de descuento de ese tipo (M06 · D8). */
+export type CuentaEmpresaConTipo = CuentaEmpresa & {
+  subRolEmpresa?: (SubRolEmpresa & { descuento: Descuento | null }) | null;
+};
+
+export interface FiltroCuentasEmpresa {
+  busqueda?: string;
+  sinTipo?: boolean;
+  page: number;
+  limit: number;
+}
+
 export interface CuentasRepository {
   buscarPorCorreo(correo: string): Promise<UsuarioConRol | null>;
   buscarPorId(idUsuario: number): Promise<UsuarioConRol | null>;
-  buscarConEmpresaPorId(idUsuario: number): Promise<(UsuarioConRol & { cuentaEmpresa: CuentaEmpresa | null }) | null>;
+  buscarConEmpresaPorId(idUsuario: number): Promise<(UsuarioConRol & { cuentaEmpresa: CuentaEmpresaConTipo | null }) | null>;
   crearUsuarioCliente(datos: {
     nombre: string;
     correo: string;
@@ -35,7 +56,14 @@ export interface CuentasRepository {
   }): Promise<UsuarioIdentidadExterna>;
   buscarCuentaEmpresaPorNit(nit: string): Promise<CuentaEmpresa | null>;
   buscarCuentaEmpresaPorIdUsuario(idUsuario: number): Promise<CuentaEmpresa | null>;
+  /** Cuentas empresa aprobadas, con su tipo de cliente (M06 · D8). */
+  listarCuentasEmpresa(filtro: FiltroCuentasEmpresa): Promise<{ items: CuentaEmpresaConTipo[]; total: number }>;
+  buscarCuentaEmpresaConTipo(idUsuario: number): Promise<CuentaEmpresaConTipo | null>;
+  /** false si la cuenta no existe. */
+  asignarTipoCuentaEmpresa(idUsuario: number, idSubRolEmpresa: number): Promise<boolean>;
 }
+
+const INCLUIR_TIPO = { subRolEmpresa: { include: { descuento: true } } } as const;
 
 export class PrismaCuentasRepository implements CuentasRepository {
   async buscarPorCorreo(correo: string): Promise<UsuarioConRol | null> {
@@ -62,11 +90,11 @@ export class PrismaCuentasRepository implements CuentasRepository {
     });
   }
 
-  async buscarConEmpresaPorId(idUsuario: number): Promise<(UsuarioConRol & { cuentaEmpresa: CuentaEmpresa | null }) | null> {
+  async buscarConEmpresaPorId(idUsuario: number): Promise<(UsuarioConRol & { cuentaEmpresa: CuentaEmpresaConTipo | null }) | null> {
     return prisma.usuario.findUnique({
       where: { idUsuario },
       include: {
-        cuentaEmpresa: true,
+        cuentaEmpresa: { include: INCLUIR_TIPO },
         usuarioRol: { select: { idRol: true } },
       },
     });
@@ -178,4 +206,42 @@ export class PrismaCuentasRepository implements CuentasRepository {
     });
   }
 
+  async listarCuentasEmpresa(filtro: FiltroCuentasEmpresa): Promise<{ items: CuentaEmpresaConTipo[]; total: number }> {
+    const busqueda = filtro.busqueda?.trim();
+    const where: Prisma.CuentaEmpresaWhereInput = {
+      ...(filtro.sinTipo === true ? { idSubRolEmpresa: null } : {}),
+      ...(busqueda === undefined || busqueda === ''
+        ? {}
+        : {
+            OR: [
+              { nombreEmpresa: { contains: busqueda, mode: 'insensitive' } },
+              { nombreRepresentante: { contains: busqueda, mode: 'insensitive' } },
+              { nit: { contains: busqueda } },
+            ],
+          }),
+    };
+    const [total, items] = await Promise.all([
+      prisma.cuentaEmpresa.count({ where }),
+      prisma.cuentaEmpresa.findMany({
+        where,
+        include: INCLUIR_TIPO,
+        orderBy: [{ nombreEmpresa: 'asc' }, { idUsuario: 'asc' }],
+        skip: (filtro.page - 1) * filtro.limit,
+        take: filtro.limit,
+      }),
+    ]);
+    return { items, total };
+  }
+
+  async buscarCuentaEmpresaConTipo(idUsuario: number): Promise<CuentaEmpresaConTipo | null> {
+    return prisma.cuentaEmpresa.findUnique({ where: { idUsuario }, include: INCLUIR_TIPO });
+  }
+
+  async asignarTipoCuentaEmpresa(idUsuario: number, idSubRolEmpresa: number): Promise<boolean> {
+    const { count } = await prisma.cuentaEmpresa.updateMany({
+      where: { idUsuario },
+      data: { idSubRolEmpresa, fechaActualizacion: new Date() },
+    });
+    return count > 0;
+  }
 }

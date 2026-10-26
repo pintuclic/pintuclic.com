@@ -23,6 +23,12 @@ const ETIQUETA_ESTADO: Record<EstadoSolicitudEmpresa, string> = {
   rechazada: 'rechazada',
 };
 
+const porcentajeEmpresa = (n: number): string => `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(n)} %`;
+
+function pesos(n: number): string {
+  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
+}
+
 function fecha(iso: string): string {
   return new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
 }
@@ -181,6 +187,27 @@ function CuentaEmpresa({
           </dl>
         ) : (
           <Alert variant="info">Los datos de tu empresa aún no están disponibles.</Alert>
+        )}
+      </SeccionPerfil>
+
+      <SeccionPerfil
+        titulo="Tu descuento de empresa"
+        descripcion="Se aplica a todo tu carrito, después de las promociones vigentes."
+      >
+        {empresa?.tipoCliente ? (
+          <Alert variant="success">
+            Eres cliente <strong>{empresa.tipoCliente.nombre}</strong>: {porcentajeEmpresa(empresa.tipoCliente.porcentaje)} de
+            descuento
+            {empresa.tipoCliente.montoMinimoCompra > 0
+              ? ` en compras desde ${pesos(empresa.tipoCliente.montoMinimoCompra)} (IVA incluido)`
+              : ' en todas tus compras'}
+            .
+          </Alert>
+        ) : (
+          <Alert variant="info">
+            Tu cuenta todavía no tiene un tipo de cliente asignado, así que no recibe descuento de empresa. Escríbenos y lo
+            revisamos.
+          </Alert>
         )}
       </SeccionPerfil>
 

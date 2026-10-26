@@ -48,6 +48,9 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
       vincularIdentidadExterna: vi.fn(),
       buscarCuentaEmpresaPorNit: vi.fn(),
       buscarCuentaEmpresaPorIdUsuario: vi.fn(),
+      listarCuentasEmpresa: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+      buscarCuentaEmpresaConTipo: vi.fn().mockResolvedValue(null),
+      asignarTipoCuentaEmpresa: vi.fn().mockResolvedValue(true),
     };
 
     codigosRepo = {
@@ -132,6 +135,43 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
       expect(res.empresa?.nit).toBe('900123456-7');
       expect(res.empresa?.fechaAprobacion).toBe(fechaBase.toISOString());
       expect(JSON.stringify(res)).not.toContain('$2b$');
+    });
+
+    describe('tipo de cliente empresa (M06 · D8)', () => {
+      const conTipo = (tipo: Record<string, unknown> | null) => {
+        const u = usuarioEmpresa();
+        return { ...u, cuentaEmpresa: { ...u.cuentaEmpresa, subRolEmpresa: tipo } } as unknown as ReturnType<typeof usuarioEmpresa>;
+      };
+      const proveedor = (extra: Record<string, unknown> = {}) => ({
+        idSubRolEmpresa: 1,
+        nombre: 'Proveedor',
+        estado: 'activo',
+        descuento: { estado: 'activo', porcentajeDescuento: '15.00', montoMinimoCompra: '300000.00' },
+        ...extra,
+      });
+
+      it('muestra el nombre y las condiciones de su descuento, y el perfil sigue cumpliendo el contrato', async () => {
+        vi.mocked(cuentasRepo.buscarConEmpresaPorId).mockResolvedValueOnce(conTipo(proveedor()));
+
+        const res = await service.obtenerPerfil(15);
+
+        expect(res.empresa?.tipoCliente).toEqual({ nombre: 'Proveedor', porcentaje: 15, montoMinimoCompra: 300000 });
+        expect(perfilUsuarioResponseSchema.strict().safeParse(res).success).toBe(true);
+      });
+
+      it.each([
+        ['sin tipo asignado', null],
+        ['tipo desactivado', proveedor({ estado: 'inactivo' })],
+        ['política de descuento desactivada', proveedor({ descuento: { estado: 'inactivo', porcentajeDescuento: '15', montoMinimoCompra: '0' } })],
+        ['tipo sin política', proveedor({ descuento: null })],
+      ])('%s: informa null (no tiene descuento)', async (_n, tipo) => {
+        vi.mocked(cuentasRepo.buscarConEmpresaPorId).mockResolvedValueOnce(conTipo(tipo));
+
+        const res = await service.obtenerPerfil(15);
+
+        expect(res.empresa?.tipoCliente).toBeNull();
+        expect(perfilUsuarioResponseSchema.strict().safeParse(res).success).toBe(true);
+      });
     });
 
     it('actualiza datos personales y devuelve el perfil completo del contrato', async () => {

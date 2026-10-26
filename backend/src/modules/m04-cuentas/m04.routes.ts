@@ -26,6 +26,7 @@ import type { DateProviderPort } from './interfaces/date-provider.port';
 import type { NotificacionesPort } from '../m18-notificaciones/interfaces/notificaciones.port';
 import type { GoogleAuthPort } from './interfaces/google-auth.port';
 import type { ParametrosCuentasPort } from './interfaces/parametros-cuentas.port';
+import type { TiposClientePort } from './interfaces/tipos-cliente.port';
 
 /**
  * RN-CUE-18 / HU-ADM-03: decidir sobre solicitudes de empresa exige este permiso
@@ -34,12 +35,20 @@ import type { ParametrosCuentasPort } from './interfaces/parametros-cuentas.port
  */
 export const PERMISO_VALIDAR_EMPRESAS = 'empresas.validar';
 
+/** Sin M06 conectado no hay tipos que ofrecer: la lista sale vacía y aprobar una cuenta empresa se rechaza. */
+const TIPOS_CLIENTE_NO_DISPONIBLES: TiposClientePort = {
+  listarActivos: () => Promise.resolve([]),
+  existeActivo: () => Promise.resolve(false),
+};
+
 export interface ModuloM04Config {
   dateProvider?: DateProviderPort;
   notificaciones?: NotificacionesPort;
   googleAuth?: GoogleAuthPort;
   /** HU-ADM-07: parámetros de autenticación de M17, inyectados desde app.routes.ts. */
   parametros?: ParametrosCuentasPort;
+  /** M06 · D8: tipos de cliente empresa (los administra M06). Sin él no se puede aprobar una cuenta empresa. */
+  tiposCliente?: TiposClientePort;
 }
 
 export function construirModuloM04(
@@ -105,6 +114,7 @@ export function construirModuloM04(
     solicitudesRepo,
     documentosRepo,
     notificaciones,
+    config?.tiposCliente ?? TIPOS_CLIENTE_NO_DISPONIBLES,
   );
 
   // Controladores
@@ -165,6 +175,10 @@ export function construirModuloM04(
   adminEmpresasRouter.get('/solicitudes', empresasController.listarSolicitudes as RequestHandler);
   adminEmpresasRouter.get('/solicitudes/:idSolicitud', empresasController.obtenerDetalleSolicitud as RequestHandler);
   adminEmpresasRouter.post('/solicitudes/:idSolicitud/dictamen', empresasController.dictaminarSolicitud as RequestHandler);
+  // M06 · D8: tipo de cliente empresa (fija el descuento de la cuenta).
+  adminEmpresasRouter.get('/tipos', empresasController.listarTiposCliente as RequestHandler);
+  adminEmpresasRouter.get('/cuentas', empresasController.listarCuentas as RequestHandler);
+  adminEmpresasRouter.patch('/cuentas/:idUsuario/tipo', empresasController.cambiarTipoCuenta as RequestHandler);
   adminEmpresasRouter.get('/renovaciones', empresasController.listarRenovaciones as RequestHandler);
   adminEmpresasRouter.get('/renovaciones/:idSolicitud', empresasController.obtenerDetalleRenovacion as RequestHandler);
   adminEmpresasRouter.post('/renovaciones/:idSolicitud/dictamen', empresasController.dictaminarRenovacionNit as RequestHandler);

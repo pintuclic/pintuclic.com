@@ -73,7 +73,7 @@ const exigirPermiso = vi.fn();
 
 interface Ruta {
   nombre: string;
-  metodo: 'GET' | 'POST';
+  metodo: 'GET' | 'POST' | 'PATCH';
   ruta: string;
   cuerpo?: Record<string, unknown>;
 }
@@ -85,7 +85,7 @@ const RUTAS_ADMINISTRATIVAS: Ruta[] = [
     nombre: 'dictamen de solicitud',
     metodo: 'POST',
     ruta: `/admin/empresas/solicitudes/${ID_SOLICITUD}/dictamen`,
-    cuerpo: { decision: 'aprobar' },
+    cuerpo: { decision: 'aprobar', idSubRolEmpresa: 1 },
   },
   { nombre: 'listar renovaciones de NIT', metodo: 'GET', ruta: '/admin/empresas/renovaciones' },
   { nombre: 'detalle de renovación de NIT', metodo: 'GET', ruta: `/admin/empresas/renovaciones/${ID_RENOVACION}` },
@@ -96,6 +96,15 @@ const RUTAS_ADMINISTRATIVAS: Ruta[] = [
     cuerpo: { decision: 'aprobar' },
   },
   { nombre: 'descarga del RUT', metodo: 'GET', ruta: `/admin/empresas/documentos/${ID_DOCUMENTO}` },
+  // M06 · D8: tipo de cliente empresa. Van al final: otros tests usan los índices de arriba.
+  { nombre: 'tipos de cliente empresa', metodo: 'GET', ruta: '/admin/empresas/tipos' },
+  { nombre: 'listar cuentas empresa', metodo: 'GET', ruta: '/admin/empresas/cuentas' },
+  {
+    nombre: 'cambiar el tipo de una cuenta',
+    metodo: 'PATCH',
+    ruta: '/admin/empresas/cuentas/7/tipo',
+    cuerpo: { idSubRolEmpresa: 1 },
+  },
 ];
 
 const RUTA_LISTAR = RUTAS_ADMINISTRATIVAS[0] as Ruta;
@@ -148,7 +157,13 @@ beforeAll(async () => {
 
   const sesionService = { validarYRenovar } as unknown as SesionService;
   const autorizacion = { exigirPermiso } as unknown as AutorizacionService;
-  const m04 = construirModuloM04(sesionService, autorizacion);
+  const m04 = construirModuloM04(sesionService, autorizacion, {
+    tiposCliente: {
+      listarActivos: () =>
+        Promise.resolve([{ idSubRolEmpresa: 1, nombre: 'Proveedor', porcentaje: 15, montoMinimoCompra: 0 }]),
+      existeActivo: (id) => Promise.resolve(id === 1),
+    },
+  });
 
   const app = express();
   app.use(express.json());
@@ -358,6 +373,57 @@ describe('HU-CUE-09 · Dictamen', () => {
     expect(repoSolicitudes.decidirSolicitud).not.toHaveBeenCalled();
   });
 
+  it('aprobar sin tipo de cliente responde 400 y no toca la solicitud (M06 · D8)', async () => {
+    const { estado, cuerpo } = await pedir({ ...rutaDictamen, cuerpo: { decision: 'aprobar' } });
+
+    expect(estado).toBe(400);
+    expect(cuerpo).toMatchObject({ error: { code: 'DATOS_INVALIDOS', message: expect.stringContaining('tipo de cliente') } });
+    expect(datosTocados()).toBe(false);
+  });
+
+  it('aprobar con un tipo que no existe responde 400 TIPO_CLIENTE_INVALIDO sin decidir', async () => {
+    repoSolicitudes.buscarPorId.mockResolvedValue(solicitud);
+
+    const { estado, cuerpo } = await pedir({ ...rutaDictamen, cuerpo: { decision: 'aprobar', idSubRolEmpresa: 99 } });
+
+    expect(estado).toBe(400);
+    expect(cuerpo).toMatchObject({ error: { code: 'TIPO_CLIENTE_INVALIDO' } });
+    expect(repoSolicitudes.decidirSolicitud).not.toHaveBeenCalled();
+  });
+
+  it('aprobar con tipo lo entrega al repositorio para que la cuenta nazca con él', async () => {
+    repoSolicitudes.buscarPorId.mockResolvedValue(solicitud);
+    repoSolicitudes.decidirSolicitud.mockResolvedValue({ resultado: 'decidida', solicitud: { ...solicitud, estado: 'aprobada' } });
+
+    const { estado } = await pedir({ ...rutaDictamen, cuerpo: { decision: 'aprobar', idSubRolEmpresa: 1 } });
+
+    expect(estado).toBe(200);
+    expect(repoSolicitudes.decidirSolicitud).toHaveBeenCalledWith(
+      ID_SOLICITUD,
+      expect.objectContaining({ estado: 'aprobada', idSubRolEmpresa: 1 }),
+    );
+  });
+
+  it('quien tiene empresas.validar recibe los tipos activos para el selector', async () => {
+    const { estado, cuerpo } = await pedir({ nombre: 'tipos', metodo: 'GET', ruta: '/admin/empresas/tipos' });
+
+    expect(estado).toBe(200);
+    expect(cuerpo).toMatchObject({
+      success: true,
+      data: [{ idSubRolEmpresa: 1, nombre: 'Proveedor', porcentaje: 15, montoMinimoCompra: 0 }],
+    });
+  });
+
+  it.each([
+    ['id de usuario inválido', '/admin/empresas/cuentas/abc/tipo', { idSubRolEmpresa: 1 }, 404],
+    ['cuerpo sin tipo', '/admin/empresas/cuentas/7/tipo', {}, 400],
+    ['tipo negativo', '/admin/empresas/cuentas/7/tipo', { idSubRolEmpresa: -3 }, 400],
+  ] as const)('cambiar tipo: %s', async (nombre, ruta, cuerpoPeticion, esperado) => {
+    const { estado } = await pedir({ nombre, metodo: 'PATCH', ruta, cuerpo: { ...cuerpoPeticion } });
+
+    expect(estado).toBe(esperado);
+  });
+
   it('el contrato acepta rechazar sin motivo; el servicio lo exige solo en registros (RN-CUE-17)', async () => {
     // Registro: sin motivo -> 400 MOTIVO_RECHAZO_REQUERIDO (no llega a decidir).
     repoSolicitudes.buscarPorId.mockResolvedValue({ ...solicitud, tipoSolicitud: 'registro' });
@@ -407,7 +473,7 @@ describe('HU-CUE-09 · Dictamen', () => {
     repoSolicitudes.buscarPorId.mockResolvedValue(solicitud);
     repoSolicitudes.decidirSolicitud.mockResolvedValue({ resultado: 'nit_ocupado' });
 
-    const { estado, cuerpo } = await pedir({ ...rutaDictamen, cuerpo: { decision: 'aprobar' } });
+    const { estado, cuerpo } = await pedir({ ...rutaDictamen, cuerpo: { decision: 'aprobar', idSubRolEmpresa: 1 } });
 
     expect(estado).toBe(409);
     expect(cuerpo).toMatchObject({ error: { code: 'NIT_YA_REGISTRADO' } });

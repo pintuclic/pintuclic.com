@@ -879,6 +879,13 @@ NIT, que se realiza fuera del sistema.*
 
 ## 
 
+> **Tipo de cliente empresa (cambio posterior, decisión D8 de M06).** Al **aprobar** un registro de empresa o un
+> ascenso, quien dictamina elige el *tipo de cliente empresa* (Proveedor, Constructora…), que fija el descuento de la
+> cuenta en sus compras (lo calcula M06). Es obligatorio al aprobar y no se pide al rechazar ni en una renovación de
+> NIT. El tipo se puede cambiar después desde «Cuentas y descuentos» (`/admin/empresas`), y la empresa ve el suyo en
+> su perfil. Los tipos y sus porcentajes se administran en M06 (`/admin/promociones`). Una cuenta sin tipo, o con el
+> tipo desactivado, no recibe descuento. Contrato: sección 11b de `contracts/m04-cuentas.contract.ts`.
+
 ### HU-CUE-10 --- Renovación de NIT del cliente empresa
 
 **Como** cliente tipo empresa,

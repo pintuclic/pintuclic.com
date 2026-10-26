@@ -320,6 +320,8 @@ export type PerfilUsuarioView = z.infer<typeof perfilUsuarioViewSchema>;
 export const dictamenSolicitudEmpresaFormSchema = z.object({
   decision: z.enum(['aprobar', 'rechazar']),
   motivoRechazo: z.string().trim().max(500).optional(),
+  /** M06 · D8: al aprobar una solicitud de cuenta (no una renovación de NIT) se elige el tipo de cliente. */
+  idSubRolEmpresa: z.number().int().positive().optional(),
 });
 export type DictamenSolicitudEmpresaFormData = z.infer<typeof dictamenSolicitudEmpresaFormSchema>;
 

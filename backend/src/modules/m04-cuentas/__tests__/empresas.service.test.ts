@@ -10,6 +10,7 @@ import type {
 import type { CuentasRepository } from '../repositories/cuentas.repository';
 import type { SolicitudesEmpresaRepository } from '../repositories/solicitudes-empresa.repository';
 import type { AlmacenDocumentosPort } from '../interfaces/almacen-documentos.port';
+import type { TiposClientePort } from '../interfaces/tipos-cliente.port';
 import type { EntidadDocumentoSoporte } from '../interfaces/cuentas.interfaces';
 import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import { EmpresasError, EmpresasService } from '../services/empresas.service';
@@ -19,6 +20,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
   let solicitudesRepo: SolicitudesEmpresaRepository;
   let almacenDocumentos: AlmacenDocumentosPort;
   let notificaciones: NotificacionesPort;
+  let tiposCliente: TiposClientePort;
   let service: EmpresasService;
 
   const fechaBase = new Date('2026-10-21T12:00:00Z');
@@ -85,6 +87,9 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       vincularIdentidadExterna: vi.fn(),
       buscarCuentaEmpresaPorNit: vi.fn().mockResolvedValue(null),
       buscarCuentaEmpresaPorIdUsuario: vi.fn().mockResolvedValue(null),
+      listarCuentasEmpresa: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+      buscarCuentaEmpresaConTipo: vi.fn().mockResolvedValue(null),
+      asignarTipoCuentaEmpresa: vi.fn().mockResolvedValue(true),
     };
 
     solicitudesRepo = {
@@ -165,11 +170,20 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       notificarDictamenEmpresa: vi.fn().mockResolvedValue(undefined),
     };
 
+    tiposCliente = {
+      listarActivos: vi.fn().mockResolvedValue([
+        { idSubRolEmpresa: 1, nombre: 'Proveedor', porcentaje: 15, montoMinimoCompra: 0 },
+        { idSubRolEmpresa: 2, nombre: 'Constructora', porcentaje: 10, montoMinimoCompra: 300000 },
+      ]),
+      existeActivo: vi.fn().mockImplementation((id: number) => Promise.resolve(id === 1 || id === 2)),
+    };
+
     service = new EmpresasService(
       cuentasRepo,
       solicitudesRepo,
       almacenDocumentos,
       notificaciones,
+      tiposCliente,
     );
   });
 
@@ -281,12 +295,13 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
 
       const res = await service.dictaminarSolicitud('solicitud-uuid-1', 1, {
         decision: 'aprobar',
+        idSubRolEmpresa: 1,
       });
 
       expect(res.mensaje).toContain('aprobada y cuenta activada');
       expect(solicitudesRepo.decidirSolicitud).toHaveBeenCalledWith(
         'solicitud-uuid-1',
-        expect.objectContaining({ estado: 'aprobada', idAdminRevisor: 1 })
+        expect.objectContaining({ estado: 'aprobada', idAdminRevisor: 1, idSubRolEmpresa: 1 })
       );
       // Activación, tipo y cuenta_empresa viven en la transacción del repositorio:
       // el servicio ya no las orquesta con escrituras sueltas.
@@ -294,6 +309,54 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       expect(notificaciones.notificarDictamenEmpresa).toHaveBeenCalledWith(
         'contacto@valle.com',
         'aprobada',
+      );
+    });
+
+    it('aprobar EXIGE el tipo de cliente empresa y no decide nada sin él (M06 · D8)', async () => {
+      vi.mocked(solicitudesRepo.buscarPorId).mockResolvedValueOnce(solicitudPendiente());
+
+      await expect(service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'aprobar' })).rejects.toMatchObject({
+        codigo: 'DATOS_INVALIDOS',
+        statusCode: 400,
+      });
+      expect(solicitudesRepo.decidirSolicitud).not.toHaveBeenCalled();
+      expect(notificaciones.notificarDictamenEmpresa).not.toHaveBeenCalled();
+    });
+
+    it('un tipo inexistente o desactivado responde 400 TIPO_CLIENTE_INVALIDO y la solicitud sigue pendiente', async () => {
+      vi.mocked(solicitudesRepo.buscarPorId).mockResolvedValueOnce(solicitudPendiente());
+
+      await expect(
+        service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'aprobar', idSubRolEmpresa: 99 })
+      ).rejects.toMatchObject({ codigo: 'TIPO_CLIENTE_INVALIDO', statusCode: 400 });
+      expect(tiposCliente.existeActivo).toHaveBeenCalledWith(99);
+      expect(solicitudesRepo.decidirSolicitud).not.toHaveBeenCalled();
+    });
+
+    it('un ascenso de cuenta personal también se aprueba con tipo', async () => {
+      vi.mocked(solicitudesRepo.buscarPorId).mockResolvedValueOnce(solicitudPendiente({ tipoSolicitud: 'ascenso_particular' }));
+
+      await service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'aprobar', idSubRolEmpresa: 2 });
+
+      expect(solicitudesRepo.decidirSolicitud).toHaveBeenCalledWith(
+        'solicitud-uuid-1',
+        expect.objectContaining({ estado: 'aprobada', idSubRolEmpresa: 2 })
+      );
+    });
+
+    it('rechazar no pide ni guarda tipo', async () => {
+      vi.mocked(solicitudesRepo.buscarPorId).mockResolvedValueOnce(solicitudPendiente());
+
+      await service.dictaminarSolicitud('solicitud-uuid-1', 1, {
+        decision: 'rechazar',
+        motivoRechazo: 'RUT ilegible o desactualizado por la DIAN.',
+        idSubRolEmpresa: 1,
+      });
+
+      expect(tiposCliente.existeActivo).not.toHaveBeenCalled();
+      expect(solicitudesRepo.decidirSolicitud).toHaveBeenCalledWith(
+        'solicitud-uuid-1',
+        expect.objectContaining({ estado: 'rechazada', idSubRolEmpresa: null })
       );
     });
 
@@ -383,7 +446,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       vi.mocked(solicitudesRepo.decidirSolicitud).mockResolvedValueOnce({ resultado: 'ya_decidida' });
 
       await expect(
-        service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'aprobar' })
+        service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'aprobar', idSubRolEmpresa: 1 })
       ).rejects.toMatchObject({ codigo: 'RECURSO_NO_ENCONTRADO', statusCode: 409 });
 
       expect(notificaciones.notificarDictamenEmpresa).not.toHaveBeenCalled();
@@ -394,7 +457,7 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       vi.mocked(solicitudesRepo.decidirSolicitud).mockResolvedValueOnce({ resultado: 'nit_ocupado' });
 
       await expect(
-        service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'aprobar' })
+        service.dictaminarSolicitud('solicitud-uuid-1', 1, { decision: 'aprobar', idSubRolEmpresa: 1 })
       ).rejects.toMatchObject({ codigo: 'NIT_YA_REGISTRADO', statusCode: 409 });
 
       expect(notificaciones.notificarDictamenEmpresa).not.toHaveBeenCalled();
@@ -402,8 +465,82 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
 
     it('una solicitud inexistente responde 404', async () => {
       await expect(
-        service.dictaminarSolicitud('no-existe', 1, { decision: 'aprobar' })
+        service.dictaminarSolicitud('no-existe', 1, { decision: 'aprobar', idSubRolEmpresa: 1 })
       ).rejects.toMatchObject({ codigo: 'RECURSO_NO_ENCONTRADO', statusCode: 404 });
+    });
+  });
+
+  describe('M06 · D8: tipo de cliente empresa de las cuentas', () => {
+    const cuenta = (extra: Record<string, unknown> = {}) =>
+      ({
+        idUsuario: 33,
+        nit: '901234567-1',
+        nombreEmpresa: 'Pinturas del Valle S.A.S.',
+        nombreRepresentante: 'Carlos Mario',
+        correoEmpresarial: 'contacto@valle.com',
+        telefono: '3151234567',
+        idSolicitudOrigen: null,
+        idSubRolEmpresa: 1,
+        fechaAprobacion: fechaBase,
+        fechaActualizacion: fechaBase,
+        subRolEmpresa: {
+          idSubRolEmpresa: 1,
+          nombre: 'Proveedor',
+          idDescuento: 1,
+          estado: 'activo',
+          descuento: { idDescuento: 1, tope: 0, porcentajeDescuento: 15, montoMinimoCompra: 0, estado: 'activo' },
+        },
+        ...extra,
+      }) as unknown as Awaited<ReturnType<CuentasRepository['buscarCuentaEmpresaConTipo']>>;
+
+    it('ofrece solo los tipos activos que entrega M06', async () => {
+      expect(await service.listarTiposCliente()).toEqual([
+        { idSubRolEmpresa: 1, nombre: 'Proveedor', porcentaje: 15, montoMinimoCompra: 0 },
+        { idSubRolEmpresa: 2, nombre: 'Constructora', porcentaje: 10, montoMinimoCompra: 300000 },
+      ]);
+    });
+
+    it('lista las cuentas con su tipo y deja null a la que no tiene', async () => {
+      vi.mocked(cuentasRepo.listarCuentasEmpresa).mockResolvedValueOnce({
+        items: [cuenta()!, cuenta({ idUsuario: 34, nit: '900111222-3', idSubRolEmpresa: null, subRolEmpresa: null })!],
+        total: 2,
+      });
+
+      const r = await service.listarCuentas({ page: 1, limit: 20, sinTipo: false });
+
+      expect(cuentasRepo.listarCuentasEmpresa).toHaveBeenCalledWith({ sinTipo: false, page: 1, limit: 20 });
+      expect(r.total).toBe(2);
+      expect(r.items[0]?.tipoCliente).toEqual({ idSubRolEmpresa: 1, nombre: 'Proveedor', porcentaje: 15, estado: 'activo' });
+      expect(r.items[1]?.tipoCliente).toBeNull();
+    });
+
+    it('cambia el tipo de una cuenta y devuelve la cuenta con el tipo nuevo', async () => {
+      vi.mocked(cuentasRepo.buscarCuentaEmpresaPorIdUsuario).mockResolvedValueOnce(cuenta()!);
+      vi.mocked(cuentasRepo.buscarCuentaEmpresaConTipo).mockResolvedValueOnce(
+        cuenta({
+          idSubRolEmpresa: 2,
+          subRolEmpresa: {
+            idSubRolEmpresa: 2,
+            nombre: 'Constructora',
+            idDescuento: 2,
+            estado: 'activo',
+            descuento: { idDescuento: 2, tope: 0, porcentajeDescuento: 10, montoMinimoCompra: 300000, estado: 'activo' },
+          },
+        })!
+      );
+
+      const r = await service.cambiarTipoCuenta(33, 2);
+
+      expect(cuentasRepo.asignarTipoCuentaEmpresa).toHaveBeenCalledWith(33, 2);
+      expect(r.tipoCliente).toMatchObject({ idSubRolEmpresa: 2, nombre: 'Constructora', porcentaje: 10 });
+    });
+
+    it('no cambia nada si la cuenta no existe (404) o el tipo no es válido (400)', async () => {
+      await expect(service.cambiarTipoCuenta(999, 1)).rejects.toMatchObject({ codigo: 'RECURSO_NO_ENCONTRADO', statusCode: 404 });
+
+      vi.mocked(cuentasRepo.buscarCuentaEmpresaPorIdUsuario).mockResolvedValueOnce(cuenta()!);
+      await expect(service.cambiarTipoCuenta(33, 99)).rejects.toMatchObject({ codigo: 'TIPO_CLIENTE_INVALIDO', statusCode: 400 });
+      expect(cuentasRepo.asignarTipoCuentaEmpresa).not.toHaveBeenCalled();
     });
   });
 
