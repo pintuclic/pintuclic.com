@@ -10,6 +10,23 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.11] - 2026-10-26
+### Esquema 4.13 (73 Tablas) - M06: eventos de descuento, cupones y tipo de cliente empresa
+- **Alcance General:** cinco tablas nuevas, cuatro ENUMs y dos columnas pedidas por el contrato de M06 (`contracts/m06-precios.contract.ts`, cambio C1). Cambio aditivo.
+  - **`evento_descuento`**: evento con calendario (R4): `fecha_inicio`/`fecha_fin` (DATE, hora de Colombia), `dias_semana` (`SMALLINT[]`, ISO 1 a 7, vacío = todos) y horas `"HH:mm"` como texto (igual que `horario_atencion`, con `ck_evento_formato_horas` y `ck_evento_horas_coherentes`: las dos horas o ninguna, fin mayor que inicio).
+  - **`evento_regla`**: una regla por objetivo (`tipo_objetivo` + `id_objetivo`; ambos NULL = todo el catálogo) con su propio `porcentaje` (mayor que 0 y hasta 100). El `id_objetivo` no lleva FK porque apunta a seis tablas (D10). `UNIQUE (id_regla, id_evento)` permite la FK compuesta de las exclusiones.
+  - **`evento_exclusion`**: excepciones de una regla (`id_regla`) o de todo el evento (`id_regla` NULL): marca, línea, categoría, subcategoría, producto, variante, **color** o **familia de color**. La FK compuesta `(id_regla, id_evento)` impide colgar una exclusión de la regla de otro evento. Dos índices únicos parciales evitan repetidas.
+  - **`cupon`** y **`cupon_uso`**: código en mayúsculas único (`ck_cupon_codigo`), porcentaje o importe fijo, mínimo de compra, límites de uso total y por persona, audiencia y vigencia. `cupon_uso.referencia` (la orden) es única: registrar dos veces lo mismo no gasta dos usos; `liberado_en` marca los usos de órdenes canceladas. Un cupón con usos no se puede borrar (`ON DELETE RESTRICT`).
+  - **`descuento.monto_minimo_compra`** (NUMERIC, no negativo, 0 = sin mínimo): total del carrito desde el que aplica el descuento de empresa.
+  - **`cuenta_empresa.id_sub_rol_empresa`** (FK opcional, `ON DELETE SET NULL`): tipo de cliente empresa de la cuenta. `rol.id_sub_rol_empresa` deja de usarse para el descuento. Las cuentas anteriores quedan sin tipo, o sea sin descuento, hasta que un administrador se lo asigne.
+  - **`sub_rol_empresa`**: índice único sobre `lower(btrim(nombre))` (los nombres de los tipos no se repiten).
+  - **ENUMs nuevos:** `enum_tipo_valor_descuento`, `enum_audiencia_descuento`, `enum_tipo_objetivo_evento` y `enum_tipo_exclusion_evento`.
+  - **Seed:** los dos tipos pasan a llamarse "Proveedor" (15 %) y "Constructora" (10 %), sin tope ni mínimo; la cuenta de prueba 4 queda como Proveedor; ejemplos **inactivos** "Miércoles de color" (Viniltex 15 %, Koraza 10 %, miércoles, sin la familia Blancos) y el cupón `BIENVENIDA10`. Ninguno cambia un precio hasta activarlo. En una base ya sembrada los dos tipos conservan el nombre y los topes anteriores: se editan desde el panel de M06 cuando exista.
+  - **Bases existentes en 4.12:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` y `npm run db:seed` (idempotentes).
+  - **Verificado en PostgreSQL 16:** esquema y seed aplicados sobre una base nueva y repetidos sin errores; 32 pruebas de insertar/actualizar/borrar confirman que los CHECK, las FK, los únicos y la cascada rechazan o aceptan lo que deben.
+
+---
+
 ## [v3.10] - 2026-10-25
 ### Esquema 4.12 (68 Tablas) - M15: hilo de conversación, estados y calificación de solicitudes
 - **Alcance General:** Una tabla nueva, un ENUM nuevo y evolución de `solicitud_contacto` pedidos por el contrato de M15 (`contracts/m15-atencion.contract.ts`, R12 y R13).
