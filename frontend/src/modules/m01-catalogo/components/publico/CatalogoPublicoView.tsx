@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SlidersHorizontal } from 'lucide-react';
-import { Alert, Button, Container, Input, ProductCard, Select, Skeleton } from '@/core/components';
+import { Alert, Button, Checkbox, Container, Input, ProductCard, Select, Skeleton } from '@/core/components';
+import { EventosEnCurso } from '@/modules/m06-precios/components/publico/EventosEnCurso';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { useCargar, useRetardo } from '../../hooks/useCargar';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
@@ -15,6 +16,7 @@ import {
   hayFiltros,
   type FiltrosVitrina,
 } from '../../services/filtros-publicos';
+import { precioVisible } from '../../services/ofertas-visuales';
 import { Paginador } from '../admin/comunes';
 
 const ORDENES: ReadonlyArray<{ value: FiltrosVitrina['ordenar']; label: string }> = [
@@ -23,12 +25,20 @@ const ORDENES: ReadonlyArray<{ value: FiltrosVitrina['ordenar']; label: string }
   { value: 'precio_desc', label: 'Precio: mayor a menor' },
 ];
 
+export interface CatalogoPublicoViewProps {
+  /** Página «Ofertas» (M06): solo productos con un evento en curso, con los eventos activos arriba. */
+  soloOfertas?: boolean;
+}
+
 /** HU-CAT-06: vitrina pública. Los filtros viven en la URL; todo se pide paginado y bajo demanda (U3). */
-export const CatalogoPublicoView: React.FC = () => {
+export const CatalogoPublicoView: React.FC<CatalogoPublicoViewProps> = ({ soloOfertas = false }) => {
   const router = useRouter();
   const ruta = usePathname();
   const parametros = useSearchParams();
-  const filtros = useMemo(() => filtrosDesdeUrl(new URLSearchParams(parametros.toString())), [parametros]);
+  const filtros = useMemo(
+    () => ({ ...filtrosDesdeUrl(new URLSearchParams(parametros.toString())), ...(soloOfertas ? { enOferta: true } : {}) }),
+    [parametros, soloOfertas],
+  );
   const [panelAbierto, setPanelAbierto] = useState(false);
 
   const [busqueda, setBusqueda] = useState(filtros.busqueda);
@@ -37,10 +47,13 @@ export const CatalogoPublicoView: React.FC = () => {
   const aplicar = useCallback(
     (cambios: Partial<FiltrosVitrina>) => {
       const siguiente: FiltrosVitrina = { ...filtros, pagina: 1, ...cambios };
-      const query = filtrosAUrl(siguiente).toString();
+      const url = filtrosAUrl(siguiente);
+      // En la página de ofertas el filtro lo da la ruta, no la URL.
+      if (soloOfertas) url.delete('enOferta');
+      const query = url.toString();
       router.replace(query === '' ? ruta : `${ruta}?${query}`, { scroll: false });
     },
-    [filtros, router, ruta],
+    [filtros, router, ruta, soloOfertas],
   );
 
   // La búsqueda se aplica 300 ms después de la última tecla.
@@ -56,6 +69,9 @@ export const CatalogoPublicoView: React.FC = () => {
   const cargarProductos = useCallback(() => catalogoPublicoApi.productos(consulta), [consulta]);
   const productos = useCargar(cargarProductos, 'No se pudieron cargar los productos.');
 
+  // En «Ofertas» el filtro de oferta es la propia página: no cuenta como un filtro que se pueda quitar.
+  const hayFiltrosActivos = hayFiltros(soloOfertas ? { ...filtros, enOferta: false } : filtros);
+
   const limpiar = () => {
     setBusqueda('');
     router.replace(ruta, { scroll: false });
@@ -70,7 +86,7 @@ export const CatalogoPublicoView: React.FC = () => {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="font-title text-base font-semibold text-corporate">Filtros</h2>
-        {hayFiltros(filtros) && (
+        {hayFiltrosActivos && (
           <button
             type="button"
             onClick={limpiar}
@@ -82,6 +98,15 @@ export const CatalogoPublicoView: React.FC = () => {
       </div>
 
       <Input label="Buscar" type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+
+      {!soloOfertas && (
+        <Checkbox
+          id="solo-ofertas"
+          label="Solo productos en oferta"
+          checked={filtros.enOferta}
+          onChange={(e) => aplicar({ enOferta: e.target.checked })}
+        />
+      )}
 
       <nav aria-label="Categorías">
         <h3 className="mb-2 font-title text-sm font-medium text-neutral-dark">Categorías</h3>
@@ -172,14 +197,23 @@ export const CatalogoPublicoView: React.FC = () => {
           </li>
           <li aria-hidden="true">›</li>
           <li aria-current="page" className="text-neutral-dark">
-            Productos
+            {filtros.enOferta ? 'Ofertas' : 'Productos'}
           </li>
         </ol>
       </nav>
-      <h1 className="font-title text-3xl font-bold text-corporate">Catálogo de productos</h1>
+      <h1 className="font-title text-3xl font-bold text-corporate">
+        {filtros.enOferta ? 'Ofertas' : 'Catálogo de productos'}
+      </h1>
       <p className="mt-1 font-sans text-sm text-neutral-medium">
-        Encuentre la pintura y los accesorios para su proyecto.
+        {filtros.enOferta
+          ? 'Productos con descuento ahora mismo. El precio final de tu compra se confirma en el carrito.'
+          : 'Encuentre la pintura y los accesorios para su proyecto.'}
       </p>
+      {filtros.enOferta && (
+        <div className="mt-5">
+          <EventosEnCurso />
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside aria-label="Filtros" className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
@@ -229,12 +263,14 @@ export const CatalogoPublicoView: React.FC = () => {
           {productos.datos !== null && productos.datos.items.length === 0 && (
             <div className="rounded-card border border-dashed border-neutral-light bg-neutral-lightest px-4 py-12 text-center">
               <p className="font-title text-base font-semibold text-neutral-black">
-                No encontramos productos con esos filtros
+                {filtros.enOferta ? 'No hay productos en oferta con esos filtros' : 'No encontramos productos con esos filtros'}
               </p>
               <p className="mt-1 font-sans text-sm text-neutral-medium">
-                Pruebe con otra búsqueda o quite algún filtro.
+                {filtros.enOferta
+                  ? 'Las promociones cambian a lo largo del día y la semana: vuelva a revisar pronto.'
+                  : 'Pruebe con otra búsqueda o quite algún filtro.'}
               </p>
-              {hayFiltros(filtros) && (
+              {hayFiltrosActivos && (
                 <Button className="mt-4" variant="outline" onClick={limpiar}>
                   Limpiar filtros
                 </Button>
@@ -250,7 +286,7 @@ export const CatalogoPublicoView: React.FC = () => {
                     name={p.nombre}
                     brand={p.marca}
                     description={`${p.esCombo ? 'Combo · ' : ''}${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
-                    price={p.precioDesde ?? 0}
+                    {...precioVisible(p.precioDesde, p.oferta)}
                     href={`/productos/${p.idProducto}`}
                     {...(p.idImagenPrincipal === null
                       ? {}

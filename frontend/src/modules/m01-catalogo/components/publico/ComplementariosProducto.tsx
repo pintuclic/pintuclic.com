@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ProductCard } from '@/core/components';
 import type { ProductoPublicoTarjeta } from '../../dtos/m01-catalogo-productos.dto';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
+import { precioVisible } from '../../services/ofertas-visuales';
 
 export interface ComplementariosProductoProps {
   idProducto: number;
@@ -42,7 +43,7 @@ export const ComplementariosProducto: React.FC<ComplementariosProductoProps> = (
               name={p.nombre}
               brand={p.marca}
               description={`${p.esCombo ? 'Combo · ' : ''}${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}`}
-              price={p.precioDesde ?? 0}
+              {...precioVisible(p.precioDesde, p.oferta)}
               href={`/productos/${p.idProducto}`}
               {...(p.idImagenPrincipal === null
                 ? {}
