@@ -26,9 +26,9 @@ export function ResumenCarrito({ resumen }: ResumenCarritoProps) {
       {resumen.descuentoEventos > 0 && <Fila etiqueta="Ofertas" valor={resumen.descuentoEventos} descuento />}
       {resumen.descuentoEmpresa > 0 && <Fila etiqueta="Descuento empresa" valor={resumen.descuentoEmpresa} descuento />}
       {resumen.descuentoCupon > 0 && <Fila etiqueta="Código de descuento" valor={resumen.descuentoCupon} descuento />}
-      <div className="flex justify-between gap-4 border-t border-neutral-light pt-3 text-base font-bold">
-        <dt className="text-neutral-black">Total</dt>
-        <dd className="text-neutral-black">{formatCOP(resumen.total)}</dd>
+      <div className="flex items-baseline justify-between gap-4 border-t border-neutral-light pt-3">
+        <dt className="font-title text-base font-bold text-neutral-black">Total</dt>
+        <dd className="font-title text-2xl font-bold text-corporate">{formatCOP(resumen.total)}</dd>
       </div>
       <p className="text-xs text-neutral-medium">
         IVA incluido ({resumen.tasaIva} %): {formatCOP(resumen.importeIva)} · Base {formatCOP(resumen.baseSinImpuesto)}.

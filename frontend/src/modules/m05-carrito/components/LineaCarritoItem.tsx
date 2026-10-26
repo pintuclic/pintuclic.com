@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Minus, Package, Plus, Trash2 } from 'lucide-react';
-import { Button, IconButton, Input } from '@/core/components';
+import { Badge, Button, IconButton, Input } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
 import { CANTIDAD_MAXIMA_POR_LINEA, type LineaCarrito } from '../dtos/m05-carrito.dto';
 import { cantidadFormSchema } from '../dtos/formularios.dto';
@@ -23,6 +23,7 @@ export function LineaCarritoItem({ linea, ocupada, onCambiarCantidad, onQuitar }
   const vendible = precio?.vendible === true;
   const nombre = producto.nombre ?? 'Producto';
   const tope = producto.esCombo && producto.topeUnidades !== null ? producto.topeUnidades : CANTIDAD_MAXIMA_POR_LINEA;
+  const conDescuento = vendible && precio !== null && (precio.descuentoTotal ?? 0) > 0;
   const [texto, setTexto] = useState(String(linea.cantidad));
   const [error, setError] = useState<string | null>(null);
 
@@ -47,80 +48,96 @@ export function LineaCarritoItem({ linea, ocupada, onCambiarCantidad, onQuitar }
 
   const idCantidad = `cantidad-${linea.idLinea}`;
   const idError = `${idCantidad}-error`;
+  const enlace = producto.idProducto === null ? null : `/productos/${producto.idProducto}`;
+
+  const imagen = (
+    <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-card border border-neutral-light bg-neutral-lightest sm:h-28 sm:w-28">
+      {producto.idImagenPrincipal === null ? (
+        <Package aria-hidden className="h-10 w-10 text-neutral-medium" />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={carritoApi.urlImagen(producto.idImagenPrincipal)}
+          alt=""
+          className="h-full w-full object-contain p-1"
+          loading="lazy"
+        />
+      )}
+    </div>
+  );
 
   return (
-    <li className="flex gap-4 border-b border-neutral-light py-4 last:border-b-0">
-      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-card bg-neutral-lightest">
-        {producto.idImagenPrincipal === null ? (
-          <Package aria-hidden className="h-8 w-8 text-neutral-medium" />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={carritoApi.urlImagen(producto.idImagenPrincipal)}
-            alt=""
-            className="h-full w-full object-contain"
-            loading="lazy"
-          />
-        )}
-      </div>
+    <li className={`flex gap-4 p-4 sm:gap-5 sm:p-5 ${vendible ? '' : 'bg-neutral-lightest'}`}>
+      {enlace === null ? imagen : <Link href={enlace} tabIndex={-1} aria-hidden>{imagen}</Link>}
 
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            {producto.idProducto === null ? (
-              <p className="font-semibold text-neutral-black">{nombre}</p>
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
+            {producto.marca !== null && (
+              <p className="font-title text-xs font-medium uppercase tracking-wider text-neutral-medium">{producto.marca}</p>
+            )}
+            {enlace === null ? (
+              <p className="font-title text-base font-semibold text-neutral-black">{nombre}</p>
             ) : (
-              <Link href={`/productos/${producto.idProducto}`} className="font-semibold text-neutral-black hover:text-action">
+              <Link href={enlace} className="font-title text-base font-semibold text-neutral-black hover:text-action">
                 {nombre}
               </Link>
             )}
-            <p className="text-sm text-neutral-medium">
-              {[producto.marca, producto.medida].filter((v) => v !== null).join(' · ')}
-            </p>
-            {producto.color !== null && (
-              <p className="mt-1 flex items-center gap-2 text-sm text-neutral-dark">
-                <span
-                  aria-hidden
-                  className="inline-block h-4 w-4 rounded-full border border-neutral-light"
-                  style={{ backgroundColor: producto.color.hexadecimal }}
-                />
-                {producto.color.nombre}
-              </p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-dark">
+              {producto.medida !== null && <span>{producto.medida}</span>}
+              {producto.color !== null && (
+                <span className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className="inline-block h-4 w-4 rounded-full border border-neutral-medium/40"
+                    style={{ backgroundColor: producto.color.hexadecimal }}
+                  />
+                  {producto.color.nombre}
+                </span>
+              )}
+            </div>
+            {vendible && precio?.precioUnitarioFinal !== null && precio?.precioUnitarioFinal !== undefined && (
+              <p className="text-sm text-neutral-medium">{formatCOP(precio.precioUnitarioFinal)} c/u</p>
             )}
           </div>
 
           {vendible && precio !== null && (
-            <div className="text-left sm:text-right">
-              {precio.descuentoTotal !== null && precio.descuentoTotal > 0 && precio.subtotalInicial !== null && (
-                <p className="text-sm text-neutral-medium line-through">{formatCOP(precio.subtotalInicial)}</p>
+            <div className="shrink-0 sm:text-right">
+              {conDescuento && precio.subtotalInicial !== null && (
+                <p className="text-sm text-neutral-medium">
+                  <span className="sr-only">Antes </span>
+                  <s>{formatCOP(precio.subtotalInicial)}</s>
+                </p>
               )}
-              <p className="text-lg font-bold text-neutral-black">{formatCOP(precio.subtotal ?? 0)}</p>
+              <p className="font-title text-lg font-bold text-neutral-black">{formatCOP(precio.subtotal ?? 0)}</p>
             </div>
           )}
         </div>
 
-        {vendible && precio !== null && precio.descuentos.length > 0 && (
-          <ul className="mt-2 space-y-0.5 text-sm text-conversion-hover" aria-label={`Descuentos de ${nombre}`}>
+        {conDescuento && precio !== null && (
+          <ul className="flex flex-wrap gap-2" aria-label={`Descuentos de ${nombre}`}>
             {precio.descuentos.map((d) => (
               <li key={d.ordenAplicacion}>
-                {d.origen}
-                {d.porcentaje !== null ? ` (−${d.porcentaje} %)` : ''}: −{formatCOP(d.importe)}
+                <Badge variant="offer">
+                  {d.origen}
+                  {d.porcentaje !== null ? ` −${d.porcentaje} %` : ''} · −{formatCOP(d.importe)}
+                </Badge>
               </li>
             ))}
           </ul>
         )}
 
         {!vendible && (
-          <p className="mt-2 rounded-card bg-danger-subtle px-3 py-2 text-sm text-danger-hover" role="status">
+          <p className="rounded-card bg-danger-subtle px-3 py-2 text-sm text-danger-hover" role="status">
             {precio === null ? 'No pudimos calcular el precio de este producto.' : textoNoVendible(precio.motivoNoVendible)}{' '}
             {precio !== null && 'Quítalo para continuar con la compra.'}
           </p>
         )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          {vendible && (
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {vendible ? (
+            <div>
+              <div className="inline-flex items-center rounded-btn border border-neutral-light bg-neutral-white">
                 <IconButton
                   aria-label={`Restar una unidad de ${nombre}`}
                   variant="ghost"
@@ -130,9 +147,10 @@ export function LineaCarritoItem({ linea, ocupada, onCambiarCantidad, onQuitar }
                 >
                   <Minus aria-hidden className="h-4 w-4" />
                 </IconButton>
-                <div className="w-20">
+                <div className="w-14">
                   <Input
                     id={idCantidad}
+                    appearance="bare"
                     aria-label={`Cantidad de ${nombre}`}
                     inputMode="numeric"
                     value={texto}
@@ -144,7 +162,7 @@ export function LineaCarritoItem({ linea, ocupada, onCambiarCantidad, onQuitar }
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') confirmarTexto();
                     }}
-                    className="text-center"
+                    className="px-1 text-center font-semibold text-neutral-black"
                   />
                 </div>
                 <IconButton
@@ -163,6 +181,8 @@ export function LineaCarritoItem({ linea, ocupada, onCambiarCantidad, onQuitar }
                 </p>
               )}
             </div>
+          ) : (
+            <span />
           )}
           <Button
             variant="ghost"
@@ -171,6 +191,7 @@ export function LineaCarritoItem({ linea, ocupada, onCambiarCantidad, onQuitar }
             disabled={ocupada}
             onClick={onQuitar}
             aria-label={`Quitar ${nombre} del carrito`}
+            className="text-neutral-medium hover:text-danger"
           >
             Quitar
           </Button>
