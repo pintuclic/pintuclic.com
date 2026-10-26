@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Search } from 'lucide-react';
-import { AdminPageHeader, Alert, Button, Input, Skeleton } from '@/core/components';
+import { Eye, PencilLine, Search } from 'lucide-react';
+import { AdminPageHeader, Alert, Button, ButtonLink, Input, Skeleton } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
-import type { EstadoCotizacion } from '../dtos/m21-cotizaciones.dto';
+import { ESTADOS_EDITABLES, type EstadoCotizacion } from '../dtos/m21-cotizaciones.dto';
 import { cotizacionesApi, mensajeDeError, type PaginaCotizaciones } from '../services/cotizaciones-api';
 import { estadoDeUrl, fechaCorta, paginaDeUrl } from '../services/textos-cotizaciones';
 import { EstadoCotizacionBadge, FiltrosEstado, Paginacion } from './comunes';
@@ -91,7 +91,7 @@ export function CotizacionesAdminView() {
         ) : (
           <>
             <div className="overflow-x-auto rounded-card border border-neutral-light/70 bg-neutral-white shadow-card">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[920px] text-sm">
                 <caption className="sr-only">Cotizaciones ({datos.total})</caption>
                 <thead className="bg-neutral-lightest text-left text-xs uppercase tracking-wide text-neutral-medium">
                   <tr>
@@ -101,6 +101,9 @@ export function CotizacionesAdminView() {
                     <th scope="col" className="px-4 py-3 font-semibold">Estado</th>
                     <th scope="col" className="px-4 py-3 text-right font-semibold">Productos</th>
                     <th scope="col" className="px-4 py-3 text-right font-semibold">Total</th>
+                    <th scope="col" className="px-4 py-3 text-right font-semibold">
+                      <span className="sr-only">Acciones</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-light">
@@ -127,6 +130,28 @@ export function CotizacionesAdminView() {
                       <td className="px-4 py-3 text-right text-neutral-dark">{c.cantidadLineas}</td>
                       <td className="px-4 py-3 text-right font-semibold text-neutral-black">
                         {formatCOP(c.totalAcordado ?? c.totalReferencia)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {ESTADOS_EDITABLES.includes(c.estado) ? (
+                          <ButtonLink
+                            href={`/admin/cotizaciones/${c.idCotizacion}`}
+                            size="sm"
+                            leftIcon={<PencilLine aria-hidden className="h-4 w-4" />}
+                            aria-label={`Revisar y responder ${c.codigo}`}
+                          >
+                            Revisar y responder
+                          </ButtonLink>
+                        ) : (
+                          <ButtonLink
+                            href={`/admin/cotizaciones/${c.idCotizacion}`}
+                            size="sm"
+                            variant="outline"
+                            leftIcon={<Eye aria-hidden className="h-4 w-4" />}
+                            aria-label={`Ver cotización ${c.codigo}`}
+                          >
+                            Ver cotización
+                          </ButtonLink>
+                        )}
                       </td>
                     </tr>
                   ))}
