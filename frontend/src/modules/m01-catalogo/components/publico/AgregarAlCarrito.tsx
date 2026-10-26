@@ -96,7 +96,7 @@ export function AgregarAlCarrito({ idVariante, idColor, requiereColor, bloqueado
         (resultado.ok ? (
           <Alert variant="success">
             {resultado.mensaje}{' '}
-            <Link href="/carrito" className="font-semibold text-action underline hover:text-action-hover">
+            <Link href="/carrito" className="font-semibold text-action hover:text-action-hover">
               Ver carrito
             </Link>
           </Alert>
