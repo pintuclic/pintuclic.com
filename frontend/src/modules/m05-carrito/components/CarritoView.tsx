@@ -58,7 +58,7 @@ export function CarritoView() {
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <ButtonLink href="/productos">Ver productos</ButtonLink>
-            <ButtonLink href="/productos?enOferta=true" variant="outline">
+            <ButtonLink href="/ofertas" variant="outline">
               Ver ofertas
             </ButtonLink>
           </div>
