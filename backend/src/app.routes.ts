@@ -89,7 +89,16 @@ export function construirAppRoutes(): Router {
   // M01: administración del catálogo (exige sesión y permisos `catalogo.*`, resueltos en servidor)
   // y consulta pública de lo publicado (sin sesión, solo lectura). Va antes de `/admin` para que
   // el router de M17 no atienda las rutas `/admin/catalogo`.
-  const m01 = construirModuloM01(m17.autorizacionService);
+  const m01 = construirModuloM01(m17.autorizacionService, {
+    // M06 (eventos de descuento): ofertas para tarjetas y ficha, y conteo de eventos al desactivar. M06 se construye
+    // después (necesita `catalogoParaCompra` de M01); la llamada ocurre por petición, cuando `m06` ya existe.
+    ofertas: {
+      idsProductosEnOferta: () => m06.precios.idsProductosEnOferta(),
+      ofertasDeProductos: (ids) => m06.precios.ofertasDeProductos(ids),
+      preciosDeVariantes: (consultas) => m06.precios.preciosDeVariantes(consultas),
+    },
+    impactoReglas: { contarEventosVigentes: (objetivos) => m06.impacto.contarEventosVigentes(objetivos) },
+  });
   router.use('/admin/catalogo', exigirSesionSalvo(auth, []), m01.adminRouter);
   router.use('/catalogo', m01.publicRouter);
 

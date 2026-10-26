@@ -1,6 +1,9 @@
 import { MAXIMO_COMPLEMENTARIOS, type TamanoImagen } from '../dtos/m01-catalogo-entrega3.dto';
 import type {
   CategoriaPublica,
+  OfertaPublica,
+  OfertaVariante,
+  OfertasProductoRequest,
   FiltrosPublicos,
   ListarColoresProductoRequest,
   ListarProductosPublicosRequest,
@@ -9,14 +12,37 @@ import type {
 } from '../dtos/m01-catalogo-productos.dto';
 import type { ImagenBytes, LogotipoMarca, Pagina } from '../interfaces/catalogo.interface';
 import type { ConsultaPublicaRepositoryPort } from '../interfaces/consulta-publica.interface';
+import type { OfertaPort, OfertasPort } from '../interfaces/ofertas.port';
 import type { ColoresDeProducto } from '../interfaces/productos.interface';
 import { errores, ServicioCatalogoBase } from './catalogo-base.service';
 import { servirImagen } from './imagen-derivadas';
 
-/** HU-CAT-06: consulta pública. Lo que no es visible responde 404 uniforme (U1). */
+const aOfertaPublica = (o: OfertaPort | null): OfertaPublica | null =>
+  o === null ? null : { nombre: o.nombre, porcentaje: o.porcentaje, precioAntes: o.precioAntes, precioConOferta: o.precioConOferta };
+
+/**
+ * HU-CAT-06: consulta pública. Lo que no es visible responde 404 uniforme (U1). Las ofertas (eventos de M06) se
+ * agregan si hay con quién pedirlas; si M06 falla, el catálogo se ve igual, sin ofertas.
+ */
 export class ConsultaPublicaService extends ServicioCatalogoBase {
-  constructor(private readonly consulta: ConsultaPublicaRepositoryPort) {
+  constructor(
+    private readonly consulta: ConsultaPublicaRepositoryPort,
+    private readonly ofertas?: OfertasPort,
+  ) {
     super();
+  }
+
+  /** Pone la oferta de cada tarjeta; sin M06 o ante un fallo de M06 quedan sin oferta. */
+  private async conOfertas(tarjetas: ProductoPublicoTarjeta[]): Promise<ProductoPublicoTarjeta[]> {
+    if (this.ofertas === undefined || tarjetas.length === 0) return tarjetas;
+    try {
+      const porProducto = new Map(
+        (await this.ofertas.ofertasDeProductos(tarjetas.map((t) => t.idProducto))).map((o) => [o.idProducto, o.oferta]),
+      );
+      return tarjetas.map((t) => ({ ...t, oferta: aOfertaPublica(porProducto.get(t.idProducto) ?? null) }));
+    } catch {
+      return tarjetas;
+    }
   }
 
   categorias(): Promise<CategoriaPublica[]> {
@@ -27,12 +53,46 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
     return this.consulta.filtros();
   }
 
-  listar(query: ListarProductosPublicosRequest): Promise<Pagina<ProductoPublicoTarjeta>> {
-    return this.consulta.listar(query);
+  /** `enOferta`: solo los productos con una oferta en curso ahora. Sin M06 no hay ofertas: lista vacía. */
+  async listar(query: ListarProductosPublicosRequest): Promise<Pagina<ProductoPublicoTarjeta>> {
+    const pagina =
+      query.enOferta === true
+        ? await this.consulta.listar(query, this.ofertas === undefined ? [] : await this.ofertas.idsProductosEnOferta())
+        : await this.consulta.listar(query);
+    return { ...pagina, items: await this.conOfertas(pagina.items) };
   }
 
   async ficha(idProducto: number): Promise<ProductoPublicoFicha> {
-    return this.exigir(await this.consulta.ficha(idProducto));
+    const ficha = this.exigir(await this.consulta.ficha(idProducto));
+    if (this.ofertas === undefined || ficha.variantes.length === 0) return ficha;
+    try {
+      const porVariante = new Map(
+        (await this.ofertas.preciosDeVariantes(ficha.variantes.map((v) => ({ idVariante: v.idVariante })))).map((o) => [
+          o.idVariante,
+          o.oferta,
+        ]),
+      );
+      return { ...ficha, variantes: ficha.variantes.map((v) => ({ ...v, oferta: aOfertaPublica(porVariante.get(v.idVariante) ?? null) })) };
+    } catch {
+      return ficha;
+    }
+  }
+
+  /**
+   * La oferta de cada variante con el color elegido: las excepciones por color (p. ej. "el blanco no entra")
+   * solo se pueden evaluar sabiendo el color.
+   */
+  async ofertasProducto(idProducto: number, query: OfertasProductoRequest): Promise<OfertaVariante[]> {
+    const ficha = this.exigir(await this.consulta.ficha(idProducto));
+    if (this.ofertas === undefined) return ficha.variantes.map((v) => ({ idVariante: v.idVariante, oferta: null }));
+    try {
+      const respuesta = await this.ofertas.preciosDeVariantes(
+        ficha.variantes.map((v) => ({ idVariante: v.idVariante, idColor: query.idColor ?? null })),
+      );
+      return respuesta.map((o) => ({ idVariante: o.idVariante, oferta: aOfertaPublica(o.oferta) }));
+    } catch {
+      return ficha.variantes.map((v) => ({ idVariante: v.idVariante, oferta: null }));
+    }
   }
 
   async colores(idProducto: number, query: ListarColoresProductoRequest): Promise<ColoresDeProducto> {
@@ -51,7 +111,7 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
 
   /** X1–X5: hasta 4 sugerencias para la ficha; vacío cuando no hay nada que sugerir (la pantalla oculta la sección). */
   async complementarios(idProducto: number): Promise<ProductoPublicoTarjeta[]> {
-    return this.exigir(await this.consulta.complementarios(idProducto, MAXIMO_COMPLEMENTARIOS));
+    return this.conOfertas(this.exigir(await this.consulta.complementarios(idProducto, MAXIMO_COMPLEMENTARIOS)));
   }
 
   async imagenMedida(idMedida: number): Promise<ImagenBytes> {

@@ -122,9 +122,13 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
     };
   }
 
-  async listar(query: ListarProductosPublicosRequest): Promise<Pagina<ProductoPublicoTarjeta>> {
+  async listar(
+    query: ListarProductosPublicosRequest,
+    idsPermitidos?: readonly number[],
+  ): Promise<Pagina<ProductoPublicoTarjeta>> {
     const busqueda = query.busqueda;
     const filtros: Prisma.ProductoWhereInput = {
+      ...(idsPermitidos !== undefined ? { idProducto: { in: [...idsPermitidos] } } : {}),
       ...(query.idMarca !== undefined ? { idMarca: query.idMarca } : {}),
       ...(query.idLinea !== undefined ? { idLinea: query.idLinea } : {}),
       ...(query.idSubcategoria !== undefined ? { idSubcategoria: query.idSubcategoria } : {}),
@@ -211,6 +215,8 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
           esCombo: p.esCombo,
           // K5: un combo agotado se ve pero no se compra; el resto de productos siempre se puede comprar.
           compraBloqueada: p.esCombo && disponible === 'agotado',
+          // La oferta la agrega el servicio con lo que dice M06.
+          oferta: null,
         },
       ];
     });
@@ -261,6 +267,7 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
         precio: v.precioVigente.toNumber(),
         disponibilidad: disponibilidad([v.existenciaReferencial]),
         compraBloqueada: p.esCombo && v.existenciaReferencial === 0,
+        oferta: null,
         rendimiento: rendimientoDeMedida({
           rendimientoMin,
           rendimientoMax,

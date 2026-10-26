@@ -677,8 +677,26 @@ export const listarProductosPublicosRequestSchema = paginacionQuerySchema.extend
   idMarca: z.coerce.number().int().positive().optional(),
   idLinea: z.coerce.number().int().positive().optional(),
   ordenar: z.enum(['nombre', 'precio_asc', 'precio_desc']).default('nombre'),
+  /** true = solo los productos con una oferta en curso (pestaña Promociones). */
+  enOferta: booleanoQuerySchema.optional(),
 });
 export type ListarProductosPublicosRequest = z.infer<typeof listarProductosPublicosRequestSchema>;
+
+/**
+ * Oferta de un evento de M06 que está en curso (la etiqueta "−15 %" y el precio tachado). El descuento de las
+ * cuentas empresa NUNCA aparece aquí: depende del total del carrito y solo se ve en el carrito.
+ */
+export const ofertaPublicaSchema = z.object({
+  /** Nombre del evento, tal como se muestra al cliente. */
+  nombre: z.string(),
+  /** La etiqueta de la tarjeta. */
+  porcentaje: z.number().gt(0).max(100),
+  /** Precio unitario sin la oferta (el que se tacha), IVA incluido. */
+  precioAntes: z.number().nonnegative(),
+  /** Precio unitario con la oferta, IVA incluido. */
+  precioConOferta: z.number().nonnegative(),
+});
+export type OfertaPublica = z.infer<typeof ofertaPublicaSchema>;
 
 export const productoPublicoTarjetaSchema = z.object({
   idProducto: idSchema,
@@ -696,6 +714,11 @@ export const productoPublicoTarjetaSchema = z.object({
   /** Entrega 3: combo; y `compraBloqueada` = combo agotado (se ve, no se compra, K5). */
   esCombo: z.boolean(),
   compraBloqueada: z.boolean(),
+  /**
+   * Oferta en curso de la variante en oferta de menor precio (D5 de M06); null si el producto no está en oferta.
+   * `precioDesde` sigue siendo el mínimo de las variantes sin oferta.
+   */
+  oferta: ofertaPublicaSchema.nullable(),
 });
 export type ProductoPublicoTarjeta = z.infer<typeof productoPublicoTarjetaSchema>;
 
@@ -727,6 +750,8 @@ export const variantePublicaSchema = z.object({
   disponibilidad: disponibilidadSchema,
   /** Entrega 3 (K5): true cuando es un combo sin existencia. */
   compraBloqueada: z.boolean(),
+  /** Oferta en curso de esta variante, sin elegir color (con color, ver `GET /productos/:id/ofertas`). */
+  oferta: ofertaPublicaSchema.nullable(),
   rendimiento: rendimientoAproximadoSchema.nullable(),
   /** GET /catalogo/medidas/:idMedida/imagen */
   tieneImagenMedida: z.boolean(),
@@ -764,6 +789,23 @@ export const productoPublicoFichaSchema = z.object({
 export type ProductoPublicoFicha = z.infer<typeof productoPublicoFichaSchema>;
 export const productoPublicoResponseEnvelopeSchema = respuestaUno(productoPublicoFichaSchema);
 export type ProductoPublicoResponseEnvelope = z.infer<typeof productoPublicoResponseEnvelopeSchema>;
+
+/**
+ * GET /catalogo/productos/:idProducto/ofertas?idColor= — la oferta de cada variante CON el color elegido, porque las
+ * excepciones por color (p. ej. "el blanco no entra") solo se pueden evaluar sabiendo el color (R8 de M06).
+ */
+export const ofertasProductoRequestSchema = z.object({
+  idColor: z.coerce.number().int().positive().optional(),
+});
+export type OfertasProductoRequest = z.infer<typeof ofertasProductoRequestSchema>;
+
+export const ofertaVarianteSchema = z.object({
+  idVariante: idSchema,
+  oferta: ofertaPublicaSchema.nullable(),
+});
+export type OfertaVariante = z.infer<typeof ofertaVarianteSchema>;
+export const ofertasProductoResponseEnvelopeSchema = respuestaLista(ofertaVarianteSchema);
+export type OfertasProductoResponseEnvelope = z.infer<typeof ofertasProductoResponseEnvelopeSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 7. ERRORES
@@ -831,6 +873,7 @@ export type ErrorProductosEnvelope = z.infer<typeof errorProductosEnvelopeSchema
  *  GET /productos                tarjetas paginadas con filtros
  *  GET /productos/:idProducto    ficha con variantes (404 si no está disponible, U1)
  *  GET /productos/:idProducto/colores   carta paginada por familia (U3, U4)
+ *  GET /productos/:idProducto/ofertas   oferta de cada variante con el color elegido (M06)
  *  GET /marcas/:idMarca/logotipo bytes del logotipo
  *  GET /imagenes/:idImagen       bytes de una imagen de producto visible
  *  GET /medidas/:idMedida/imagen bytes de la imagen de una medida

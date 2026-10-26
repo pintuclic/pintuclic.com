@@ -3,6 +3,7 @@ import { tamanoImagenQuerySchema } from '../dtos/m01-catalogo-entrega3.dto';
 import {
   listarColoresProductoRequestSchema,
   listarProductosPublicosRequestSchema,
+  ofertasProductoRequestSchema,
 } from '../dtos/m01-catalogo-productos.dto';
 import type { ConsultaPublicaService } from '../services/consulta-publica.service';
 import { leerId, manejar, responderParametroInvalido, validar } from './catalogo-http';
@@ -35,6 +36,17 @@ export class ConsultaPublicaController {
       return;
     }
     responderExito(res, await this.servicio.ficha(id));
+  });
+
+  ofertas = manejar(async (req, res) => {
+    const id = leerId(req, 'idProducto');
+    if (id === null) {
+      responderParametroInvalido(res, 'El identificador del producto no es válido.');
+      return;
+    }
+    const query = validar(res, ofertasProductoRequestSchema, req.query);
+    if (query === null) return;
+    responderExito(res, await this.servicio.ofertasProducto(id, query));
   });
 
   colores = manejar(async (req, res) => {

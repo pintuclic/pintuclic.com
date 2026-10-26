@@ -18,7 +18,8 @@ export interface ConsultaPublicaRepositoryPort {
   /** U2: solo categorías y subcategorías con productos visibles. */
   categorias(): Promise<CategoriaPublica[]>;
   filtros(): Promise<FiltrosPublicos>;
-  listar(query: ListarProductosPublicosRequest): Promise<Pagina<ProductoPublicoTarjeta>>;
+  /** `idsPermitidos` (filtro `enOferta`): solo esos productos; vacío = ninguno. */
+  listar(query: ListarProductosPublicosRequest, idsPermitidos?: readonly number[]): Promise<Pagina<ProductoPublicoTarjeta>>;
   /** null si el producto no existe o no es visible (U1). */
   ficha(idProducto: number): Promise<ProductoPublicoFicha | null>;
   /** null si el producto no es visible; U3: paginada y bajo demanda. */

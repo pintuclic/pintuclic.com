@@ -278,7 +278,7 @@ export class ProductosService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.productos.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.productos.contarImpacto(id), { tipo: 'producto', id }),
       padreActivo: () => this.productos.padreActivo(id),
       etiquetaPadre: 'la marca, la línea, la subcategoría o la categoría',
       cambiar: (estado) => this.productos.cambiarEstado(id, estado),
@@ -287,7 +287,7 @@ export class ProductosService extends ServicioCatalogoBase {
 
   async impacto(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.productos.obtener(id));
-    return this.productos.contarImpacto(id);
+    return this.conReglasComerciales(this.productos.contarImpacto(id), { tipo: 'producto', id });
   }
 
   /** P7: publicar exige producto activo y al menos una variante activa. Despublicar siempre se puede. */

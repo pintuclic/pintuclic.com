@@ -62,7 +62,7 @@ export class LineasService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.lineas.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.lineas.contarImpacto(id), { tipo: 'linea', id }),
       padreActivo: () => this.lineas.padreActivo(id),
       etiquetaPadre: 'la marca',
       cambiar: (estado) => this.lineas.cambiarEstado(id, estado),
@@ -71,6 +71,6 @@ export class LineasService extends ServicioCatalogoBase {
 
   async impacto(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.lineas.obtener(id));
-    return this.lineas.contarImpacto(id);
+    return this.conReglasComerciales(this.lineas.contarImpacto(id), { tipo: 'linea', id });
   }
 }

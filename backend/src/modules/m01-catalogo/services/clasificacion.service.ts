@@ -45,7 +45,7 @@ export class ClasificacionService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.categorias.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.categorias.contarImpacto(id), { tipo: 'categoria', id }),
       padreActivo: () => this.categorias.padreActivo(id),
       etiquetaPadre: 'el padre',
       cambiar: (estado) => this.categorias.cambiarEstado(id, estado),
@@ -54,7 +54,7 @@ export class ClasificacionService extends ServicioCatalogoBase {
 
   async impacto(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.categorias.obtener(id));
-    return this.categorias.contarImpacto(id);
+    return this.conReglasComerciales(this.categorias.contarImpacto(id), { tipo: 'categoria', id });
   }
 
   /* ─── Subcategorías ─── */
@@ -102,7 +102,7 @@ export class ClasificacionService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.subcategorias.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.subcategorias.contarImpacto(id), { tipo: 'subcategoria', id }),
       padreActivo: () => this.subcategorias.padreActivo(id),
       etiquetaPadre: 'la categoría',
       cambiar: (estado) => this.subcategorias.cambiarEstado(id, estado),
@@ -111,6 +111,6 @@ export class ClasificacionService extends ServicioCatalogoBase {
 
   async impactoSubcategoria(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.subcategorias.obtener(id));
-    return this.subcategorias.contarImpacto(id);
+    return this.conReglasComerciales(this.subcategorias.contarImpacto(id), { tipo: 'subcategoria', id });
   }
 }
