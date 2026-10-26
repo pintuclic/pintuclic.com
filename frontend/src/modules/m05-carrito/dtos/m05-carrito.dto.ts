@@ -145,6 +145,10 @@ export const lineaCarritoSchema = z.object({
   producto: productoLineaSchema,
   /** La línea correspondiente del cálculo de M06 (mismo orden). Null si el carrito no se pudo calcular. */
   precio: lineaCalculadaSchema.nullable(),
+  /** C15: la cotización de la que viene; null en una línea normal. */
+  idCotizacion: idSchema.nullable(),
+  /** C15: precio unitario pactado; null en una línea normal. */
+  precioAcordado: dineroSchema.nullable(),
 });
 export type LineaCarrito = z.infer<typeof lineaCarritoSchema>;
 
@@ -236,7 +240,8 @@ export type RevalidacionResponseEnvelope = z.infer<typeof revalidacionResponseEn
  * Envelope global del backend: `{ success: false, error: { code, message, details } }`.
  * 400 PARAMETRO_INVALIDO · 400 CANTIDAD_FUERA_DE_RANGO (C4) · 400 LIMITE_LINEAS_ALCANZADO (C5) ·
  * 404 RECURSO_NO_DISPONIBLE (línea ajena o inexistente, C14) · 409 PRODUCTO_NO_DISPONIBLE (C6, con el
- * motivo en `details`) · 409 SIN_EXISTENCIA_SUFICIENTE (tope de combo, C4) · 500 ERROR_INTERNO (sin detalles).
+ * motivo en `details`) · 409 SIN_EXISTENCIA_SUFICIENTE (tope de combo, C4) · 409 LINEA_COTIZADA (C15) ·
+ * 500 ERROR_INTERNO (sin detalles).
  */
 export const CODIGOS_ERROR_CARRITO = [
   'PARAMETRO_INVALIDO',
@@ -245,6 +250,7 @@ export const CODIGOS_ERROR_CARRITO = [
   'RECURSO_NO_DISPONIBLE',
   'PRODUCTO_NO_DISPONIBLE',
   'SIN_EXISTENCIA_SUFICIENTE',
+  'LINEA_COTIZADA',
   'ERROR_INTERNO',
 ] as const;
 export type CodigoErrorCarrito = (typeof CODIGOS_ERROR_CARRITO)[number];

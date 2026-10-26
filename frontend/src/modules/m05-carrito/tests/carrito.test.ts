@@ -35,6 +35,8 @@ const carrito: Carrito = {
         disponibilidad: 'disponible',
       },
       precio: null,
+      idCotizacion: null,
+      precioAcordado: null,
     },
   ],
   cantidadItems: 2,

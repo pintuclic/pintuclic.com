@@ -15,6 +15,7 @@ import type {
   CarritoGuardado,
   CarritoRepositoryPort,
   DuenoCarrito,
+  LineaAcordadaNueva,
   LineaNueva,
   PlanUnion,
 } from '../../interfaces/carrito.interface';
@@ -118,7 +119,14 @@ export class PreciosEjemplo implements PreciosCarritoPort {
     const cuponValido = cupon === CUPON_VALIDO;
     const lineas: LineaCalculada[] = entrada.lineas.map((l, indice) => {
       const v = this.catalogo.variantes[l.idVariante];
-      const base = { indice, idVariante: l.idVariante, idColor: l.idColor ?? null, cantidad: l.cantidad, precioAcordado: false };
+      const acordado = l.precioAcordado;
+      const base = {
+        indice,
+        idVariante: l.idVariante,
+        idColor: l.idColor ?? null,
+        cantidad: l.cantidad,
+        precioAcordado: acordado !== undefined,
+      };
       if (v === undefined || v.vendible === false) {
         return {
           ...base,
@@ -133,10 +141,12 @@ export class PreciosEjemplo implements PreciosCarritoPort {
           precioUnitarioFinal: null,
         };
       }
-      const subtotalInicial = redondear(v.precioBase * l.cantidad);
+      const precioInicial = acordado ?? v.precioBase;
+      const subtotalInicial = redondear(precioInicial * l.cantidad);
       const descuentos: DescuentoAplicado[] = [];
       let subtotal = subtotalInicial;
-      const excluido = v.esCombo === true;
+      // R3 de M06: un precio acordado no recibe descuentos.
+      const excluido = v.esCombo === true || acordado !== undefined;
       if (!excluido && (v.evento ?? 0) > 0) {
         const importe = redondear((subtotal * (v.evento ?? 0)) / 100);
         descuentos.push({ ordenAplicacion: 1, tipoOrigen: 'evento', idRegla: 7, origen: 'Miércoles de color', porcentaje: v.evento ?? 0, importe });
@@ -152,8 +162,8 @@ export class PreciosEjemplo implements PreciosCarritoPort {
         ...base,
         vendible: true,
         motivoNoVendible: null,
-        excluidoDeDescuentos: excluido,
-        precioInicial: v.precioBase,
+        excluidoDeDescuentos: v.esCombo === true,
+        precioInicial,
         subtotalInicial,
         descuentos,
         descuentoTotal,
@@ -239,6 +249,8 @@ interface LineaMemoria {
   idVariante: number;
   idColor: number | null;
   cantidad: number;
+  idCotizacion: number | null;
+  precioAcordado: number | null;
 }
 
 export class CarritoMemoriaRepository implements CarritoRepositoryPort {
@@ -262,7 +274,14 @@ export class CarritoMemoriaRepository implements CarritoRepositoryPort {
       lineas: this.lineas
         .filter((l) => l.idCarrito === c.idCarrito)
         .sort((a, b) => a.idLinea - b.idLinea)
-        .map(({ idLinea, idVariante, idColor, cantidad }) => ({ idLinea, idVariante, idColor, cantidad })),
+        .map(({ idLinea, idVariante, idColor, cantidad, idCotizacion, precioAcordado }) => ({
+          idLinea,
+          idVariante,
+          idColor,
+          cantidad,
+          idCotizacion,
+          precioAcordado,
+        })),
     };
   }
 
@@ -293,7 +312,9 @@ export class CarritoMemoriaRepository implements CarritoRepositoryPort {
       fechaUltimaActividad: fecha,
     };
     this.carritos.push(c);
-    for (const l of lineas) this.lineas.push({ idLinea: this.siguienteLinea++, idCarrito: c.idCarrito, ...l });
+    for (const l of lineas) {
+      this.lineas.push({ idLinea: this.siguienteLinea++, idCarrito: c.idCarrito, idCotizacion: null, precioAcordado: null, ...l });
+    }
     return c.idCarrito;
   }
 
@@ -302,7 +323,23 @@ export class CarritoMemoriaRepository implements CarritoRepositoryPort {
       (l) => l.idCarrito === idCarrito && l.idVariante === linea.idVariante && l.idColor === linea.idColor,
     );
     if (existente !== undefined) existente.cantidad = linea.cantidad;
-    else this.lineas.push({ idLinea: this.siguienteLinea++, idCarrito, ...linea });
+    else this.lineas.push({ idLinea: this.siguienteLinea++, idCarrito, idCotizacion: null, precioAcordado: null, ...linea });
+    return Promise.resolve();
+  }
+
+  guardarLineasAcordadas(idCarrito: number, idCotizacion: number, lineas: readonly LineaAcordadaNueva[]): Promise<void> {
+    for (const l of lineas) {
+      const existente = this.lineas.find(
+        (x) => x.idCarrito === idCarrito && x.idVariante === l.idVariante && x.idColor === l.idColor,
+      );
+      if (existente !== undefined) {
+        existente.cantidad = l.cantidad;
+        existente.idCotizacion = idCotizacion;
+        existente.precioAcordado = l.precioAcordado;
+      } else {
+        this.lineas.push({ idLinea: this.siguienteLinea++, idCarrito, ...l, idCotizacion });
+      }
+    }
     return Promise.resolve();
   }
 
@@ -359,7 +396,7 @@ export class CarritoMemoriaRepository implements CarritoRepositoryPort {
       if (l !== undefined) l.cantidad = a.cantidad;
     }
     for (const n of plan.agregar) {
-      this.lineas.push({ idLinea: this.siguienteLinea++, idCarrito: plan.idCarritoCuenta, ...n });
+      this.lineas.push({ idLinea: this.siguienteLinea++, idCarrito: plan.idCarritoCuenta, idCotizacion: null, precioAcordado: null, ...n });
     }
     this.lineas = this.lineas.filter((x) => x.idCarrito !== plan.idCarritoVisitante);
     this.carritos = this.carritos.filter((x) => x.idCarrito !== plan.idCarritoVisitante);

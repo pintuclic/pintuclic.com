@@ -24,6 +24,8 @@ export function LineaCarritoItem({ linea, ocupada, onCambiarCantidad, onQuitar }
   const nombre = producto.nombre ?? 'Producto';
   const tope = producto.esCombo && producto.topeUnidades !== null ? producto.topeUnidades : CANTIDAD_MAXIMA_POR_LINEA;
   const conDescuento = vendible && precio !== null && (precio.descuentoTotal ?? 0) > 0;
+  /** C15: viene de una cotización aceptada; su precio y cantidad están pactados. */
+  const cotizada = linea.idCotizacion !== null;
   const [texto, setTexto] = useState(String(linea.cantidad));
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +77,13 @@ export function LineaCarritoItem({ linea, ocupada, onCambiarCantidad, onQuitar }
           <div className="min-w-0 space-y-1">
             {producto.marca !== null && (
               <p className="font-title text-xs font-medium uppercase tracking-wider text-neutral-medium">{producto.marca}</p>
+            )}
+            {cotizada && (
+              <p>
+                <Link href={`/cotizaciones/${linea.idCotizacion}`} className="inline-flex">
+                  <Badge variant="success">Precio de tu cotización</Badge>
+                </Link>
+              </p>
             )}
             {enlace === null ? (
               <p className="font-title text-base font-semibold text-neutral-black">{nombre}</p>
@@ -135,7 +144,11 @@ export function LineaCarritoItem({ linea, ocupada, onCambiarCantidad, onQuitar }
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {vendible ? (
+          {cotizada ? (
+            <p className="text-sm text-neutral-dark">
+              Cantidad: <span className="font-semibold text-neutral-black">{linea.cantidad}</span>
+            </p>
+          ) : vendible ? (
             <div>
               <div className="inline-flex items-center rounded-btn border border-neutral-light bg-neutral-white">
                 <IconButton
