@@ -1,4 +1,5 @@
 import type {
+  BuscarReferenciasRequest,
   CrearEventoRequest,
   Estado,
   Evento,
@@ -39,6 +40,12 @@ export class EventosService {
     private readonly catalogo: CatalogoPreciosRepositoryPort,
     private readonly reloj: () => Date = () => new Date(),
   ) {}
+
+  /** D14: buscador del editor. */
+  async buscarReferencias(filtro: BuscarReferenciasRequest): Promise<ReferenciaCatalogo[]> {
+    const filas = await this.catalogo.buscar(filtro.tipo, filtro.busqueda, filtro.limite);
+    return filas.map((f) => ({ tipo: filtro.tipo, id: f.id, nombre: f.nombre }));
+  }
 
   async listar(filtro: ListarEventosRequest): Promise<Pagina<EventoResumen>> {
     const ahora = this.reloj();

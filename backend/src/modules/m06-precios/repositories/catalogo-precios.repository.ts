@@ -99,6 +99,105 @@ export class CatalogoPreciosRepository implements CatalogoPreciosRepositoryPort 
     }));
   }
 
+  async buscar(
+    tipo: Exclusion['tipo'],
+    busqueda: string | undefined,
+    limite: number,
+  ): Promise<Array<{ id: number; nombre: string }>> {
+    const contiene = (campo: string): Record<string, unknown> =>
+      busqueda === undefined || busqueda === '' ? {} : { [campo]: { contains: busqueda, mode: 'insensitive' } };
+    const activo = { estado: 'activo' } as const;
+    switch (tipo) {
+      case 'marca':
+        return (
+          await prisma.marca.findMany({
+            where: { ...activo, ...contiene('nombre') },
+            orderBy: { nombre: 'asc' },
+            take: limite,
+          })
+        ).map((m) => ({ id: m.idMarca, nombre: m.nombre }));
+      case 'linea':
+        return (
+          await prisma.linea.findMany({
+            where: { ...activo, ...contiene('nombre') },
+            include: { marca: { select: { nombre: true } } },
+            orderBy: [{ marca: { nombre: 'asc' } }, { nombre: 'asc' }],
+            take: limite,
+          })
+        ).map((l) => ({ id: l.idLinea, nombre: `${l.marca.nombre} · ${l.nombre}` }));
+      case 'categoria':
+        return (
+          await prisma.categoria.findMany({
+            where: { ...activo, ...contiene('nombre') },
+            orderBy: { nombre: 'asc' },
+            take: limite,
+          })
+        ).map((c) => ({ id: c.idCategoria, nombre: c.nombre }));
+      case 'subcategoria':
+        return (
+          await prisma.subcategoria.findMany({
+            where: { ...activo, ...contiene('nombre') },
+            include: { categoria: { select: { nombre: true } } },
+            orderBy: [{ categoria: { nombre: 'asc' } }, { nombre: 'asc' }],
+            take: limite,
+          })
+        ).map((s) => ({ id: s.idSubcategoria, nombre: `${s.categoria.nombre} · ${s.nombre}` }));
+      case 'producto':
+        return (
+          await prisma.producto.findMany({
+            where: { ...activo, ...contiene('nombre') },
+            include: { marca: { select: { nombre: true } } },
+            orderBy: [{ marca: { nombre: 'asc' } }, { nombre: 'asc' }],
+            take: limite,
+          })
+        ).map((p) => ({ id: p.idProducto, nombre: `${p.marca.nombre} · ${p.nombre}` }));
+      case 'variante':
+        return (
+          await prisma.variante.findMany({
+            where:
+              busqueda === undefined || busqueda === ''
+                ? { ...activo, producto: activo }
+                : {
+                    ...activo,
+                    producto: activo,
+                    OR: [
+                      { sku: { contains: busqueda, mode: 'insensitive' } },
+                      { producto: { nombre: { contains: busqueda, mode: 'insensitive' } } },
+                    ],
+                  },
+            include: { medida: { select: { nombre: true } }, producto: { select: { nombre: true } } },
+            orderBy: [{ producto: { nombre: 'asc' } }, { idVariante: 'asc' }],
+            take: limite,
+          })
+        ).map((v) => ({ id: v.idVariante, nombre: `${v.producto.nombre} · ${v.medida.nombre} (${v.sku})` }));
+      case 'color':
+        return (
+          await prisma.color.findMany({
+            where:
+              busqueda === undefined || busqueda === ''
+                ? activo
+                : {
+                    ...activo,
+                    OR: [
+                      { nombre: { contains: busqueda, mode: 'insensitive' } },
+                      { codigo: { contains: busqueda, mode: 'insensitive' } },
+                    ],
+                  },
+            orderBy: { nombre: 'asc' },
+            take: limite,
+          })
+        ).map((c) => ({ id: c.idColor, nombre: c.codigo === null ? c.nombre : `${c.nombre} (${c.codigo})` }));
+      case 'familia_color':
+        return (
+          await prisma.familiaColor.findMany({
+            where: { ...activo, ...contiene('nombre') },
+            orderBy: { orden: 'asc' },
+            take: limite,
+          })
+        ).map((f) => ({ id: f.idFamiliaColor, nombre: f.nombre }));
+    }
+  }
+
   async nombrar(refs: readonly Exclusion[]): Promise<{ nombres: Map<string, string>; inexistentes: Exclusion[] }> {
     const ids = (tipo: Exclusion['tipo']): number[] => [
       ...new Set(refs.filter((r) => r.tipo === tipo).map((r) => r.id)),

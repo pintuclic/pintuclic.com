@@ -280,6 +280,7 @@ describe.skipIf(URL_BD === undefined)('M06 · precios, eventos y descuentos (HTT
       ['actualizar tipo', 'PUT', '/tipos-cliente-empresa/1', {}],
       ['estado tipo', 'PATCH', '/tipos-cliente-empresa/1/estado', { estado: 'inactivo' }],
       ['simular', 'POST', '/simular', {}],
+      ['buscar referencias', 'GET', '/referencias?tipo=marca', undefined],
     ];
 
     it.each(rutas)('%s: sin sesión responde 404 RECURSO_NO_DISPONIBLE', async (_n, m, ruta, cuerpo) => {
@@ -462,6 +463,41 @@ describe.skipIf(URL_BD === undefined)('M06 · precios, eventos y descuentos (HTT
         ]),
       ).toEqual([['P1', 20, 2, 2]]);
       expect(await prisma.eventoDescuento.count({ where: { nombre: { startsWith: PREFIJO } } })).toBe(0);
+    });
+
+    it('el buscador del editor encuentra cada tipo de referencia por nombre (D14)', async () => {
+      const buscar = async (tipo: string, texto: string): Promise<Dato[]> =>
+        lista(await admin('GET', `/referencias?tipo=${tipo}&busqueda=${encodeURIComponent(texto)}`));
+      const nombres = (filas: Dato[]): unknown[] => filas.map((f) => f.nombre);
+      expect(await buscar('marca', `${PREFIJO} marca a`)).toEqual([
+        { tipo: 'marca', id: c.marcaA, nombre: `${PREFIJO} Marca A` },
+      ]);
+      expect(nombres(await buscar('linea', 'koraza')).filter((n) => String(n).includes(PREFIJO))).toEqual([
+        `${PREFIJO} Marca A · ${PREFIJO} Koraza`,
+      ]);
+      expect(nombres(await buscar('producto', `${PREFIJO} P1`))).toEqual([`${PREFIJO} Marca A · ${PREFIJO} P1`]);
+      expect((await buscar('variante', `${PREFIJO}-P1`)).map((f) => f.id).sort()).toEqual([c.p1c, c.p1g].sort());
+      expect(await buscar('color', `${PREFIJO} Blanco`)).toEqual([
+        { tipo: 'color', id: c.blanco, nombre: `${PREFIJO} Blanco` },
+      ]);
+      expect(await buscar('familia_color', `${PREFIJO} Blancos`)).toEqual([
+        { tipo: 'familia_color', id: c.famBlanco, nombre: `${PREFIJO} Blancos` },
+      ]);
+      expect((await buscar('categoria', `${PREFIJO}-cat`)).length).toBe(1);
+      expect(nombres(await buscar('subcategoria', `${PREFIJO}-sub`))).toEqual([`${PREFIJO}-cat · ${PREFIJO}-sub`]);
+      expect(await buscar('marca', 'texto que no existe en ninguna marca')).toEqual([]);
+    });
+
+    it('el buscador respeta el límite, ignora lo inactivo y valida el tipo', async () => {
+      expect(lista(await admin('GET', `/referencias?tipo=producto&busqueda=${PREFIJO}&limite=2`))).toHaveLength(2);
+      await prisma.marca.update({ where: { idMarca: c.marcaB }, data: { estado: 'inactivo' } });
+      expect(
+        lista(await admin('GET', `/referencias?tipo=marca&busqueda=${encodeURIComponent(`${PREFIJO} Marca B`)}`)),
+      ).toEqual([]);
+      await prisma.marca.update({ where: { idMarca: c.marcaB }, data: { estado: 'activo' } });
+      const malo = await admin('GET', '/referencias?tipo=algo');
+      expect([malo.status, codigo(malo)]).toEqual([400, 'PARAMETRO_INVALIDO']);
+      expect((await admin('GET', '/referencias?tipo=marca&limite=500')).status).toBe(400);
     });
 
     it('eventos en curso: solo los que aplican ahora, con su porcentaje máximo', async () => {

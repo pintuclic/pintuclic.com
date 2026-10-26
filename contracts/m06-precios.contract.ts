@@ -168,6 +168,9 @@ import { z } from 'zod';
  *  D11 El `nombre` del evento se muestra al cliente y se congela como `origen` del descuento en la orden.
  *  D12 PROPUESTAS incluidas, que se pueden quitar sin afectar el resto: el simulador y la vista previa de
  *      "qué productos entran en este evento" (útil para comprobar las excepciones antes de publicar).
+ *  D14 El editor de eventos busca marcas, líneas, productos, colores… por nombre con una ruta propia de M06
+ *      (`GET /referencias`, solo lectura, catalogo.ver) en vez de usar las de M01: así M06 no depende de su
+ *      frontend ni de sus formas de respuesta.
  *  D13 Los cupones se conservan (el campo está en el mockup del carrito); no estaban en tu lista, di si sobran.
  *
  * ── Piezas en otros módulos (cada una en su PR pequeño, con visto bueno del Tech Lead) ──
@@ -430,6 +433,14 @@ export const productoAfectadoSchema = z.object({
   variantesTotales: z.number().int().nonnegative(),
 });
 export type ProductoAfectado = z.infer<typeof productoAfectadoSchema>;
+
+/** GET /referencias — buscador del editor de eventos (D14): activos cuyo nombre contiene el texto. */
+export const buscarReferenciasRequestSchema = z.object({
+  tipo: tipoExclusionSchema,
+  busqueda: z.string().trim().max(100).optional(),
+  limite: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type BuscarReferenciasRequest = z.infer<typeof buscarReferenciasRequestSchema>;
 
 /** Evento en curso, tal como se enseña al público (pestaña Promociones). */
 export const eventoPublicoSchema = z.object({
@@ -816,6 +827,9 @@ export type ListarEventosResponseEnvelope = z.infer<typeof listarEventosResponse
 export const vistaPreviaEventoResponseEnvelopeSchema = respuestaPaginada(productoAfectadoSchema);
 export type VistaPreviaEventoResponseEnvelope = z.infer<typeof vistaPreviaEventoResponseEnvelopeSchema>;
 
+export const buscarReferenciasResponseEnvelopeSchema = respuestaLista(referenciaCatalogoSchema);
+export type BuscarReferenciasResponseEnvelope = z.infer<typeof buscarReferenciasResponseEnvelopeSchema>;
+
 export const cuponResponseEnvelopeSchema = respuestaUno(cuponSchema);
 export type CuponResponseEnvelope = z.infer<typeof cuponResponseEnvelopeSchema>;
 export const listarCuponesResponseEnvelopeSchema = respuestaPaginada(cuponSchema);
@@ -947,6 +961,7 @@ export type ErrorPreciosEnvelope = z.infer<typeof errorPreciosEnvelopeSchema>;
  *   GET   /eventos                         catalogo.ver     → listarEventos (paginado)
  *   POST  /eventos                         catalogo.editar  → crearEvento
  *   POST  /eventos/vista-previa            catalogo.ver     → productos que entran (paginado; no escribe)
+ *   GET   /referencias                     catalogo.ver     → buscarReferencias (lista sin paginar, D14)
  *   GET   /eventos/:idEvento               catalogo.ver
  *   PUT   /eventos/:idEvento               catalogo.editar  → actualizarEvento
  *   PATCH /eventos/:idEvento/estado        catalogo.editar  → cambiarEstado

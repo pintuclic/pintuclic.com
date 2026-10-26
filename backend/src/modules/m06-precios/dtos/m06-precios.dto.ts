@@ -237,6 +237,14 @@ export const productoAfectadoSchema = z.object({
 });
 export type ProductoAfectado = z.infer<typeof productoAfectadoSchema>;
 
+/** GET /referencias — buscador del editor de eventos (D14): activos cuyo nombre contiene el texto. */
+export const buscarReferenciasRequestSchema = z.object({
+  tipo: tipoExclusionSchema,
+  busqueda: z.string().trim().max(100).optional(),
+  limite: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type BuscarReferenciasRequest = z.infer<typeof buscarReferenciasRequestSchema>;
+
 /** Evento en curso, tal como se enseña al público (pestaña Promociones). */
 export const eventoPublicoSchema = z.object({
   idEvento: idSchema,
@@ -622,6 +630,9 @@ export type ListarEventosResponseEnvelope = z.infer<typeof listarEventosResponse
 export const vistaPreviaEventoResponseEnvelopeSchema = respuestaPaginada(productoAfectadoSchema);
 export type VistaPreviaEventoResponseEnvelope = z.infer<typeof vistaPreviaEventoResponseEnvelopeSchema>;
 
+export const buscarReferenciasResponseEnvelopeSchema = respuestaLista(referenciaCatalogoSchema);
+export type BuscarReferenciasResponseEnvelope = z.infer<typeof buscarReferenciasResponseEnvelopeSchema>;
+
 export const cuponResponseEnvelopeSchema = respuestaUno(cuponSchema);
 export type CuponResponseEnvelope = z.infer<typeof cuponResponseEnvelopeSchema>;
 export const listarCuponesResponseEnvelopeSchema = respuestaPaginada(cuponSchema);
@@ -753,6 +764,7 @@ export type ErrorPreciosEnvelope = z.infer<typeof errorPreciosEnvelopeSchema>;
  *   GET   /eventos                         catalogo.ver     → listarEventos (paginado)
  *   POST  /eventos                         catalogo.editar  → crearEvento
  *   POST  /eventos/vista-previa            catalogo.ver     → productos que entran (paginado; no escribe)
+ *   GET   /referencias                     catalogo.ver     → buscarReferencias (lista sin paginar, D14)
  *   GET   /eventos/:idEvento               catalogo.ver
  *   PUT   /eventos/:idEvento               catalogo.editar  → actualizarEvento
  *   PATCH /eventos/:idEvento/estado        catalogo.editar  → cambiarEstado

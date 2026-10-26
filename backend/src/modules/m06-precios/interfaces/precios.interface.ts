@@ -50,6 +50,8 @@ export interface CatalogoPreciosRepositoryPort {
   variantesActivasDeProductos(idsProducto: readonly number[]): Promise<FilaClasificacion[]>;
   /** Todas las variantes activas de productos activos. */
   variantesActivasDelCatalogo(): Promise<FilaCandidata[]>;
+  /** Referencias activas del tipo cuyo nombre contiene el texto, ordenadas por nombre (D14). */
+  buscar(tipo: Exclusion['tipo'], busqueda: string | undefined, limite: number): Promise<Array<{ id: number; nombre: string }>>;
   /** Nombre de cada referencia que existe (clave `claveReferencia`) y las que no existen (R19). */
   nombrar(refs: readonly Exclusion[]): Promise<{ nombres: Map<string, string>; inexistentes: Exclusion[] }>;
 }

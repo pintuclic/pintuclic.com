@@ -76,6 +76,7 @@ export function construirModuloM06(autorizacion: AutorizacionService, dep: Depen
   adminRouter.get('/eventos', ver, c.listarEventos);
   adminRouter.post('/eventos', editar, c.crearEvento);
   adminRouter.post('/eventos/vista-previa', ver, c.vistaPreviaEvento);
+  adminRouter.get('/referencias', ver, c.buscarReferencias);
   adminRouter.get('/eventos/:idEvento', ver, c.obtenerEvento);
   adminRouter.put('/eventos/:idEvento', editar, c.actualizarEvento);
   adminRouter.patch('/eventos/:idEvento/estado', editar, c.estadoEvento);

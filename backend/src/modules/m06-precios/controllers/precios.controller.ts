@@ -4,6 +4,7 @@ import {
   actualizarCuponRequestSchema,
   actualizarEventoRequestSchema,
   actualizarTipoClienteRequestSchema,
+  buscarReferenciasRequestSchema,
   calcularRequestSchema,
   cambiarEstadoRequestSchema,
   crearCuponRequestSchema,
@@ -93,6 +94,12 @@ export class PreciosController {
     if (query === null || datos === null) return;
     const p = await this.eventos.vistaPrevia(datos, query.pagina, query.limite);
     responderPagina(res, p.items, p.total, query.pagina, query.limite);
+  });
+
+  buscarReferencias = manejar(async (req, res) => {
+    const query = validar(res, buscarReferenciasRequestSchema, req.query);
+    if (query === null) return;
+    responderExito(res, await this.eventos.buscarReferencias(query));
   });
 
   /* ── Cupones ─────────────────────────────────────────────────────────── */
