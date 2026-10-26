@@ -61,6 +61,8 @@ export const CODIGOS_PERMISO = [
   'atencion.ver',
   'atencion.editar',
   'atencion.atender_clientes',
+  'patrocinios.ver',
+  'patrocinios.editar',
   // Alias legados soportados en seed
   'productos.crear',
   'productos.eliminar',
@@ -80,6 +82,7 @@ export const AREA_FUNCIONAL = [
   'estadisticas',
   'notificaciones',
   'atencion',
+  'patrocinios',
 ] as const;
 export const areaFuncionalSchema = z.enum(AREA_FUNCIONAL);
 export type AreaFuncional = z.infer<typeof areaFuncionalSchema>;

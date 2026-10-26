@@ -65,7 +65,10 @@ INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     -- Atención al cliente (M15 HU-ATC-02, HU-ATC-03, HU-ATC-04, HU-ATC-05)
     (24, 'atencion.ver',                   'Ver solicitudes de contacto, horario y canal de atención',         'activo'),
     (25, 'atencion.editar',                'Gestionar el horario de atención y el canal de WhatsApp',          'activo'),
-    (26, 'atencion.atender_clientes',      'Atender las consultas escaladas a un asesor humano',               'activo')
+    (26, 'atencion.atender_clientes',      'Atender las consultas escaladas a un asesor humano',               'activo'),
+    -- Patrocinios y publicidad (M14 HU-PAT-01, HU-PAT-02)
+    (27, 'patrocinios.ver',                'Consultar campañas de patrocinio, anuncios y su medición',         'activo'),
+    (28, 'patrocinios.editar',             'Crear y editar campañas de patrocinio y anuncios publicitarios',   'activo')
 ON CONFLICT (id_permiso) DO NOTHING;
 
 -- 1.5 Asignación de Permisos a Roles
@@ -75,6 +78,7 @@ INSERT INTO asignacion_permiso (id_rol, id_permiso) VALUES
     (1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
     (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
     (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26),
+    (1, 27), (1, 28),
     (3, 4), (3, 10)
 ON CONFLICT (id_rol, id_permiso) DO NOTHING;
 
