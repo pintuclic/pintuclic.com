@@ -10,6 +10,13 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.12] - 2026-10-26
+### Esquema 4.13 (73 Tablas, sin cambios de DDL) - M17: parámetro `comercial.umbral_sugerir_empresa`
+- **Seed:** parámetro 12 `comercial.umbral_sugerir_empresa` (área `comercial`, número, 500 000 por defecto, mínimo 0, sin máximo): total del carrito desde el que M06 invita a un cliente registrado a solicitar la cuenta empresa (R12 del contrato de M06). Es editable desde la configuración general; el valor inicial está por confirmar.
+- Se agregó la clave a `CLAVES_PARAMETROS` (contrato de M17 y sus dos espejos). Idempotente: no pisa un valor ya modificado.
+
+---
+
 ## [v3.11] - 2026-10-26
 ### Esquema 4.13 (73 Tablas) - M06: eventos de descuento, cupones y tipo de cliente empresa
 - **Alcance General:** cinco tablas nuevas, cuatro ENUMs y dos columnas pedidas por el contrato de M06 (`contracts/m06-precios.contract.ts`, cambio C1). Cambio aditivo.
