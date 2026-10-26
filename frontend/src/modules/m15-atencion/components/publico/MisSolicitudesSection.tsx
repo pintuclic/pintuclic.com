@@ -7,7 +7,7 @@ import { MessageSquare, Star } from 'lucide-react';
 import {
   Alert,
   Badge,
-   type BadgeVariant,
+  type BadgeVariant,
   Button,
   ButtonLink,
   Select,
@@ -34,6 +34,7 @@ import {
   obtenerMiSolicitudDetalle,
 } from '../../services/atencion-api';
 import { mensajeDeError } from '../../services/mensaje-error';
+import { FormularioContacto } from './FormularioContacto';
 
 const LIMITE = 10;
 const ESTRELLAS: readonly CalificacionAtencion[] = [1, 2, 3, 4, 5];
@@ -250,7 +251,7 @@ function HiloSolicitudCliente({ idSolicitud, onActualizado }: HiloClienteProps) 
         <div className="space-y-3">
           <div className="rounded-card border border-neutral-light bg-neutral-lightest p-3 font-sans text-sm text-neutral-dark">
             Esta solicitud fue atendida y quedó cerrada. Si tienes otra inquietud, puedes crear una
-            nueva solicitud desde el centro de ayuda.
+            nueva solicitud.
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-neutral-light bg-neutral-white p-4">
@@ -265,7 +266,11 @@ function HiloSolicitudCliente({ idSolicitud, onActualizado }: HiloClienteProps) 
               </p>
             </div>
 
-            <div className="flex items-center gap-1" role="group" aria-label="Calificar atención de 1 a 5 estrellas">
+            <div
+              className="flex items-center gap-1"
+              role="group"
+              aria-label="Calificar atención de 1 a 5 estrellas"
+            >
               {ESTRELLAS.map((valor) => {
                 const activa = detalle.calificacion !== null && valor <= detalle.calificacion;
                 return (
@@ -307,6 +312,7 @@ export function MisSolicitudesSection() {
   const [tipo, setTipo] = useState<TipoSolicitudContacto | ''>('');
   const [estado, setEstado] = useState<EstadoSolicitudContacto | ''>('');
   const [idExpandido, setIdExpandido] = useState<string | null>(null);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
@@ -370,10 +376,38 @@ export function MisSolicitudesSection() {
             califica la atención recibida.
           </p>
         </div>
-        <ButtonLink href="/atencion#escribenos" variant="outline" size="sm">
-          Nueva solicitud
-        </ButtonLink>
+        <div className="flex flex-wrap items-center gap-2">
+          <ButtonLink href="/centro-de-ayuda#contacto-equipo" variant="ghost" size="sm">
+            Ir al centro de ayuda
+          </ButtonLink>
+          <Button
+            variant={mostrarFormulario ? 'selection' : 'outline'}
+            selected={mostrarFormulario}
+            size="sm"
+            onClick={() => setMostrarFormulario((actual) => !actual)}
+          >
+            {mostrarFormulario ? 'Ocultar formulario' : 'Nueva solicitud'}
+          </Button>
+        </div>
       </div>
+
+      {mostrarFormulario && (
+        <div className="rounded-card border border-neutral-light bg-neutral-white p-5 shadow-card">
+          <h3 className="mb-1 font-title text-base font-bold text-corporate">
+            Nueva solicitud de contacto
+          </h3>
+          <p className="mb-4 font-sans text-sm text-neutral-medium">
+            Cuéntanos qué necesitas y podrás dar seguimiento a la conversación desde aquí mismo.
+          </p>
+          <FormularioContacto
+            mostrarEnlaceMisSolicitudes={false}
+            onSolicitudCreada={() => {
+              setPagina(1);
+              void cargar();
+            }}
+          />
+        </div>
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <Select
@@ -406,11 +440,20 @@ export function MisSolicitudesSection() {
           <p className="font-sans text-sm text-neutral-dark">
             Aún no tienes solicitudes de contacto con estos filtros.
           </p>
-          <div className="mt-4">
-            <ButtonLink href="/atencion#escribenos" variant="primary-action" size="sm">
-              Escribir al equipo
-            </ButtonLink>
-          </div>
+          {!mostrarFormulario && (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              <Button
+                variant="primary-action"
+                size="sm"
+                onClick={() => setMostrarFormulario(true)}
+              >
+                Escribir al equipo
+              </Button>
+              <ButtonLink href="/centro-de-ayuda#contacto-equipo" variant="outline" size="sm">
+                Ver centro de ayuda
+              </ButtonLink>
+            </div>
+          )}
         </div>
       ) : (
         <ul className="space-y-4">
