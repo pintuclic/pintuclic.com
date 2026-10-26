@@ -70,6 +70,17 @@ export function precioDesdePorcentaje(referencia: number, texto: string): number
   return porcentaje < 100 ? precioConDescuento(referencia, porcentaje) : null;
 }
 
+/**
+ * Una línea es "personalizada" si hay un descuento general aplicado y su % ya no es ese
+ * (se cambió a mano el % o el precio). Compara como números: "10", "10.0" y "10,00" son el mismo %.
+ */
+export function esPersonalizado(general: string | null, porcentajeLinea: string): boolean {
+  if (general === null) return false;
+  const a = Number(general.trim().replace(',', '.'));
+  const b = Number(porcentajeLinea.trim().replace(',', '.'));
+  return porcentajeLinea.trim() === '' || !Number.isFinite(b) || Math.abs(a - b) > 0.005;
+}
+
 /** % de descuento que representa un precio acordado frente a la referencia (puede ser negativo). */
 export function porcentajeDescuento(referencia: number, acordado: number): number {
   if (referencia <= 0) return 0;

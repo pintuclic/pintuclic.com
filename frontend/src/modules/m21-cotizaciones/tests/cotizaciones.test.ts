@@ -11,6 +11,7 @@ import {
 } from '../services/editor';
 import {
   ETIQUETA_ESTADO,
+  esPersonalizado,
   estadoDeUrl,
   fechaCorta,
   paginaDeUrl,
@@ -84,6 +85,14 @@ describe('M21 · editor del panel', () => {
     expect(faltanPrecios(conCambios)).toBe(false);
     expect(totalEnPantalla(v)).toBeNull();
     expect(totalEnPantalla(conCambios)).toBe(450_000);
+  });
+
+  it('marca como personalizada la línea cuyo % ya no es el general', () => {
+    expect(esPersonalizado(null, '5')).toBe(false);
+    expect(esPersonalizado('10', '10')).toBe(false);
+    expect(esPersonalizado('10', '10,00')).toBe(false);
+    expect(esPersonalizado('10', '1')).toBe(true);
+    expect(esPersonalizado('10', '')).toBe(true);
   });
 
   it('la referencia y el descuento sobre el total salen de las líneas en pantalla', () => {

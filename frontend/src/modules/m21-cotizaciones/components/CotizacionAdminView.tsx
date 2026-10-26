@@ -23,7 +23,7 @@ import {
   totalEnPantalla,
   valoresDelEditor,
 } from '../services/editor';
-import { fechaCorta, porcentajeDescuento, precioDesdePorcentaje } from '../services/textos-cotizaciones';
+import { esPersonalizado, fechaCorta, porcentajeDescuento, precioDesdePorcentaje } from '../services/textos-cotizaciones';
 import { EstadoCotizacionBadge, TablaLineas, Totales } from './comunes';
 
 /** /admin/cotizaciones/:id: revisar, ajustar (R5), enviar (R6) o rechazar (R7). */
@@ -38,6 +38,8 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
   /** Descuento general: un % para todas las líneas incluidas (atajo; cada línea se puede ajustar después). */
   const [porcentajeGeneral, setPorcentajeGeneral] = useState('');
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
+  /** El % general que se aplicó con "Aplicar a todos"; null si no hay. */
+  const [generalAplicado, setGeneralAplicado] = useState<string | null>(null);
 
   const editor = useForm<EditorFormData>({ resolver: zodResolver(editorFormSchema), defaultValues: { lineas: [], nota: '', fechaVencimiento: '' } });
   const { fields } = useFieldArray({ control: editor.control, name: 'lineas', keyName: 'clave' });
@@ -47,6 +49,8 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
   const cargar = (d: CotizacionDetalle): void => {
     setC(d);
     setPorcentajes({});
+    setGeneralAplicado(null);
+    setPorcentajeGeneral('');
     editor.reset(valoresDelEditor(d));
   };
 
@@ -82,6 +86,35 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
     }
     setErrorGeneral(null);
     setPorcentajes((p) => ({ ...p, ...nuevos }));
+    setGeneralAplicado(porcentajeGeneral.trim());
+  };
+
+  /** % que se ve en la línea: lo escrito, o el que resulta de su precio acordado. */
+  const porcentajeDeLinea = (idLinea: number, referencia: number, precioTexto: string): string => {
+    const escrito = porcentajes[idLinea];
+    if (escrito !== undefined) return escrito;
+    const precio = Number(precioTexto);
+    return precioTexto.trim() === '' || !Number.isFinite(precio) ? '' : String(porcentajeDescuento(referencia, precio));
+  };
+
+  /** Quita el descuento general: las líneas que lo tenían vuelven a "Sin precio"; las personalizadas no cambian. */
+  const quitarATodos = (): void => {
+    if (c === null) return;
+    const quitadas: number[] = [];
+    editor.getValues('lineas').forEach((l, i) => {
+      const referencia = c.lineas.find((x) => x.idLinea === l.idLinea)?.precioReferencia ?? 0;
+      if (!l.incluida || esPersonalizado(generalAplicado, porcentajeDeLinea(l.idLinea, referencia, l.precio))) return;
+      editor.setValue(`lineas.${i}.precio`, '', { shouldDirty: true, shouldValidate: true });
+      quitadas.push(l.idLinea);
+    });
+    setPorcentajes((p) => {
+      const resto = { ...p };
+      for (const id of quitadas) delete resto[id];
+      return resto;
+    });
+    setGeneralAplicado(null);
+    setPorcentajeGeneral('');
+    setErrorGeneral(null);
   };
 
   const guardar = editor.handleSubmit(async (datos) => {
@@ -238,6 +271,11 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
             <Button type="button" variant="outline" onClick={aplicarATodos}>
               Aplicar a todos
             </Button>
+            {generalAplicado !== null && (
+              <Button type="button" variant="ghost" onClick={quitarATodos} leftIcon={<X aria-hidden className="h-4 w-4" />}>
+                Quitar descuento
+              </Button>
+            )}
             <p className="text-sm text-neutral-medium sm:pb-2.5">
               Pone ese % sobre el precio de referencia de cada producto incluido. Luego puedes ajustar cualquiera a mano.
             </p>
@@ -302,20 +340,21 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
                           inputMode="decimal"
                           disabled={!incluida}
                           placeholder="%"
-                          value={
-                            porcentajes[linea.idLinea] ??
-                            (precio === null || !Number.isFinite(precio) ? '' : String(porcentajeDescuento(linea.precioReferencia, precio)))
-                          }
+                          value={porcentajeDeLinea(linea.idLinea, linea.precioReferencia, precioTexto)}
                           onChange={(e) => {
-                            // El precio y el subtotal se calculan mientras se escribe el %.
+                            // El precio y el subtotal se calculan mientras se escribe el %; si se borra, el precio también.
                             const texto = e.target.value;
                             setPorcentajes((p) => ({ ...p, [linea.idLinea]: texto }));
-                            const nuevo = precioDesdePorcentaje(linea.precioReferencia, texto);
+                            const nuevo = texto.trim() === '' ? '' : precioDesdePorcentaje(linea.precioReferencia, texto);
                             if (nuevo !== null) {
                               editor.setValue(`lineas.${i}.precio`, String(nuevo), { shouldDirty: true, shouldValidate: true });
                             }
                           }}
                         />
+                        {incluida &&
+                          esPersonalizado(generalAplicado, porcentajeDeLinea(linea.idLinea, linea.precioReferencia, precioTexto)) && (
+                            <p className="mt-1 text-xs font-medium text-action">Personalizado</p>
+                          )}
                       </td>
                       <td className="w-40 px-4 py-3 align-top">
                         <Input
