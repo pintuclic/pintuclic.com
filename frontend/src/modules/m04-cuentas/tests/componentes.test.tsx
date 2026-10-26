@@ -135,6 +135,37 @@ describe('Panel de empresas (HU-CUE-09)', () => {
     expect(salida).toContain('Rechazar');
   });
 
+  describe('tipo de cliente empresa al aprobar (M06 · D8)', () => {
+    const tipos = [
+      { idSubRolEmpresa: 1, nombre: 'Proveedor', porcentaje: 15, montoMinimoCompra: 0 },
+      { idSubRolEmpresa: 2, nombre: 'Constructora', porcentaje: 10, montoMinimoCompra: 300000 },
+    ];
+
+    it('en una solicitud de cuenta pide elegir el tipo y no deja aprobar hasta elegirlo', () => {
+      const salida = html(<DictamenPanel motivoObligatorio onDictaminar={async () => undefined} tiposCliente={tipos} />);
+      expect(salida).toContain('Tipo de cliente empresa');
+      expect(salida).toContain('Proveedor · 15 % de descuento');
+      expect(salida).toContain('Constructora · 10 % de descuento');
+      // el botón Aprobar nace deshabilitado
+      expect(salida).toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Aprobar/s);
+    });
+
+    it('en una renovación de NIT (sin tipos) no pide tipo y deja aprobar', () => {
+      const salida = html(<DictamenPanel motivoObligatorio={false} onDictaminar={async () => undefined} />);
+      expect(salida).not.toContain('Tipo de cliente empresa');
+      expect(salida).not.toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Aprobar/s);
+    });
+
+    it('mientras cargan los tipos lo dice, y si no hay ninguno activo explica dónde crearlos', () => {
+      expect(html(<DictamenPanel motivoObligatorio onDictaminar={async () => undefined} tiposCliente={null} />)).toContain(
+        'Cargando los tipos de cliente',
+      );
+      const vacio = html(<DictamenPanel motivoObligatorio onDictaminar={async () => undefined} tiposCliente={[]} />);
+      expect(vacio).toContain('No hay tipos de cliente empresa activos');
+      expect(vacio).toContain('Promociones');
+    });
+  });
+
   it('muestra el estado legible', () => {
     expect(html(<EstadoBadge estado="pendiente" />)).toContain('Pendiente');
     expect(html(<EstadoBadge estado="rechazada" />)).toContain('Rechazada');

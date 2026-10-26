@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Modal, Skeleton } from '@/core/components';
 import type { DictamenSolicitudEmpresaFormData, EstadoSolicitudEmpresa } from '../../dtos/m04-cuentas.dto';
-import type { ListaPaginada, SolicitudEmpresaAdmin } from '../../interfaces/api.interfaces';
-import { dictaminarSolicitud, listarSolicitudes } from '../../services/admin-empresas.service';
+import type { ListaPaginada, SolicitudEmpresaAdmin, TipoClienteOpcion } from '../../interfaces/api.interfaces';
+import { dictaminarSolicitud, listarSolicitudes, listarTiposCliente } from '../../services/admin-empresas.service';
 import { aErrorCuentas, type ErrorCuentas } from '../../services/errores';
 import { DictamenPanel } from './DictamenPanel';
 import { ErrorAdmin, EstadoBadge, ListaVacia, Paginacion } from './ElementosAdmin';
@@ -141,6 +141,21 @@ function SolicitudDetalle({
   solicitud: SolicitudEmpresaAdmin;
   onDictaminar: (dictamen: DictamenSolicitudEmpresaFormData) => Promise<void>;
 }) {
+  // M06 · D8: al aprobar se elige el tipo de cliente; se cargan solo si la solicitud está pendiente.
+  const [tipos, setTipos] = useState<TipoClienteOpcion[] | null>(null);
+  const [errorTipos, setErrorTipos] = useState<string | null>(null);
+  const pendiente = solicitud.estado === 'pendiente';
+  useEffect(() => {
+    if (!pendiente) return;
+    let vigente = true;
+    listarTiposCliente()
+      .then((t) => vigente && setTipos(t))
+      .catch((e: unknown) => vigente && setErrorTipos(aErrorCuentas(e).mensaje));
+    return () => {
+      vigente = false;
+    };
+  }, [pendiente]);
+
   const filas: ReadonlyArray<[string, string]> = [
     ['NIT', solicitud.nit],
     ['Representante legal', solicitud.nombreRepresentante],
@@ -167,8 +182,13 @@ function SolicitudDetalle({
       {solicitud.estado === 'rechazada' && solicitud.motivoRechazo && (
         <Alert variant="warning">Motivo del rechazo: {solicitud.motivoRechazo}</Alert>
       )}
-      {solicitud.estado === 'pendiente' && (
-        <DictamenPanel motivoObligatorio={motivoObligatorio(solicitud.tipoSolicitud)} onDictaminar={onDictaminar} />
+      {pendiente && errorTipos !== null && <Alert variant="error">{errorTipos}</Alert>}
+      {pendiente && (
+        <DictamenPanel
+          motivoObligatorio={motivoObligatorio(solicitud.tipoSolicitud)}
+          onDictaminar={onDictaminar}
+          tiposCliente={tipos}
+        />
       )}
     </div>
   );
