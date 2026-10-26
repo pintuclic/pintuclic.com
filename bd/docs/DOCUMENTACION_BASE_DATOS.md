@@ -1,6 +1,6 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.16 — esquema 4.16 (M14 Patrocinios y publicidad: campañas, anuncios y medición).  
+> **Versión Actual:** 3.17 — esquema 4.17 (M14: se elimina `producto.patrocinado`; el patrocinio es de las campañas).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
 > **Total de Tablas:** 78  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.17** (esquema 4.17) | 2026-10-27 | Ninguna | Ninguna | M14 · A13: se elimina la columna `producto.patrocinado` (interruptor manual que M01 ya no usa); el patrocinio queda solo en las campañas de M14. Total 78 tablas. | [Ver v3.17](./CHANGELOG_DATABASE.md#v317---2026-10-27) |
 | **v3.16** (esquema 4.16) | 2026-10-26 | `campania_patrocinio`, `campania_objetivo`, `anuncio_publicitario`, `anuncio_imagen`, `medicion_patrocinio` (5) | Ninguna | M14: campañas de patrocinio de productos (por producto, línea o marca, con vigencia y prioridad), anuncios de espacios publicitarios con sus imágenes y medición diaria de impresiones y clics sin datos personales. Siete ENUMs nuevos. Total 78 tablas. | [Ver v3.16](./CHANGELOG_DATABASE.md#v316---2026-10-26) |
 | **v3.15** (esquema 4.15) | 2026-10-26 | Ninguna | Ninguna | M14: permisos `patrocinios.ver` y `patrocinios.editar` (27-28) en el seed. Total 73 tablas. | [Ver v3.15](./CHANGELOG_DATABASE.md#v315---2026-10-26) |
 | **v3.14** (esquema 4.15) | 2026-10-26 | Ninguna | Ninguna | M05: restricciones únicas `carrito(id_usuario)` y `carrito(token_visitante)` (un carrito por dueño); el token se guarda con SHA-256. Modelos Prisma `Carrito` y `LineaCarrito`. Total 73 tablas. | [Ver v3.14](./CHANGELOG_DATABASE.md#v314---2026-10-26) |
@@ -701,7 +702,7 @@ Además amplía `descuento` (`monto_minimo_compra`) y `cuenta_empresa` (`id_sub_
 | **`cupon_uso`** *(v3.11)* | `id_cupon_uso` | `id_cupon` $\rightarrow$ `cupon` (RESTRICT); `id_usuario` $\rightarrow$ `usuario` (SET NULL) | Un uso por orden (`referencia` única, idempotente); `liberado_en` marca la orden cancelada. |
 
 ### Módulo 15: Patrocinios y Publicidad — M14 (5 Tablas, esquema 4.16)
-No toca ninguna tabla existente. La columna `producto.patrocinado` (interruptor manual de M01) se elimina en un PR posterior, cuando M01 deje de usarla (contrato M14 · A13).
+No toca ninguna tabla existente. La columna `producto.patrocinado` (interruptor manual de M01) se eliminó en la v3.17 (esquema 4.17), cuando M01 dejó de usarla (contrato M14 · A13).
 
 | Tabla | PK | FKs | Descripción |
 | :--- | :--- | :--- | :--- |

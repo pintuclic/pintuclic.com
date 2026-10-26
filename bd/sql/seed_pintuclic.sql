@@ -265,13 +265,13 @@ INSERT INTO color (id_color, id_marca, nombre, codigo, id_base, id_acabado, id_f
 ON CONFLICT (id_color) DO NOTHING;
 
 -- 3.8 Productos (marca → línea opcional → producto)
-INSERT INTO producto (id_producto, id_marca, id_linea, id_subcategoria, nombre, descripcion, uso_interior, uso_exterior, estado, publicado, id_categoria_complementaria, patrocinado) VALUES
-    (1, 1, 1,    1,  'Viniltex Ultralavable',      'Vinilo tipo 1 de alta lavabilidad para muros interiores.',          true,  false, 'activo', true, 6,    false),
-    (2, 1, 2,    2,  'Koraza Sol & Lluvia',        'Pintura para fachadas con protección contra sol y lluvia.',         false, true,  'activo', true, 6,    true),
-    (3, 1, 3,    3,  'Pintulux 3 en 1',            'Esmalte que prepara, protege y decora metal y madera.',             true,  true,  'activo', true, 6,    false),
-    (4, 1, 4,    3,  'Esmalte ICO',                'Esmalte de colores de fábrica, sin preparación por colorimetría.',  true,  true,  'activo', true, NULL, false),
-    (5, 1, NULL, 10, 'Barniz Transparente',        'Barniz para proteger y realzar la madera.',                         true,  true,  'activo', true, 6,    false),
-    (6, 2, NULL, 18, 'Brocha de cerda natural',    'Brocha para pinturas base agua y base aceite.',                    false, false, 'activo', true, NULL, false)
+INSERT INTO producto (id_producto, id_marca, id_linea, id_subcategoria, nombre, descripcion, uso_interior, uso_exterior, estado, publicado, id_categoria_complementaria) VALUES
+    (1, 1, 1,    1,  'Viniltex Ultralavable',      'Vinilo tipo 1 de alta lavabilidad para muros interiores.',          true,  false, 'activo', true, 6),
+    (2, 1, 2,    2,  'Koraza Sol & Lluvia',        'Pintura para fachadas con protección contra sol y lluvia.',         false, true,  'activo', true, 6),
+    (3, 1, 3,    3,  'Pintulux 3 en 1',            'Esmalte que prepara, protege y decora metal y madera.',             true,  true,  'activo', true, 6),
+    (4, 1, 4,    3,  'Esmalte ICO',                'Esmalte de colores de fábrica, sin preparación por colorimetría.',  true,  true,  'activo', true, NULL),
+    (5, 1, NULL, 10, 'Barniz Transparente',        'Barniz para proteger y realzar la madera.',                         true,  true,  'activo', true, 6),
+    (6, 2, NULL, 18, 'Brocha de cerda natural',    'Brocha para pinturas base agua y base aceite.',                    false, false, 'activo', true, NULL)
 ON CONFLICT (id_producto) DO NOTHING;
 
 INSERT INTO ficha_recubrimiento (id_producto, id_tipo_resina, tipo_calidad, rendimiento_min, rendimiento_max) VALUES
