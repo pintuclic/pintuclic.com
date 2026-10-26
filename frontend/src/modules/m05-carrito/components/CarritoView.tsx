@@ -5,7 +5,7 @@ import { ShoppingCart } from 'lucide-react';
 import { Alert, Button, ButtonLink, Container, Skeleton } from '@/core/components';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { useCarrito } from '../hooks/useCarrito';
-import { referenciaWhatsapp, textoAviso, textoCambio, textoUnion } from '../services/textos-carrito';
+import { referenciaWhatsapp, textoAviso, textoCambio, textoSiguientePaso, textoUnion } from '../services/textos-carrito';
 import { CuponForm } from './CuponForm';
 import { LineaCarritoItem } from './LineaCarritoItem';
 import { ResumenCarrito } from './ResumenCarrito';
@@ -32,7 +32,7 @@ export function CarritoView() {
                 <li key={`${cambio.tipo}-${i}`}>{textoCambio(cambio, carrito)}</li>
               ))}
             </ul>
-            <p className="mt-2">Revisa tu carrito y vuelve a pulsar «Continuar con la compra».</p>
+            <p className="mt-2">{textoSiguientePaso(c.cambios)}</p>
           </Alert>
         )}
         {c.listoParaPagar && (

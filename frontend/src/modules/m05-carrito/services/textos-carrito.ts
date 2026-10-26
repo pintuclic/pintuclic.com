@@ -85,6 +85,13 @@ export function textoCambio(cambio: CambioRevalidacion, carrito: Carrito): strin
   }
 }
 
+/** Qué hacer después de una revalidación con cambios: un código rechazado no se arregla volviendo a pulsar. */
+export function textoSiguientePaso(cambios: readonly CambioRevalidacion[]): string {
+  return cambios.some((c) => c.tipo === 'cupon_no_aplica')
+    ? 'Quita el código de descuento o escribe otro, y vuelve a pulsar «Continuar con la compra».'
+    : 'Revisa tu carrito y vuelve a pulsar «Continuar con la compra».';
+}
+
 /** Referencia para el botón de WhatsApp de M15. */
 export function referenciaWhatsapp(cantidadItems: number): string {
   return `Tengo dudas sobre mi carrito de ${cantidadItems} ${cantidadItems === 1 ? 'producto' : 'productos'}.`;

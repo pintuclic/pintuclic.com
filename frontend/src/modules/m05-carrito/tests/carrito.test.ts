@@ -8,6 +8,7 @@ import {
   textoCambio,
   textoCupon,
   textoNoVendible,
+  textoSiguientePaso,
   textoUnion,
 } from '../services/textos-carrito';
 
@@ -64,6 +65,11 @@ describe('M05 · textos de la pantalla del carrito', () => {
     );
     expect(textoCambio({ tipo: 'linea_no_vendible', idLinea: 7, motivo: 'color_no_ofrecido' }, carrito)).toContain('Quítalo');
     expect(textoCambio({ tipo: 'linea_quitada', idLinea: 99 }, carrito)).toBe('Un producto que veías ya no está en tu carrito.');
+  });
+
+  it('con un código rechazado pide quitarlo, no solo volver a pulsar', () => {
+    expect(textoSiguientePaso([{ tipo: 'cupon_no_aplica', codigo: 'ABC', motivo: 'cupon_no_valido' }])).toContain('Quita el código');
+    expect(textoSiguientePaso([{ tipo: 'linea_nueva', idLinea: 7 }])).toContain('Revisa tu carrito');
   });
 
   it('la unión solo se informa si movió algo', () => {
