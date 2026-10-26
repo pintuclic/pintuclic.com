@@ -31,11 +31,13 @@ export const correoSchema = z
   .max(150, 'El correo no puede exceder 150 caracteres')
   .toLowerCase();
 
+/** Regla transversal del teléfono; su copia ejecutable vive en `backend/src/core/dtos/telefono.dto.ts`. */
 export const telefonoSchema = z
   .string()
   .trim()
   .min(7, 'El teléfono debe tener al menos 7 dígitos')
-  .max(20, 'El teléfono no puede exceder 20 caracteres');
+  .max(20, 'El teléfono no puede exceder 20 caracteres')
+  .regex(/^[0-9+\s()-]+$/, 'El teléfono solo debe contener números o caracteres de marcado');
 
 export const nombreSchema = z
   .string()
