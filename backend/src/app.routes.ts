@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import { construirRutasLandingBanners } from './core/landing/banners.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
+import { construirModuloM14 } from './modules/m14-patrocinios/m14.routes';
 import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
 import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-final-m06.adapter';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
@@ -146,6 +147,13 @@ export function construirAppRoutes(): Router {
     catalogo: m01.catalogoParaCompra,
   });
   router.use('/carrito', m05.publicRouter);
+
+  // M14: patrocinios. La administración de campañas exige sesión y los permisos propios `patrocinios.ver` y
+  // `patrocinios.editar`; el bloque «Productos patrocinados» del inicio es público. Pide a M01 las tarjetas. Va antes
+  // de `/admin` por lo mismo que M01.
+  const m14 = construirModuloM14(m17.autorizacionService, { tarjetas: m01.consultaPublicaService });
+  router.use('/admin/patrocinios', exigirSesionSalvo(auth, []), m14.adminRouter);
+  router.use('/patrocinios', m14.publicRouter);
 
   // M16: gestión administrativa de contenido institucional y FAQ (exige sesión y permisos
   // `configuracion.*`) y consulta pública de páginas publicadas y FAQ activas (sin sesión).

@@ -420,6 +420,8 @@ export const productoPatrocinadoSchema = productoPublicoTarjetaSchema.extend({
   idCampania: idSchema,
 });
 export type ProductoPatrocinado = z.infer<typeof productoPatrocinadoSchema>;
+/** La tarjeta pública de M01, sin la marca de patrocinio. */
+export type ProductoPublicoTarjetaPatrocinio = z.infer<typeof productoPublicoTarjetaSchema>;
 
 export const campaniaResponseEnvelopeSchema = respuestaUno(campaniaSchema);
 export type CampaniaResponseEnvelope = z.infer<typeof campaniaResponseEnvelopeSchema>;
@@ -737,7 +739,7 @@ export interface PatrocinioPort {
  * de los productos VISIBLES (A6) de la lista, en el mismo orden; los que no se muestran se omiten.
  */
 export interface TarjetasPublicasPort {
-  tarjetasPublicas(idsProducto: readonly number[]): Promise<z.infer<typeof productoPublicoTarjetaSchema>[]>;
+  tarjetasPublicas(idsProducto: readonly number[]): Promise<ProductoPublicoTarjetaPatrocinio[]>;
 }
 
 /* ───────────────────────────────────────────────────────────────────────────

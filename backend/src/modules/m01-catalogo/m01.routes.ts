@@ -85,6 +85,8 @@ export interface ModuloM01 {
   combosService: CombosService;
   /** Puerto interno para M05, M07, M08, M06 y M21 (entrega 3, sección 6). */
   catalogoParaCompra: CatalogoParaCompraService;
+  /** Puerto interno para M14: tarjetas públicas, con su oferta, de una lista de productos (M14 · `TarjetasPublicasPort`). */
+  consultaPublicaService: ConsultaPublicaService;
 }
 
 /**
@@ -157,9 +159,8 @@ export function construirModuloM01(autorizacion: AutorizacionService, dependenci
   const combos = new CombosController(combosService);
   const imagenes = new ImagenesController(imagenesService);
   const imagenMedida = new ImagenMedidaController(medidasService);
-  const consultaPublica = new ConsultaPublicaController(
-    new ConsultaPublicaService(new ConsultaPublicaRepository(), dependencias.ofertas),
-  );
+  const consultaPublicaService = new ConsultaPublicaService(new ConsultaPublicaRepository(), dependencias.ofertas);
+  const consultaPublica = new ConsultaPublicaController(consultaPublicaService);
   const superficies = controladorSimple({
     servicio: new CatalogoSimpleService(new SuperficiesRepository(), 'una superficie'),
     esquemaCrear: crearSuperficieRequestSchema,
@@ -336,5 +337,6 @@ export function construirModuloM01(autorizacion: AutorizacionService, dependenci
     imagenesService,
     combosService,
     catalogoParaCompra: new CatalogoParaCompraService(new CompraRepository()),
+    consultaPublicaService,
   };
 }
