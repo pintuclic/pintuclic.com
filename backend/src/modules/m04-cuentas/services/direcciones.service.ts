@@ -110,16 +110,4 @@ export class DireccionesService {
     await this.direccionesRepo.eliminar(idDireccion, idUsuario);
     return { mensaje: 'Dirección eliminada exitosamente.' };
   }
-
-  /**
-   * HU-CUE-07: Designar dirección como predeterminada única
-   */
-  async establecerPredeterminada(idDireccion: string, idUsuario: number): Promise<DireccionCliente> {
-    const direccion = await this.direccionesRepo.buscarPorId(idDireccion, idUsuario);
-    if (!direccion) {
-      throw new DireccionesError('Dirección no encontrada o no pertenece a la cuenta.', 'RECURSO_NO_ENCONTRADO', 404);
-    }
-
-    return this.direccionesRepo.establecerPredeterminada(idDireccion, idUsuario);
-  }
 }

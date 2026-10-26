@@ -54,7 +54,6 @@ describe('m04.routes · Ensamblaje y registro de rutas de cuentas y perfiles', (
     expect(paths).toContain('/perfil/desactivar');
     expect(paths).toContain('/direcciones');
     expect(paths).toContain('/direcciones/:idDireccion');
-    expect(paths).toContain('/direcciones/:idDireccion/predeterminada');
     expect(paths).toContain('/empresas/ascenso');
     expect(paths).toContain('/empresas/renovacion-nit');
   });

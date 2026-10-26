@@ -138,36 +138,4 @@ export class DireccionesController {
       throw error;
     }
   };
-
-  /**
-   * HU-CUE-07: Establecer como dirección predeterminada
-   * PATCH /cuentas/direcciones/:idDireccion/predeterminada
-   */
-  establecerPredeterminada = async (req: Request, res: Response): Promise<void> => {
-    const actor = req.actor;
-    if (!actor) {
-      responderRecursoNoDisponible(res);
-      return;
-    }
-
-    const idDireccion = leerParamUuid(req, 'idDireccion');
-    if (idDireccion === null) {
-      responderRecursoNoDisponible(res);
-      return;
-    }
-
-    try {
-      const predeterminada = await this.direccionesService.establecerPredeterminada(idDireccion, actor.idUsuario);
-      responderExito(res, predeterminada, 'Dirección establecida como predeterminada.');
-    } catch (error) {
-      if (error instanceof DireccionesError) {
-        res.status(error.statusCode).json({
-          success: false,
-          error: { code: error.codigo, message: error.message },
-        });
-        return;
-      }
-      throw error;
-    }
-  };
 }

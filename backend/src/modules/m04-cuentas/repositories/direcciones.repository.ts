@@ -31,8 +31,6 @@ export interface DireccionesRepository {
     },
   ): Promise<DireccionCliente>;
   eliminar(idDireccion: string, idUsuario: number): Promise<void>;
-  desmarcarPredeterminadas(idUsuario: number): Promise<void>;
-  establecerPredeterminada(idDireccion: string, idUsuario: number): Promise<DireccionCliente>;
 }
 
 export class PrismaDireccionesRepository implements DireccionesRepository {
@@ -187,30 +185,6 @@ export class PrismaDireccionesRepository implements DireccionesRepository {
           });
         }
       }
-    });
-  }
-
-  async desmarcarPredeterminadas(idUsuario: number): Promise<void> {
-    await prisma.direccionCliente.updateMany({
-      where: { idUsuario, esPredeterminada: true },
-      data: { esPredeterminada: false },
-    });
-  }
-
-  async establecerPredeterminada(idDireccion: string, idUsuario: number): Promise<DireccionCliente> {
-    return prisma.$transaction(async (tx) => {
-      await tx.direccionCliente.updateMany({
-        where: { idUsuario, esPredeterminada: true },
-        data: { esPredeterminada: false },
-      });
-
-      return tx.direccionCliente.update({
-        where: { idDireccion },
-        data: {
-          esPredeterminada: true,
-          fechaActualizacion: new Date(),
-        },
-      });
     });
   }
 }

@@ -47,23 +47,6 @@ describe('DireccionesService (HU-CUE-07)', () => {
         } as DireccionCliente)
       ),
       eliminar: vi.fn().mockResolvedValue(undefined),
-      desmarcarPredeterminadas: vi.fn().mockResolvedValue(undefined),
-      establecerPredeterminada: vi.fn().mockImplementation((idDireccion, idUsuario) =>
-        Promise.resolve({
-          idDireccion,
-          idUsuario,
-          direccion: 'Calle 10 # 20-30',
-          barrio: 'Centro',
-          apartamentoCasa: null,
-          nombreApellido: 'Juan',
-          telefono: '3001234567',
-          esPredeterminada: true,
-          latitud: null,
-          longitud: null,
-          fechaCreacion: fechaBase,
-          fechaActualizacion: fechaBase,
-        } as DireccionCliente)
-      ),
     };
 
     service = new DireccionesService(direccionesRepo);
@@ -188,16 +171,5 @@ describe('DireccionesService (HU-CUE-07)', () => {
     const res = await service.eliminar('dir-1', 5);
     expect(res.mensaje).toContain('eliminada exitosamente');
     expect(direccionesRepo.eliminar).toHaveBeenCalledWith('dir-1', 5);
-  });
-
-  it('establece dirección como predeterminada única', async () => {
-    vi.mocked(direccionesRepo.buscarPorId).mockResolvedValueOnce({
-      idDireccion: 'dir-1',
-      idUsuario: 5,
-    } as DireccionCliente);
-
-    const res = await service.establecerPredeterminada('dir-1', 5);
-    expect(res.esPredeterminada).toBe(true);
-    expect(direccionesRepo.establecerPredeterminada).toHaveBeenCalledWith('dir-1', 5);
   });
 });
