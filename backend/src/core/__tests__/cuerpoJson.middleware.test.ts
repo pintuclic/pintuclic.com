@@ -16,7 +16,7 @@ function cuerpoDe(bytes: number): string {
   return JSON.stringify({ contenidoBase64: 'A'.repeat(bytes) });
 }
 
-async function enviar(ruta: string, cuerpo: string, metodo: 'POST' | 'PUT' = 'POST') {
+async function enviar(ruta: string, cuerpo: string, metodo: 'POST' | 'PUT' | 'PATCH' = 'POST') {
   const respuesta = await fetch(`${base}${ruta}`, {
     method: metodo,
     headers: { 'Content-Type': 'application/json' },
@@ -40,6 +40,10 @@ beforeAll(async () => {
   app.put('/api/v1/admin/catalogo/medidas/:idMedida/imagen', eco);
   app.post('/api/v1/admin/catalogo/productos', eco);
   app.post('/api/v1/admin/catalogo/categorias', eco);
+  app.post('/api/v1/admin/patrocinios/anuncios', eco);
+  app.put('/api/v1/admin/patrocinios/anuncios/:idAnuncio', eco);
+  app.patch('/api/v1/admin/patrocinios/anuncios/:idAnuncio/estado', eco);
+  app.post('/api/v1/admin/patrocinios/campanias', eco);
   app.post('/api/v1/admin/inventario/cargas/previsualizar', eco);
   app.post('/api/v1/admin/inventario/cargas/aplicar', eco);
   app.put('/api/v1/admin/inventario/variantes/:idVariante/existencia', eco);
@@ -171,5 +175,34 @@ describe('construirParserJson — cargas masivas de inventario (M13)', () => {
     const ajuste = '/api/v1/admin/inventario/variantes/5/existencia';
     expect((await enviar(ajuste, cuerpoDe(200 * 1024), 'PUT')).status).toBe(413);
     expect((await enviar('/api/v1/admin/inventario/cargas/aplicar', cuerpoDe(200 * 1024), 'PUT')).status).toBe(413);
+  });
+});
+
+describe('construirParserJson — imágenes de los anuncios de M14', () => {
+  const base64DeCincoMb = Math.ceil((5 * MB) / 3) * 4;
+
+  it('crear un anuncio acepta dos imágenes de 5 MB exactos en el mismo JSON (~13,4 MB)', async () => {
+    const dos = JSON.stringify({ a: 'A'.repeat(base64DeCincoMb), b: 'A'.repeat(base64DeCincoMb) });
+    expect((await enviar('/api/v1/admin/patrocinios/anuncios', dos)).status).toBe(200);
+  });
+
+  it('editar un anuncio (PUT) también acepta dos imágenes de 5 MB', async () => {
+    const dos = JSON.stringify({ a: 'A'.repeat(base64DeCincoMb), b: 'A'.repeat(base64DeCincoMb) });
+    expect((await enviar('/api/v1/admin/patrocinios/anuncios/9', dos, 'PUT')).status).toBe(200);
+  });
+
+  it('por encima de 14 MB responde 413 con el mensaje de las imágenes', async () => {
+    const { status, json } = await enviar('/api/v1/admin/patrocinios/anuncios', cuerpoDe(14 * MB + 1));
+    expect(status).toBe(413);
+    expect(json).toEqual({
+      success: false,
+      error: { code: 'CUERPO_DEMASIADO_GRANDE', message: 'Cada imagen no puede superar 5 MB.' },
+    });
+  });
+
+  it('el estado del anuncio, las campañas y un id no numérico conservan el límite de 100 kb', async () => {
+    expect((await enviar('/api/v1/admin/patrocinios/anuncios/9/estado', cuerpoDe(200 * 1024), 'PATCH')).status).toBe(413);
+    expect((await enviar('/api/v1/admin/patrocinios/campanias', cuerpoDe(200 * 1024))).status).toBe(413);
+    expect((await enviar('/api/v1/admin/patrocinios/anuncios/abc', cuerpoDe(1 * MB), 'PUT')).status).toBe(413);
   });
 });
