@@ -400,7 +400,11 @@ export const crearDireccionRequestSchema = z.object({
 });
 export type CrearDireccionRequest = z.infer<typeof crearDireccionRequestSchema>;
 
-export const actualizarDireccionRequestSchema = crearDireccionRequestSchema.partial();
+/** Al editar, `null` en las coordenadas las borra (el cliente quita su ubicación); ausentes se conservan. */
+export const actualizarDireccionRequestSchema = crearDireccionRequestSchema.partial().extend({
+  latitud: z.number().min(-90).max(90).nullable().optional(),
+  longitud: z.number().min(-180).max(180).nullable().optional(),
+});
 export type ActualizarDireccionRequest = z.infer<typeof actualizarDireccionRequestSchema>;
 
 export const listarDireccionesResponseSchema = z.array(direccionClienteItemSchema);
