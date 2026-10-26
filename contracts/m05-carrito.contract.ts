@@ -7,7 +7,7 @@ import {
   MAXIMO_LINEAS_CALCULO,
   calculoSchema,
   cantidadSchema,
-  codigoCuponSchema,
+  codigoCuponEntradaSchema,
   dineroSchema,
   lineaCalculadaSchema,
   motivoCuponSchema,
@@ -71,7 +71,9 @@ import type { PreciosPort } from './m06-precios.contract';
  *      orden del carrito, el perfil del cliente (`idUsuario` de la sesión o null) y el `codigoCupon` que
  *      envía la pantalla. Carrito vacío → `calculo: null` (M06 exige al menos una línea).
  *  C8  CUPÓN. El código no se guarda en el carrito: lo conserva la pantalla y lo envía en cada consulta
- *      (`?codigoCupon=`) y en la revalidación. Un cupón que no aplica no rompe nada: se muestra su motivo.
+ *      (`?codigoCupon=`) y en la revalidación. Se acepta cualquier texto corto (`codigoCuponEntradaSchema` de
+ *      M06): un código mal escrito vuelve como `cupon_no_valido`, no como 400. Un cupón que no aplica no rompe
+ *      nada: se muestra su motivo.
  *  C9  UNIÓN AL INICIAR SESIÓN (RF-CAR-04-01 y RF-CAR-04-03). La primera petición al carrito que llega
  *      con sesión Y con cookie `pc_cart` une el carrito del visitante al de la cuenta: las líneas iguales
  *      suman (hasta el tope de C4) y las demás se agregan (hasta C5; las que no caben se descartan y se
@@ -188,7 +190,7 @@ export type IdLineaParams = z.infer<typeof idLineaParamsSchema>;
 
 /** GET /carrito — el cupón lo envía la pantalla en cada consulta (C8). */
 export const consultarCarritoRequestSchema = z.object({
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type ConsultarCarritoRequest = z.infer<typeof consultarCarritoRequestSchema>;
 
@@ -198,14 +200,14 @@ export const agregarLineaRequestSchema = z.object({
   /** El color elegido; null u omitido si el producto no lleva color. */
   idColor: idSchema.nullable().optional(),
   cantidad: cantidadSchema,
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type AgregarLineaRequest = z.infer<typeof agregarLineaRequestSchema>;
 
 /** PATCH /carrito/lineas/:idLinea — fija la cantidad (C4, C12). */
 export const cambiarCantidadRequestSchema = z.object({
   cantidad: cantidadSchema,
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type CambiarCantidadRequest = z.infer<typeof cambiarCantidadRequestSchema>;
 
@@ -225,7 +227,7 @@ export type LineaEnPantalla = z.infer<typeof lineaEnPantallaSchema>;
 export const revalidarRequestSchema = z.object({
   lineas: z.array(lineaEnPantallaSchema).max(MAXIMO_LINEAS_CARRITO),
   total: dineroSchema,
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type RevalidarRequest = z.infer<typeof revalidarRequestSchema>;
 
