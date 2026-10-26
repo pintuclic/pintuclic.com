@@ -1,10 +1,15 @@
 import {
   LIMITE_SOLICITUDES_POR_VENTANA,
   VENTANA_LIMITE_MINUTOS,
+  type ActualizarEstadoSolicitudRequest,
+  type CalificarSolicitudRequest,
   type ConfirmacionContacto,
+  type CrearMensajeSolicitudRequest,
   type CrearSolicitudContactoRequest,
   type ListarSolicitudesRequest,
+  type MensajeSolicitudContacto,
   type SolicitudContacto,
+  type SolicitudContactoDetalle,
 } from '../dtos/m15-atencion.dto';
 import type {
   ConfiguracionAtencionRepositoryPort,
@@ -50,6 +55,7 @@ export class ContactoService {
     };
   }
 
+  /** Lista global para el panel de atención (admin/empleado con `atencion.ver`). */
   async listar(filtros: ListarSolicitudesRequest): Promise<PaginaSolicitudes> {
     return this.repo.listar({
       ...(filtros.tipo === undefined ? {} : { tipo: filtros.tipo }),
@@ -59,14 +65,118 @@ export class ContactoService {
     });
   }
 
-  async marcarAtendida(idSolicitud: string): Promise<SolicitudContacto> {
+  /** Lista únicamente las solicitudes del cliente autenticado (titular). */
+  async listarDeUsuario(
+    idUsuario: number,
+    filtros: ListarSolicitudesRequest,
+  ): Promise<PaginaSolicitudes> {
+    return this.repo.listar({
+      idUsuario,
+      ...(filtros.tipo === undefined ? {} : { tipo: filtros.tipo }),
+      ...(filtros.estado === undefined ? {} : { estado: filtros.estado }),
+      pagina: filtros.pagina,
+      limite: filtros.limite,
+    });
+  }
+
+  /** Detalle completo con hilo de mensajes para el panel de atención. */
+  async obtenerDetalle(idSolicitud: string): Promise<SolicitudContactoDetalle> {
+    const detalle = await this.repo.obtenerDetalle(idSolicitud);
+    if (detalle === null) {
+      throw errores.noDisponible();
+    }
+    return detalle;
+  }
+
+  /**
+   * Detalle completo con hilo de mensajes para el cliente titular.
+   * R11 / ADR-003: si no existe o pertenece a otro usuario, devuelve 404 opaco.
+   */
+  async obtenerDetalleDeUsuario(
+    idUsuario: number,
+    idSolicitud: string,
+  ): Promise<SolicitudContactoDetalle> {
+    const detalle = await this.repo.obtenerDetalle(idSolicitud);
+    if (detalle === null || detalle.idUsuario !== idUsuario) {
+      throw errores.noDisponible();
+    }
+    return detalle;
+  }
+
+  /**
+   * R12: el cliente titular puede enviar mensajes consecutivos mientras la
+   * solicitud esté en `en_revision`. Si está `atendida` o `rechazada`, queda
+   * bloqueado (`409 SOLICITUD_CERRADA`).
+   */
+  async agregarMensajeCliente(
+    idUsuario: number,
+    idSolicitud: string,
+    datos: CrearMensajeSolicitudRequest,
+  ): Promise<MensajeSolicitudContacto> {
+    const solicitud = await this.repo.obtener(idSolicitud);
+    if (solicitud === null || solicitud.idUsuario !== idUsuario) {
+      throw errores.noDisponible();
+    }
+    if (solicitud.estado !== 'en_revision') {
+      throw errores.solicitudCerrada();
+    }
+    return this.repo.agregarMensaje(idSolicitud, idUsuario, 'cliente', datos.contenido);
+  }
+
+  /**
+   * R12: el admin o empleado con permiso `atencion.atender_clientes` puede
+   * responder cuando quiera, incluso con varios mensajes consecutivos sin
+   * esperar respuesta del cliente.
+   */
+  async agregarMensajeEquipo(
+    idAutor: number,
+    idSolicitud: string,
+    datos: CrearMensajeSolicitudRequest,
+  ): Promise<MensajeSolicitudContacto> {
     const solicitud = await this.repo.obtener(idSolicitud);
     if (solicitud === null) {
       throw errores.noDisponible();
     }
-    if (solicitud.estado === 'atendida') {
+    return this.repo.agregarMensaje(idSolicitud, idAutor, 'equipo', datos.contenido);
+  }
+
+  /** Cambia el estado de la solicitud (`en_revision`, `atendida` o `rechazada`). */
+  async cambiarEstado(
+    idSolicitud: string,
+    datos: ActualizarEstadoSolicitudRequest,
+  ): Promise<SolicitudContacto> {
+    const solicitud = await this.repo.obtener(idSolicitud);
+    if (solicitud === null) {
+      throw errores.noDisponible();
+    }
+    if (solicitud.estado === datos.estado) {
       return solicitud;
     }
-    return this.repo.marcarAtendida(idSolicitud);
+    return this.repo.cambiarEstado(idSolicitud, datos.estado);
+  }
+
+  /** Compatibilidad con la ruta legacy `/atender`. */
+  async marcarAtendida(idSolicitud: string): Promise<SolicitudContacto> {
+    return this.cambiarEstado(idSolicitud, { estado: 'atendida' });
+  }
+
+  /**
+   * R13: el cliente titular puede calificar de 1 a 5 estrellas únicamente
+   * cuando la solicitud se encuentra en estado `atendida`.
+   */
+  async calificarDeUsuario(
+    idUsuario: number,
+    idSolicitud: string,
+    datos: CalificarSolicitudRequest,
+    ahora: Date = new Date(),
+  ): Promise<SolicitudContacto> {
+    const solicitud = await this.repo.obtener(idSolicitud);
+    if (solicitud === null || solicitud.idUsuario !== idUsuario) {
+      throw errores.noDisponible();
+    }
+    if (solicitud.estado !== 'atendida') {
+      throw errores.solicitudNoCalificable();
+    }
+    return this.repo.calificar(idSolicitud, datos.calificacion, ahora);
   }
 }
