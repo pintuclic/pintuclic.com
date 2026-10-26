@@ -126,6 +126,17 @@ describe('M05 · HTTP /api/v1/carrito', () => {
     }
   });
 
+  it('C8: un cupón corto o mal escrito no es un 400: vuelve como cupón no válido', async () => {
+    await pedir('POST', '/lineas', { cuerpo: { idVariante: 2, cantidad: 1 }, actor: ID_USUARIO_PARTICULAR });
+    const r = await pedir('GET', '/?codigoCupon=abc', { actor: ID_USUARIO_PARTICULAR });
+    expect(r.status).toBe(200);
+    expect(carritoResponseEnvelopeSchema.parse(r.cuerpo).data.calculo?.cupon).toMatchObject({
+      codigo: 'abc',
+      aplicado: false,
+      motivoRechazo: 'cupon_no_valido',
+    });
+  });
+
   it('los errores de dominio salen con el envelope del contrato', async () => {
     const r = await pedir('POST', '/lineas', { cuerpo: { idVariante: 4, cantidad: 1 }, actor: ID_USUARIO_PARTICULAR });
     expect(r.status).toBe(409);

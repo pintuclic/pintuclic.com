@@ -7,7 +7,7 @@ import {
   MAXIMO_LINEAS_CALCULO,
   calculoSchema,
   cantidadSchema,
-  codigoCuponSchema,
+  codigoCuponEntradaSchema,
   dineroSchema,
   lineaCalculadaSchema,
   motivoCuponSchema,
@@ -64,7 +64,7 @@ export type IdLineaParams = z.infer<typeof idLineaParamsSchema>;
 
 /** GET /carrito — el cupón lo envía la pantalla en cada consulta (C8). */
 export const consultarCarritoRequestSchema = z.object({
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type ConsultarCarritoRequest = z.infer<typeof consultarCarritoRequestSchema>;
 
@@ -74,14 +74,14 @@ export const agregarLineaRequestSchema = z.object({
   /** El color elegido; null u omitido si el producto no lleva color. */
   idColor: idSchema.nullable().optional(),
   cantidad: cantidadSchema,
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type AgregarLineaRequest = z.infer<typeof agregarLineaRequestSchema>;
 
 /** PATCH /carrito/lineas/:idLinea — fija la cantidad (C4, C12). */
 export const cambiarCantidadRequestSchema = z.object({
   cantidad: cantidadSchema,
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type CambiarCantidadRequest = z.infer<typeof cambiarCantidadRequestSchema>;
 
@@ -101,7 +101,7 @@ export type LineaEnPantalla = z.infer<typeof lineaEnPantallaSchema>;
 export const revalidarRequestSchema = z.object({
   lineas: z.array(lineaEnPantallaSchema).max(MAXIMO_LINEAS_CARRITO),
   total: dineroSchema,
-  codigoCupon: codigoCuponSchema.optional(),
+  codigoCupon: codigoCuponEntradaSchema.optional(),
 });
 export type RevalidarRequest = z.infer<typeof revalidarRequestSchema>;
 
