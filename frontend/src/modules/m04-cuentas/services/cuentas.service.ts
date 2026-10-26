@@ -191,14 +191,6 @@ export async function eliminarDireccion(idDireccion: string): Promise<void> {
   await apiClient.delete(`/cuentas/direcciones/${encodeURIComponent(idDireccion)}`);
 }
 
-export async function marcarPredeterminada(idDireccion: string): Promise<Direccion> {
-  const { data } = await apiClient.patch<RespuestaExitosa<Direccion>>(
-    `/cuentas/direcciones/${encodeURIComponent(idDireccion)}/predeterminada`,
-    {},
-  );
-  return data.data;
-}
-
 /* ─── HU-CUE-06 (06-C) y HU-CUE-10 · Empresa ─── */
 
 export async function consultarMisSolicitudes(): Promise<MisSolicitudes> {

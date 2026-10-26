@@ -1,5 +1,11 @@
 import type { Request } from 'express';
-import { idUuidSchema } from '../dtos/m04-cuentas.dto';
+import { z } from 'zod';
+
+/**
+ * Basta con el formato que PostgreSQL acepta como `uuid` (8-4-4-4-12 hexadecimal): los datos de
+ * semilla usan ids como `d0000000-0000-0000-0000-000000000001`, que el UUID estricto rechaza.
+ */
+const parametroUuidSchema = z.guid();
 
 /**
  * Lee un parámetro de ruta que debe ser un UUID.
@@ -12,6 +18,6 @@ import { idUuidSchema } from '../dtos/m04-cuentas.dto';
 export function leerParamUuid(req: Request, nombre: string): string | null {
   const bruto = req.params[nombre];
   const valor = Array.isArray(bruto) ? bruto[0] : bruto;
-  const resultado = idUuidSchema.safeParse(valor);
+  const resultado = parametroUuidSchema.safeParse(valor);
   return resultado.success ? resultado.data : null;
 }

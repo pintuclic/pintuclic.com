@@ -250,7 +250,7 @@ export const solicitarAscensoEmpresaFormSchema = z.object({
 export type SolicitarAscensoEmpresaFormData = z.infer<typeof solicitarAscensoEmpresaFormSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
- * 9. SCHEMAS DE FORMULARIOS: HU-CUE-07 DIRECCIONES
+ * 9. SCHEMAS DE FORMULARIOS: HU-CUE-07 DIRECCIÓN DE ENTREGA
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export const direccionClienteFormSchema = z.object({
@@ -264,6 +264,24 @@ export const direccionClienteFormSchema = z.object({
   longitud: z.number().min(-180).max(180).optional(),
 });
 export type DireccionClienteFormData = z.infer<typeof direccionClienteFormSchema>;
+
+/**
+ * Respuesta de la geocodificación inversa (Nominatim) con la que se completa la
+ * dirección a partir de la ubicación del dispositivo. Solo se leen los campos útiles.
+ */
+export const geocodificacionInversaSchema = z.object({
+  address: z
+    .object({
+      road: z.string().optional(),
+      house_number: z.string().optional(),
+      neighbourhood: z.string().optional(),
+      suburb: z.string().optional(),
+      quarter: z.string().optional(),
+      city_district: z.string().optional(),
+    })
+    .optional(),
+});
+export type GeocodificacionInversa = z.infer<typeof geocodificacionInversaSchema>;
 
 /** Desactivación de la propia cuenta: exige la contraseña actual. */
 export const desactivarCuentaFormSchema = z.object({

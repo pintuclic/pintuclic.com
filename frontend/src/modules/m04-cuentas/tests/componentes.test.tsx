@@ -114,17 +114,17 @@ describe('Recuperación y restablecimiento (HU-CUE-05)', () => {
 describe('Direcciones (HU-CUE-07)', () => {
   const guardar = async () => undefined;
 
-  it('la primera dirección se anuncia como predeterminada sin casilla', () => {
-    const salida = html(<DireccionForm esPrimera onGuardar={guardar} onCancelar={nada} />);
-    expect(salida).toContain('Será tu dirección predeterminada');
+  it('no ofrece elegir predeterminada: la única dirección siempre lo es', () => {
+    const salida = html(<DireccionForm onGuardar={guardar} onCancelar={nada} />);
     expect(salida).not.toContain('type="checkbox"');
+    expect(salida).not.toContain('predeterminada');
   });
 
-  it('las siguientes permiten elegir y ofrecen la ubicación del dispositivo', () => {
-    const salida = html(<DireccionForm esPrimera={false} onGuardar={guardar} onCancelar={nada} />);
-    expect(salida).toContain('type="checkbox"');
+  it('ofrece completar con la ubicación del dispositivo y mantiene la edición manual', () => {
+    const salida = html(<DireccionForm onGuardar={guardar} onCancelar={nada} />);
     expect(salida).toContain('Usar mi ubicación actual');
     expect(salida).toContain('Apartamento o casa (opcional)');
+    expect(salida).not.toContain('Quitar ubicación');
   });
 });
 
