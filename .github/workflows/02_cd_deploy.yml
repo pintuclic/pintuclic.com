@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ejecutar despliegue en servidor remoto
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.VPS_HOST || secrets.SSH_HOST }}
           username: ${{ secrets.VPS_USER || secrets.SSH_USER }}
