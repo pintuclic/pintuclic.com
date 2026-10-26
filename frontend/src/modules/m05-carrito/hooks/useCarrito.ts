@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/core/store/authStore';
+import { avisarCarritoActualizado } from '@/core/utils/eventos-carrito';
 import type { CambioRevalidacion, Carrito } from '../dtos/m05-carrito.dto';
 import { carritoApi, mensajeDeError } from '../services/carrito-api';
 import { pantallaDe } from '../services/textos-carrito';
@@ -62,6 +63,8 @@ export function useCarrito() {
       try {
         const carrito = await accion();
         setEstado((e) => ({ ...e, carrito, ocupado: null, cargando: false }));
+        // La cabecera vuelve a leer la cantidad y el total.
+        avisarCarritoActualizado();
       } catch (err: unknown) {
         setEstado((e) => ({ ...e, ocupado: null, cargando: false, error: mensajeDeError(err, respaldo) }));
       }
