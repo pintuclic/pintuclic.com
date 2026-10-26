@@ -11,15 +11,15 @@ export interface DireccionSugerida {
 
 /**
  * Convierte la respuesta de geocodificación en los campos del formulario.
- * La dirección sigue el formato colombiano ("Calle 12 # 5-37"); el barrio sale del
- * nivel más fino que exista (barrio, sector, comuna), nunca de la ciudad.
+ * La dirección sigue el formato colombiano ("Calle 12 # 5-37"). El barrio solo sale de los niveles
+ * que son barrio (`neighbourhood`, `quarter`): `suburb` y `city_district` suelen ser la localidad o la
+ * comuna, y guardarlas como barrio daría un dato equivocado.
  */
 export function sugerirDireccion(respuesta: GeocodificacionInversa): DireccionSugerida {
   const partes = respuesta.address;
   const calle = partes?.road?.trim() || null;
   const numero = partes?.house_number?.trim() || null;
-  const barrio =
-    partes?.neighbourhood?.trim() || partes?.suburb?.trim() || partes?.quarter?.trim() || partes?.city_district?.trim() || null;
+  const barrio = partes?.neighbourhood?.trim() || partes?.quarter?.trim() || null;
 
   return {
     direccion: calle ? (numero ? `${calle} # ${numero}` : calle) : null,

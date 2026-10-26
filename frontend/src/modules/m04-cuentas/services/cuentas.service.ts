@@ -182,7 +182,8 @@ export async function crearDireccion(datos: DireccionClienteFormData): Promise<D
 export async function actualizarDireccion(idDireccion: string, datos: DireccionClienteFormData): Promise<Direccion> {
   const { data } = await apiClient.put<RespuestaExitosa<Direccion>>(
     `/cuentas/direcciones/${encodeURIComponent(idDireccion)}`,
-    cuerpoDireccion(datos),
+    // Al editar, sin ubicación en el formulario se envía null para borrar la que estaba guardada.
+    { latitud: null, longitud: null, ...cuerpoDireccion(datos) },
   );
   return data.data;
 }

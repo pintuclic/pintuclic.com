@@ -275,9 +275,7 @@ export const geocodificacionInversaSchema = z.object({
       road: z.string().optional(),
       house_number: z.string().optional(),
       neighbourhood: z.string().optional(),
-      suburb: z.string().optional(),
       quarter: z.string().optional(),
-      city_district: z.string().optional(),
     })
     .optional(),
 });

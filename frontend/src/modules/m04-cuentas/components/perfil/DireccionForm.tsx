@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LocateFixed } from 'lucide-react';
@@ -64,6 +64,7 @@ export function DireccionForm({ inicial, onGuardar, onCancelar }: DireccionFormP
     register,
     handleSubmit,
     setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<DireccionClienteFormData>({
     resolver: zodResolver(direccionClienteFormSchema),
@@ -80,13 +81,26 @@ export function DireccionForm({ inicial, onGuardar, onCancelar }: DireccionFormP
     },
   });
 
+  // La consulta puede tardar: si el formulario se cierra mientras tanto, no se toca nada.
+  const montado = useRef(true);
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
+
   const completarConUbicacion = async (latitud: number, longitud: number) => {
     setValue('latitud', latitud);
     setValue('longitud', longitud);
+    const direccionAntes = getValues('direccion');
+    const barrioAntes = getValues('barrio');
     const sugerida = await direccionDesdeCoordenadas(latitud, longitud);
+    if (!montado.current) return;
     const opciones = { shouldValidate: true, shouldDirty: true } as const;
-    if (sugerida?.direccion) setValue('direccion', sugerida.direccion, opciones);
-    if (sugerida?.barrio) setValue('barrio', sugerida.barrio, opciones);
+    // Lo que la persona corrigió mientras esperaba no se pisa con la sugerencia.
+    if (sugerida?.direccion && getValues('direccion') === direccionAntes) setValue('direccion', sugerida.direccion, opciones);
+    if (sugerida?.barrio && getValues('barrio') === barrioAntes) setValue('barrio', sugerida.barrio, opciones);
     if (sugerida?.direccion && sugerida.barrio) setAutocompletado('completo');
     else if (sugerida?.direccion) setAutocompletado('sin-barrio');
     else if (sugerida?.barrio) setAutocompletado('sin-calle');

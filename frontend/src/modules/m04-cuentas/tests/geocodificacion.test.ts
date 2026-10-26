@@ -3,20 +3,19 @@ import { direccionDesdeCoordenadas, motivoFalloUbicacion, sugerirDireccion } fro
 
 describe('M04 Frontend — dirección a partir de la ubicación (CA-CUE-07-04)', () => {
   describe('sugerirDireccion', () => {
-    it('arma la dirección con el formato colombiano y toma el barrio más fino', () => {
+    it('arma la dirección con el formato colombiano y toma el barrio', () => {
       expect(
         sugerirDireccion({
-          address: { road: 'Calle 12', house_number: '5-37', neighbourhood: 'San Pedro', city_district: 'Comuna 3' },
+          address: { road: 'Calle 12', house_number: '5-37', neighbourhood: 'San Pedro' },
         }),
       ).toEqual({ direccion: 'Calle 12 # 5-37', barrio: 'San Pedro' });
     });
 
-    it('sin número de casa deja solo la vía, y sin barrio recurre al sector o a la comuna', () => {
-      expect(sugerirDireccion({ address: { road: 'Avenida Carrera 7', suburb: 'Chapinero' } })).toEqual({
+    it('sin número de casa deja solo la vía, y sin barrio recurre al sector', () => {
+      expect(sugerirDireccion({ address: { road: 'Avenida Carrera 7', quarter: 'Chapinero Alto' } })).toEqual({
         direccion: 'Avenida Carrera 7',
-        barrio: 'Chapinero',
+        barrio: 'Chapinero Alto',
       });
-      expect(sugerirDireccion({ address: { road: 'Calle 1', city_district: 'Comuna 3' } }).barrio).toBe('Comuna 3');
     });
 
     it('un número sin calle no se usa y una respuesta vacía no inventa nada', () => {
@@ -44,6 +43,15 @@ describe('M04 Frontend — dirección a partir de la ubicación (CA-CUE-07-04)',
       expect(url.searchParams.get('lat')).toBe('3.4516');
       expect(url.searchParams.get('lon')).toBe('-76.532');
       expect(url.searchParams.get('accept-language')).toBe('es');
+    });
+
+    it('la localidad o la comuna que devuelve el servicio no se guardan como barrio', async () => {
+      vi.stubGlobal(
+        'fetch',
+        responder({ address: { road: 'Calle 1', suburb: 'Localidad Chapinero', city_district: 'Comuna 3' } }),
+      );
+
+      expect(await direccionDesdeCoordenadas(4.63, -74.065)).toEqual({ direccion: 'Calle 1', barrio: null });
     });
 
     it('devuelve null si el servicio falla, no responde o no conoce el lugar', async () => {

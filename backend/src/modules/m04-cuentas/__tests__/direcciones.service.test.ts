@@ -152,6 +152,19 @@ describe('DireccionesService (HU-CUE-07)', () => {
     expect(direccionesRepo.actualizar).toHaveBeenCalledWith('dir-1', 5, { barrio: 'Otro' });
   });
 
+  it('deja borrar las coordenadas con null y conserva las ausentes', async () => {
+    vi.mocked(direccionesRepo.buscarPorId).mockResolvedValue({
+      idDireccion: 'dir-1',
+      idUsuario: 5,
+    } as DireccionCliente);
+
+    await service.actualizar('dir-1', 5, { latitud: null, longitud: null });
+    expect(direccionesRepo.actualizar).toHaveBeenLastCalledWith('dir-1', 5, { latitud: null, longitud: null });
+
+    await service.actualizar('dir-1', 5, { barrio: 'Otro' });
+    expect(direccionesRepo.actualizar).toHaveBeenLastCalledWith('dir-1', 5, { barrio: 'Otro' });
+  });
+
   it('rechaza actualizar dirección si no existe o no pertenece al usuario', async () => {
     vi.mocked(direccionesRepo.buscarPorId).mockResolvedValueOnce(null);
 
