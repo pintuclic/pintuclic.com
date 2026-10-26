@@ -146,7 +146,7 @@ export const header: HeaderProps = {
     },
   },
   account: { label: 'Mi cuenta', sublabel: 'Iniciar sesión', href: '/login' },
-  cart: { count: 0, total: 0, href: '/productos' },
+  cart: { count: 0, total: 0, href: '/carrito' },
 };
 
 export const footer: FooterProps = {
