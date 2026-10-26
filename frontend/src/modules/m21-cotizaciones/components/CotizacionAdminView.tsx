@@ -15,7 +15,14 @@ import {
   type RechazoAdminFormData,
 } from '../dtos/formularios.dto';
 import { cotizacionesApi, mensajeDeError } from '../services/cotizaciones-api';
-import { cuerpoDelEditor, faltanPrecios, totalEnPantalla, valoresDelEditor } from '../services/editor';
+import {
+  cuerpoDelEditor,
+  descuentoSobreTotal,
+  faltanPrecios,
+  referenciaEnPantalla,
+  totalEnPantalla,
+  valoresDelEditor,
+} from '../services/editor';
 import { fechaCorta, porcentajeDescuento, precioDesdePorcentaje } from '../services/textos-cotizaciones';
 import { EstadoCotizacionBadge, TablaLineas, Totales } from './comunes';
 
@@ -133,7 +140,21 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
   if (c === null) return <Skeleton className="h-96" />;
 
   const editable = ESTADOS_EDITABLES.includes(c.estado);
-  const total = totalEnPantalla({ lineas: valores.lineas?.map((l) => ({ idLinea: l?.idLinea ?? 0, incluida: l?.incluida ?? true, cantidad: l?.cantidad ?? '', precio: l?.precio ?? '' })) ?? [], nota: '', fechaVencimiento: '' });
+  const enPantalla: EditorFormData = {
+    lineas:
+      valores.lineas?.map((l) => ({
+        idLinea: l?.idLinea ?? 0,
+        incluida: l?.incluida ?? true,
+        cantidad: l?.cantidad ?? '',
+        precio: l?.precio ?? '',
+      })) ?? [],
+    nota: '',
+    fechaVencimiento: '',
+  };
+  const total = totalEnPantalla(enPantalla);
+  // Se calcula con las líneas (no con el total guardado), así sigue a las cantidades y a los productos quitados.
+  const referencia = referenciaEnPantalla(enPantalla, new Map(c.lineas.map((l) => [l.idLinea, l.precioReferencia])));
+  const descuento = total === null ? null : descuentoSobreTotal(referencia, total);
 
   return (
     <div className="space-y-6">
@@ -353,8 +374,16 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-neutral-dark">Total con precios del carrito</dt>
-                  <dd className="text-neutral-black">{formatCOP(c.totalReferencia)}</dd>
+                  <dd className="text-neutral-black">{formatCOP(referencia)}</dd>
                 </div>
+                {descuento !== null && descuento.importe > 0 && (
+                  <div className="flex justify-between">
+                    <dt className="text-neutral-dark">Descuento</dt>
+                    <dd className="font-medium text-conversion-hover">
+                      −{formatCOP(descuento.importe)} ({descuento.porcentaje} %)
+                    </dd>
+                  </div>
+                )}
                 <div className="flex items-baseline justify-between border-t border-neutral-light pt-2">
                   <dt className="font-title font-bold text-neutral-black">Total acordado</dt>
                   <dd className="font-title text-xl font-bold text-corporate">{total === null ? '—' : formatCOP(total)}</dd>

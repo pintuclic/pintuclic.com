@@ -101,13 +101,18 @@ export function TablaLineas({ cotizacion }: { cotizacion: CotizacionDetalle }) {
 
 /** Totales: la referencia (lo que costaba en el carrito) y el acordado si ya lo hay. */
 export function Totales({ cotizacion }: { cotizacion: CotizacionDetalle }) {
-  const ahorro = cotizacion.totalAcordado === null ? 0 : cotizacion.totalReferencia - cotizacion.totalAcordado;
+  // Con las líneas a la vista, la referencia se suma de ellas (sirve también para cotizaciones anteriores a M21).
+  const referencia =
+    cotizacion.lineas.length > 0
+      ? Math.round(cotizacion.lineas.reduce((s, l) => s + l.precioReferencia * l.cantidad, 0) * 100) / 100
+      : cotizacion.totalReferencia;
+  const ahorro = cotizacion.totalAcordado === null ? 0 : referencia - cotizacion.totalAcordado;
   return (
     <dl className="space-y-2 text-sm">
       <div className="flex justify-between gap-4">
         <dt className="text-neutral-dark">Total con precios del carrito</dt>
         <dd className={cotizacion.totalAcordado === null ? 'font-semibold text-neutral-black' : 'text-neutral-medium line-through'}>
-          {formatCOP(cotizacion.totalReferencia)}
+          {formatCOP(referencia)}
         </dd>
       </div>
       {cotizacion.totalAcordado !== null && (

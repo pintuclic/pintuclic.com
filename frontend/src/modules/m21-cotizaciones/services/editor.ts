@@ -35,6 +35,23 @@ export function faltanPrecios(f: EditorFormData): boolean {
   return f.lineas.some((l) => l.incluida && l.precio.trim() === '');
 }
 
+const redondear = (v: number): number => Math.round((v + Number.EPSILON) * 100) / 100;
+
+/** Total con precios del carrito de las líneas incluidas, con las cantidades que hay en pantalla. */
+export function referenciaEnPantalla(f: EditorFormData, referencias: ReadonlyMap<number, number>): number {
+  return redondear(
+    f.lineas
+      .filter((l) => l.incluida && /^\d+$/.test(l.cantidad.trim()))
+      .reduce((s, l) => s + (referencias.get(l.idLinea) ?? 0) * Number(l.cantidad), 0),
+  );
+}
+
+/** Cuánto baja el total acordado frente al de referencia, en pesos y en % (0 si no baja). */
+export function descuentoSobreTotal(referencia: number, acordado: number): { importe: number; porcentaje: number } {
+  if (referencia <= 0 || acordado >= referencia) return { importe: 0, porcentaje: 0 };
+  return { importe: redondear(referencia - acordado), porcentaje: redondear((1 - acordado / referencia) * 100) };
+}
+
 /** Total acordado que verá el cliente, calculado en pantalla mientras se edita (informativo). */
 export function totalEnPantalla(f: EditorFormData): number | null {
   const incluidas = f.lineas.filter((l) => l.incluida);

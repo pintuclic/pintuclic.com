@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CotizacionDetalle } from '../dtos/m21-cotizaciones.dto';
 import { editorFormSchema, rechazoAdminFormSchema, solicitarFormSchema } from '../dtos/formularios.dto';
-import { cuerpoDelEditor, faltanPrecios, totalEnPantalla, valoresDelEditor } from '../services/editor';
+import {
+  cuerpoDelEditor,
+  descuentoSobreTotal,
+  faltanPrecios,
+  referenciaEnPantalla,
+  totalEnPantalla,
+  valoresDelEditor,
+} from '../services/editor';
 import {
   ETIQUETA_ESTADO,
   estadoDeUrl,
@@ -77,6 +84,19 @@ describe('M21 · editor del panel', () => {
     expect(faltanPrecios(conCambios)).toBe(false);
     expect(totalEnPantalla(v)).toBeNull();
     expect(totalEnPantalla(conCambios)).toBe(450_000);
+  });
+
+  it('la referencia y el descuento sobre el total salen de las líneas en pantalla', () => {
+    const v = valoresDelEditor(cotizacion);
+    const refs = new Map([
+      [1, 85_900],
+      [2, 28_900],
+    ]);
+    const todas = { ...v, lineas: v.lineas.map((l) => ({ ...l, cantidad: '1' })) };
+    expect(referenciaEnPantalla(todas, refs)).toBe(114_800);
+    expect(referenciaEnPantalla({ ...todas, lineas: [todas.lineas[0]!, { ...todas.lineas[1]!, incluida: false }] }, refs)).toBe(85_900);
+    expect(descuentoSobreTotal(114_800, 103_320)).toEqual({ importe: 11_480, porcentaje: 10 });
+    expect(descuentoSobreTotal(100, 120)).toEqual({ importe: 0, porcentaje: 0 });
   });
 
   it('valida cantidades, precios y que quede al menos una línea', () => {
