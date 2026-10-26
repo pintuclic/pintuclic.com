@@ -11,6 +11,7 @@ import { catalogoPublicoApi } from '../../services/consulta-publica-api';
 import { imagenParaSeleccion } from '../../services/galeria';
 import { etiquetaOferta, ofertaDePresentacion } from '../../services/ofertas-visuales';
 import { textoRendimiento } from '../../services/rendimiento';
+import { AgregarAlCarrito } from './AgregarAlCarrito';
 import { ComplementariosProducto } from './ComplementariosProducto';
 import { GaleriaProducto } from './GaleriaProducto';
 import { ColorProducto } from './SelectorColorProducto';
@@ -236,6 +237,14 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
               {p.acabados.map((a) => a.nombre).join(', ')}
             </p>
           )}
+
+          {/* M05 · P3: agregar la presentación y el color elegidos al carrito. */}
+          <AgregarAlCarrito
+            idVariante={variante?.idVariante ?? null}
+            idColor={color?.idColor ?? null}
+            requiereColor={p.claseColor !== undefined && p.claseColor !== 'sin_color'}
+            bloqueado={p.compraBloqueada}
+          />
 
           {/* Contacto directo de M15 con la referencia del producto (HU-ATC-03). */}
           <BotonContactoDirecto
