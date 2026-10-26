@@ -10,6 +10,16 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.14] - 2026-10-26
+### Esquema 4.15 (73 Tablas) - M05: un carrito por dueño y modelos Prisma del carrito
+- **Alcance General:** pedido por el contrato `contracts/m05-carrito.contract.ts` (P1). Sin tablas nuevas.
+  - **`carrito`**: restricciones únicas `uq_carrito_usuario (id_usuario)` y `uq_carrito_token_visitante (token_visitante)`. Una cuenta tiene un solo carrito y un token de visitante, también. En PostgreSQL los NULL no chocan, así que conviven los carritos de cuenta (token NULL) y los de visitante (usuario NULL).
+  - `carrito.token_visitante` guarda el SHA-256 del token opaco de la cookie `pc_cart`, nunca el token.
+  - **Prisma:** modelos `Carrito` y `LineaCarrito` (ADR-004) y sus relaciones en `Usuario`, `Variante` y `Color`.
+  - **Bases existentes en 4.14:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente). Si una cuenta tuviera dos carritos, el script se detiene con un mensaje y no cambia nada: hay que unirlos a mano.
+
+---
+
 ## [v3.13] - 2026-10-26
 ### Esquema 4.14 (73 Tablas, sin cambios de tablas) - M04: una sola dirección por cliente
 - **Alcance General:** El cliente guarda como máximo una dirección de entrega (HU-CUE-07). No cambia ninguna tabla ni columna.

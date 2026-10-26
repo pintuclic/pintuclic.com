@@ -1,6 +1,6 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.11 — esquema 4.13 (M06 Precios: eventos de descuento, cupones y tipo de cliente empresa).  
+> **Versión Actual:** 3.14 — esquema 4.15 (M05 Carrito: un carrito por dueño y modelos Prisma del carrito).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
 > **Total de Tablas:** 73  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.14** (esquema 4.15) | 2026-10-26 | Ninguna | Ninguna | M05: restricciones únicas `carrito(id_usuario)` y `carrito(token_visitante)` (un carrito por dueño); el token se guarda con SHA-256. Modelos Prisma `Carrito` y `LineaCarrito`. Total 73 tablas. | [Ver v3.14](./CHANGELOG_DATABASE.md#v314---2026-10-26) |
 | **v3.11** (esquema 4.13) | 2026-10-26 | `evento_descuento`, `evento_regla`, `evento_exclusion`, `cupon`, `cupon_uso` (5) | Ninguna | M06: eventos de descuento con calendario (fechas, días de la semana, horas), reglas con porcentaje propio por objetivo y excepciones (incluidos color y familia de color); cupones con usos; `descuento.monto_minimo_compra`; `cuenta_empresa.id_sub_rol_empresa` (tipo de cliente empresa). Cuatro ENUMs nuevos. Total 73 tablas. | [Ver v3.11](./CHANGELOG_DATABASE.md#v311---2026-10-26) |
 | **v3.9** (esquema 4.11) | 2026-10-25 | `solicitud_contacto`, `horario_atencion`, `configuracion_atencion_whatsapp` (3) | Ninguna | M15 Atención al cliente: solicitudes del formulario de contacto sin duplicar datos de contacto, horario de atención humana por día con franja coherente y destino del botón de WhatsApp en fila única. Tres ENUMs nuevos y los permisos `atencion.*`. Las preguntas frecuentes son de M16. Total 67 tablas. | [Ver v3.9](./CHANGELOG_DATABASE.md#v39---2026-10-25) |
 | **v3.8** (esquema 4.10) | 2026-10-25 | Ninguna | Ninguna | M13: `ajuste_inventario.referencia` (única por variante y motivo) y valores `orden`, `venta` y `devolucion` en sus ENUMs, para descontar y reponer la existencia de los combos de forma idempotente. Total 64 tablas. | [Ver v3.8](./CHANGELOG_DATABASE.md#v38---2026-10-25) |

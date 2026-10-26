@@ -895,12 +895,32 @@ CREATE TABLE IF NOT EXISTS carrito (
     token_visitante VARCHAR(255),
     id_usuario INT,
     fecha_ultima_actividad TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_carrito_usuario FOREIGN KEY (id_usuario) 
-        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
+    CONSTRAINT fk_carrito_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_carrito_usuario UNIQUE (id_usuario),
+    CONSTRAINT uq_carrito_token_visitante UNIQUE (token_visitante)
 );
 
+-- M05 (v4.15): un carrito por cuenta y uno por token de visitante (contrato m05-carrito, P1). En PostgreSQL
+-- los NULL no chocan entre sí. Bases anteriores: se agregan las restricciones si no hay duplicados.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_carrito_usuario') THEN
+        IF EXISTS (SELECT 1 FROM carrito WHERE id_usuario IS NOT NULL GROUP BY id_usuario HAVING count(*) > 1) THEN
+            RAISE EXCEPTION 'M05 (4.15): hay cuentas con más de un carrito. Unirlos a mano antes de aplicar el esquema.';
+        END IF;
+        ALTER TABLE carrito ADD CONSTRAINT uq_carrito_usuario UNIQUE (id_usuario);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_carrito_token_visitante') THEN
+        IF EXISTS (SELECT 1 FROM carrito WHERE token_visitante IS NOT NULL GROUP BY token_visitante HAVING count(*) > 1) THEN
+            RAISE EXCEPTION 'M05 (4.15): hay tokens de visitante repetidos en carrito. Corregirlos a mano antes de aplicar el esquema.';
+        END IF;
+        ALTER TABLE carrito ADD CONSTRAINT uq_carrito_token_visitante UNIQUE (token_visitante);
+    END IF;
+END $$;
+
 COMMENT ON TABLE carrito IS 'Cabecera del carrito de compras vivo para usuarios y visitantes';
-COMMENT ON COLUMN carrito.token_visitante IS 'Identificador para carritos anónimos antes del inicio de sesión';
+COMMENT ON COLUMN carrito.token_visitante IS 'SHA-256 del token opaco de la cookie pc_cart del visitante (nunca el token); null en el carrito de una cuenta (M05 · C2)';
 COMMENT ON COLUMN carrito.id_usuario IS 'Cliente autenticado propietario del carrito (nullable)';
 
 -- Tabla: linea_carrito
@@ -2182,5 +2202,5 @@ CREATE INDEX IF NOT EXISTS idx_cupon_uso_cupon_usuario ON cupon_uso(id_cupon, id
 CREATE INDEX IF NOT EXISTS idx_cuenta_empresa_sub_rol ON cuenta_empresa(id_sub_rol_empresa);
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (73 TABLAS - v4.14)
+-- FIN DEL SCRIPT DDL (73 TABLAS - v4.15)
 -- ==============================================================================

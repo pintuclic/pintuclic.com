@@ -323,6 +323,9 @@ model Usuario {
   paginasInstitucionales PaginaInstitucional[] @relation("PaginaInstitucionalAutor")
   entradasFaq            FaqEntrada[]          @relation("FaqEntradaAutor")
 
+  // M05 Relaciones
+  carrito Carrito?
+
   @@map("usuario")
 }
 
@@ -744,6 +747,43 @@ model AjusteInventario {
 }
 
 // =============================================================================
+// MÓDULO M05 — CARRITO DE COMPRAS (esquema 4.15)
+// =============================================================================
+
+/// Carrito vivo (HU-CAR-01, HU-CAR-04): uno por cuenta o uno por token de visitante
+model Carrito {
+  idCarrito            Int      @id @default(autoincrement()) @map("id_carrito")
+  /// SHA-256 del token opaco de la cookie `pc_cart`, nunca el token (M05 · C2)
+  tokenVisitante       String?  @unique(map: "uq_carrito_token_visitante") @map("token_visitante") @db.VarChar(255)
+  idUsuario            Int?     @unique(map: "uq_carrito_usuario") @map("id_usuario")
+  fechaUltimaActividad DateTime @default(now()) @map("fecha_ultima_actividad") @db.Timestamp(6)
+
+  usuario Usuario?       @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade, map: "fk_carrito_usuario")
+  lineas  LineaCarrito[]
+
+  @@map("carrito")
+}
+
+/// Línea viva del carrito (HU-CAR-02): variante + color; agregar la misma suma la cantidad (C3)
+model LineaCarrito {
+  idLineaCarrito Int  @id @default(autoincrement()) @map("id_linea_carrito")
+  idCarrito      Int  @map("id_carrito")
+  idVariante     Int  @map("id_variante")
+  /// Color elegido; null si el producto no lleva color
+  idColor        Int? @map("id_color")
+  /// Referencia viva del carrito (M21)
+  refViva        Int  @default(1) @map("ref_viva")
+  cantidad       Int  @default(1)
+
+  carrito  Carrito  @relation(fields: [idCarrito], references: [idCarrito], onDelete: Cascade, map: "fk_lineacarrito_carrito")
+  variante Variante @relation(fields: [idVariante], references: [idVariante], onDelete: Cascade, map: "fk_lineacarrito_variante")
+  color    Color?   @relation(fields: [idColor], references: [idColor], onDelete: Restrict, map: "fk_lineacarrito_color")
+
+  // `uq_carrito_variante_color` (UNIQUE NULLS NOT DISTINCT) vive solo en el DDL: Prisma no expresa NULLS NOT DISTINCT.
+  @@map("linea_carrito")
+}
+
+// =============================================================================
 // MÓDULO M06 — PRECIOS, EVENTOS DE DESCUENTO Y CUPONES (esquema 4.13)
 // =============================================================================
 
@@ -1109,6 +1149,7 @@ model Color {
   familia   FamiliaColor?   @relation(fields: [idFamiliaColor], references: [idFamiliaColor], onDelete: Restrict, map: "fk_color_familia")
   productos ProductoColor[]
   imagenes  Imagen[]
+  lineasCarrito LineaCarrito[]
 
   @@unique([idMarca, nombre, idAcabado], map: "uq_color_nombre_marca_acabado")
   @@index([idMarca], map: "idx_color_marca")
@@ -1263,6 +1304,7 @@ model Variante {
   imagenes Imagen[]
   combos   VarianteCombo[]
   ajustes  AjusteInventario[]
+  lineasCarrito LineaCarrito[]
 
   @@unique([idProducto, idMedida], map: "uq_variante_producto_medida")
   @@index([idProducto], map: "idx_variante_producto")
