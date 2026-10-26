@@ -28,6 +28,9 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
   const [rechazando, setRechazando] = useState(false);
   /** Lo que se escribe en "% desc." por línea; si no hay nada, se muestra el % del precio acordado. */
   const [porcentajes, setPorcentajes] = useState<Record<number, string>>({});
+  /** Descuento general: un % para todas las líneas incluidas (atajo; cada línea se puede ajustar después). */
+  const [porcentajeGeneral, setPorcentajeGeneral] = useState('');
+  const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
 
   const editor = useForm<EditorFormData>({ resolver: zodResolver(editorFormSchema), defaultValues: { lineas: [], nota: '', fechaVencimiento: '' } });
   const { fields } = useFieldArray({ control: editor.control, name: 'lineas', keyName: 'clave' });
@@ -52,6 +55,27 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
     // `cargar` solo usa setters estables y `reset`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idCotizacion]);
+
+  const aplicarATodos = (): void => {
+    if (c === null) return;
+    const lineas = editor.getValues('lineas');
+    let aplicadas = 0;
+    const nuevos: Record<number, string> = {};
+    lineas.forEach((l, i) => {
+      const referencia = c.lineas.find((x) => x.idLinea === l.idLinea)?.precioReferencia;
+      const precio = referencia === undefined ? null : precioDesdePorcentaje(referencia, porcentajeGeneral);
+      if (!l.incluida || precio === null) return;
+      editor.setValue(`lineas.${i}.precio`, String(precio), { shouldDirty: true, shouldValidate: true });
+      nuevos[l.idLinea] = porcentajeGeneral.trim();
+      aplicadas += 1;
+    });
+    if (aplicadas === 0) {
+      setErrorGeneral('Escribe un porcentaje entre 0 y 99,99.');
+      return;
+    }
+    setErrorGeneral(null);
+    setPorcentajes((p) => ({ ...p, ...nuevos }));
+  };
 
   const guardar = editor.handleSubmit(async (datos) => {
     setOcupado('guardar');
@@ -171,6 +195,33 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
         </div>
       ) : (
         <form noValidate className="space-y-6" onSubmit={(e) => void guardar(e)}>
+          <div className="flex flex-col gap-3 rounded-card border border-neutral-light/70 bg-neutral-white p-4 shadow-card sm:flex-row sm:items-end">
+            <div className="sm:w-56">
+              <Input
+                id="descuento-general"
+                label="Descuento para todos (%)"
+                inputMode="decimal"
+                placeholder="Ej.: 10"
+                value={porcentajeGeneral}
+                onChange={(e) => setPorcentajeGeneral(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter aplica el descuento en vez de guardar el formulario.
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    aplicarATodos();
+                  }
+                }}
+                {...(errorGeneral === null ? {} : { error: errorGeneral })}
+              />
+            </div>
+            <Button type="button" variant="outline" onClick={aplicarATodos}>
+              Aplicar a todos
+            </Button>
+            <p className="text-sm text-neutral-medium sm:pb-2.5">
+              Pone ese % sobre el precio de referencia de cada producto incluido. Luego puedes ajustar cualquiera a mano.
+            </p>
+          </div>
+
           <div className="overflow-x-auto rounded-card border border-neutral-light/70 bg-neutral-white shadow-card">
             <table className="w-full min-w-[900px] text-sm">
               <caption className="sr-only">Ajustar precios y cantidades</caption>

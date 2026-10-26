@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, FileText, ShoppingCart } from 'lucide-react';
 import { Alert, Button, ButtonLink, Container, Skeleton } from '@/core/components';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { SolicitarCotizacion } from '@/modules/m21-cotizaciones/components/SolicitarCotizacion';
@@ -81,6 +81,12 @@ export function CarritoView() {
             <ButtonLink href="/ofertas" variant="outline">
               Ver ofertas
             </ButtonLink>
+            {/* M21: las cotizaciones siguen disponibles aunque el carrito esté vacío. */}
+            {c.haySesion && (
+              <ButtonLink href="/cotizaciones" variant="outline" leftIcon={<FileText aria-hidden className="h-4 w-4" />}>
+                Mis cotizaciones
+              </ButtonLink>
+            )}
           </div>
         </div>
       ) : (
