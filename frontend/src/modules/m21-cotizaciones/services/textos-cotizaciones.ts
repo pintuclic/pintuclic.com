@@ -11,11 +11,15 @@ export const ETIQUETA_ESTADO: Record<EstadoCotizacion, string> = {
   vencida: 'Vencida',
 };
 
+/**
+ * Color de cada estado: amarillo = esperando al equipo comercial; verde = respondida, lista para que el
+ * cliente decida; azul = aceptada (cerrada con éxito); rojo = rechazada; gris = vencida.
+ */
 export const VARIANTE_ESTADO: Record<EstadoCotizacion, BadgeVariant> = {
-  solicitada: 'action',
-  borrador: 'action',
-  enviada: 'offer',
-  aprobada: 'success',
+  solicitada: 'sponsored',
+  borrador: 'sponsored',
+  enviada: 'success',
+  aprobada: 'action',
   rechazada: 'danger',
   vencida: 'neutral',
 };
