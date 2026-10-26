@@ -10,6 +10,13 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.18] - 2026-10-27
+### Esquema 4.17 (78 Tablas, sin cambios de DDL) - M17: parámetro `comercial.dias_vigencia_carrito_visitante`
+- **Seed:** parámetro 13 `comercial.dias_vigencia_carrito_visitante` (área `comercial`, número, 30 por defecto, de 1 a 365): días sin actividad tras los cuales M05 borra el carrito de un visitante sin sesión (C13 del contrato de M05, Q4 resuelta por el Tech Lead). Editable desde la configuración general.
+- Se agregó la clave a `CLAVES_PARAMETROS` (contrato de M17 y sus dos espejos). Idempotente: no pisa un valor ya modificado.
+
+---
+
 ## [v3.17] - 2026-10-27
 ### Esquema 4.17 (78 Tablas, sin cambios de tablas) - M14 · A13: se elimina `producto.patrocinado`
 - **Alcance General:** retiro del interruptor manual de patrocinio, pedido por el contrato `contracts/m14-patrocinios.contract.ts` (A13). El patrocinio ahora es solo de las campañas de M14 (`campania_patrocinio`), con vigencia, prioridad y ubicación. Se entrega al final, cuando M01 ya dejó de leer y escribir la columna (PR de M01 ya unido).

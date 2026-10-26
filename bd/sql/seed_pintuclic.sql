@@ -535,7 +535,8 @@ INSERT INTO parametro_sistema (id_parametro, clave, area, tipo_dato, descripcion
     (9, 'comercial.costo_envio_base', 'comercial', 'numero', 'Tarifa base de despacho estándar a domicilio', '15000'::jsonb, '15000'::jsonb, 0, NULL),
     (10, 'comercial.umbral_envio_gratis', 'comercial', 'numero', 'Monto mínimo de compra para exoneración de costos de envío', '200000'::jsonb, '200000'::jsonb, 0, NULL),
     (11, 'auth.vigencia_enlace_activacion_horas', 'autenticacion', 'numero', 'Vigencia en horas del enlace con el que un colaborador nuevo define su contraseña', '72'::jsonb, '72'::jsonb, 1, 168),
-    (12, 'comercial.umbral_sugerir_empresa', 'comercial', 'numero', 'Total del carrito desde el que se invita a un cliente registrado a solicitar la cuenta empresa (M06 · R12)', '500000'::jsonb, '500000'::jsonb, 0, NULL)
+    (12, 'comercial.umbral_sugerir_empresa', 'comercial', 'numero', 'Total del carrito desde el que se invita a un cliente registrado a solicitar la cuenta empresa (M06 · R12)', '500000'::jsonb, '500000'::jsonb, 0, NULL),
+    (13, 'comercial.dias_vigencia_carrito_visitante', 'comercial', 'numero', 'Días sin actividad tras los cuales se borra el carrito de un visitante sin sesión (M05 · C13)', '30'::jsonb, '30'::jsonb, 1, 365)
 ON CONFLICT (clave) DO NOTHING;
 
 -- Alineación con el piso de contraseña de M20 (12 caracteres, RN-SEG-01 / RFC-M17-001 D-5).
