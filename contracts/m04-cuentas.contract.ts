@@ -368,7 +368,8 @@ export type SolicitarAscensoEmpresaRequest = z.infer<typeof solicitarAscensoEmpr
  * Regla: cada cuenta guarda como máximo UNA dirección (RF-CUE-07-04). Un segundo
  * POST responde 400 LIMITE_DIRECCIONES_ALCANZADO y la BD lo impide con el índice
  * único uq_direccion_una_por_usuario. Como es la única, siempre queda marcada como
- * predeterminada. Para cambiarla el cliente la edita o la elimina y crea otra.
+ * predeterminada, por lo que no existe endpoint para cambiar la predeterminada.
+ * Para cambiarla el cliente la edita o la elimina y crea otra.
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export const direccionClienteItemSchema = z.object({
