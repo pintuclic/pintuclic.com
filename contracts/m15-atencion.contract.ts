@@ -161,9 +161,10 @@ import { z } from 'zod';
  * 1. PRIMITIVAS
  * ─────────────────────────────────────────────────────────────────────────── */
 
+const PATRON_UUID_PG = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const idSchema = z.number().int().positive();
-export const idSolicitudSchema = z.string().uuid();
-export const idMensajeSolicitudSchema = z.string().uuid();
+export const idSolicitudSchema = z.string().regex(PATRON_UUID_PG, 'Identificador UUID inválido');
+export const idMensajeSolicitudSchema = z.string().regex(PATRON_UUID_PG, 'Identificador UUID inválido');
 
 export const TIPOS_SOLICITUD_CONTACTO = ['consulta', 'cotizacion', 'reclamo'] as const;
 export const tipoSolicitudContactoSchema = z.enum(TIPOS_SOLICITUD_CONTACTO);
