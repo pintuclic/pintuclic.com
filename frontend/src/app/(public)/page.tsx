@@ -4,6 +4,7 @@ import { CategoryExplorer } from './_components/CategoryExplorer';
 import { EmpresaCta } from './_components/EmpresaCta';
 import { FeaturedProducts } from './_components/FeaturedProducts';
 import { HeroSection } from './_components/HeroSection';
+import { ProductosPatrocinados } from '@/modules/m14-patrocinios/components/ProductosPatrocinados';
 import { ToolsBar } from './_components/ToolsBar';
 import { TrustStrip } from './_components/TrustStrip';
 
@@ -22,6 +23,7 @@ export default function HomePage() {
       <EmpresaCta />
       <ToolsBar />
       <FeaturedProducts />
+      <ProductosPatrocinados />
       <CategoryExplorer />
     </Container>
   );

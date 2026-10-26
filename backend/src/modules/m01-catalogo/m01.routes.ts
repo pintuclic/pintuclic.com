@@ -53,6 +53,7 @@ import { ConsultaPublicaService } from './services/consulta-publica.service';
 import { ImagenesService } from './services/imagenes.service';
 import { LineasService } from './services/lineas.service';
 import type { ImpactoReglasPort, OfertasPort } from './interfaces/ofertas.port';
+import type { PatrocinioPort } from './interfaces/patrocinio.port';
 import { MarcasService } from './services/marcas.service';
 import { MedidasService } from './services/medidas.service';
 import { ProductosService } from './services/productos.service';
@@ -85,6 +86,8 @@ export interface ModuloM01 {
   combosService: CombosService;
   /** Puerto interno para M05, M07, M08, M06 y M21 (entrega 3, sección 6). */
   catalogoParaCompra: CatalogoParaCompraService;
+  /** Puerto interno para M14: tarjetas públicas, con su oferta, de una lista de productos (M14 · `TarjetasPublicasPort`). */
+  consultaPublicaService: ConsultaPublicaService;
 }
 
 /**
@@ -106,6 +109,8 @@ function permisoDeCambioEstado(autorizacion: AutorizacionService): RequestHandle
 export interface DependenciasM01 {
   ofertas?: OfertasPort;
   impactoReglas?: ImpactoReglasPort;
+  /** M14: los productos de campañas vigentes van primero en los complementarios de la ficha. */
+  patrocinio?: PatrocinioPort;
 }
 
 export function construirModuloM01(autorizacion: AutorizacionService, dependencias: DependenciasM01 = {}): ModuloM01 {
@@ -157,9 +162,12 @@ export function construirModuloM01(autorizacion: AutorizacionService, dependenci
   const combos = new CombosController(combosService);
   const imagenes = new ImagenesController(imagenesService);
   const imagenMedida = new ImagenMedidaController(medidasService);
-  const consultaPublica = new ConsultaPublicaController(
-    new ConsultaPublicaService(new ConsultaPublicaRepository(), dependencias.ofertas),
+  const consultaPublicaService = new ConsultaPublicaService(
+    new ConsultaPublicaRepository(),
+    dependencias.ofertas,
+    dependencias.patrocinio,
   );
+  const consultaPublica = new ConsultaPublicaController(consultaPublicaService);
   const superficies = controladorSimple({
     servicio: new CatalogoSimpleService(new SuperficiesRepository(), 'una superficie'),
     esquemaCrear: crearSuperficieRequestSchema,
@@ -336,5 +344,6 @@ export function construirModuloM01(autorizacion: AutorizacionService, dependenci
     imagenesService,
     combosService,
     catalogoParaCompra: new CatalogoParaCompraService(new CompraRepository()),
+    consultaPublicaService,
   };
 }

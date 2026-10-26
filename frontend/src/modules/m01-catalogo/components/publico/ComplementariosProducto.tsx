@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ProductCard } from '@/core/components';
-import type { ProductoPublicoTarjeta } from '../../dtos/m01-catalogo-productos.dto';
+import type { Complementario } from '../../dtos/m01-catalogo-entrega3.dto';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
 import { precioVisible } from '../../services/ofertas-visuales';
 
@@ -15,7 +15,7 @@ export interface ComplementariosProductoProps {
  * falla, la sección no se muestra: nunca debe estorbar a la ficha.
  */
 export const ComplementariosProducto: React.FC<ComplementariosProductoProps> = ({ idProducto }) => {
-  const [productos, setProductos] = useState<ProductoPublicoTarjeta[]>([]);
+  const [productos, setProductos] = useState<Complementario[]>([]);
 
   useEffect(() => {
     let vigente = true;
@@ -44,6 +44,7 @@ export const ComplementariosProducto: React.FC<ComplementariosProductoProps> = (
               brand={p.marca}
               description={`${p.esCombo ? 'Combo · ' : ''}${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}`}
               {...precioVisible(p.precioDesde, p.oferta)}
+              isSponsored={p.patrocinado}
               href={`/productos/${p.idProducto}`}
               {...(p.idImagenPrincipal === null
                 ? {}

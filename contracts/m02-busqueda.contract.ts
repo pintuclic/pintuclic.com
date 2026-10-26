@@ -37,8 +37,8 @@ import {
  * ── Qué NO hace ─────────────────────────────────────────────────────────────
  *  · No crea, edita ni desactiva categorías, subcategorías, marcas, líneas, colores, productos
  *    ni variantes: eso es de M01. M02 solo LEE el catálogo y nunca lo escribe.
- *  · HU-BUS-04 (prioridad por patrocinio en los resultados): descartada en la spec. El campo
- *    `producto.patrocinado` no influye en ningún orden ni filtro (CA-BUS-03-04). Campañas: M14.
+ *  · El patrocinio NO cambia qué productos aparecen ni cuántos: solo el orden (HU-BUS-04, ver O7). Las campañas son
+ *    de M14 y el interruptor `producto.patrocinado` no influye en ningún orden ni filtro (CA-BUS-03-04).
  *  · No calcula descuentos ni precios de cliente empresa: los pide a M06 por un puerto (Q1).
  *  · No muestra existencias exactas ni datos internos (HU-SEG-06, U7 de M01).
  *  · No ofrece autocompletado, "¿quisiste decir…?", historial personal de búsquedas ni
@@ -109,6 +109,17 @@ import {
  *  O5  Precio: se ordena por el precio final MÍNIMO de las variantes activas del producto (con el evento en
  *      curso), el mismo que usa `precioDesde` (CA-BUS-03-05). El descuento de empresa no entra (ver F5).
  *  O6  Novedad = `producto.fecha_creacion` descendente.
+ *  O7  PATROCINIO (HU-BUS-04; contrato M14 · A8). Solo con `ordenar=relevancia` (el orden por defecto):
+ *        · Sin texto de búsqueda, los productos de campañas vigentes con la ubicación `listado` van primero, por
+ *          prioridad (mayor primero); el resto sigue su orden normal.
+ *        · Con texto, se ordena por relevancia y SOLO entre productos con la MISMA relevancia van primero los
+ *          patrocinados. Nunca entra un producto con relevancia 0 (CA-BUS-03-04).
+ *        · Con `precio_asc`, `precio_desc` o `novedad` el patrocinio no actúa.
+ *        · CUPO: como mucho CUPO_PATROCINADOS_LISTADO productos patrocinados pasan por delante; si hay más, el resto
+ *          se ordena como uno normal.
+ *        · No cambia el total, los filtros ni sus conteos, y un producto aparece una sola vez.
+ *        · Cada resultado que el patrocinio adelantó lleva `patrocinado: true` y el id de su campaña (la pantalla
+ *          pone la etiqueta «Patrocinado» y mide, M14 · A9, M3). Si M14 falla, se ordena sin patrocinio.
  *
  * ── Reglas de paginación ────────────────────────────────────────────────────
  *  G1  Por página se entregan solo los resultados de esa página, con `total`, `pagina`, `limite`
@@ -199,6 +210,8 @@ export const PESOS_RELEVANCIA = {
 } as const;
 /** Multiplicador de una coincidencia exacta frente a una aproximada (O2). */
 export const FACTOR_COINCIDENCIA_EXACTA = 2;
+/** Cuántos productos patrocinados pueden pasar por delante en el listado (M14 · A8; mismo valor que allí). */
+export const CUPO_PATROCINADOS_LISTADO = 8;
 
 export const PERIODOS_ESTADISTICA = ['diario', 'semanal', 'mensual', 'anual'] as const;
 export const periodoEstadisticaSchema = z.enum(PERIODOS_ESTADISTICA);
@@ -298,6 +311,10 @@ export type ListarSinResultadoRequest = z.infer<typeof listarSinResultadoRequest
 export const resultadoBusquedaSchema = productoPublicoTarjetaSchema.extend({
   /** Nombre del color o de la familia que coincidió con el término; null si no fue por color. */
   coincidenciaColor: z.string().nullable(),
+  /** true si el patrocinio de una campaña de M14 lo adelantó en este resultado (O7). */
+  patrocinado: z.boolean(),
+  /** La campaña que lo adelantó, para medir (M14 · M3, M4); null si `patrocinado` es false. */
+  idCampania: idSchema.nullable(),
 });
 export type ResultadoBusqueda = z.infer<typeof resultadoBusquedaSchema>;
 
@@ -417,6 +434,16 @@ export interface OfertasListadoPort {
   ofertasDeProductos(
     idsProducto: readonly number[],
   ): Promise<ReadonlyArray<{ idProducto: number; oferta: OfertaListado | null }>>;
+}
+
+/**
+ * Campañas de patrocinio de M14 para el listado (O7): los productos de campañas vigentes con la ubicación `listado`
+ * y su prioridad. Lo implementa M14; sin M14 no hay patrocinio.
+ */
+export interface PatrocinioListadoPort {
+  prioridadesDeProductos(
+    ubicacion: 'listado',
+  ): Promise<ReadonlyArray<{ idProducto: number; prioridad: number; idCampania: number }>>;
 }
 
 /* ───────────────────────────────────────────────────────────────────────────

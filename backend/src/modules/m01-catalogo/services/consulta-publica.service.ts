@@ -1,4 +1,5 @@
-import { MAXIMO_COMPLEMENTARIOS, type TamanoImagen } from '../dtos/m01-catalogo-entrega3.dto';
+import { MAXIMO_COMPLEMENTARIOS, type Complementario, type TamanoImagen } from '../dtos/m01-catalogo-entrega3.dto';
+import { listarProductosPublicosRequestSchema } from '../dtos/m01-catalogo-productos.dto';
 import type {
   CategoriaPublica,
   OfertaPublica,
@@ -13,9 +14,13 @@ import type {
 import type { ImagenBytes, LogotipoMarca, Pagina } from '../interfaces/catalogo.interface';
 import type { ConsultaPublicaRepositoryPort } from '../interfaces/consulta-publica.interface';
 import type { OfertaPort, OfertasPort } from '../interfaces/ofertas.port';
+import type { PatrocinioPort, PrioridadProductoPort } from '../interfaces/patrocinio.port';
 import type { ColoresDeProducto } from '../interfaces/productos.interface';
 import { errores, ServicioCatalogoBase } from './catalogo-base.service';
 import { servirImagen } from './imagen-derivadas';
+
+/** Tope de una consulta de tarjetas por ids (el máximo del límite de página). */
+const MAXIMO_TARJETAS_POR_CONSULTA = 100;
 
 const aOfertaPublica = (o: OfertaPort | null): OfertaPublica | null =>
   o === null ? null : { nombre: o.nombre, porcentaje: o.porcentaje, precioAntes: o.precioAntes, precioConOferta: o.precioConOferta };
@@ -28,6 +33,7 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
   constructor(
     private readonly consulta: ConsultaPublicaRepositoryPort,
     private readonly ofertas?: OfertasPort,
+    private readonly patrocinio?: PatrocinioPort,
   ) {
     super();
   }
@@ -60,6 +66,25 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
         ? await this.consulta.listar(query, this.ofertas === undefined ? [] : await this.ofertas.idsProductosEnOferta())
         : await this.consulta.listar(query);
     return { ...pagina, items: await this.conOfertas(pagina.items) };
+  }
+
+  /**
+   * Las tarjetas públicas de esos productos, con su oferta, en el mismo orden. Los que no se muestran (inactivos, sin
+   * publicar o con un padre inactivo) se omiten. Lo usa M14 para el bloque de productos patrocinados.
+   */
+  async tarjetasPublicas(idsProducto: readonly number[]): Promise<ProductoPublicoTarjeta[]> {
+    const ids = [...new Set(idsProducto)].slice(0, MAXIMO_TARJETAS_POR_CONSULTA);
+    if (ids.length === 0) return [];
+    const pagina = await this.consulta.listar(
+      listarProductosPublicosRequestSchema.parse({ pagina: 1, limite: ids.length }),
+      ids,
+    );
+    const porId = new Map(pagina.items.map((t) => [t.idProducto, t]));
+    const enOrden = ids.flatMap((id) => {
+      const tarjeta = porId.get(id);
+      return tarjeta === undefined ? [] : [tarjeta];
+    });
+    return this.conOfertas(enOrden);
   }
 
   async ficha(idProducto: number): Promise<ProductoPublicoFicha> {
@@ -110,8 +135,23 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
   }
 
   /** X1–X5: hasta 4 sugerencias para la ficha; vacío cuando no hay nada que sugerir (la pantalla oculta la sección). */
-  async complementarios(idProducto: number): Promise<ProductoPublicoTarjeta[]> {
-    return this.conOfertas(this.exigir(await this.consulta.complementarios(idProducto, MAXIMO_COMPLEMENTARIOS)));
+  async complementarios(idProducto: number): Promise<Complementario[]> {
+    const deCampanias = await this.patrocinadosPorCampania();
+    const campania = new Map(deCampanias.map((p) => [p.idProducto, p.idCampania]));
+    const tarjetas = await this.conOfertas(
+      this.exigir(await this.consulta.complementarios(idProducto, MAXIMO_COMPLEMENTARIOS, deCampanias)),
+    );
+    return tarjetas.map((t) => ({ ...t, patrocinado: campania.has(t.idProducto), idCampania: campania.get(t.idProducto) ?? null }));
+  }
+
+  /** Los productos de campañas vigentes de M14 para los complementarios; si M14 falla, la ficha se ve igual. */
+  private async patrocinadosPorCampania(): Promise<PrioridadProductoPort[]> {
+    if (this.patrocinio === undefined) return [];
+    try {
+      return await this.patrocinio.prioridadesDeProductos('complementarios');
+    } catch {
+      return [];
+    }
   }
 
   async imagenMedida(idMedida: number): Promise<ImagenBytes> {

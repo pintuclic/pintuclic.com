@@ -457,6 +457,7 @@ export const BusquedaCatalogoView: React.FC = () => {
                         p.precioDesde === null ? '' : ' · Precio desde'
                       }${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
                       {...precioVisible(p.precioDesde, p.oferta)}
+                      isSponsored={p.patrocinado}
                       href={`/productos/${p.idProducto}`}
                       {...(p.idImagenPrincipal === null
                         ? {}

@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import { construirRutasLandingBanners } from './core/landing/banners.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
+import { construirModuloM14 } from './modules/m14-patrocinios/m14.routes';
 import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
 import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-final-m06.adapter';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
@@ -100,6 +101,8 @@ export function construirAppRoutes(): Router {
       preciosDeVariantes: (consultas) => m06.precios.preciosDeVariantes(consultas),
     },
     impactoReglas: { contarEventosVigentes: (objetivos) => m06.impacto.contarEventosVigentes(objetivos) },
+    // M14 (campañas de patrocinio): los productos patrocinados van primero en los complementarios de la ficha.
+    patrocinio: { prioridadesDeProductos: (ubicacion) => m14.patrocinio.prioridadesDeProductos(ubicacion) },
   });
   router.use('/admin/catalogo', exigirSesionSalvo(auth, []), m01.adminRouter);
   router.use('/catalogo', m01.publicRouter);
@@ -112,6 +115,8 @@ export function construirAppRoutes(): Router {
       idsProductosEnOferta: () => m06.precios.idsProductosEnOferta(),
       ofertasDeProductos: (ids) => m06.precios.ofertasDeProductos(ids),
     },
+    // Las campañas de M14 (se piden de forma diferida: M14 se construye después, porque pide a M01 las tarjetas).
+    patrocinio: { prioridadesDeProductos: (ubicacion) => m14.patrocinio.prioridadesDeProductos(ubicacion) },
   });
   router.use('/admin/busqueda', exigirSesionSalvo(auth, []), m02.adminRouter);
   router.use('/busqueda', m02.publicRouter);
@@ -146,6 +151,13 @@ export function construirAppRoutes(): Router {
     catalogo: m01.catalogoParaCompra,
   });
   router.use('/carrito', m05.publicRouter);
+
+  // M14: patrocinios. La administración de campañas exige sesión y los permisos propios `patrocinios.ver` y
+  // `patrocinios.editar`; el bloque «Productos patrocinados» del inicio es público. Pide a M01 las tarjetas. Va antes
+  // de `/admin` por lo mismo que M01.
+  const m14 = construirModuloM14(m17.autorizacionService, { tarjetas: m01.consultaPublicaService });
+  router.use('/admin/patrocinios', exigirSesionSalvo(auth, []), m14.adminRouter);
+  router.use('/patrocinios', m14.publicRouter);
 
   // M16: gestión administrativa de contenido institucional y FAQ (exige sesión y permisos
   // `configuracion.*`) y consulta pública de páginas publicadas y FAQ activas (sin sesión).

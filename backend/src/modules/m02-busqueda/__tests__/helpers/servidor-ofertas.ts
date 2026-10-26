@@ -7,7 +7,8 @@ import { AutorizacionService, type ResolutorPermisos } from '../../../m20-seguri
 import type { SesionService } from '../../../m20-seguridad/services/sesion.service';
 import { construirModuloM01 } from '../../../m01-catalogo/m01.routes';
 import { construirModuloM06, type ModuloM06 } from '../../../m06-precios/m06.routes';
-import type { OfertasListadoPort, PrecioFinalPort } from '../../dtos/m02-busqueda.dto';
+import { construirModuloM14 } from '../../../m14-patrocinios/m14.routes';
+import type { OfertasListadoPort, PatrocinioListadoPort, PrecioFinalPort } from '../../dtos/m02-busqueda.dto';
 import { construirModuloM02 } from '../../m02.routes';
 import { PrecioFinalM06Adapter } from '../../services/precio-final-m06.adapter';
 
@@ -33,6 +34,7 @@ export interface ServidorBusqueda {
 export interface Sustitutos {
   precioFinal?: PrecioFinalPort;
   ofertas?: OfertasListadoPort;
+  patrocinio?: PatrocinioListadoPort;
 }
 
 export async function levantarServidorBusqueda(
@@ -52,7 +54,10 @@ export async function levantarServidorBusqueda(
     catalogoCompra: m01.catalogoParaCompra,
     parametros: { obtenerNumero: () => Promise.resolve(null) },
   });
+  // M14 de verdad: las campañas salen de la base, como en `app.routes.ts`.
+  const m14 = construirModuloM14(autorizacion, { tarjetas: m01.consultaPublicaService });
   const m02 = construirModuloM02(autorizacion, {
+    patrocinio: sustitutos.patrocinio ?? { prioridadesDeProductos: (u) => m14.patrocinio.prioridadesDeProductos(u) },
     precioFinal:
       sustitutos.precioFinal ?? new PrecioFinalM06Adapter({ preciosDeVariantes: (c) => m06().precios.preciosDeVariantes(c) }),
     ofertas: sustitutos.ofertas ?? {

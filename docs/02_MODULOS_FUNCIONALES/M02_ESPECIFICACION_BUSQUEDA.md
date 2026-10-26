@@ -27,7 +27,7 @@ Este módulo está diseñado para responder con alto rendimiento (paginación y 
 | **HU-BUS-03** | Ordenamiento de resultados | Visitante / Cliente | Alta | Definido |
 | **HU-BUS-05** | Paginación de resultados | Visitante / Cliente | Alta | Definido |
 | **HU-BUS-06** | Registro de búsquedas sin resultado | Administrador | Baja | Definido |
-| **HU-BUS-04** | Prioridad de patrocinio en resultados | N/A | N/A | *Bloqueada / Descartada* |
+| **HU-BUS-04** | Prioridad de patrocinio en resultados | Responsable comercial | — | Definido (campañas en M14; regla O7 del contrato) |
 
 ---
 
@@ -177,6 +177,33 @@ Este módulo está diseñado para responder con alto rendimiento (paginación y 
 
 #### Diagramas de Referencia
 ![Flujo del Proceso](../assets/diagrams/M02/HU-BUS-03.png)
+
+---
+
+### HU-BUS-04: Prioridad de patrocinio dentro de resultados pertinentes
+> **Como** responsable comercial de Pintu Clic  
+> **Quiero** que los productos de campañas de patrocinio vigentes aparezcan mejor posicionados dentro de los resultados pertinentes  
+> **Para** cumplir los acuerdos comerciales sin mostrar al cliente productos que no tienen relación con lo que buscó.  
+
+> Las campañas (vigencia, prioridad, productos por marca, línea o producto) se administran en **M14**; aquí solo está su efecto en el orden. Contrato: regla **O7** de `contracts/m02-busqueda.contract.ts` y regla **A8** de `contracts/m14-patrocinios.contract.ts`.
+
+#### Criterios de Aceptación (Gherkin)
+- **CA-BUS-04-01:**
+  - **Dado que** no escribí texto de búsqueda y el orden es «Relevancia»
+  - **Cuando** hay campañas de patrocinio vigentes con la ubicación «listado»
+  - **Entonces** sus productos aparecen primero, por prioridad, con la etiqueta «Patrocinado»; el resto sigue su orden normal.
+- **CA-BUS-04-02:**
+  - **Dado que** busqué un texto
+  - **Cuando** dos productos tienen la misma relevancia y uno está patrocinado
+  - **Entonces** el patrocinado va primero; uno con menos relevancia no pasa por delante de uno con más, y uno con relevancia 0 no aparece (CA-BUS-03-04).
+- **CA-BUS-04-03:**
+  - **Dado que** ordeno por precio o por novedad
+  - **Cuando** se cargan los resultados
+  - **Entonces** el patrocinio no actúa.
+- **CA-BUS-04-04:**
+  - **Dado que** hay más productos patrocinados que el cupo (8)
+  - **Cuando** se cargan los resultados
+  - **Entonces** solo los 8 de mayor prioridad pasan por delante; el resto se ordena como uno normal. El total y los filtros no cambian.
 
 ---
 

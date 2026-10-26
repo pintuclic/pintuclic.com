@@ -16,6 +16,7 @@ import type {
   PeriodoEstadistica,
   OfertaListado,
   OfertasListadoPort,
+  PatrocinioListadoPort,
   PrecioFinalPort,
   ResultadoBusqueda,
 } from '../dtos/m02-busqueda.dto';
@@ -25,6 +26,7 @@ import {
 } from '../dtos/m02-busqueda.dto';
 import type { BusquedaRepositoryPort, PaginaResultado } from '../interfaces/busqueda.interface';
 import { PrecioFinalBaseAdapter } from '../services/precio-final.adapter';
+import { compararPorRelevancia, elegirPatrocinados } from '../services/patrocinio-listado';
 
 export function normalizarTexto(texto: string): string {
   return texto
@@ -69,7 +71,22 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
   constructor(
     private readonly precioFinalPort: PrecioFinalPort = new PrecioFinalBaseAdapter(),
     private readonly ofertasPort: OfertasListadoPort | null = null,
+    private readonly patrocinioPort: PatrocinioListadoPort | null = null,
   ) {}
+
+  /**
+   * Los productos de campañas vigentes con la ubicación `listado` (O7). Si M14 falla, se ordena sin patrocinio: el
+   * catálogo no se cae por las campañas.
+   */
+  private async patrocinios(): Promise<ReadonlyMap<number, { prioridad: number; idCampania: number }>> {
+    if (this.patrocinioPort === null) return new Map();
+    try {
+      const filas = await this.patrocinioPort.prioridadesDeProductos('listado');
+      return new Map(filas.map((f) => [f.idProducto, { prioridad: f.prioridad, idCampania: f.idCampania }]));
+    } catch {
+      return new Map();
+    }
+  }
 
   /** Ids de los productos en oferta ahora (F9). Solo se pide con el filtro: un fallo de M06 se propaga. */
   private async idsEnOferta(filtros: { enOferta?: boolean | undefined }): Promise<ReadonlySet<number>> {
@@ -371,12 +388,22 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       evaluados.push({ producto: p, puntaje, coincidenciaColor });
     }
 
-    // Ordenar resultados (O1–O6)
+    // Patrocinio (O7): solo con el orden por relevancia, con cupo, y sin cambiar quién aparece ni cuántos.
+    const patrocinados = elegirPatrocinados(
+      evaluados.map((e) => ({ idProducto: e.producto.idProducto, puntaje: e.puntaje, nombre: e.producto.nombre })),
+      filtros.ordenar === 'relevancia' ? await this.patrocinios() : new Map(),
+      filtros.ordenar,
+    );
+
+    // Ordenar resultados (O1–O7)
     evaluados.sort((a, b) => {
       if (filtros.ordenar === 'relevancia') {
-        if (a.puntaje !== b.puntaje) {
-          return b.puntaje - a.puntaje;
-        }
+        const porRelevancia = compararPorRelevancia(
+          { idProducto: a.producto.idProducto, puntaje: a.puntaje },
+          { idProducto: b.producto.idProducto, puntaje: b.puntaje },
+          patrocinados,
+        );
+        if (porRelevancia !== 0) return porRelevancia;
       } else if (filtros.ordenar === 'precio_asc') {
         if (a.producto.precioDesde !== b.producto.precioDesde) {
           return a.producto.precioDesde - b.producto.precioDesde;
@@ -418,6 +445,8 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       esCombo: producto.esCombo,
       compraBloqueada: producto.compraBloqueada,
       oferta: ofertas.get(producto.idProducto) ?? null,
+      patrocinado: patrocinados.has(producto.idProducto),
+      idCampania: patrocinados.get(producto.idProducto)?.idCampania ?? null,
       coincidenciaColor,
     }));
 
