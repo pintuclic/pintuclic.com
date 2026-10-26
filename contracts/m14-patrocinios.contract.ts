@@ -9,14 +9,12 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  * Scope: m14-patrocinios · Ola 7 (valor añadido) · Prefijo de historias: PAT · BORRADOR para el Tech Lead.
  * Base de datos: tablas nuevas `campania_patrocinio`, `campania_producto` y `campania_espacio`
  * (+ enum `enum_espacio_promocional`). No toca ninguna tabla existente.
- * Depende de M01 (marcas y productos) y M17 (permisos). Lo consumen M02 (desempate en resultados),
+ * Depende de M01 (marcas y productos) y M17 (permisos nuevos `patrocinios.ver` / `patrocinios.editar`). Lo consumen M02 (desempate en resultados),
  * M01 (complementarios) y las pantallas del inicio y del catálogo.
  *
- * FUENTE: «Pintu Clic — Documento de Historias de Usuario v5.2» (14 oct 2026), HU-PAT-01 a HU-PAT-04, y
- * las decisiones de Pintuco del 12 oct 2026 que cita su capítulo 7. Ese documento remite los requisitos
- * (RF-PAT-01-xx, RF-PAT-02-xx, RF-BUS-04-02/03) a la «Tanda 4B», que NO está en este repositorio. Este contrato
- * infiere de las HU lo que esos requisitos dirían; lo que no se pudo inferir está en «Preguntas abiertas».
- * Si la Tanda 4B dice otra cosa, manda la Tanda 4B y se ajusta este contrato antes de programar.
+ * FUENTE: «Pintu Clic — Documento de Historias de Usuario v5.2» (14 oct 2026), HU-PAT-01 a HU-PAT-04, y las
+ * decisiones de Pintuco del 12 oct 2026 que cita su capítulo 7. Ese documento deriva sus requisitos de unas
+ * «tandas» que no se usan: el contrato lo escribe directamente desde las HU y lo aprueba el Tech Lead.
  *
  * ── Qué es M14 ──────────────────────────────────────────────────────────────
  *  El modelo de ingresos complementario de Pintu Clic: campañas temporales acordadas con una marca, que dan
@@ -84,8 +82,11 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *      Sin campañas vigentes responde una lista vacía y la pantalla oculta el bloque.
  *  R12 COMPLEMENTARIOS. Con el espacio `complementarios`, M01 pone primero los productos de campañas vigentes (por
  *      prioridad) y luego el resto, como hoy con `producto.patrocinado` (RF-CAT-08-02). Ver Q5 sobre ese campo.
- *  R13 PERMISOS. Toda la administración exige sesión y permiso (ver mapa de rutas); un acceso denegado responde
- *      404 RECURSO_NO_DISPONIBLE y se audita, como en el resto de paneles. Las rutas públicas no exigen sesión.
+ *  R13 PERMISOS PROPIOS. Toda la administración exige sesión y uno de dos permisos nuevos de M17:
+ *      `patrocinios.ver` (consultar campañas) y `patrocinios.editar` (crear, editar y cambiar el estado). Quien tiene
+ *      `editar` recibe `ver` automáticamente (RN-ADM-07). Un acceso denegado responde 404 RECURSO_NO_DISPONIBLE y se
+ *      audita, como en el resto de paneles. Las rutas públicas no exigen sesión. El permiso `catalogo.*` NO sirve aquí:
+ *      el responsable comercial puede gestionar campañas sin poder editar el catálogo, y al revés.
  *  R14 NOMBRE. Único por marca, sin distinguir mayúsculas (409 NOMBRE_CAMPANIA_DUPLICADO).
  *  R15 SIN IDENTIDAD. Ninguna ruta pública guarda ni usa quién consulta (M20).
  *
@@ -96,15 +97,15 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *  · M02: desempate de R9 con `PatrocinioPort`, campo `patrocinado` en cada resultado, y su spec/contrato: la
  *    versión 5.2 de las HU ya NO dice que HU-BUS-04 esté descartada (el repositorio aún dice «Bloqueada / Descartada»).
  *  · Inicio y catálogo: los dos bloques «Productos patrocinados» (frontend público; el inicio es de FP-01).
- *  · M17 (solo si se elige Q2): los permisos nuevos.
+ *  · M17 (archivos compartidos, PR aparte y antes que el módulo): los dos permisos en `seed_pintuclic.sql`
+ *    (ids 27 y 28, asignados al rol administrador), en `CODIGOS_PERMISO` de su contrato y espejos, y la dependencia
+ *    `patrocinios.editar` → `patrocinios.ver` de `permisos.service.ts`. Además, que el panel de permisos de M17 los
+ *    muestre bajo un área «Patrocinios».
  *
  * ── Preguntas abiertas (para el Tech Lead / cliente) ────────────────────────
- *  Q1  La Tanda 4B (RF-PAT-01-xx, RF-PAT-02-xx, RF-BUS-04-xx) no está en el repositorio. ¿Existe? Hay que
- *      contrastar este contrato con ella antes de aprobarlo: sobre todo el número y la forma de los «espacios
- *      promocionales» (HU-PAT-02, 8 requisitos) y los campos de la campaña (HU-PAT-01, 9 requisitos).
- *  Q2  Permisos. Se asume `catalogo.ver` / `catalogo.editar` (como M06), sin tocar M17. La HU habla de un
- *      «responsable comercial»: si debe ser un rol con permisos propios, hay que añadir `patrocinios.ver` y
- *      `patrocinios.editar` (cambio de archivos compartidos: seed y contrato de M17).
+ *  Q1  RESUELTA: las tandas de requisitos no se usan (decisión del Tech Lead: están mal hechas). Este contrato se
+ *      guía por las HU v5.2 y las decisiones de Pintuco que cita; lo que ellas no resuelven está en Q3–Q9.
+ *  Q2  RESUELTA: permisos propios `patrocinios.ver` y `patrocinios.editar` (R13).
  *  Q3  Espacios (R8): se asumen cuatro, deducidos del UI Spec (4.3.4 y 4.1), de HU-BUS-04 y de HU-CAT-08. ¿Hay más
  *      (banner, ficha, carrito) o sobra alguno?
  *  Q4  ¿La campaña lleva contenido propio (imagen, título, enlace)? Se asume que no: solo productos. Si lo lleva,
@@ -137,8 +138,8 @@ export const LIMITE_BLOQUE_POR_DEFECTO = 8;
 export const LIMITE_BLOQUE_MAXIMO = 24;
 export const LIMITE_PRODUCTOS_BUSQUEDA = 20;
 
-export const PERMISO_VER_CAMPANIAS = 'catalogo.ver';
-export const PERMISO_EDITAR_CAMPANIAS = 'catalogo.editar';
+export const PERMISO_VER_CAMPANIAS = 'patrocinios.ver';
+export const PERMISO_EDITAR_CAMPANIAS = 'patrocinios.editar';
 
 export { idSchema };
 
@@ -391,12 +392,12 @@ export interface TarjetasPublicasPort {
  *   GET  /:espacio/productos             → bloqueResponseEnvelope   (:espacio = inicio | catalogo; R11)
  *
  *  ADMINISTRACIÓN (montaje: /api/v1/admin/patrocinios) — sesión + permisos de M17
- *   GET   /campanias                     catalogo.ver     → listarCampanias (paginado)
- *   POST  /campanias                     catalogo.editar  → crearCampania
- *   GET   /campanias/:idCampania         catalogo.ver     → campaniaResponseEnvelope
- *   PUT   /campanias/:idCampania         catalogo.editar  → actualizarCampania (sin cambiar la marca)
- *   PATCH /campanias/:idCampania/estado  catalogo.editar  → cambiarEstado
- *   GET   /productos                     catalogo.ver     → buscarProductosMarca (paginado; para el editor)
+ *   GET   /campanias                     patrocinios.ver    → listarCampanias (paginado)
+ *   POST  /campanias                     patrocinios.editar → crearCampania
+ *   GET   /campanias/:idCampania         patrocinios.ver    → campaniaResponseEnvelope
+ *   PUT   /campanias/:idCampania         patrocinios.editar → actualizarCampania (sin cambiar la marca)
+ *   PATCH /campanias/:idCampania/estado  patrocinios.editar → cambiarEstado
+ *   GET   /productos                     patrocinios.ver    → buscarProductosMarca (paginado; para el editor)
  *
  *  Panel: /admin/patrocinios (lista con situación y filtros, y editor con marca, productos, vigencia, prioridad y
  *  espacios). Bloques públicos: «Productos patrocinados» en el inicio y en el catálogo.
