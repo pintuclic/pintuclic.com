@@ -19,7 +19,7 @@ export function CarritoView() {
   const hayNoVendibles = carrito?.lineas.some((l) => l.precio?.vendible !== true) ?? false;
 
   return (
-    <Container className="py-8">
+    <Container className="min-h-[60vh] py-8">
       <h1 className="font-title text-2xl font-bold text-corporate">Tu carrito</h1>
 
       <div className="mt-4 space-y-3" aria-live="polite">
@@ -48,10 +48,20 @@ export function CarritoView() {
           <Skeleton className="h-64" />
         </div>
       ) : carrito === null || carrito.lineas.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center gap-4 text-center">
-          <ShoppingCart aria-hidden className="h-12 w-12 text-neutral-medium" />
-          <p className="text-lg text-neutral-dark">Tu carrito está vacío.</p>
-          <ButtonLink href="/productos">Ver productos</ButtonLink>
+        <div className="mx-auto mt-6 flex max-w-xl flex-col items-center gap-4 rounded-card border border-neutral-light bg-neutral-white px-6 py-12 text-center">
+          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-subaction">
+            <ShoppingCart aria-hidden className="h-10 w-10 text-action" />
+          </span>
+          <h2 className="font-title text-xl font-bold text-neutral-black">Tu carrito está vacío</h2>
+          <p className="text-neutral-dark">
+            Explora el catálogo, elige la presentación y el color, y pulsa «Agregar al carrito».
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <ButtonLink href="/productos">Ver productos</ButtonLink>
+            <ButtonLink href="/productos?enOferta=true" variant="outline">
+              Ver ofertas
+            </ButtonLink>
+          </div>
         </div>
       ) : (
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_22rem]">
