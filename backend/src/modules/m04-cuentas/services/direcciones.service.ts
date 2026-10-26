@@ -2,7 +2,15 @@ import type { DireccionCliente } from '@prisma/client';
 import type { DireccionesRepository } from '../repositories/direcciones.repository';
 import type { ActualizarDireccionRequest, CrearDireccionRequest } from '../dtos/m04-cuentas.dto';
 
-const MAX_DIRECCIONES_POR_CLIENTE = 10;
+const MAX_DIRECCIONES_POR_CLIENTE = 1;
+
+const MENSAJE_LIMITE =
+  'Ya tienes una dirección de entrega guardada. Edítala o elimínala para registrar otra.';
+
+/** Violación de una restricción única de la BD (carrera entre dos peticiones): código Prisma P2002. */
+function esViolacionUnica(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002';
+}
 
 export class DireccionesError extends Error {
   constructor(
@@ -26,36 +34,38 @@ export class DireccionesService {
   }
 
   /**
-   * HU-CUE-07: Crear nueva dirección respetando límite de 10
+   * HU-CUE-07: Crear la dirección de entrega. Cada cuenta guarda una sola (RF-CUE-07-04) y,
+   * al ser la única, queda siempre como predeterminada (RN-CUE-07).
    */
   async crear(idUsuario: number, input: CrearDireccionRequest): Promise<DireccionCliente> {
     const totalActual = await this.direccionesRepo.contarPorUsuario(idUsuario);
     if (totalActual >= MAX_DIRECCIONES_POR_CLIENTE) {
-      throw new DireccionesError(
-        `Ha alcanzado el límite máximo de ${MAX_DIRECCIONES_POR_CLIENTE} direcciones de entrega registradas.`,
-        'LIMITE_DIRECCIONES_ALCANZADO',
-        400,
-      );
+      throw new DireccionesError(MENSAJE_LIMITE, 'LIMITE_DIRECCIONES_ALCANZADO', 400);
     }
 
-    // Si es la primera dirección registrada, se fuerza como predeterminada (RN-CUE-07)
-    const esPredeterminada = totalActual === 0 ? true : Boolean(input.esPredeterminada);
-
-    return this.direccionesRepo.crear({
-      idUsuario,
-      direccion: input.direccion,
-      barrio: input.barrio,
-      apartamentoCasa: input.apartamentoCasa ?? null,
-      nombreApellido: input.nombreApellido,
-      telefono: input.telefono,
-      esPredeterminada,
-      latitud: input.latitud ?? null,
-      longitud: input.longitud ?? null,
-    });
+    try {
+      return await this.direccionesRepo.crear({
+        idUsuario,
+        direccion: input.direccion,
+        barrio: input.barrio,
+        apartamentoCasa: input.apartamentoCasa ?? null,
+        nombreApellido: input.nombreApellido,
+        telefono: input.telefono,
+        esPredeterminada: true,
+        latitud: input.latitud ?? null,
+        longitud: input.longitud ?? null,
+      });
+    } catch (error) {
+      // Dos peticiones simultáneas pasan el conteo; el índice único de la BD frena la segunda.
+      if (esViolacionUnica(error)) {
+        throw new DireccionesError(MENSAJE_LIMITE, 'LIMITE_DIRECCIONES_ALCANZADO', 400);
+      }
+      throw error;
+    }
   }
 
   /**
-   * HU-CUE-07: Actualizar dirección existente
+   * HU-CUE-07: Actualizar dirección existente. La marca de predeterminada no se toca: la única siempre lo es.
    */
   async actualizar(
     idDireccion: string,
@@ -73,7 +83,6 @@ export class DireccionesService {
       apartamentoCasa?: string | null;
       nombreApellido?: string;
       telefono?: string;
-      esPredeterminada?: boolean;
       latitud?: number | null;
       longitud?: number | null;
     } = {};
@@ -83,7 +92,6 @@ export class DireccionesService {
     if (input.apartamentoCasa !== undefined) datosActualizacion.apartamentoCasa = input.apartamentoCasa;
     if (input.nombreApellido !== undefined) datosActualizacion.nombreApellido = input.nombreApellido;
     if (input.telefono !== undefined) datosActualizacion.telefono = input.telefono;
-    if (input.esPredeterminada !== undefined) datosActualizacion.esPredeterminada = input.esPredeterminada;
     if (input.latitud !== undefined) datosActualizacion.latitud = input.latitud;
     if (input.longitud !== undefined) datosActualizacion.longitud = input.longitud;
 
@@ -101,17 +109,5 @@ export class DireccionesService {
 
     await this.direccionesRepo.eliminar(idDireccion, idUsuario);
     return { mensaje: 'Dirección eliminada exitosamente.' };
-  }
-
-  /**
-   * HU-CUE-07: Designar dirección como predeterminada única
-   */
-  async establecerPredeterminada(idDireccion: string, idUsuario: number): Promise<DireccionCliente> {
-    const direccion = await this.direccionesRepo.buscarPorId(idDireccion, idUsuario);
-    if (!direccion) {
-      throw new DireccionesError('Dirección no encontrada o no pertenece a la cuenta.', 'RECURSO_NO_ENCONTRADO', 404);
-    }
-
-    return this.direccionesRepo.establecerPredeterminada(idDireccion, idUsuario);
   }
 }
