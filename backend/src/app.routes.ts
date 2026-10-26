@@ -14,6 +14,7 @@ import { construirModuloM16 } from './modules/m16-contenido/m16.routes';
 import { construirModuloM17 } from './modules/m17-permisos/m17.routes';
 import { construirModuloM18 } from './modules/m18-notificaciones/m18.routes';
 import { construirModuloM20 } from './modules/m20-seguridad/m20.routes';
+import { construirModuloM21 } from './modules/m21-cotizaciones/m21.routes';
 
 interface RutaPublica {
   metodo: string;
@@ -159,6 +160,22 @@ export function construirAppRoutes(): Router {
     },
   });
   router.use('/carrito', m05.publicRouter);
+
+  // M21: cotizaciones. El cliente las pide desde su carrito (M05) y exige sesión; el panel exige sesión y los permisos
+  // `ventas.ver` / `ventas.gestionar`, resueltos en servidor. Al aceptarla, sus líneas vuelven al carrito con el precio
+  // acordado. Va antes de `/admin` por lo mismo que M01.
+  const m21 = construirModuloM21(m17.autorizacionService, {
+    carrito: m05.carrito,
+    parametros: {
+      obtenerNumero: async (clave) => {
+        const { parametros } = await m17.configService.obtenerCatalogo();
+        const valor = parametros.find((p) => p.clave === clave)?.valor;
+        return typeof valor === 'number' ? valor : null;
+      },
+    },
+  });
+  router.use('/admin/cotizaciones', exigirSesionSalvo(auth, []), m21.adminRouter);
+  router.use('/cotizaciones', exigirSesionSalvo(auth, []), m21.clienteRouter);
 
   // M14: patrocinios. La administración de campañas exige sesión y los permisos propios `patrocinios.ver` y
   // `patrocinios.editar`; el bloque «Productos patrocinados» del inicio es público. Pide a M01 las tarjetas. Va antes
