@@ -337,8 +337,8 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
 
   /**
    * X1–X4: hasta `limite` productos para la ficha de `idProducto`. null si ese producto no es visible (U1).
-   * Con categoría complementaria: patrocinados primero y luego el resto, cada grupo al azar. Sin ella:
-   * solo patrocinados. Se excluyen el propio producto, los no visibles y los combos agotados.
+   * Con categoría complementaria: los de campañas de M14 primero (por prioridad) y luego el resto, al azar. Sin ella:
+   * solo los de campañas. Se excluyen el propio producto, los no visibles y los combos agotados.
    */
   async complementarios(
     idProducto: number,
@@ -369,7 +369,7 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
 
     const enCategoria: Prisma.ProductoWhereInput = idCategoria === null ? {} : { subcategoria: { idCategoria } };
     const elegidos: number[] = [];
-    // Primero los de campañas vigentes de M14 (por prioridad y, entre iguales, al azar), luego los marcados a mano.
+    // Primero los de campañas vigentes de M14 (por prioridad y, entre iguales, al azar).
     if (patrocinadosPorCampania.length > 0) {
       const prioridad = new Map(patrocinadosPorCampania.map((p) => [p.idProducto, p.prioridad]));
       const visiblesDeCampania = await ids({ ...enCategoria, idProducto: { in: [...prioridad.keys()] } });
@@ -377,14 +377,9 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
       conAzar.sort((a, b) => (prioridad.get(b) ?? 0) - (prioridad.get(a) ?? 0));
       elegidos.push(...conAzar.slice(0, limite));
     }
-    const patrocinados = barajar(
-      (await ids({ ...enCategoria, patrocinado: true })).filter((id) => !elegidos.includes(id)),
-      aleatorio,
-    );
-    elegidos.push(...patrocinados.slice(0, limite - elegidos.length));
     if (idCategoria !== null && elegidos.length < limite) {
       const resto = barajar(
-        (await ids({ patrocinado: false, subcategoria: { idCategoria } })).filter((id) => !elegidos.includes(id)),
+        (await ids({ subcategoria: { idCategoria } })).filter((id) => !elegidos.includes(id)),
         aleatorio,
       );
       elegidos.push(...resto.slice(0, limite - elegidos.length));

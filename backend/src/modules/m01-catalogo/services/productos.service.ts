@@ -120,7 +120,6 @@ export class ProductosService extends ServicioCatalogoBase {
       usoInterior: peticion.usoInterior,
       usoExterior: peticion.usoExterior,
       idCategoriaComplementaria: peticion.idCategoriaComplementaria ?? null,
-      patrocinado: peticion.patrocinado,
       ficha:
         peticion.ficha === null || peticion.ficha === undefined
           ? null
@@ -260,7 +259,6 @@ export class ProductosService extends ServicioCatalogoBase {
       ...(peticion.idCategoriaComplementaria !== undefined
         ? { idCategoriaComplementaria: peticion.idCategoriaComplementaria }
         : {}),
-      ...(peticion.patrocinado !== undefined ? { patrocinado: peticion.patrocinado } : {}),
       ...(peticion.ficha !== undefined ? { ficha: fichaFinal } : {}),
       ...(peticion.idsSuperficies !== undefined ? { idsSuperficies: peticion.idsSuperficies } : {}),
       ...(peticion.idsAcabados !== undefined ? { idsAcabados: peticion.idsAcabados } : {}),

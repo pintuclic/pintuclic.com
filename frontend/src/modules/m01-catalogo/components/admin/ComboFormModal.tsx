@@ -21,7 +21,6 @@ const VACIO: FormCombo = {
   sku: '',
   descripcion: '',
   excluidoDeDescuentos: false,
-  patrocinado: false,
   idCategoriaComplementaria: '',
   existenciaInicial: '',
 };
@@ -191,7 +190,6 @@ export const ComboFormModal: React.FC<ComboFormModalProps> = ({ combo, referenci
           </div>
           <div className="flex flex-wrap gap-6 sm:col-span-2">
             <CampoCheck control={control} name="excluidoDeDescuentos" label="Excluido de descuentos" />
-            <CampoCheck control={control} name="patrocinado" label="Patrocinado" />
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">

@@ -227,7 +227,6 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
         publicado: false,
         usoInterior: true,
         usoExterior: false,
-        patrocinado: false,
         variantesActivas: 0,
         descripcion: 'Descripción',
         ficha: {
@@ -463,18 +462,19 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       });
       const r = await admin('PUT', `/productos/${p.idProducto}`, {
         descripcion: 'Nueva',
+        // Ya no existe el interruptor: un cliente viejo que lo envíe no lo guarda (el patrocinio es de M14).
         patrocinado: true,
         idMarca: fx.otraMarca,
       });
       expect(r.status).toBe(200);
       expect(dato(r)).toMatchObject({
         descripcion: 'Nueva',
-        patrocinado: true,
         idMarca: fx.marca,
         nombre: p.nombre,
         idLinea: fx.linea,
         claseColor: 'entonable',
       });
+      expect(dato(r)).not.toHaveProperty('patrocinado');
       expect(ids(dato(r).bases)).toEqual([fx.baseA]);
       expect(dato(r).caracteristicas).toEqual(p.caracteristicas);
       expect((await admin('PUT', `/productos/${p.idProducto}`, {})).status).toBe(400);

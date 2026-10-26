@@ -44,7 +44,6 @@ const SELECCION_RESUMEN = {
   usoExterior: true,
   estado: true,
   publicado: true,
-  patrocinado: true,
   esCombo: true,
   excluidoDeDescuentos: true,
   marca: { select: { nombre: true } },
@@ -139,7 +138,6 @@ function aResumen(f: FilaResumen, variantesActivas: number): ProductoResumen {
     claseColor: derivarClaseColor(f._count.bases, f._count.coloresFabrica),
     estado: f.estado,
     publicado: f.publicado,
-    patrocinado: f.patrocinado,
     esCombo: f.esCombo,
     excluidoDeDescuentos: f.excluidoDeDescuentos,
     variantesActivas,
@@ -169,7 +167,6 @@ function aDetalle(f: FilaDetalle): ProductoDetalle {
     claseColor: derivarClaseColor(f.bases.length, f.coloresFabrica.length),
     estado: f.estado,
     publicado: f.publicado,
-    patrocinado: f.patrocinado,
     esCombo: f.esCombo,
     excluidoDeDescuentos: f.excluidoDeDescuentos,
     variantesActivas: variantes.filter((v) => v.estado === 'activo').length,
@@ -404,7 +401,6 @@ export class ProductosRepository implements ProductosRepositoryPort {
         usoInterior: datos.usoInterior,
         usoExterior: datos.usoExterior,
         idCategoriaComplementaria: datos.idCategoriaComplementaria,
-        patrocinado: datos.patrocinado,
         ...(datos.ficha !== null ? { ficha: { create: columnasFicha(datos.ficha) } } : {}),
         superficies: {
           create: datos.idsSuperficies.map((idSuperficie) => ({
@@ -439,7 +435,6 @@ export class ProductosRepository implements ProductosRepositoryPort {
           ...(datos.idCategoriaComplementaria !== undefined
             ? { idCategoriaComplementaria: datos.idCategoriaComplementaria }
             : {}),
-          ...(datos.patrocinado !== undefined ? { patrocinado: datos.patrocinado } : {}),
         },
       });
       if (datos.ficha === null) {

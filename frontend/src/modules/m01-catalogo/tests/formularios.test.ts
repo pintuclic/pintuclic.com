@@ -39,7 +39,6 @@ const productoBase: FormProducto = {
   descripcion: '',
   usoInterior: true,
   usoExterior: false,
-  patrocinado: false,
   idCategoriaComplementaria: '',
   conFicha: true,
   idTipoResina: '4',
@@ -142,6 +141,13 @@ describe('M01 · formularios → cuerpos del contrato', () => {
         caracteristicas: [{ nombre: 'Secado', valor: '2 h', orden: 0 }],
       },
     });
+  });
+
+  it('el interruptor «patrocinado» ya no existe: ni el producto ni el combo lo envían (el patrocinio es de M14)', () => {
+    const producto = aCuerpoProducto(productoBase, relBase);
+    expect(producto.ok && 'patrocinado' in producto.valor).toBe(false);
+    const editado = aCuerpoProductoEditado(productoBase, relBase);
+    expect(editado.ok && 'patrocinado' in editado.valor).toBe(false);
   });
 
   it('producto sin ficha: acabados, bases y colores de fábrica no viajan (P2) y la línea es opcional', () => {
@@ -247,7 +253,6 @@ describe('M01 · formularios → cuerpos del contrato', () => {
       claseColor: 'entonable',
       estado: 'activo',
       publicado: false,
-      patrocinado: false,
       variantesActivas: 0,
       descripcion: null,
       idCategoriaComplementaria: null,
@@ -290,10 +295,14 @@ describe('M01 · formulario de combos (entrega 3)', () => {
     sku: '',
     descripcion: '',
     excluidoDeDescuentos: true,
-    patrocinado: false,
     idCategoriaComplementaria: '',
     existenciaInicial: '',
   };
+
+  it('el combo tampoco envía «patrocinado»', () => {
+    const r = aCuerpoCombo({ ...f, precio: '59900' });
+    expect(r.ok && 'patrocinado' in r.valor).toBe(false);
+  });
 
   it('arma el cuerpo de alta: sin SKU ni descripción vacíos y con las banderas', () => {
     expect(aCuerpoCombo({ ...f, precio: '59900' })).toEqual({
@@ -306,7 +315,6 @@ describe('M01 · formulario de combos (entrega 3)', () => {
         idMedida: 7,
         precio: 59900,
         excluidoDeDescuentos: true,
-        patrocinado: false,
         idCategoriaComplementaria: null,
       },
     });
@@ -339,7 +347,6 @@ describe('M01 · formulario de combos (entrega 3)', () => {
       idSubcategoria: 4,
       subcategoria: 'Brochas',
       idCategoriaComplementaria: 2,
-      patrocinado: true,
       excluidoDeDescuentos: false,
       idMedida: 7,
       medida: '1 unidad',
@@ -355,7 +362,7 @@ describe('M01 · formulario de combos (entrega 3)', () => {
     expect(form).toMatchObject({ idMarca: '1', idMedida: '7', precio: '59900', idCategoriaComplementaria: '2' });
     expect(aCuerpoComboEditado(form)).toMatchObject({
       ok: true,
-      valor: { nombre: 'Combo', precio: 59900, sku: 'P9-V11', patrocinado: true, idCategoriaComplementaria: 2 },
+      valor: { nombre: 'Combo', precio: 59900, sku: 'P9-V11', idCategoriaComplementaria: 2 },
     });
   });
 

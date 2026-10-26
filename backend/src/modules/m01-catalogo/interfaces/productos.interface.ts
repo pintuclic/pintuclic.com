@@ -28,7 +28,6 @@ export interface CrearProductoDatos {
   usoInterior: boolean;
   usoExterior: boolean;
   idCategoriaComplementaria: number | null;
-  patrocinado: boolean;
   ficha: FichaRecubrimientoDatos | null;
   idsSuperficies: number[];
   idsAcabados: number[];
@@ -46,7 +45,6 @@ export interface EditarProductoDatos {
   usoInterior?: boolean;
   usoExterior?: boolean;
   idCategoriaComplementaria?: number | null;
-  patrocinado?: boolean;
   ficha?: FichaRecubrimientoDatos | null;
   idsSuperficies?: number[];
   idsAcabados?: number[];

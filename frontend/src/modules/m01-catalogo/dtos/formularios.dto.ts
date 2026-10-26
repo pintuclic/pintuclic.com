@@ -97,7 +97,6 @@ export const formComboSchema = z.object({
   sku: z.string().trim().max(60, 'Máximo 60 caracteres'),
   descripcion: z.string().trim().max(5000, 'Máximo 5000 caracteres'),
   excluidoDeDescuentos: z.boolean(),
-  patrocinado: z.boolean(),
   idCategoriaComplementaria: z.string(),
   existenciaInicial: enteroTexto('La existencia es un número entero'),
 });
@@ -114,7 +113,6 @@ export const formProductoSchema = z
     descripcion: z.string().trim().max(5000, 'Máximo 5000 caracteres'),
     usoInterior: z.boolean(),
     usoExterior: z.boolean(),
-    patrocinado: z.boolean(),
     idCategoriaComplementaria: z.string(),
     conFicha: z.boolean(),
     idTipoResina: z.string(),
