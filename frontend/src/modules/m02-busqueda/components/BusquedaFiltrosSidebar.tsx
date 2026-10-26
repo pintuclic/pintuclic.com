@@ -35,6 +35,25 @@ export const BusquedaFiltrosSidebar: React.FC<Props> = ({
         <h2 className="font-title text-base font-semibold text-corporate">Filtros</h2>
       </div>
 
+      {/* Ofertas (M06) */}
+      <section aria-labelledby="filtro-ofertas">
+        <h3 id="filtro-ofertas" className="mb-2 font-title text-sm font-semibold text-neutral-dark">
+          Ofertas
+        </h3>
+        <button
+          type="button"
+          aria-pressed={filtros.enOferta}
+          onClick={() => onCambiar({ enOferta: !filtros.enOferta, pagina: 1 })}
+          className={`w-full rounded-btn border px-3 py-1.5 text-center text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
+            filtros.enOferta
+              ? 'border-offer bg-offer text-neutral-white font-semibold'
+              : 'border-neutral-light bg-neutral-white text-neutral-dark hover:border-offer/50'
+          }`}
+        >
+          Solo productos en oferta
+        </button>
+      </section>
+
       {/* Categorías y Subcategorías en Árbol Jerárquico (Estilo Imagen 3) */}
       {opciones && opciones.categorias.length > 0 && (
         <section aria-labelledby="filtro-categorias">

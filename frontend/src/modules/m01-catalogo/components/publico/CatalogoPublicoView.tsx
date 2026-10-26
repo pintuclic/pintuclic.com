@@ -25,20 +25,12 @@ const ORDENES: ReadonlyArray<{ value: FiltrosVitrina['ordenar']; label: string }
   { value: 'precio_desc', label: 'Precio: mayor a menor' },
 ];
 
-export interface CatalogoPublicoViewProps {
-  /** Página «Ofertas» (M06): solo productos con un evento en curso, con los eventos activos arriba. */
-  soloOfertas?: boolean;
-}
-
 /** HU-CAT-06: vitrina pública. Los filtros viven en la URL; todo se pide paginado y bajo demanda (U3). */
-export const CatalogoPublicoView: React.FC<CatalogoPublicoViewProps> = ({ soloOfertas = false }) => {
+export const CatalogoPublicoView: React.FC = () => {
   const router = useRouter();
   const ruta = usePathname();
   const parametros = useSearchParams();
-  const filtros = useMemo(
-    () => ({ ...filtrosDesdeUrl(new URLSearchParams(parametros.toString())), ...(soloOfertas ? { enOferta: true } : {}) }),
-    [parametros, soloOfertas],
-  );
+  const filtros = useMemo(() => filtrosDesdeUrl(new URLSearchParams(parametros.toString())), [parametros]);
   const [panelAbierto, setPanelAbierto] = useState(false);
 
   const [busqueda, setBusqueda] = useState(filtros.busqueda);
@@ -47,13 +39,10 @@ export const CatalogoPublicoView: React.FC<CatalogoPublicoViewProps> = ({ soloOf
   const aplicar = useCallback(
     (cambios: Partial<FiltrosVitrina>) => {
       const siguiente: FiltrosVitrina = { ...filtros, pagina: 1, ...cambios };
-      const url = filtrosAUrl(siguiente);
-      // En la página de ofertas el filtro lo da la ruta, no la URL.
-      if (soloOfertas) url.delete('enOferta');
-      const query = url.toString();
+      const query = filtrosAUrl(siguiente).toString();
       router.replace(query === '' ? ruta : `${ruta}?${query}`, { scroll: false });
     },
-    [filtros, router, ruta, soloOfertas],
+    [filtros, router, ruta],
   );
 
   // La búsqueda se aplica 300 ms después de la última tecla.
@@ -69,9 +58,6 @@ export const CatalogoPublicoView: React.FC<CatalogoPublicoViewProps> = ({ soloOf
   const cargarProductos = useCallback(() => catalogoPublicoApi.productos(consulta), [consulta]);
   const productos = useCargar(cargarProductos, 'No se pudieron cargar los productos.');
 
-  // En «Ofertas» el filtro de oferta es la propia página: no cuenta como un filtro que se pueda quitar.
-  const hayFiltrosActivos = hayFiltros(soloOfertas ? { ...filtros, enOferta: false } : filtros);
-
   const limpiar = () => {
     setBusqueda('');
     router.replace(ruta, { scroll: false });
@@ -86,7 +72,7 @@ export const CatalogoPublicoView: React.FC<CatalogoPublicoViewProps> = ({ soloOf
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="font-title text-base font-semibold text-corporate">Filtros</h2>
-        {hayFiltrosActivos && (
+        {hayFiltros(filtros) && (
           <button
             type="button"
             onClick={limpiar}
@@ -99,14 +85,12 @@ export const CatalogoPublicoView: React.FC<CatalogoPublicoViewProps> = ({ soloOf
 
       <Input label="Buscar" type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
 
-      {!soloOfertas && (
-        <Checkbox
-          id="solo-ofertas"
-          label="Solo productos en oferta"
-          checked={filtros.enOferta}
-          onChange={(e) => aplicar({ enOferta: e.target.checked })}
-        />
-      )}
+      <Checkbox
+        id="solo-ofertas"
+        label="Solo productos en oferta"
+        checked={filtros.enOferta}
+        onChange={(e) => aplicar({ enOferta: e.target.checked })}
+      />
 
       <nav aria-label="Categorías">
         <h3 className="mb-2 font-title text-sm font-medium text-neutral-dark">Categorías</h3>
@@ -270,7 +254,7 @@ export const CatalogoPublicoView: React.FC<CatalogoPublicoViewProps> = ({ soloOf
                   ? 'Las promociones cambian a lo largo del día y la semana: vuelva a revisar pronto.'
                   : 'Pruebe con otra búsqueda o quite algún filtro.'}
               </p>
-              {hayFiltrosActivos && (
+              {hayFiltros(filtros) && (
                 <Button className="mt-4" variant="outline" onClick={limpiar}>
                   Limpiar filtros
                 </Button>

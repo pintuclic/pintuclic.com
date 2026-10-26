@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { Alert, Button, Container, ProductCard, Select, Skeleton } from '@/core/components';
+import { precioVisible } from '@/modules/m01-catalogo/services/ofertas-visuales';
+import { EventosEnCurso } from '@/modules/m06-precios/components/publico/EventosEnCurso';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { Paginador } from '@/modules/m01-catalogo/components/admin/comunes';
 import type { OpcionesFiltro, PaginaBusqueda, ResultadoBusqueda } from '../dtos/busqueda.dto';
@@ -223,6 +225,14 @@ export const BusquedaCatalogoView: React.FC = () => {
       }
     }
 
+    if (filtros.enOferta) {
+      chips.push({
+        id: 'oferta',
+        label: 'En oferta',
+        onQuitar: () => aplicar({ enOferta: false, pagina: 1 }),
+      });
+    }
+
     if (filtros.ambiente) {
       chips.push({
         id: 'ambiente',
@@ -270,9 +280,13 @@ export const BusquedaCatalogoView: React.FC = () => {
       {/* Título principal y buscador */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="font-title text-3xl font-bold text-corporate">Catálogo de productos</h1>
+          <h1 className="font-title text-3xl font-bold text-corporate">
+            {filtros.enOferta ? 'Ofertas' : 'Catálogo de productos'}
+          </h1>
           <p className="mt-1 font-sans text-sm text-neutral-medium">
-            Encuentre pinturas, recubrimientos y accesorios con búsqueda inteligente y filtros.
+            {filtros.enOferta
+              ? 'Productos con descuento ahora mismo. El precio final de tu compra se confirma en el carrito.'
+              : 'Encuentre pinturas, recubrimientos y accesorios con búsqueda inteligente y filtros.'}
           </p>
         </div>
 
@@ -301,6 +315,13 @@ export const BusquedaCatalogoView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Promociones que están en curso: solo en la página de ofertas */}
+      {filtros.enOferta && (
+        <div className="mt-5">
+          <EventosEnCurso />
+        </div>
+      )}
 
       {/* Chips de filtros activos */}
       {chipsActivos.length > 0 && (
@@ -435,7 +456,7 @@ export const BusquedaCatalogoView: React.FC = () => {
                       description={`${p.esCombo ? 'Combo · ' : ''}${p.subcategoria}${
                         p.precioDesde === null ? '' : ' · Precio desde'
                       }${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
-                      price={p.precioDesde ?? 0}
+                      {...precioVisible(p.precioDesde, p.oferta)}
                       href={`/productos/${p.idProducto}`}
                       {...(p.idImagenPrincipal === null
                         ? {}
