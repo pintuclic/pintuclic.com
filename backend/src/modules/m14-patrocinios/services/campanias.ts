@@ -17,6 +17,9 @@ export function situacionCampania(c: CampaniaVigencia, ahora: Date): Situacion {
   return 'vigente';
 }
 
+/** B3: la vigencia de un anuncio es la misma que la de una campaña (A1). */
+export const situacionAnuncio = situacionCampania;
+
 /** ¿El producto cae en alguno de los objetivos? Línea y marca cubren todos sus productos (A3). */
 export function cubre(objetivos: readonly ObjetivoPatrocinio[], p: Pick<ProductoDeCatalogo, 'idProducto' | 'idMarca' | 'idLinea'>): boolean {
   return objetivos.some(

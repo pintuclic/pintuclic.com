@@ -1,12 +1,14 @@
 import express, { type Express } from 'express';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { construirParserJson } from '../../../../core/middlewares/cuerpoJson.middleware';
 import { errorHandler } from '../../../../core/middlewares/errorHandler';
 import { construirModuloM01 } from '../../../m01-catalogo/m01.routes';
 import type { Actor } from '../../../m20-seguridad/interfaces/actor.interface';
 import type { AuditoriaPort } from '../../../m20-seguridad/interfaces/auditoria.port';
 import { AutorizacionService, type ResolutorPermisos } from '../../../m20-seguridad/services/autorizacion.service';
 import { construirModuloM14, type ModuloM14 } from '../../m14.routes';
+import type { LimitadorPorMinuto } from '../../services/limitador';
 import type { TarjetasPublicasPort } from '../../interfaces/patrocinios.interface';
 
 /**
@@ -31,6 +33,12 @@ export interface ServidorPrueba {
   modulo: ModuloM14;
   admin: (actor: NombreActor | null, metodo: 'GET' | 'POST' | 'PUT' | 'PATCH', ruta: string, cuerpo?: unknown) => Promise<RespuestaHttp>;
   publico: (ruta: string) => Promise<RespuestaHttp>;
+  /** POST público (la medición): devuelve el estado y el cuerpo en texto, sin exigir JSON. */
+  publicoPost: (ruta: string, cuerpo: unknown, cabeceras?: Record<string, string>) => Promise<{ status: number; texto: string }>;
+  /** Respuesta sin interpretar (imágenes, CSV, redirecciones: no sigue los 302). */
+  crudo: (ruta: string, init?: RequestInit) => Promise<Response>;
+  /** Igual que `crudo`, bajo la administración y con el actor indicado. */
+  adminCrudo: (actor: NombreActor | null, ruta: string) => Promise<Response>;
   /** El catálogo público de M01 (para ver los complementarios de la ficha, A7). */
   catalogo: (ruta: string) => Promise<RespuestaHttp>;
   cerrar: () => Promise<void>;
@@ -40,6 +48,7 @@ export async function levantarServidor(
   auditoria: AuditoriaPort,
   ids: IdsActores,
   tarjetas?: TarjetasPublicasPort,
+  limitador?: LimitadorPorMinuto,
 ): Promise<ServidorPrueba> {
   const actores = Object.fromEntries(
     (Object.keys(ids) as NombreActor[]).map((n) => [
@@ -67,11 +76,12 @@ export async function levantarServidor(
       },
     },
   });
-  const modulo = construirModuloM14(autorizacion, { tarjetas: tarjetas ?? m01.consultaPublicaService });
+  const modulo = construirModuloM14(autorizacion, { tarjetas: tarjetas ?? m01.consultaPublicaService, ...(limitador === undefined ? {} : { limitador }) });
   construido.m14 = modulo;
 
   const app: Express = express();
-  app.use(express.json({ limit: '1mb' }));
+  // El mismo parser que la aplicación: así se prueba también el límite de las rutas con imágenes.
+  app.use(construirParserJson());
   app.use('/api/v1/admin/patrocinios', (req, _res, next) => {
     const nombre = req.header('x-actor');
     if (nombre !== undefined && nombre in actores) req.actor = actores[nombre as NombreActor];
@@ -105,6 +115,20 @@ export async function levantarServidor(
         ...(cuerpo !== undefined ? { body: JSON.stringify(cuerpo) } : {}),
       }),
     publico: (ruta) => leer(`${baseUrl}/api/v1/patrocinios${ruta}`, { method: 'GET' }),
+    publicoPost: async (ruta, cuerpo, cabeceras = {}) => {
+      const r = await fetch(`${baseUrl}/api/v1/patrocinios${ruta}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...cabeceras },
+        body: JSON.stringify(cuerpo),
+      });
+      return { status: r.status, texto: await r.text() };
+    },
+    crudo: (ruta, init = {}) => fetch(`${baseUrl}/api/v1/patrocinios${ruta}`, { redirect: 'manual', ...init }),
+    adminCrudo: (actor, ruta) =>
+      fetch(`${baseUrl}/api/v1/admin/patrocinios${ruta}`, {
+        redirect: 'manual',
+        headers: actor !== null ? { 'x-actor': actor } : {},
+      }),
     catalogo: (ruta) => leer(`${baseUrl}/api/v1/catalogo${ruta}`, { method: 'GET' }),
     cerrar: () => new Promise<void>((resolver, rechazar) => servidor.close((e) => (e ? rechazar(e) : resolver()))),
   };
