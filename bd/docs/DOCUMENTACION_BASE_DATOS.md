@@ -1,8 +1,8 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.14 — esquema 4.15 (M05 Carrito: un carrito por dueño y modelos Prisma del carrito).  
+> **Versión Actual:** 3.16 — esquema 4.16 (M14 Patrocinios y publicidad: campañas, anuncios y medición).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
-> **Total de Tablas:** 73  
+> **Total de Tablas:** 78  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script de Mocks / Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Guía Oficial de Mocks y Datos de Prueba:** [`./GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./GUIA_MOCKS_Y_DATOS_PRUEBA.md)  
@@ -14,6 +14,8 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.16** (esquema 4.16) | 2026-10-26 | `campania_patrocinio`, `campania_objetivo`, `anuncio_publicitario`, `anuncio_imagen`, `medicion_patrocinio` (5) | Ninguna | M14: campañas de patrocinio de productos (por producto, línea o marca, con vigencia y prioridad), anuncios de espacios publicitarios con sus imágenes y medición diaria de impresiones y clics sin datos personales. Siete ENUMs nuevos. Total 78 tablas. | [Ver v3.16](./CHANGELOG_DATABASE.md#v316---2026-10-26) |
+| **v3.15** (esquema 4.15) | 2026-10-26 | Ninguna | Ninguna | M14: permisos `patrocinios.ver` y `patrocinios.editar` (27-28) en el seed. Total 73 tablas. | [Ver v3.15](./CHANGELOG_DATABASE.md#v315---2026-10-26) |
 | **v3.14** (esquema 4.15) | 2026-10-26 | Ninguna | Ninguna | M05: restricciones únicas `carrito(id_usuario)` y `carrito(token_visitante)` (un carrito por dueño); el token se guarda con SHA-256. Modelos Prisma `Carrito` y `LineaCarrito`. Total 73 tablas. | [Ver v3.14](./CHANGELOG_DATABASE.md#v314---2026-10-26) |
 | **v3.11** (esquema 4.13) | 2026-10-26 | `evento_descuento`, `evento_regla`, `evento_exclusion`, `cupon`, `cupon_uso` (5) | Ninguna | M06: eventos de descuento con calendario (fechas, días de la semana, horas), reglas con porcentaje propio por objetivo y excepciones (incluidos color y familia de color); cupones con usos; `descuento.monto_minimo_compra`; `cuenta_empresa.id_sub_rol_empresa` (tipo de cliente empresa). Cuatro ENUMs nuevos. Total 73 tablas. | [Ver v3.11](./CHANGELOG_DATABASE.md#v311---2026-10-26) |
 | **v3.9** (esquema 4.11) | 2026-10-25 | `solicitud_contacto`, `horario_atencion`, `configuracion_atencion_whatsapp` (3) | Ninguna | M15 Atención al cliente: solicitudes del formulario de contacto sin duplicar datos de contacto, horario de atención humana por día con franja coherente y destino del botón de WhatsApp en fila única. Tres ENUMs nuevos y los permisos `atencion.*`. Las preguntas frecuentes son de M16. Total 67 tablas. | [Ver v3.9](./CHANGELOG_DATABASE.md#v39---2026-10-25) |
@@ -569,7 +571,7 @@ erDiagram
 
 ---
 
-## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (73 Tablas)
+## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (78 Tablas)
 
 ### Módulo 1: Seguridad, Roles y Descuentos (5 Tablas)
 | Tabla | PK | FKs | Descripción |
@@ -698,11 +700,22 @@ Además amplía `descuento` (`monto_minimo_compra`) y `cuenta_empresa` (`id_sub_
 | **`cupon`** *(v3.11)* | `id_cupon` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Código único en mayúsculas, porcentaje o importe fijo, mínimo de compra, límites de uso, audiencia y vigencia. |
 | **`cupon_uso`** *(v3.11)* | `id_cupon_uso` | `id_cupon` $\rightarrow$ `cupon` (RESTRICT); `id_usuario` $\rightarrow$ `usuario` (SET NULL) | Un uso por orden (`referencia` única, idempotente); `liberado_en` marca la orden cancelada. |
 
+### Módulo 15: Patrocinios y Publicidad — M14 (5 Tablas, esquema 4.16)
+No toca ninguna tabla existente. La columna `producto.patrocinado` (interruptor manual de M01) se elimina en un PR posterior, cuando M01 deje de usarla (contrato M14 · A13).
+
+| Tabla | PK | FKs | Descripción |
+| :--- | :--- | :--- | :--- |
+| **`campania_patrocinio`** *(v3.16)* | `id_campania` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Campaña con vigencia (`fecha_fin` obligatoria: caduca sola), `prioridad` 0-100 y `ubicaciones` (listado, inicio, complementarios). Nombre único sin distinguir mayúsculas (`uq_campania_nombre`). |
+| **`campania_objetivo`** *(v3.16)* | `id_campania_objetivo` | `id_campania` $\rightarrow$ `campania_patrocinio` (CASCADE) | Producto, línea o marca que patrocina la campaña. Sin FK en `id_referencia` (apunta a tres tablas según `tipo`); un objetivo que ya no existe se ignora. |
+| **`anuncio_publicitario`** *(v3.16)* | `id_anuncio` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Anuncio de un espacio (inicio, catálogo, ficha) con texto alternativo obligatorio, vigencia y orden en el slider. `enlace` solo `https://` o ruta interna (`ck_anuncio_enlace`). |
+| **`anuncio_imagen`** *(v3.16)* | `(id_anuncio, variante, tamano)` | `id_anuncio` $\rightarrow$ `anuncio_publicitario` (CASCADE) | Imagen de escritorio y móvil, cada una con su original y sus versiones reducidas (WEBP). JPEG, PNG o WEBP; nunca SVG. |
+| **`medicion_patrocinio`** *(v3.16)* | `(fecha, entidad, id_entidad, lugar, evento)` | Ninguna (apunta a dos tablas según `entidad`) | Impresiones y clics por día de una campaña o un anuncio. Solo totales: ni IP, ni sesión, ni navegador. Se conservan siempre. |
+
 ---
 
 ## 🛡️ 4. Tipos Enumerados (ENUMs)
 
-Para asegurar la máxima robustez en PostgreSQL, el esquema utiliza 28 tipos enumerados nativos.
+Para asegurar la máxima robustez en PostgreSQL, el esquema utiliza 40 tipos enumerados nativos.
 `enum_clase_color` aparece abajo pero **todavía no existe en el DDL**: queda pendiente de la Entrega 2 de M01.
 
 ```sql
@@ -755,6 +768,15 @@ enum_estado_envio_notificacion -- ('pendiente', 'enviado', 'fallido')
 
 -- Contenido institucional (M16)
 enum_estado_contenido   -- ('borrador', 'publicado', 'archivado')
+
+-- Patrocinios y publicidad (M14)
+enum_ubicacion_patrocinio      -- ('listado', 'inicio', 'complementarios')
+enum_tipo_objetivo_patrocinio  -- ('producto', 'linea', 'marca')
+enum_espacio_publicitario      -- ('inicio', 'catalogo', 'ficha')
+enum_variante_imagen_anuncio   -- ('escritorio', 'movil')
+enum_tamano_imagen_anuncio     -- ('original', 'mediano', 'pequeno')
+enum_entidad_medicion          -- ('campania', 'anuncio')
+enum_evento_medicion           -- ('impresion', 'clic')
 
 -- Atención al cliente (M15)
 enum_tipo_solicitud_contacto   -- ('consulta', 'cotizacion', 'reclamo')

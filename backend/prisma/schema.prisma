@@ -190,6 +190,66 @@ enum AudienciaDescuento {
   @@map("enum_audiencia_descuento")
 }
 
+/// Dónde se ve el patrocinio de productos (M14 · A7)
+enum UbicacionPatrocinio {
+  listado
+  inicio
+  complementarios
+
+  @@map("enum_ubicacion_patrocinio")
+}
+
+/// Qué patrocina una campaña (M14 · A3)
+enum TipoObjetivoPatrocinio {
+  producto
+  linea
+  marca
+
+  @@map("enum_tipo_objetivo_patrocinio")
+}
+
+/// Espacios del sitio donde se muestran anuncios (M14 · B1)
+enum EspacioPublicitario {
+  inicio
+  catalogo
+  ficha
+
+  @@map("enum_espacio_publicitario")
+}
+
+/// Imagen de escritorio o móvil de un anuncio (M14 · B10)
+enum VarianteImagenAnuncio {
+  escritorio
+  movil
+
+  @@map("enum_variante_imagen_anuncio")
+}
+
+/// Original o versión reducida de una imagen de anuncio (M14 · B11)
+enum TamanoImagenAnuncio {
+  original
+  mediano
+  pequeno
+
+  @@map("enum_tamano_imagen_anuncio")
+}
+
+/// A qué se refiere una medición (M14 · M1)
+enum EntidadMedicion {
+  campania
+  anuncio
+
+  @@map("enum_entidad_medicion")
+}
+
+/// Qué se cuenta en una medición (M14 · M1)
+enum EventoMedicion {
+  impresion
+  clic
+
+  @@map("enum_evento_medicion")
+}
+
 /// Qué parte del catálogo cubre una regla de evento (M06 · R5)
 enum TipoObjetivoEvento {
   marca
@@ -312,6 +372,8 @@ model Usuario {
 
   // M06 Relaciones
   eventosDescuentoActualizados EventoDescuento[] @relation("EventoDescuentoUsuarioActualizo")
+  campaniasPatrocinioActualizadas CampaniaPatrocinio[] @relation("CampaniaPatrocinioUsuarioActualizo")
+  anunciosActualizados AnuncioPublicitario[] @relation("AnuncioPublicitarioUsuarioActualizo")
   cuponesActualizados          Cupon[]           @relation("CuponUsuarioActualizo")
   usosCupon                    CuponUso[]
 
@@ -1404,4 +1466,101 @@ model FaqEntrada {
   @@index([estado, orden, idFaq], map: "idx_faq_entrada_estado_orden")
   @@index([idAutor], map: "idx_faq_entrada_autor")
   @@map("faq_entrada")
+}
+
+// =============================================================================
+// MÓDULO M14 — PATROCINIOS Y PUBLICIDAD (esquema 4.16)
+// =============================================================================
+
+/// Campaña que pone productos por delante en el sitio (M14 · A1-A13). Fechas de calendario en hora de Colombia.
+/// `uq_campania_nombre` (único sin distinguir mayúsculas ni espacios de los bordes) vive solo en el DDL: Prisma no expresa índices sobre funciones.
+model CampaniaPatrocinio {
+  idCampania         Int                   @id @default(autoincrement()) @map("id_campania")
+  nombre             String                @db.VarChar(100)
+  descripcion        String?               @db.VarChar(500)
+  estado             EstadoGeneral         @default(activo)
+  fechaInicio        DateTime              @map("fecha_inicio") @db.Date
+  fechaFin           DateTime              @map("fecha_fin") @db.Date
+  /// 0 a 100; el mayor va primero (M14 · A4)
+  prioridad          Int                   @default(0) @db.SmallInt
+  ubicaciones        UbicacionPatrocinio[]
+  fechaCreacion      DateTime              @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime              @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?                  @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario?           @relation("CampaniaPatrocinioUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_campania_usuario")
+  objetivos        CampaniaObjetivo[]
+
+  @@index([estado, fechaInicio, fechaFin], map: "idx_campania_estado_fechas")
+  @@map("campania_patrocinio")
+}
+
+/// Un producto, una línea o una marca que patrocina una campaña (M14 · A3). `idReferencia` no es FK: apunta a tres tablas según `tipo`.
+model CampaniaObjetivo {
+  idCampaniaObjetivo Int                    @id @default(autoincrement()) @map("id_campania_objetivo")
+  idCampania         Int                    @map("id_campania")
+  tipo               TipoObjetivoPatrocinio
+  idReferencia       Int                    @map("id_referencia")
+
+  campania CampaniaPatrocinio @relation(fields: [idCampania], references: [idCampania], onDelete: Cascade, map: "fk_campania_objetivo_campania")
+
+  @@unique([idCampania, tipo, idReferencia], map: "uq_campania_objetivo")
+  @@index([tipo, idReferencia], map: "idx_campania_objetivo_referencia")
+  @@map("campania_objetivo")
+}
+
+/// Anuncio de un espacio publicitario: imagen y enlace al anunciante (M14 · B1-B9). Las imágenes viven en `AnuncioImagen`.
+model AnuncioPublicitario {
+  idAnuncio          Int                 @id @default(autoincrement()) @map("id_anuncio")
+  nombre             String              @db.VarChar(100)
+  anunciante         String              @db.VarChar(100)
+  espacio            EspacioPublicitario
+  textoAlternativo   String              @map("texto_alternativo") @db.VarChar(150)
+  /// https://… o ruta interna (/…); nunca javascript:, data: ni http:// (M14 · B6)
+  enlace             String?             @db.VarChar(500)
+  estado             EstadoGeneral       @default(activo)
+  fechaInicio        DateTime            @map("fecha_inicio") @db.Date
+  fechaFin           DateTime            @map("fecha_fin") @db.Date
+  /// Posición en el slider: el menor va primero (M14 · B4)
+  orden              Int                 @default(0) @db.SmallInt
+  fechaCreacion      DateTime            @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime            @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?                @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario?        @relation("AnuncioPublicitarioUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_anuncio_usuario")
+  imagenes         AnuncioImagen[]
+
+  @@index([espacio, estado, fechaInicio, fechaFin], map: "idx_anuncio_espacio_vigencia")
+  @@map("anuncio_publicitario")
+}
+
+/// Imagen de escritorio o móvil de un anuncio, original y reducidas (M14 · B7, B11). La sirve Pintu Clic, nunca un tercero.
+model AnuncioImagen {
+  idAnuncio Int                   @map("id_anuncio")
+  variante  VarianteImagenAnuncio
+  tamano    TamanoImagenAnuncio
+  contenido Bytes
+  mimeType  String                @map("mime_type") @db.VarChar(20)
+  ancho     Int
+  alto      Int
+
+  anuncio AnuncioPublicitario @relation(fields: [idAnuncio], references: [idAnuncio], onDelete: Cascade, map: "fk_anuncio_imagen_anuncio")
+
+  @@id([idAnuncio, variante, tamano])
+  @@map("anuncio_imagen")
+}
+
+/// Impresiones y clics por día de una campaña o un anuncio (M14 · M1). Solo totales, sin datos personales.
+/// `lugar` es la ubicación de la campaña o el espacio del anuncio. Sin FK: apunta a dos tablas según `entidad`.
+model MedicionPatrocinio {
+  fecha     DateTime        @db.Date
+  entidad   EntidadMedicion
+  idEntidad Int             @map("id_entidad")
+  lugar     String          @db.VarChar(20)
+  evento    EventoMedicion
+  total     BigInt          @default(0)
+
+  @@id([fecha, entidad, idEntidad, lugar, evento])
+  @@index([entidad, idEntidad, fecha], map: "idx_medicion_entidad_fecha")
+  @@map("medicion_patrocinio")
 }
