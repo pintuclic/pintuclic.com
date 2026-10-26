@@ -13,8 +13,10 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  * CONTRATO DE API REST — M14. Patrocinios y publicidad
  * ============================================================================
  * Scope: m14-patrocinios · Ola 7 (valor añadido) · Prefijo de historias: PAT · BORRADOR v2 para el Tech Lead.
- * Base de datos: tablas nuevas `campania_patrocinio`, `campania_objetivo` y `anuncio_publicitario`
- * (+ enums `enum_ubicacion_patrocinio`, `enum_tipo_objetivo_patrocinio`, `enum_espacio_publicitario`) y se RETIRA la
+ * Base de datos: tablas nuevas `campania_patrocinio`, `campania_objetivo`, `anuncio_publicitario` y
+ * `medicion_patrocinio` (totales por día, sin datos personales)
+ * (+ enums `enum_ubicacion_patrocinio`, `enum_tipo_objetivo_patrocinio`, `enum_espacio_publicitario`,
+ * `enum_entidad_medicion`, `enum_evento_medicion`) y se RETIRA la
  * columna `producto.patrocinado` (A13). Todo en un PR de BD aparte, antes del módulo.
  * Depende de M01 (marcas, líneas y productos) y M17 (permisos nuevos `patrocinios.ver` / `patrocinios.editar`).
  * Lo consumen M02 (listado), M01 (complementarios) y las vistas del cliente (inicio, catálogo y ficha).
@@ -33,6 +35,10 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *     Aparece de primero en el listado del catálogo y de la búsqueda, en un bloque del inicio y en los
  *     complementarios de la ficha (UBICACIONES_PATROCINIO).
  *
+ *  M. MEDICIÓN PROPIA (HU-PAT-04). Un contador local, sin servicios externos, que cuenta impresiones y clics de cada
+ *     campaña y de cada anuncio, para que el responsable pueda sustentar el valor del acuerdo ante la marca. El clic
+ *     en un anuncio pasa primero por Pintu Clic, que lo cuenta, y de ahí sigue a la dirección real.
+ *
  *  B. ESPACIOS PUBLICITARIOS (HU-PAT-02). Huecos fijos y cuidados en tres vistas del cliente (inicio, catálogo y
  *     ficha de producto) donde se muestra un slider de anuncios: una IMAGEN con un ENLACE «invisible» (la
  *     imagen entera es el enlace) que lleva al anunciante. Los sube el administrador o un empleado con el permiso
@@ -40,9 +46,8 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *     ESPACIO: los acuerdos y los cobros con los anunciantes se hacen fuera del sistema. Cada anuncio tiene vigencia, orden y su espacio.
  *
  * ── Qué NO hace ─────────────────────────────────────────────────────────────
- *  · NO mide (HU-PAT-04 está BLOQUEADA en el documento de HU, cap. 7: espera la decisión de analítica propia o
- *    servicio externo, la misma de HU-RPT-06). Ni cuenta impresiones ni clics, y el enlace del anuncio va DIRECTO al
- *    anunciante, sin redirección por Pintu Clic. Por eso M14 ya no depende de M19.
+ *  · NO es la analítica de comportamiento y embudo de HU-RPT-06 (M19), que sigue pendiente de decisión. La medición
+ *    de M14 es mínima y propia: dos números por campaña y por anuncio, sin saber quién ni desde dónde (M).
  *  · NO guarda contratos, montos ni cobros: el modelo de cobro es comercial y está fuera del sistema.
  *  · NO tiene cuentas de anunciante: los anuncios los sube solo el administrador o un empleado con permiso.
  *  · NO pone publicidad en el carrito ni en el pago: distrae de la compra (decisión del Tech Lead).
@@ -124,6 +129,42 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *      con el tamaño recomendado: así nadie sube una imagen que se vea deformada o recortada.
  *  B9  ACCESIBILIDAD. `textoAlternativo` es OBLIGATORIO (3 a 150 caracteres).
  *
+ *  B10 DISPOSITIVOS. Tres anchos: móvil (menos de PUNTO_QUIEBRE_MOVIL = 640 px), tablet (de 640 a 1023 px) y escritorio
+ *      (1024 px o más). La imagen de escritorio sirve para tablet y escritorio: tiene la misma proporción y solo se
+ *      escala. En móvil se usa la imagen móvil (4:3); sin ella se usa la de escritorio, que en un celular se ve muy
+ *      pequeña, así que el panel avisa «Sin imagen móvil: en celulares se verá muy pequeña».
+ *  B11 PESO. Al subir una imagen, el servidor guarda además versiones reducidas (`pequeno` de 640 px y `mediano` de
+ *      1232 px de ancho, en WEBP) y la página pide la adecuada con `srcset`/`<picture>`: un celular nunca descarga los
+ *      5 MB originales.
+ *  B12 TÁCTIL. En pantallas táctiles el slider se desliza con el dedo, se pausa mientras se toca y no depende del
+ *      cursor; los puntos de navegación tienen una zona táctil de al menos 44×44 px.
+ *  B13 TAMAÑO MÍNIMO. La imagen de escritorio mide al menos ANCHO_MINIMO_ESCRITORIO (1232 px) y la móvil al menos
+ *      ANCHO_MINIMO_MOVIL (640 px), y ninguna pasa de ANCHO_MAXIMO_IMAGEN (4000 px); si no, 400 IMAGEN_TAMANO_INVALIDO.
+ *      Para pantallas de alta densidad conviene subir el doble (2464×560).
+ *
+ * ── M. Reglas de la medición ────────────────────────────────────────────────
+ *  M1  QUÉ SE MIDE. Dos números por campaña de productos y por anuncio: IMPRESIONES (veces que se mostró) y CLICS, y
+ *      su CTR (clics ÷ impresiones, en %). Solo totales por día; NUNCA quién ni desde dónde: no se guarda IP, sesión,
+ *      cookie ni navegador (M20). No hay «personas únicas»: quien recarga la página suma otra impresión.
+ *  M2  CLIC EN UN ANUNCIO. La imagen enlaza a `GET /patrocinios/anuncios/:idAnuncio/ir`, que suma un clic y responde
+ *      302 a la dirección real. Si el anuncio no está vigente o no tiene enlace, no suma y manda al inicio (el cliente
+ *      nunca ve un error). La dirección real no se publica en la página. La redirección solo va a la que guardó el
+ *      personal (validada en B6), jamás a una que venga en la petición: no es un redirector abierto.
+ *  M3  IMPRESIÓN. La pantalla avisa con `POST /patrocinios/medicion` cuando un anuncio o un producto patrocinado queda
+ *      visible al menos 50 % durante 1 segundo, una sola vez por carga de página y elemento.
+ *  M4  CLIC EN UN PRODUCTO PATROCINADO. La tarjeta avisa (con `sendBeacon`) el clic, con el id de campaña y la
+ *      ubicación, y sigue a la ficha. El clic en un anuncio NO usa este aviso: usa la redirección (M2), que no se pierde
+ *      aunque el navegador bloquee scripts.
+ *  M5  SOLO LO VIGENTE. Un aviso sobre algo inexistente o no vigente se ignora (204), sin error.
+ *  M6  ROBOTS Y EXCESOS. No se cuentan los rastreadores que se declaran como tales (se mira el agente del navegador y
+ *      no se guarda) y se limita a MAXIMO_EVENTOS_POR_MINUTO por origen, contado en memoria sin guardar la IP.
+ *  M7  LÍMITES. Las cifras son INDICATIVAS, para negociar con la marca; no son auditables: quien escriba un script
+ *      puede inflarlas y los bloqueadores de anuncios pueden impedir impresiones (los clics por redirección sí se
+ *      cuentan). Una auditoría independiente exigiría un servicio externo.
+ *  M8  INFORME (`patrocinios.ver`). Resumen por campaña y por anuncio en un rango de fechas (por defecto, los últimos 30
+ *      días; máximo 366), serie diaria de uno y exportación a CSV (separador «;», UTF-8 con BOM, para Excel).
+ *  M9  CONSERVACIÓN. Los totales diarios no tienen datos personales y se conservan sin vencimiento (Q9).
+ *
  * ── Reglas comunes ──────────────────────────────────────────────────────────
  *  C1  PERMISOS PROPIOS. Toda la administración exige sesión y uno de dos permisos nuevos de M17: `patrocinios.ver`
  *      (consultar) y `patrocinios.editar` (crear, editar, cambiar estado y subir imágenes). Quien tiene `editar`
@@ -148,9 +189,7 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  * ── Preguntas abiertas (para el Tech Lead / cliente) ────────────────────────
  *  Q1  RESUELTA: los anuncios los sube el administrador o un empleado con `patrocinios.editar`; los negocios con
  *      los anunciantes se hacen fuera del sistema.
- *  Q2  Medir (clics, impresiones) está bloqueado (HU-PAT-04). Con el enlace directo no se puede contar. Si el
- *      cliente exige reporte a los anunciantes, la salida es una redirección propia (`/patrocinios/anuncios/:id/ir`)
- *      que cuente y reenvíe; el contrato la admitiría sin cambiar lo demás. ¿La dejamos prevista?
+ *  Q2  RESUELTA: medición propia y local (M), sin servicios externos.
  *  Q3  Tamaños de los espacios (DEFINICION_ESPACIOS): son propuesta. ¿Hay un tamaño que Pintuco ya tenga para sus
  *      anuncios?
  *  Q4  RESUELTA: no hay espacio en el carrito ni en el pago.
@@ -160,6 +199,8 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *  Q7  Patrocinio por MARCA: si una marca tiene 300 productos, el cupo (A8) limita cuántos van delante, pero ¿cuáles?
  *      Se asume los de mejor relevancia/nombre dentro de la campaña. ¿Basta, o se elige una muestra al azar para
  *      repartir la visibilidad?
+ *  Q9  Conservación de la medición (M9): los totales diarios pesan casi nada y no son datos personales, así que se
+ *      conservan siempre. ¿Se prefiere borrar lo anterior a N años?
  *  Q8  Auditoría (M20): crear, editar y cambiar el estado se registran con las acciones genéricas; falta confirmar que
  *      el catálogo de acciones auditables de M17 las cubre.
  *
@@ -187,6 +228,20 @@ export const IMAGEN_MAXIMO_BYTES = 5 * 1024 * 1024;
 export const IMAGEN_MAXIMO_BASE64 = LOGOTIPO_MAXIMO_BASE64;
 export const TOLERANCIA_PROPORCION = 0.1;
 export const PROPORCION_MOVIL = { ancho: 4, alto: 3 } as const;
+/** Tamaño recomendado de la imagen móvil (4:3), en píxeles (B10, B13). */
+export const TAMANO_MOVIL_RECOMENDADO = { ancho: 800, alto: 600 } as const;
+export const PUNTO_QUIEBRE_MOVIL = 640;
+export const ANCHO_MINIMO_ESCRITORIO = 1232;
+export const ANCHO_MINIMO_MOVIL = 640;
+export const ANCHO_MAXIMO_IMAGEN = 4000;
+/** Anchos de las versiones reducidas que el servidor guarda (B11). */
+export const ANCHO_PEQUENO = 640;
+export const ANCHO_MEDIANO = 1232;
+
+export const MAXIMO_EVENTOS_POR_AVISO = 20;
+export const MAXIMO_EVENTOS_POR_MINUTO = 60;
+export const DIAS_INFORME_POR_DEFECTO = 30;
+export const DIAS_INFORME_MAXIMO = 366;
 
 export const PERMISO_VER_PATROCINIOS = 'patrocinios.ver';
 export const PERMISO_EDITAR_PATROCINIOS = 'patrocinios.editar';
@@ -359,7 +414,11 @@ export const campaniaSchema = campaniaResumenSchema
 export type Campania = z.infer<typeof campaniaSchema>;
 
 /** Tarjeta de M01 más la marca de patrocinio (A9: la pantalla muestra «Patrocinado»). */
-export const productoPatrocinadoSchema = productoPublicoTarjetaSchema.extend({ patrocinado: z.literal(true) });
+export const productoPatrocinadoSchema = productoPublicoTarjetaSchema.extend({
+  patrocinado: z.literal(true),
+  /** La campaña que lo puso aquí (la de mayor prioridad, A5): la pantalla la usa para medir (M3, M4). */
+  idCampania: idSchema,
+});
 export type ProductoPatrocinado = z.infer<typeof productoPatrocinadoSchema>;
 
 export const campaniaResponseEnvelopeSchema = respuestaUno(campaniaSchema);
@@ -472,8 +531,11 @@ export type ListarAnunciosRequest = z.infer<typeof listarAnunciosRequestSchema>;
 export const anunciosEspacioParamsSchema = z.object({ espacio: espacioPublicitarioSchema });
 /** GET …/imagenes/:idAnuncio?variante= */
 export const VARIANTES_IMAGEN = ['escritorio', 'movil'] as const;
+export const TAMANOS_IMAGEN = ['pequeno', 'mediano', 'original'] as const;
 export const imagenAnuncioQuerySchema = z.object({
   variante: z.enum(VARIANTES_IMAGEN).default('escritorio'),
+  /** `pequeno` = 640 px, `mediano` = 1232 px de ancho (B11). */
+  tamano: z.enum(TAMANOS_IMAGEN).default('mediano'),
 });
 export type ImagenAnuncioQuery = z.infer<typeof imagenAnuncioQuerySchema>;
 
@@ -508,7 +570,10 @@ export type Anuncio = z.infer<typeof anuncioSchema>;
 export const anuncioPublicoSchema = z.object({
   idAnuncio: idSchema,
   textoAlternativo: z.string(),
-  enlace: z.string().nullable(),
+  /** La redirección que cuenta el clic (M2); null si el anuncio no tiene enlace. La dirección real no se publica. */
+  urlClic: z.string().nullable(),
+  /** true si el enlace es externo (B6): abre en pestaña nueva. */
+  abrirEnNuevaPestana: z.boolean(),
   urlImagen: z.string(),
   urlImagenMovil: z.string().nullable(),
 });
@@ -526,10 +591,99 @@ export const anunciosEspacioResponseEnvelopeSchema = z.object({
 export type AnunciosEspacioResponseEnvelope = z.infer<typeof anunciosEspacioResponseEnvelopeSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
+ * 5B. MEDICIÓN
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+export const ENTIDADES_MEDICION = ['campania', 'anuncio'] as const;
+export const entidadMedicionSchema = z.enum(ENTIDADES_MEDICION);
+export type EntidadMedicion = z.infer<typeof entidadMedicionSchema>;
+
+/**
+ * Un aviso de la pantalla (M3, M4). El clic en un anuncio no va aquí: lo cuenta la redirección (M2).
+ */
+export const eventoMedicionSchema = z.discriminatedUnion('entidad', [
+  z.object({ entidad: z.literal('anuncio'), tipo: z.literal('impresion'), id: idSchema }),
+  z.object({
+    entidad: z.literal('campania'),
+    tipo: z.enum(['impresion', 'clic']),
+    id: idSchema,
+    ubicacion: ubicacionPatrocinioSchema,
+  }),
+]);
+export type EventoMedicion = z.infer<typeof eventoMedicionSchema>;
+
+/** POST /patrocinios/medicion → 204 sin cuerpo. */
+export const registrarMedicionRequestSchema = z.object({
+  eventos: z.array(eventoMedicionSchema).min(1).max(MAXIMO_EVENTOS_POR_AVISO),
+});
+export type RegistrarMedicionRequest = z.infer<typeof registrarMedicionRequestSchema>;
+
+/** Rango del informe; sin fechas, los últimos DIAS_INFORME_POR_DEFECTO días (M8). */
+const rangoInformeSchema = z.object({ desde: fechaSchema.optional(), hasta: fechaSchema.optional() });
+const rangoInformeValido = (v: { desde?: string | undefined; hasta?: string | undefined }): boolean => {
+  if (v.desde === undefined || v.hasta === undefined) return true;
+  if (v.hasta < v.desde) return false;
+  const dias = (Date.parse(`${v.hasta}T00:00:00Z`) - Date.parse(`${v.desde}T00:00:00Z`)) / 86_400_000 + 1;
+  return dias <= DIAS_INFORME_MAXIMO;
+};
+const MENSAJE_RANGO_INFORME = `El rango debe ser válido y de máximo ${DIAS_INFORME_MAXIMO} días`;
+
+/** GET /admin/patrocinios/medicion/resumen */
+export const resumenMedicionRequestSchema = rangoInformeSchema
+  .extend({ entidad: entidadMedicionSchema.optional() })
+  .refine(rangoInformeValido, { message: MENSAJE_RANGO_INFORME, path: ['hasta'] });
+export type ResumenMedicionRequest = z.infer<typeof resumenMedicionRequestSchema>;
+
+/** GET /admin/patrocinios/medicion/serie */
+export const serieMedicionRequestSchema = rangoInformeSchema
+  .extend({ entidad: entidadMedicionSchema, id: z.coerce.number().int().positive() })
+  .refine(rangoInformeValido, { message: MENSAJE_RANGO_INFORME, path: ['hasta'] });
+export type SerieMedicionRequest = z.infer<typeof serieMedicionRequestSchema>;
+
+/** GET /admin/patrocinios/medicion/exportar → CSV */
+export const exportarMedicionRequestSchema = rangoInformeSchema
+  .extend({ entidad: entidadMedicionSchema.optional() })
+  .refine(rangoInformeValido, { message: MENSAJE_RANGO_INFORME, path: ['hasta'] });
+
+export const filaMedicionSchema = z.object({
+  entidad: entidadMedicionSchema,
+  id: idSchema,
+  nombre: z.string(),
+  impresiones: z.number().int().nonnegative(),
+  clics: z.number().int().nonnegative(),
+  /** clics ÷ impresiones × 100, con 2 decimales; null si no hubo impresiones (M1). */
+  ctr: z.number().nonnegative().nullable(),
+});
+export type FilaMedicion = z.infer<typeof filaMedicionSchema>;
+
+export const puntoSerieMedicionSchema = z.object({
+  fecha: fechaSchema,
+  impresiones: z.number().int().nonnegative(),
+  clics: z.number().int().nonnegative(),
+});
+export type PuntoSerieMedicion = z.infer<typeof puntoSerieMedicionSchema>;
+
+/** El resumen trae el rango realmente usado, para que el panel lo muestre. */
+export const resumenMedicionResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    desde: fechaSchema,
+    hasta: fechaSchema,
+    filas: z.array(filaMedicionSchema),
+  }),
+});
+export type ResumenMedicionResponseEnvelope = z.infer<typeof resumenMedicionResponseEnvelopeSchema>;
+export const serieMedicionResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: z.object({ desde: fechaSchema, hasta: fechaSchema, puntos: z.array(puntoSerieMedicionSchema) }),
+});
+export type SerieMedicionResponseEnvelope = z.infer<typeof serieMedicionResponseEnvelopeSchema>;
+
+/* ───────────────────────────────────────────────────────────────────────────
  * 6. ERRORES
  * ───────────────────────────────────────────────────────────────────────────
  * 400 PARAMETRO_INVALIDO · 400 IMAGEN_INVALIDA (no es una imagen válida o no es del tipo declarado) ·
- * 400 IMAGEN_PROPORCION_INVALIDA (B8; el mensaje trae el tamaño recomendado) ·
+ * 400 IMAGEN_PROPORCION_INVALIDA (B8; el mensaje trae el tamaño recomendado) · 400 IMAGEN_TAMANO_INVALIDO (B13) ·
  * 404 RECURSO_NO_DISPONIBLE (no existe, no está vigente en una ruta pública, o falta el permiso: C1) ·
  * 409 NOMBRE_CAMPANIA_DUPLICADO (A11) · 409 OBJETIVO_NO_EXISTE (`details` = los objetivos que no existen).
  */
@@ -537,6 +691,7 @@ export const CODIGOS_ERROR_PATROCINIOS = [
   'PARAMETRO_INVALIDO',
   'IMAGEN_INVALIDA',
   'IMAGEN_PROPORCION_INVALIDA',
+  'IMAGEN_TAMANO_INVALIDO',
   'RECURSO_NO_DISPONIBLE',
   'NOMBRE_CAMPANIA_DUPLICADO',
   'OBJETIVO_NO_EXISTE',
@@ -561,6 +716,8 @@ export interface PrioridadProducto {
   idProducto: number;
   /** La más alta entre las campañas vigentes que lo cubren en esa ubicación (A5). */
   prioridad: number;
+  /** La campaña de esa prioridad (en un empate, la de fecha de inicio más antigua), para medir (M3, M4). */
+  idCampania: number;
 }
 
 /**
@@ -589,7 +746,9 @@ export interface TarjetasPublicasPort {
  *  PÚBLICAS (montaje: /api/v1/patrocinios) — sin sesión
  *   GET  /productos                          → bloqueResponseEnvelope        (bloque del inicio, A10)
  *   GET  /anuncios/:espacio                  → anunciosEspacioResponseEnvelope (slider de un espacio, B4)
- *   GET  /anuncios/imagenes/:idAnuncio       imagen binaria (?variante=escritorio|movil); solo anuncios vigentes
+ *   GET  /anuncios/imagenes/:idAnuncio       imagen binaria (?variante=escritorio|movil&tamano=pequeno|mediano|original); solo vigentes
+ *   GET  /anuncios/:idAnuncio/ir             suma un clic y responde 302 a la dirección real (o al inicio si no está vigente, M2)
+ *   POST /medicion                           registrarMedicion → 204 (impresiones de anuncios y de productos, clics de productos)
  *
  *  ADMINISTRACIÓN (montaje: /api/v1/admin/patrocinios) — sesión + permisos de M17
  *   GET   /campanias                         patrocinios.ver    → listarCampanias (paginado)
@@ -606,8 +765,11 @@ export interface TarjetasPublicasPort {
  *   PUT   /anuncios/:idAnuncio               patrocinios.editar → actualizarAnuncio
  *   PATCH /anuncios/:idAnuncio/estado        patrocinios.editar → cambiarEstado
  *   GET   /anuncios/:idAnuncio/imagen        patrocinios.ver    → imagen binaria para la vista previa (?variante=)
+ *   GET   /medicion/resumen                  patrocinios.ver    → resumenMedicion (por campaña y por anuncio, M8)
+ *   GET   /medicion/serie                    patrocinios.ver    → serieMedicion (por día, de una campaña o un anuncio)
+ *   GET   /medicion/exportar                 patrocinios.ver    → CSV del resumen por día (M8)
  *
- *  Panel: /admin/patrocinios, con dos pestañas: «Campañas de productos» y «Anuncios».
+ *  Panel: /admin/patrocinios, con tres pestañas: «Campañas de productos», «Anuncios» y «Medición».
  *  Vistas del cliente: bloque «Productos patrocinados» (inicio), etiqueta «Patrocinado» (listado y ficha) y
  *  componente `EspacioPublicitario` (inicio, catálogo y ficha).
  *
