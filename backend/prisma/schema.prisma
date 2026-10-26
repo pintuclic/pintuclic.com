@@ -173,6 +173,49 @@ enum OrigenAjusteInventario {
   @@map("enum_origen_ajuste_inventario")
 }
 
+/// Cómo se expresa un descuento: porcentaje o importe fijo (M06; los eventos solo usan porcentaje)
+enum TipoValorDescuento {
+  porcentaje
+  importe_fijo
+
+  @@map("enum_tipo_valor_descuento")
+}
+
+/// A quién va dirigido un cupón (M06)
+enum AudienciaDescuento {
+  todos
+  particular
+  empresa
+
+  @@map("enum_audiencia_descuento")
+}
+
+/// Qué parte del catálogo cubre una regla de evento (M06 · R5)
+enum TipoObjetivoEvento {
+  marca
+  linea
+  categoria
+  subcategoria
+  producto
+  variante
+
+  @@map("enum_tipo_objetivo_evento")
+}
+
+/// Qué se saca de una regla o de un evento (M06 · R6): lo mismo más color y familia de color
+enum TipoExclusionEvento {
+  marca
+  linea
+  categoria
+  subcategoria
+  producto
+  variante
+  color
+  familia_color
+
+  @@map("enum_tipo_exclusion_evento")
+}
+
 /// Tipo de solicitud del formulario de contacto (M15 · HU-ATC-02); cotizacion es solo intención (RF-ATC-02-07)
 enum TipoSolicitudContacto {
   consulta
@@ -267,6 +310,11 @@ model Usuario {
   // M13 Relaciones
   ajustesInventario AjusteInventario[]
 
+  // M06 Relaciones
+  eventosDescuentoActualizados EventoDescuento[] @relation("EventoDescuentoUsuarioActualizo")
+  cuponesActualizados          Cupon[]           @relation("CuponUsuarioActualizo")
+  usosCupon                    CuponUso[]
+
   // M15 Relaciones
   solicitudesContacto        SolicitudContacto[]
   mensajesSolicitudContacto  MensajeSolicitudContacto[]
@@ -282,6 +330,37 @@ model Usuario {
 // MÓDULO M17 — ADMINISTRACIÓN, EMPLEADOS Y PERMISOS
 // =============================================================================
 
+/// Política de descuento de un tipo de cliente empresa (M06 · R10, R11)
+model Descuento {
+  idDescuento         Int           @id @default(autoincrement()) @map("id_descuento")
+  /// Monto máximo de ahorro por compra; 0 = sin tope
+  tope                Decimal       @default(0.00) @db.Decimal(12, 2)
+  porcentajeDescuento Decimal       @map("porcentaje_descuento") @db.Decimal(5, 2)
+  estado              EstadoGeneral @default(activo)
+  /// Total del carrito (después de eventos, IVA incluido) desde el que aplica; 0 = sin mínimo
+  montoMinimoCompra   Decimal       @default(0.00) @map("monto_minimo_compra") @db.Decimal(12, 2)
+
+  subRoles SubRolEmpresa[]
+
+  @@map("descuento")
+}
+
+/// Tipo de cliente empresa (Proveedor, Constructora…) con su descuento (M06 · D8). Se asigna en cuenta_empresa.
+model SubRolEmpresa {
+  idSubRolEmpresa Int           @id @default(autoincrement()) @map("id_sub_rol_empresa")
+  nombre          String        @db.VarChar(100)
+  idDescuento     Int?          @map("id_descuento")
+  estado          EstadoGeneral @default(activo)
+
+  descuento Descuento?      @relation(fields: [idDescuento], references: [idDescuento], onDelete: SetNull, map: "fk_subrol_descuento")
+  roles     Rol[]
+  cuentas   CuentaEmpresa[]
+
+  @@index([idDescuento], map: "idx_subrol_descuento")
+  // Índice único funcional lower(btrim(nombre)) solo en el DDL: Prisma no expresa índices sobre expresiones.
+  @@map("sub_rol_empresa")
+}
+
 /// Rol o perfil de asignación relacional (ADR-006)
 model Rol {
   idRol            Int           @id @default(autoincrement()) @map("id_rol")
@@ -289,6 +368,7 @@ model Rol {
   idSubRolEmpresa  Int?          @map("id_sub_rol_empresa")
   estado           EstadoGeneral @default(activo)
 
+  subRolEmpresa    SubRolEmpresa?      @relation(fields: [idSubRolEmpresa], references: [idSubRolEmpresa], onDelete: SetNull, map: "fk_rol_subrol")
   asignaciones     AsignacionPermiso[]
   usuariosConRol   UsuarioRol[]
   usuariosDirectos Usuario[]     @relation("UsuarioRolDirecto")
@@ -439,11 +519,15 @@ model CuentaEmpresa {
   idSolicitudOrigen   String?           @map("id_solicitud_origen") @db.Uuid
   fechaAprobacion     DateTime          @default(now()) @map("fecha_aprobacion") @db.Timestamptz(6)
   fechaActualizacion  DateTime          @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  /// Tipo de cliente empresa que fija su descuento (M06 · D8); null = sin descuento
+  idSubRolEmpresa     Int?     @map("id_sub_rol_empresa")
 
+  subRolEmpresa   SubRolEmpresa?    @relation(fields: [idSubRolEmpresa], references: [idSubRolEmpresa], onDelete: SetNull, map: "fk_cuenta_empresa_sub_rol")
   usuario             Usuario           @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
   solicitudOrigen     SolicitudEmpresa? @relation("CuentaEmpresaSolicitudOrigen", fields: [idSolicitudOrigen], references: [idSolicitud], onDelete: SetNull)
 
   @@index([idSolicitudOrigen], map: "idx_cuenta_empresa_solicitud")
+  @@index([idSubRolEmpresa], map: "idx_cuenta_empresa_sub_rol")
   @@map("cuenta_empresa")
 }
 
@@ -657,6 +741,115 @@ model AjusteInventario {
   @@index([idUsuario], map: "idx_ajuste_usuario")
   // Índice único parcial (WHERE referencia IS NOT NULL) solo en el DDL: Prisma no expresa índices parciales.
   @@map("ajuste_inventario")
+}
+
+// =============================================================================
+// MÓDULO M06 — PRECIOS, EVENTOS DE DESCUENTO Y CUPONES (esquema 4.13)
+// =============================================================================
+
+/// Evento de descuento con calendario (M06 · R4). Fechas y horas son de calendario en hora de Colombia.
+model EventoDescuento {
+  idEvento           Int           @id @default(autoincrement()) @map("id_evento")
+  nombre             String        @db.VarChar(100)
+  descripcion        String?       @db.VarChar(500)
+  estado             EstadoGeneral @default(activo)
+  fechaInicio        DateTime      @map("fecha_inicio") @db.Date
+  fechaFin           DateTime?     @map("fecha_fin") @db.Date
+  /// Días ISO (1 = lunes … 7 = domingo); vacío = todos los días
+  diasSemana         Int[]         @default([]) @map("dias_semana") @db.SmallInt
+  /// "HH:mm" en 24 h; null con horaFin null = todo el día
+  horaInicio         String?       @map("hora_inicio") @db.VarChar(5)
+  horaFin            String?       @map("hora_fin") @db.VarChar(5)
+  fechaCreacion      DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime      @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?          @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario?          @relation("EventoDescuentoUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_evento_usuario")
+  reglas           EventoRegla[]
+  exclusiones      EventoExclusion[]
+
+  @@index([estado, fechaInicio, fechaFin], map: "idx_evento_estado_fechas")
+  @@map("evento_descuento")
+}
+
+/// Regla de un evento: objetivo (null = todo el catálogo) y porcentaje propio (M06 · R5)
+model EventoRegla {
+  idRegla      Int                 @id @default(autoincrement()) @map("id_regla")
+  idEvento     Int                 @map("id_evento")
+  tipoObjetivo TipoObjetivoEvento? @map("tipo_objetivo")
+  /// Sin FK: apunta a seis tablas distintas (M06 · D10)
+  idObjetivo   Int?                @map("id_objetivo")
+  porcentaje   Decimal             @db.Decimal(5, 2)
+  orden        Int                 @default(0) @db.SmallInt
+
+  evento      EventoDescuento   @relation(fields: [idEvento], references: [idEvento], onDelete: Cascade, map: "fk_evento_regla_evento")
+  exclusiones EventoExclusion[]
+
+  @@unique([idRegla, idEvento], map: "uq_evento_regla_evento")
+  @@index([idEvento], map: "idx_evento_regla_evento")
+  @@index([tipoObjetivo, idObjetivo], map: "idx_evento_regla_objetivo")
+  @@map("evento_regla")
+}
+
+/// Excepción de una regla (idRegla informado) o de todo el evento (idRegla null) (M06 · R6)
+model EventoExclusion {
+  idExclusion Int                 @id @default(autoincrement()) @map("id_exclusion")
+  idEvento    Int                 @map("id_evento")
+  idRegla     Int?                @map("id_regla")
+  tipo        TipoExclusionEvento
+  idObjetivo  Int                 @map("id_objetivo")
+
+  evento EventoDescuento @relation(fields: [idEvento], references: [idEvento], onDelete: Cascade, map: "fk_evento_exclusion_evento")
+  regla  EventoRegla?    @relation(fields: [idRegla, idEvento], references: [idRegla, idEvento], onDelete: Cascade, map: "fk_evento_exclusion_regla")
+
+  @@index([idEvento], map: "idx_evento_exclusion_evento")
+  @@index([idRegla], map: "idx_evento_exclusion_regla")
+  // Índices únicos parciales (WHERE id_regla IS NULL / IS NOT NULL) solo en el DDL.
+  @@map("evento_exclusion")
+}
+
+/// Cupón que el cliente escribe en el carrito (M06 · R13, R14). Código en mayúsculas, único.
+model Cupon {
+  idCupon            Int                @id @default(autoincrement()) @map("id_cupon")
+  codigo             String             @unique(map: "uq_cupon_codigo") @db.VarChar(30)
+  nombre             String             @db.VarChar(100)
+  descripcion        String?            @db.VarChar(500)
+  tipoValor          TipoValorDescuento @map("tipo_valor")
+  valor              Decimal            @db.Decimal(12, 2)
+  montoMinimoCompra  Decimal?           @map("monto_minimo_compra") @db.Decimal(12, 2)
+  usosMaximos        Int?               @map("usos_maximos")
+  usosPorUsuario     Int?               @map("usos_por_usuario")
+  audiencia          AudienciaDescuento @default(todos)
+  fechaInicio        DateTime           @map("fecha_inicio") @db.Timestamptz(6)
+  fechaFin           DateTime?          @map("fecha_fin") @db.Timestamptz(6)
+  estado             EstadoGeneral      @default(activo)
+  fechaCreacion      DateTime           @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime           @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?               @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario?   @relation("CuponUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_cupon_usuario")
+  usos             CuponUso[]
+
+  @@index([estado, fechaInicio, fechaFin], map: "idx_cupon_estado_fechas")
+  @@map("cupon")
+}
+
+/// Un uso de cupón por orden; `referencia` única hace idempotente el registro (M06 · R15)
+model CuponUso {
+  idCuponUso       Int       @id @default(autoincrement()) @map("id_cupon_uso")
+  idCupon          Int       @map("id_cupon")
+  idUsuario        Int?      @map("id_usuario")
+  referencia       String    @unique(map: "uq_cupon_uso_referencia") @db.VarChar(100)
+  importeDescuento Decimal   @map("importe_descuento") @db.Decimal(12, 2)
+  fecha            DateTime  @default(now()) @db.Timestamptz(6)
+  /// Se llena al cancelarse la orden; los liberados no cuentan para los límites
+  liberadoEn       DateTime? @map("liberado_en") @db.Timestamptz(6)
+
+  cupon   Cupon    @relation(fields: [idCupon], references: [idCupon], onDelete: Restrict, map: "fk_cupon_uso_cupon")
+  usuario Usuario? @relation(fields: [idUsuario], references: [idUsuario], onDelete: SetNull, map: "fk_cupon_uso_usuario")
+
+  // Índice parcial (idCupon, idUsuario) WHERE liberado_en IS NULL solo en el DDL.
+  @@map("cupon_uso")
 }
 
 // =============================================================================

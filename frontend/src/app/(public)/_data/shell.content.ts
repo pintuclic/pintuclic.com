@@ -12,6 +12,7 @@
 import type {
   FooterProps,
   HeaderProps,
+  MegaMenuTab,
   TopbarItem,
 } from '@/core/components';
 
@@ -23,6 +24,73 @@ export const topbarItems: ReadonlyArray<TopbarItem> = [
   { icon: 'telefono', label: '322 123 4567', href: 'tel:+573221234567' },
 ];
 
+export const megaMenuTabs: ReadonlyArray<MegaMenuTab> = [
+  {
+    id: 'paredes-techos',
+    title: 'Paredes y Techos',
+    icon: 'paredes',
+    columns: [
+      {
+        title: 'Pinturas',
+        items: [
+          { label: 'Vinilos para muros', href: '/productos?subcategoria=1' },
+          { label: 'Pinturas para fachadas', href: '/productos?subcategoria=2' },
+        ],
+        verMasHref: '/productos?superficie=1',
+      },
+    ],
+  },
+  {
+    id: 'madera',
+    title: 'Madera',
+    icon: 'madera',
+    columns: [
+      {
+        title: 'Pinturas y Barnices',
+        items: [
+          { label: 'Barnices', href: '/productos?subcategoria=10' },
+          { label: 'Esmaltes', href: '/productos?subcategoria=3' },
+        ],
+        verMasHref: '/productos?superficie=2',
+      },
+    ],
+  },
+  {
+    id: 'metal',
+    title: 'Metal',
+    icon: 'metal',
+    columns: [
+      {
+        title: 'Pinturas para Metal',
+        items: [
+          { label: 'Esmaltes', href: '/productos?subcategoria=3' },
+        ],
+        verMasHref: '/productos?superficie=3',
+      },
+    ],
+  },
+  {
+    id: 'otras-superficies',
+    title: 'Otras Superficies',
+    icon: 'superficies',
+    columns: [],
+  },
+  {
+    id: 'herramientas',
+    title: 'Herramientas',
+    icon: 'herramientas',
+    columns: [
+      {
+        title: 'Aplicación',
+        items: [
+          { label: 'Brochas', href: '/productos?subcategoria=18' },
+        ],
+        verMasHref: '/productos?categoria=6',
+      },
+    ],
+  },
+];
+
 export const header: HeaderProps = {
   logo: {
     src: '/images/landing/logo.png',
@@ -31,6 +99,7 @@ export const header: HeaderProps = {
     height: 303,
     className: 'h-11 w-auto lg:h-14',
   },
+  categoriesLabel: '¿Qué buscas?',
   navItems: [
     { label: 'Inicio', href: '/' },
     { label: 'Productos', href: '/productos' },
@@ -39,6 +108,7 @@ export const header: HeaderProps = {
     { label: 'Sobre Nosotros', href: '/sobre-nosotros' },
   ],
   megaMenu: {
+    tabs: megaMenuTabs,
     groups: [
       {
         title: 'Pinturas',

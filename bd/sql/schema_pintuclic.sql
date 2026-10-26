@@ -145,6 +145,20 @@ BEGIN
         CREATE TYPE enum_origen_ajuste_inventario AS ENUM ('manual', 'carga_masiva', 'samit');
     END IF;
 
+    -- Precios, eventos de descuento y cupones (M06)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_valor_descuento') THEN
+        CREATE TYPE enum_tipo_valor_descuento AS ENUM ('porcentaje', 'importe_fijo');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_audiencia_descuento') THEN
+        CREATE TYPE enum_audiencia_descuento AS ENUM ('todos', 'particular', 'empresa');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_objetivo_evento') THEN
+        CREATE TYPE enum_tipo_objetivo_evento AS ENUM ('marca', 'linea', 'categoria', 'subcategoria', 'producto', 'variante');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_exclusion_evento') THEN
+        CREATE TYPE enum_tipo_exclusion_evento AS ENUM ('marca', 'linea', 'categoria', 'subcategoria', 'producto', 'variante', 'color', 'familia_color');
+    END IF;
+
     -- Estado editorial de una página institucional (M16 - HU-CON-01 / HU-CON-03)
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_contenido') THEN
         CREATE TYPE enum_estado_contenido AS ENUM ('borrador', 'publicado', 'archivado');
@@ -233,6 +247,16 @@ COMMENT ON COLUMN descuento.tope IS 'Monto tope máximo en valor monetario aplic
 COMMENT ON COLUMN descuento.porcentaje_descuento IS 'Porcentaje de descuento (0 a 100)';
 COMMENT ON COLUMN descuento.estado IS 'Estado de la regla de descuento (activo/inactivo)';
 
+-- M06 (v4.13): total del carrito (después de eventos, IVA incluido) desde el que aplica el descuento de empresa; 0 = sin mínimo.
+ALTER TABLE descuento ADD COLUMN IF NOT EXISTS monto_minimo_compra NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_descuento_monto_minimo') THEN
+        ALTER TABLE descuento ADD CONSTRAINT chk_descuento_monto_minimo CHECK (monto_minimo_compra >= 0);
+    END IF;
+END $$;
+COMMENT ON COLUMN descuento.monto_minimo_compra IS 'Total mínimo del carrito para que aplique el descuento de empresa; 0 = sin mínimo (M06 · R10)';
+
 -- Tabla: sub_rol_empresa
 CREATE TABLE IF NOT EXISTS sub_rol_empresa (
     id_sub_rol_empresa SERIAL PRIMARY KEY,
@@ -245,6 +269,8 @@ CREATE TABLE IF NOT EXISTS sub_rol_empresa (
 
 COMMENT ON TABLE sub_rol_empresa IS 'Sub-roles empresariales asociados a políticas de descuento';
 COMMENT ON COLUMN sub_rol_empresa.id_descuento IS 'Referencia opcional a una política de descuento';
+COMMENT ON TABLE sub_rol_empresa IS 'Tipos de cliente empresa (Proveedor, Constructora…) con su política de descuento. Se asigna en cuenta_empresa (M06 · D8)';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sub_rol_empresa_nombre ON sub_rol_empresa (lower(btrim(nombre)));
 
 -- Tabla: rol
 CREATE TABLE IF NOT EXISTS rol (
@@ -1385,6 +1411,18 @@ CREATE TABLE IF NOT EXISTS cuenta_empresa (
 COMMENT ON TABLE cuenta_empresa IS 'Datos y NIT vigente de las cuentas empresa aprobadas; extensión 1:1 de usuario (HU-CUE-09, HU-CUE-10)';
 COMMENT ON COLUMN cuenta_empresa.id_usuario IS 'Cuenta empresa a la que pertenece (PK y FK: relación 1:1 con usuario)';
 COMMENT ON COLUMN cuenta_empresa.nit IS 'NIT o RUT VIGENTE. Solo cambia por una renovación aprobada (RN-CUE-13); único en todo el sistema (RN-CUE-14)';
+
+-- M06 (v4.13): tipo de cliente empresa que fija el descuento de la cuenta. Lo asigna el administrador al aprobar la
+-- solicitud y lo puede cambiar después; NULL = sin descuento (cuentas anteriores a M06).
+ALTER TABLE cuenta_empresa ADD COLUMN IF NOT EXISTS id_sub_rol_empresa INT;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_cuenta_empresa_sub_rol') THEN
+        ALTER TABLE cuenta_empresa ADD CONSTRAINT fk_cuenta_empresa_sub_rol FOREIGN KEY (id_sub_rol_empresa)
+            REFERENCES sub_rol_empresa (id_sub_rol_empresa) ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+END $$;
+COMMENT ON COLUMN cuenta_empresa.id_sub_rol_empresa IS 'Tipo de cliente empresa (sub-rol) que define su descuento; NULL = sin descuento (M06 · D8, R20)';
 COMMENT ON COLUMN cuenta_empresa.id_solicitud_origen IS 'Solicitud de empresa cuya aprobación dio origen a esta cuenta; trazabilidad histórica';
 COMMENT ON COLUMN cuenta_empresa.fecha_aprobacion IS 'Momento en que se habilitaron las condiciones comerciales de empresa';
 
@@ -1844,6 +1882,142 @@ COMMENT ON TABLE configuracion_atencion_whatsapp IS 'Destino y mensaje base del 
 COMMENT ON COLUMN configuracion_atencion_whatsapp.destino IS 'URL completa (canal de difusión) o número de WhatsApp Business; el enlace se arma según cuál sea';
 
 -- ==============================================================================
+-- 9.x PRECIOS, EVENTOS DE DESCUENTO Y CUPONES (M06 · contracts/m06-precios.contract.ts)
+-- ==============================================================================
+
+-- Tabla: evento_descuento
+-- Evento de descuento con calendario (M06 · R4). Fechas y horas son de calendario en hora de Colombia, sin huso:
+-- las horas van como texto "HH:mm" (igual que horario_atencion). dias_semana: ISO 1 = lunes … 7 = domingo; vacío = todos.
+CREATE TABLE IF NOT EXISTS evento_descuento (
+    id_evento SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(500),
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE,
+    dias_semana SMALLINT[] NOT NULL DEFAULT '{}',
+    hora_inicio VARCHAR(5),
+    hora_fin VARCHAR(5),
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_evento_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_evento_nombre CHECK (length(btrim(nombre)) >= 3),
+    CONSTRAINT ck_evento_fechas CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio),
+    CONSTRAINT ck_evento_dias_semana CHECK (dias_semana <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::SMALLINT[]),
+    CONSTRAINT ck_evento_formato_horas CHECK (
+        (hora_inicio IS NULL OR hora_inicio ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        AND (hora_fin IS NULL OR hora_fin ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ),
+    CONSTRAINT ck_evento_horas_coherentes CHECK (
+        (hora_inicio IS NULL AND hora_fin IS NULL)
+        OR (hora_inicio IS NOT NULL AND hora_fin IS NOT NULL AND hora_fin > hora_inicio)
+    )
+);
+
+COMMENT ON TABLE evento_descuento IS 'Eventos de descuento con calendario: fechas, días de la semana que se repiten y horas (M06 · R4)';
+COMMENT ON COLUMN evento_descuento.nombre IS 'Se muestra al cliente y se congela como origen del descuento en la orden (M06 · D11)';
+COMMENT ON COLUMN evento_descuento.dias_semana IS 'Días ISO (1 = lunes … 7 = domingo); vacío = todos los días del rango';
+COMMENT ON COLUMN evento_descuento.hora_inicio IS 'Hora local "HH:mm" en 24h; NULL con hora_fin NULL = todo el día';
+
+-- Tabla: evento_regla
+-- Una regla de un evento: objetivo (marca, línea, categoría, subcategoría, producto o variante; NULL = todo el
+-- catálogo) y su propio porcentaje (M06 · R5). El id_objetivo no lleva FK porque apunta a seis tablas (M06 · D10).
+CREATE TABLE IF NOT EXISTS evento_regla (
+    id_regla SERIAL PRIMARY KEY,
+    id_evento INT NOT NULL,
+    tipo_objetivo enum_tipo_objetivo_evento,
+    id_objetivo INT,
+    porcentaje NUMERIC(5, 2) NOT NULL,
+    orden SMALLINT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_evento_regla_evento FOREIGN KEY (id_evento)
+        REFERENCES evento_descuento (id_evento) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_evento_regla_evento UNIQUE (id_regla, id_evento),
+    CONSTRAINT ck_evento_regla_porcentaje CHECK (porcentaje > 0 AND porcentaje <= 100),
+    CONSTRAINT ck_evento_regla_objetivo CHECK ((tipo_objetivo IS NULL) = (id_objetivo IS NULL))
+);
+
+COMMENT ON TABLE evento_regla IS 'Reglas de un evento: objetivo y porcentaje propio; así un evento da 15 % a una línea y 10 % a otra (M06 · R5)';
+COMMENT ON COLUMN evento_regla.tipo_objetivo IS 'NULL con id_objetivo NULL = todo el catálogo';
+
+-- Tabla: evento_exclusion
+-- Excepciones: de una regla (id_regla informado) o de todo el evento (id_regla NULL) (M06 · R6).
+-- La FK compuesta obliga a que la regla sea del mismo evento.
+CREATE TABLE IF NOT EXISTS evento_exclusion (
+    id_exclusion SERIAL PRIMARY KEY,
+    id_evento INT NOT NULL,
+    id_regla INT,
+    tipo enum_tipo_exclusion_evento NOT NULL,
+    id_objetivo INT NOT NULL,
+    CONSTRAINT fk_evento_exclusion_evento FOREIGN KEY (id_evento)
+        REFERENCES evento_descuento (id_evento) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_evento_exclusion_regla FOREIGN KEY (id_regla, id_evento)
+        REFERENCES evento_regla (id_regla, id_evento) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+COMMENT ON TABLE evento_exclusion IS 'Excepciones de un evento: producto, variante, color, familia de color, línea, marca… (M06 · R6)';
+COMMENT ON COLUMN evento_exclusion.id_regla IS 'NULL = excepción de todo el evento; con valor, solo de esa regla';
+
+-- Tabla: cupon
+-- Código que el cliente escribe en el carrito (M06 · R13, R14). El código se guarda en mayúsculas y es único.
+CREATE TABLE IF NOT EXISTS cupon (
+    id_cupon SERIAL PRIMARY KEY,
+    codigo VARCHAR(30) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(500),
+    tipo_valor enum_tipo_valor_descuento NOT NULL,
+    valor NUMERIC(12, 2) NOT NULL,
+    monto_minimo_compra NUMERIC(12, 2),
+    usos_maximos INT,
+    usos_por_usuario INT,
+    audiencia enum_audiencia_descuento NOT NULL DEFAULT 'todos',
+    fecha_inicio TIMESTAMPTZ NOT NULL,
+    fecha_fin TIMESTAMPTZ,
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT uq_cupon_codigo UNIQUE (codigo),
+    CONSTRAINT fk_cupon_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_cupon_codigo CHECK (codigo ~ '^[A-Z0-9_-]{6,30}$'),
+    CONSTRAINT ck_cupon_valor CHECK (valor > 0 AND (tipo_valor <> 'porcentaje' OR valor <= 100)),
+    CONSTRAINT ck_cupon_monto_minimo CHECK (monto_minimo_compra IS NULL OR monto_minimo_compra >= 0),
+    CONSTRAINT ck_cupon_usos_maximos CHECK (usos_maximos IS NULL OR usos_maximos >= 1),
+    CONSTRAINT ck_cupon_usos_por_usuario CHECK (usos_por_usuario IS NULL OR usos_por_usuario >= 1),
+    CONSTRAINT ck_cupon_fechas CHECK (fecha_fin IS NULL OR fecha_fin > fecha_inicio)
+);
+
+COMMENT ON TABLE cupon IS 'Cupones de descuento que el cliente escribe en el carrito (M06 · HU de precios, R13-R15)';
+COMMENT ON COLUMN cupon.codigo IS 'Mayúsculas, números, guion y guion bajo (6 a 30). No cambia una vez creado';
+COMMENT ON COLUMN cupon.usos_maximos IS 'NULL = sin límite de usos en total';
+COMMENT ON COLUMN cupon.usos_por_usuario IS 'NULL = sin límite por persona; con valor, el cupón exige sesión';
+
+-- Tabla: cupon_uso
+-- Un uso de un cupón, registrado al crearse la orden (M06 · R15). `referencia` (la orden) es única: hace idempotente el
+-- registro; al cancelarse la orden se marca liberado_en y deja de contar. Solo se inserta y se libera, no se borra.
+CREATE TABLE IF NOT EXISTS cupon_uso (
+    id_cupon_uso SERIAL PRIMARY KEY,
+    id_cupon INT NOT NULL,
+    id_usuario INT,
+    referencia VARCHAR(100) NOT NULL,
+    importe_descuento NUMERIC(12, 2) NOT NULL,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    liberado_en TIMESTAMPTZ,
+    CONSTRAINT uq_cupon_uso_referencia UNIQUE (referencia),
+    CONSTRAINT fk_cupon_uso_cupon FOREIGN KEY (id_cupon)
+        REFERENCES cupon (id_cupon) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_cupon_uso_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_cupon_uso_importe CHECK (importe_descuento >= 0),
+    CONSTRAINT ck_cupon_uso_referencia CHECK (length(btrim(referencia)) > 0)
+);
+
+COMMENT ON TABLE cupon_uso IS 'Usos de cupones por orden; los liberados (orden cancelada) no cuentan para los límites (M06 · R15)';
+COMMENT ON COLUMN cupon_uso.referencia IS 'Identificador de la orden; único, para que registrar dos veces lo mismo no consuma dos usos';
+
+-- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
 -- ==============================================================================
 
@@ -1932,7 +2106,7 @@ CREATE INDEX IF NOT EXISTS idx_direccion_predeterminada ON direccion_cliente(id_
 -- C-4: Dirección predeterminada única por usuario y prevención de duplicados (RN-CUE-21)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_predeterminada_unica ON direccion_cliente (id_usuario) WHERE es_predeterminada;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_no_duplicada ON direccion_cliente (id_usuario, lower(direccion), lower(barrio), lower(coalesce(apartamento_casa, '')));
--- M04 (v4.13): una sola dirección por cliente (HU-CUE-07). Antes de crear el índice se retiran las
+-- M04 (v4.14): una sola dirección por cliente (HU-CUE-07). Antes de crear el índice se retiran las
 -- direcciones sobrantes de las cuentas que ya tenían varias, conservando la predeterminada
 -- (o, si ninguna lo es, la más reciente).
 DELETE FROM direccion_cliente d
@@ -1995,6 +2169,18 @@ CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_estado_fecha ON solicitud_cont
 CREATE INDEX IF NOT EXISTS idx_mensaje_solicitud_fecha ON mensaje_solicitud_contacto(id_solicitud, fecha_creacion ASC);
 CREATE INDEX IF NOT EXISTS idx_mensaje_solicitud_autor ON mensaje_solicitud_contacto(id_autor);
 
+-- M06: eventos, cupones y tipos de cliente empresa
+CREATE INDEX IF NOT EXISTS idx_evento_estado_fechas ON evento_descuento(estado, fecha_inicio, fecha_fin);
+CREATE INDEX IF NOT EXISTS idx_evento_regla_evento ON evento_regla(id_evento);
+CREATE INDEX IF NOT EXISTS idx_evento_regla_objetivo ON evento_regla(tipo_objetivo, id_objetivo);
+CREATE INDEX IF NOT EXISTS idx_evento_exclusion_evento ON evento_exclusion(id_evento);
+CREATE INDEX IF NOT EXISTS idx_evento_exclusion_regla ON evento_exclusion(id_regla);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_evento_exclusion_evento ON evento_exclusion(id_evento, tipo, id_objetivo) WHERE id_regla IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_evento_exclusion_regla ON evento_exclusion(id_regla, tipo, id_objetivo) WHERE id_regla IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_cupon_estado_fechas ON cupon(estado, fecha_inicio, fecha_fin);
+CREATE INDEX IF NOT EXISTS idx_cupon_uso_cupon_usuario ON cupon_uso(id_cupon, id_usuario) WHERE liberado_en IS NULL;
+CREATE INDEX IF NOT EXISTS idx_cuenta_empresa_sub_rol ON cuenta_empresa(id_sub_rol_empresa);
+
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (68 TABLAS - v4.13)
+-- FIN DEL SCRIPT DDL (73 TABLAS - v4.14)
 -- ==============================================================================

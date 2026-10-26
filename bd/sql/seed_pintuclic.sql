@@ -15,14 +15,14 @@ BEGIN;
 
 -- 1.1 Descuentos
 INSERT INTO descuento (id_descuento, tope, porcentaje_descuento, estado) VALUES
-    (1, 500000.00, 15.00, 'activo'),
-    (2, 200000.00, 10.00, 'activo')
+    (1, 0.00, 15.00, 'activo'),
+    (2, 0.00, 10.00, 'activo')
 ON CONFLICT (id_descuento) DO NOTHING;
 
 -- 1.2 Sub-Roles de Empresa
 INSERT INTO sub_rol_empresa (id_sub_rol_empresa, nombre, id_descuento, estado) VALUES
-    (1, 'Distribuidor Mayorista', 1, 'activo'),
-    (2, 'Contratista Comercial',  2, 'activo')
+    (1, 'Proveedor',     1, 'activo'),
+    (2, 'Constructora',  2, 'activo')
 ON CONFLICT (id_sub_rol_empresa) DO NOTHING;
 
 -- 1.3 Roles Principales
@@ -489,6 +489,9 @@ FROM solicitud_empresa
 WHERE estado = 'aprobada'
 ON CONFLICT (id_usuario) DO NOTHING;
 
+-- 9.2b Tipo de cliente empresa de la cuenta de prueba (M06 · D8): Proveedor, 15 % de descuento
+UPDATE cuenta_empresa SET id_sub_rol_empresa = 1 WHERE id_usuario = 4 AND id_sub_rol_empresa IS NULL;
+
 -- 9.3a Documento de soporte (RUT adjunto - RFC-M04-001 C-3). Mock: PDF mínimo de 15 bytes
 INSERT INTO documento_soporte (id_documento, nombre_original, tipo_mime, tamano_bytes, sha256, contenido) VALUES
     ('f0000000-0000-0000-0000-000000000001', 'rut_actualizado_valle.pdf', 'application/pdf', 15, '14bcd090baf31edba64e9cbd8cdfc15f943344aa72cb3675ad8e91bfcbce03ad', '\x255044462d312e340a2525454f460a')
@@ -527,7 +530,8 @@ INSERT INTO parametro_sistema (id_parametro, clave, area, tipo_dato, descripcion
     (8, 'comercial.iva_porcentaje', 'comercial', 'numero', 'Porcentaje general de impuesto al valor agregado (IVA) aplicable a ventas', '19'::jsonb, '19'::jsonb, 0, 50),
     (9, 'comercial.costo_envio_base', 'comercial', 'numero', 'Tarifa base de despacho estándar a domicilio', '15000'::jsonb, '15000'::jsonb, 0, NULL),
     (10, 'comercial.umbral_envio_gratis', 'comercial', 'numero', 'Monto mínimo de compra para exoneración de costos de envío', '200000'::jsonb, '200000'::jsonb, 0, NULL),
-    (11, 'auth.vigencia_enlace_activacion_horas', 'autenticacion', 'numero', 'Vigencia en horas del enlace con el que un colaborador nuevo define su contraseña', '72'::jsonb, '72'::jsonb, 1, 168)
+    (11, 'auth.vigencia_enlace_activacion_horas', 'autenticacion', 'numero', 'Vigencia en horas del enlace con el que un colaborador nuevo define su contraseña', '72'::jsonb, '72'::jsonb, 1, 168),
+    (12, 'comercial.umbral_sugerir_empresa', 'comercial', 'numero', 'Total del carrito desde el que se invita a un cliente registrado a solicitar la cuenta empresa (M06 · R12)', '500000'::jsonb, '500000'::jsonb, 0, NULL)
 ON CONFLICT (clave) DO NOTHING;
 
 -- Alineación con el piso de contraseña de M20 (12 caracteres, RN-SEG-01 / RFC-M17-001 D-5).
@@ -765,7 +769,30 @@ INSERT INTO mensaje_solicitud_contacto (id_mensaje, id_solicitud, id_autor, rol_
 ON CONFLICT (id_mensaje) DO NOTHING;
 
 -- ==============================================================================
+-- Precios, eventos de descuento y cupones (M06) — ejemplos INACTIVOS: no cambian ningún precio hasta activarlos
+-- ==============================================================================
+-- "Miércoles de color" (RC-23): todos los miércoles, Viniltex 15 % y Koraza 10 %, sin la familia de color Blancos.
+INSERT INTO evento_descuento (id_evento, nombre, descripcion, estado, fecha_inicio, fecha_fin, dias_semana, hora_inicio, hora_fin) VALUES
+    (1, 'Miércoles de color', 'Descuento semanal en líneas seleccionadas de Pintuco, excepto los blancos', 'inactivo', '2026-11-04', NULL, '{3}', NULL, NULL)
+ON CONFLICT (id_evento) DO NOTHING;
+
+INSERT INTO evento_regla (id_regla, id_evento, tipo_objetivo, id_objetivo, porcentaje, orden) VALUES
+    (1, 1, 'linea', 1, 15.00, 1),
+    (2, 1, 'linea', 2, 10.00, 2)
+ON CONFLICT (id_regla) DO NOTHING;
+
+INSERT INTO evento_exclusion (id_exclusion, id_evento, id_regla, tipo, id_objetivo) VALUES
+    (1, 1, NULL, 'familia_color', 1)
+ON CONFLICT (id_exclusion) DO NOTHING;
+
+INSERT INTO cupon (id_cupon, codigo, nombre, descripcion, tipo_valor, valor, monto_minimo_compra, usos_maximos, usos_por_usuario, audiencia, fecha_inicio, fecha_fin, estado) VALUES
+    (1, 'BIENVENIDA10', 'Bienvenida', '10 % en la primera compra', 'porcentaje', 10.00, 50000.00, 100, 1, 'todos', '2026-11-01T05:00:00Z', NULL, 'inactivo')
+ON CONFLICT (id_cupon) DO NOTHING;
+
+
+-- ==============================================================================
 -- 10. ACTUALIZACIÓN AUTOMÁTICA DE SECUENCIAS (EVITA COLISIONES DE IDs)
+
 -- ==============================================================================
 
 SELECT setval('descuento_id_descuento_seq',                      COALESCE((SELECT MAX(id_descuento) FROM descuento), 1));
@@ -813,5 +840,10 @@ SELECT setval('parametro_sistema_id_parametro_seq',              COALESCE((SELEC
 SELECT setval('pagina_institucional_id_pagina_seq',              COALESCE((SELECT MAX(id_pagina) FROM pagina_institucional), 1));
 SELECT setval('faq_entrada_id_faq_seq',                          COALESCE((SELECT MAX(id_faq) FROM faq_entrada), 1));
 SELECT setval('horario_atencion_id_horario_seq',                 COALESCE((SELECT MAX(id_horario) FROM horario_atencion), 1));
+
+SELECT setval('evento_descuento_id_evento_seq',       COALESCE((SELECT MAX(id_evento) FROM evento_descuento), 1));
+SELECT setval('evento_regla_id_regla_seq',            COALESCE((SELECT MAX(id_regla) FROM evento_regla), 1));
+SELECT setval('evento_exclusion_id_exclusion_seq',    COALESCE((SELECT MAX(id_exclusion) FROM evento_exclusion), 1));
+SELECT setval('cupon_id_cupon_seq',                   COALESCE((SELECT MAX(id_cupon) FROM cupon), 1));
 
 COMMIT;
