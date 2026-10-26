@@ -8,7 +8,6 @@ import {
   ChevronUp,
   CircleHelp,
   FileText,
-  MessageSquare,
   RefreshCw,
   Search,
 } from 'lucide-react';
@@ -79,16 +78,16 @@ export const CentroAyudaFaqView: React.FC = () => {
     return cancelar;
   }, [cargarContenido]);
 
-  const TerminoBusqueda = busqueda.trim().toLowerCase();
+  const terminoBusqueda = busqueda.trim().toLowerCase();
 
   const itemsFiltrados = useMemo(() => {
-    if (!TerminoBusqueda) return items;
+    if (!terminoBusqueda) return items;
     return items.filter(
       (f) =>
-        f.pregunta.toLowerCase().includes(TerminoBusqueda) ||
-        f.respuestaMarkdown.toLowerCase().includes(TerminoBusqueda),
+        f.pregunta.toLowerCase().includes(terminoBusqueda) ||
+        f.respuestaMarkdown.toLowerCase().includes(terminoBusqueda),
     );
-  }, [items, TerminoBusqueda]);
+  }, [items, terminoBusqueda]);
 
   const enlacesPaginas = paginas.length > 0 ? paginas : PAGINAS_INSTITUCIONALES_BASE;
 
@@ -99,22 +98,22 @@ export const CentroAyudaFaqView: React.FC = () => {
       className="scroll-mt-24"
     >
       <Container>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Columna principal: buscador + acordeones FAQ */}
-          <div className="lg:col-span-8 space-y-4">
-            <div className="bg-neutral-white rounded-card border border-neutral-light p-6 shadow-card">
-              <div className="mb-4">
-                <h2
-                  id="titulo-preguntas-frecuentes"
-                  className="font-title font-bold text-xl sm:text-2xl text-corporate tracking-tight"
-                >
-                  Preguntas frecuentes
-                </h2>
-                <p className="font-sans text-sm text-neutral-medium mt-1">
-                  Filtra por palabra clave o selecciona una pregunta para ver la respuesta completa.
-                </p>
-              </div>
+        {/* Cabecera única del Centro de Ayuda con buscador integrado a la derecha */}
+        <div className="bg-neutral-white rounded-card border border-neutral-light p-6 sm:p-8 shadow-card mb-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <h1
+                id="titulo-preguntas-frecuentes"
+                className="font-title font-bold text-2xl sm:text-3xl text-corporate tracking-tight"
+              >
+                Centro de ayuda y preguntas frecuentes
+              </h1>
+              <p className="font-sans text-sm sm:text-base text-neutral-medium mt-2">
+                Encuentra respuestas rápidas sobre pedidos, modalidades de entrega, colores entonados y cuentas empresariales, o comunícate con nuestro equipo más abajo.
+              </p>
+            </div>
 
+            <div className="w-full lg:w-96 shrink-0">
               <Input
                 id="busqueda-faq-publica"
                 label="Buscar en preguntas frecuentes"
@@ -124,7 +123,12 @@ export const CentroAyudaFaqView: React.FC = () => {
                 leftIcon={<Search className="w-4 h-4" aria-hidden="true" />}
               />
             </div>
+          </div>
+        </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Columna principal: acordeones FAQ */}
+          <div className="lg:col-span-8 space-y-3">
             {cargando ? (
               <div className="space-y-3" aria-label="Cargando preguntas frecuentes">
                 <Skeleton className="h-20 w-full rounded-card" />
@@ -137,9 +141,9 @@ export const CentroAyudaFaqView: React.FC = () => {
                   className="w-8 h-8 text-neutral-medium mx-auto mb-2"
                   aria-hidden="true"
                 />
-                <h3 className="font-title font-semibold text-base text-neutral-black">
+                <h2 className="font-title font-semibold text-base text-neutral-black">
                   No pudimos cargar las preguntas frecuentes en este momento
-                </h3>
+                </h2>
                 <p className="font-sans text-sm text-neutral-medium mt-1 mb-4">
                   Intenta cargar de nuevo o escríbenos directamente en la sección de contacto más abajo.
                 </p>
@@ -160,11 +164,11 @@ export const CentroAyudaFaqView: React.FC = () => {
                   className="w-8 h-8 text-neutral-medium mx-auto mb-2"
                   aria-hidden="true"
                 />
-                {TerminoBusqueda.length > 0 ? (
+                {terminoBusqueda.length > 0 ? (
                   <>
-                    <h3 className="font-title font-semibold text-base text-neutral-black">
+                    <h2 className="font-title font-semibold text-base text-neutral-black">
                       No encontramos preguntas que coincidan con tu búsqueda
-                    </h3>
+                    </h2>
                     <p className="font-sans text-sm text-neutral-medium mt-1 mb-4">
                       Intenta con otra palabra clave o explora todas las preguntas disponibles.
                     </p>
@@ -178,9 +182,9 @@ export const CentroAyudaFaqView: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <h3 className="font-title font-semibold text-base text-neutral-black">
+                    <h2 className="font-title font-semibold text-base text-neutral-black">
                       Aún no hay preguntas frecuentes publicadas
-                    </h3>
+                    </h2>
                     <p className="font-sans text-sm text-neutral-medium mt-1">
                       Puedes enviarnos tu consulta desde el formulario de contacto o escribirnos por WhatsApp.
                     </p>
@@ -188,64 +192,62 @@ export const CentroAyudaFaqView: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div className="space-y-3">
-                {itemsFiltrados.map((faq) => {
-                  const expandida = abiertaId === faq.idFaq;
-                  const panelId = `faq-panel-${faq.idFaq}`;
-                  return (
-                    <div
-                      key={faq.idFaq}
-                      className="bg-neutral-white rounded-card border border-neutral-light shadow-card overflow-hidden"
-                    >
-                      <h3 className="m-0">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          fullWidth
-                          aria-expanded={expandida}
-                          aria-controls={panelId}
-                          onClick={() =>
-                            setAbiertaId(expandida ? null : faq.idFaq)
-                          }
-                          rightIcon={
-                            expandida ? (
-                              <ChevronUp className="w-4 h-4 text-action" aria-hidden="true" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-neutral-medium" aria-hidden="true" />
-                            )
-                          }
-                          className="justify-between text-left px-5 py-4 font-title font-semibold text-sm sm:text-base text-corporate"
-                        >
-                          {faq.pregunta}
-                        </Button>
-                      </h3>
-                      {expandida && (
-                        <div
-                          id={panelId}
-                          role="region"
-                          aria-label={faq.pregunta}
-                          className="px-5 pb-5 pt-2 border-t border-neutral-light/70 bg-neutral-lightest/40"
-                        >
-                          <MarkdownContenido markdown={faq.respuestaMarkdown} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              itemsFiltrados.map((faq) => {
+                const expandida = abiertaId === faq.idFaq;
+                const panelId = `faq-panel-${faq.idFaq}`;
+                return (
+                  <div
+                    key={faq.idFaq}
+                    className="bg-neutral-white rounded-card border border-neutral-light shadow-card overflow-hidden"
+                  >
+                    <h2 className="m-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        fullWidth
+                        aria-expanded={expandida}
+                        aria-controls={panelId}
+                        onClick={() =>
+                          setAbiertaId(expandida ? null : faq.idFaq)
+                        }
+                        rightIcon={
+                          expandida ? (
+                            <ChevronUp className="w-4 h-4 text-action" aria-hidden="true" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-neutral-medium" aria-hidden="true" />
+                          )
+                        }
+                        className="justify-between text-left px-5 py-4 font-title font-semibold text-sm sm:text-base text-corporate"
+                      >
+                        {faq.pregunta}
+                      </Button>
+                    </h2>
+                    {expandida && (
+                      <div
+                        id={panelId}
+                        role="region"
+                        aria-label={faq.pregunta}
+                        className="px-5 pb-5 pt-2 border-t border-neutral-light/70 bg-neutral-lightest/40"
+                      >
+                        <MarkdownContenido markdown={faq.respuestaMarkdown} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
 
-          {/* Columna lateral: enlaces institucionales y atajo a contacto */}
+          {/* Columna lateral: enlaces institucionales */}
           <aside
             aria-label="Enlaces institucionales"
-            className="lg:col-span-4 space-y-6"
+            className="lg:col-span-4"
           >
             <div className="bg-neutral-white rounded-card border border-neutral-light p-6 shadow-card">
-              <h3 className="font-title font-semibold text-base text-corporate mb-2 flex items-center gap-2">
+              <h2 className="font-title font-semibold text-base text-corporate mb-2 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-action" aria-hidden="true" />
                 Políticas e Información
-              </h3>
+              </h2>
               <p className="font-sans text-xs text-neutral-medium mb-3">
                 Consulta nuestros lineamientos de servicio, envíos y tratamiento de datos.
               </p>
@@ -262,22 +264,6 @@ export const CentroAyudaFaqView: React.FC = () => {
                   </li>
                 ))}
               </ul>
-            </div>
-
-            <div className="bg-neutral-white rounded-card border border-neutral-light p-6 shadow-card">
-              <h3 className="font-title font-semibold text-base text-corporate mb-2 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-action" aria-hidden="true" />
-                ¿No encontraste tu respuesta?
-              </h3>
-              <p className="font-sans text-sm text-neutral-dark mb-4">
-                Escríbenos desde tu cuenta o habla con un asesor por WhatsApp dentro de nuestro horario de atención.
-              </p>
-              <a
-                href="#contacto-equipo"
-                className="inline-flex min-h-[44px] w-full items-center justify-center rounded-btn border border-action px-4 py-2 font-title text-sm font-semibold text-action transition-colors hover:bg-subaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
-              >
-                Ir a canales de contacto
-              </a>
             </div>
           </aside>
         </div>
