@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { telefonoSchema } from '@/core/dtos/telefono.dto';
 
 /**
  * ============================================================================
@@ -26,11 +27,8 @@ export const correoSchema = z
   .max(150, 'El correo no puede exceder 150 caracteres')
   .toLowerCase();
 
-export const telefonoSchema = z
-  .string()
-  .trim()
-  .min(7, 'El teléfono debe tener al menos 7 dígitos')
-  .max(20, 'El teléfono no puede exceder 20 caracteres');
+/** Regla transversal del teléfono (registro, perfil, empresa y direcciones): vive en `core/dtos`. */
+export { telefonoSchema };
 
 export const nombreSchema = z
   .string()

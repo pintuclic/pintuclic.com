@@ -3,6 +3,7 @@ import {
   cambioContrasenaPrimerAccesoFormSchema,
   dictamenRegistroEmpresaFormSchema,
   dictamenSolicitudEmpresaFormSchema,
+  direccionClienteFormSchema,
 } from '../dtos/m04-cuentas.dto';
 
 describe('M04 Frontend — DTO de dictamen (RN-CUE-17)', () => {
@@ -72,5 +73,24 @@ describe('M04 Frontend — formulario de primer acceso (HU-CUE-04)', () => {
     const r = cambioContrasenaPrimerAccesoFormSchema.safeParse({ ...datos, nuevaContrasena: datos.contrasenaActual, confirmarNuevaContrasena: datos.contrasenaActual });
     expect(r.success).toBe(false);
     expect(r.error?.issues.map((i) => i.path.join('.'))).toContain('nuevaContrasena');
+  });
+});
+
+describe('M04 Frontend — teléfono de la dirección (regla transversal)', () => {
+  const base = {
+    direccion: 'Calle 12 # 5-37',
+    barrio: 'San Pedro',
+    nombreApellido: 'Laura Gomez',
+    esPredeterminada: true,
+  };
+
+  it('acepta un número con formato', () => {
+    expect(direccionClienteFormSchema.safeParse({ ...base, telefono: '300 123 4567' }).success).toBe(true);
+  });
+
+  it('rechaza letras o símbolos con un mensaje que dice qué falta', () => {
+    const res = direccionClienteFormSchema.safeParse({ ...base, telefono: '300abc4567' });
+    expect(res.success).toBe(false);
+    if (!res.success) expect(res.error.issues[0]?.message).toContain('números o caracteres de marcado');
   });
 });
