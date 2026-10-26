@@ -10,6 +10,17 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.17] - 2026-10-27
+### Esquema 4.17 (78 Tablas, sin cambios de tablas) - M14 · A13: se elimina `producto.patrocinado`
+- **Alcance General:** retiro del interruptor manual de patrocinio, pedido por el contrato `contracts/m14-patrocinios.contract.ts` (A13). El patrocinio ahora es solo de las campañas de M14 (`campania_patrocinio`), con vigencia, prioridad y ubicación. Se entrega al final, cuando M01 ya dejó de leer y escribir la columna (PR de M01 ya unido).
+  - **`producto`**: `ALTER TABLE producto DROP COLUMN IF EXISTS patrocinado;` (idempotente). La columna era `BOOLEAN NOT NULL DEFAULT false`; los combos son productos y comparten la columna, así que también salen de ella.
+  - **Prisma:** se quita `patrocinado` del modelo `Producto`.
+  - **Seed:** la tabla `producto` se siembra sin la columna (antes Koraza Sol & Lluvia estaba marcada).
+  - **Datos que se pierden:** la marca manual de cada producto. No hay forma de convertirla en campaña (le faltan fechas, prioridad y lugar); si alguien la usaba, se crea una campaña en `/admin/patrocinios`.
+  - **Bases existentes en 4.16:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente). **No hay vuelta atrás automática:** conviene respaldar antes si se quiere conservar la marca antigua.
+
+---
+
 ## [v3.16] - 2026-10-26
 ### Esquema 4.16 (78 Tablas) - M14: campañas de patrocinio, anuncios publicitarios y su medición
 - **Alcance General:** cinco tablas nuevas pedidas por el contrato `contracts/m14-patrocinios.contract.ts` (C2). Cambio puramente aditivo.
@@ -21,7 +32,7 @@ Este documento constituye el registro histórico y oficial del versionamiento de
   - **ENUMs nuevos (7):** `enum_ubicacion_patrocinio`, `enum_tipo_objetivo_patrocinio`, `enum_espacio_publicitario`, `enum_variante_imagen_anuncio`, `enum_tamano_imagen_anuncio`, `enum_entidad_medicion` y `enum_evento_medicion`.
   - **Índices:** `(estado, fecha_inicio, fecha_fin)` en campañas, `(tipo, id_referencia)` en objetivos, `(espacio, estado, fecha_inicio, fecha_fin)` en anuncios y `(entidad, id_entidad, fecha)` en la medición.
   - **Prisma:** modelos `CampaniaPatrocinio`, `CampaniaObjetivo`, `AnuncioPublicitario`, `AnuncioImagen` y `MedicionPatrocinio`. El índice único sobre `lower(btrim(nombre))` vive solo en el DDL (Prisma no expresa índices sobre funciones).
-  - **Pendiente (PR aparte, al final):** eliminar `producto.patrocinado` cuando M01 deje de usarlo (contrato M14 · A13). Esta versión NO la toca.
+  - **Pendiente (PR aparte, al final):** eliminar `producto.patrocinado` cuando M01 deje de usarlo (contrato M14 · A13). Esta versión NO la toca; lo hace la v3.17.
   - **Bases existentes en 4.15:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente: `IF NOT EXISTS`).
 
 ---

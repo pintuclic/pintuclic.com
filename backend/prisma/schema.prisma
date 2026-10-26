@@ -1233,7 +1233,6 @@ model Producto {
   estado                    EstadoGeneral @default(activo)
   publicado                 Boolean       @default(false)
   idCategoriaComplementaria Int?          @map("id_categoria_complementaria")
-  patrocinado               Boolean       @default(false)
   /// Combo (HU-CAT-13): paquete a precio propio con una única variante; su venta se limita por existencia
   esCombo                   Boolean       @default(false) @map("es_combo")
   /// M06 no le aplica descuentos (RF-CAT-13-01)
@@ -1469,7 +1468,7 @@ model FaqEntrada {
 }
 
 // =============================================================================
-// MÓDULO M14 — PATROCINIOS Y PUBLICIDAD (esquema 4.16)
+// MÓDULO M14 — PATROCINIOS Y PUBLICIDAD (esquema 4.17)
 // =============================================================================
 
 /// Campaña que pone productos por delante en el sitio (M14 · A1-A13). Fechas de calendario en hora de Colombia.

@@ -686,7 +686,6 @@ CREATE TABLE IF NOT EXISTS producto (
     estado enum_estado_general NOT NULL DEFAULT 'activo',
     publicado BOOLEAN NOT NULL DEFAULT false,
     id_categoria_complementaria INT,
-    patrocinado BOOLEAN NOT NULL DEFAULT false,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT fk_producto_marca FOREIGN KEY (id_marca)
         REFERENCES marca (id_marca) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -698,6 +697,10 @@ CREATE TABLE IF NOT EXISTS producto (
         REFERENCES categoria (id_categoria) ON UPDATE CASCADE ON DELETE SET NULL,
     CONSTRAINT uq_producto_nombre_marca UNIQUE (id_marca, nombre)
 );
+
+-- Migración idempotente (M14 · A13): el interruptor manual `patrocinado` se retira. El patrocinio es de las campañas de M14
+-- (campania_patrocinio), con vigencia, prioridad y ubicación. M01 dejó de leer y escribir la columna antes de este cambio.
+ALTER TABLE producto DROP COLUMN IF EXISTS patrocinado;
 
 COMMENT ON TABLE producto IS 'Producto del catálogo (HU-CAT-02): marca → línea (opcional) → producto. Pertenece a una subcategoría y se etiqueta con superficies y ambiente.';
 COMMENT ON CONSTRAINT fk_producto_linea_marca ON producto IS 'La línea, si existe, debe ser de la misma marca del producto (RF-CAT-11-02, CA-CAT-11-02).';
@@ -2352,5 +2355,5 @@ CREATE INDEX IF NOT EXISTS idx_anuncio_espacio_vigencia ON anuncio_publicitario(
 CREATE INDEX IF NOT EXISTS idx_medicion_entidad_fecha ON medicion_patrocinio(entidad, id_entidad, fecha);
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (78 TABLAS - v4.16)
+-- FIN DEL SCRIPT DDL (78 TABLAS - v4.17)
 -- ==============================================================================
