@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ProductCard } from '@/core/components';
+import { MedidorPatrocinio } from '@/modules/m14-patrocinios/components/MedidorPatrocinio';
 import type { Complementario } from '../../dtos/m01-catalogo-entrega3.dto';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
 import { precioVisible } from '../../services/ofertas-visuales';
@@ -38,6 +39,7 @@ export const ComplementariosProducto: React.FC<ComplementariosProductoProps> = (
       <ul className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {productos.map((p) => (
           <li key={p.idProducto} className="flex">
+            <MedidorPatrocinio idCampania={p.patrocinado ? p.idCampania : null} ubicacion="complementarios" className="flex w-full">
             <ProductCard
               id={String(p.idProducto)}
               name={p.nombre}
@@ -51,6 +53,7 @@ export const ComplementariosProducto: React.FC<ComplementariosProductoProps> = (
                 : { imageUrl: catalogoPublicoApi.urlImagen(p.idImagenPrincipal, 'miniatura') })}
               className="w-full"
             />
+            </MedidorPatrocinio>
           </li>
         ))}
       </ul>

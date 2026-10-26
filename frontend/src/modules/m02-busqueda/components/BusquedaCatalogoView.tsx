@@ -9,6 +9,8 @@ import { precioVisible } from '@/modules/m01-catalogo/services/ofertas-visuales'
 import { EventosEnCurso } from '@/modules/m06-precios/components/publico/EventosEnCurso';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { Paginador } from '@/modules/m01-catalogo/components/admin/comunes';
+import { EspacioPublicitario } from '@/modules/m14-patrocinios/components/EspacioPublicitario';
+import { MedidorPatrocinio } from '@/modules/m14-patrocinios/components/MedidorPatrocinio';
 import type { OpcionesFiltro, PaginaBusqueda, ResultadoBusqueda } from '../dtos/busqueda.dto';
 import { busquedaApi } from '../services/busqueda-api';
 import type { FiltrosBusqueda } from '../services/filtros-busqueda';
@@ -354,6 +356,9 @@ export const BusquedaCatalogoView: React.FC = () => {
       )}
 
       {/* Layout de 2 columnas: Sidebar + Grid */}
+      {/* Espacio publicitario sobre el listado (M14 · B1): no se pinta si no hay anuncios vigentes */}
+      <EspacioPublicitario espacio="catalogo" className="mt-6" />
+
       <div className="mt-6 grid gap-8 lg:grid-cols-[260px_1fr]">
         {/* Sidebar desktop */}
         <aside aria-label="Filtros" className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
@@ -448,7 +453,7 @@ export const BusquedaCatalogoView: React.FC = () => {
             <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
               {resultado.items.map((p) => (
                 <li key={p.idProducto} className="flex flex-col">
-                  <div className="relative flex-1">
+                  <MedidorPatrocinio idCampania={p.patrocinado ? p.idCampania : null} ubicacion="listado" className="relative flex-1">
                     <ProductCard
                       id={String(p.idProducto)}
                       name={p.nombre}
@@ -472,7 +477,7 @@ export const BusquedaCatalogoView: React.FC = () => {
                         <span>{p.coincidenciaColor}</span>
                       </div>
                     )}
-                  </div>
+                  </MedidorPatrocinio>
                 </li>
               ))}
             </ul>
