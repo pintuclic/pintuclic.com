@@ -58,6 +58,14 @@ export function precioConDescuento(referencia: number, porcentaje: number): numb
   return redondear(referencia * (1 - porcentaje / 100));
 }
 
+/** Lo que se escribe en "% desc.": devuelve el precio con ese descuento, o null si aún no es un % válido (0 a 99,99). */
+export function precioDesdePorcentaje(referencia: number, texto: string): number | null {
+  const limpio = texto.trim().replace(',', '.');
+  if (!/^\d{1,2}(\.\d{0,2})?$/.test(limpio)) return null;
+  const porcentaje = Number(limpio);
+  return porcentaje < 100 ? precioConDescuento(referencia, porcentaje) : null;
+}
+
 /** % de descuento que representa un precio acordado frente a la referencia (puede ser negativo). */
 export function porcentajeDescuento(referencia: number, acordado: number): number {
   if (referencia <= 0) return 0;

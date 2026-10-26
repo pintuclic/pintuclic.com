@@ -16,7 +16,7 @@ import {
 } from '../dtos/formularios.dto';
 import { cotizacionesApi, mensajeDeError } from '../services/cotizaciones-api';
 import { cuerpoDelEditor, faltanPrecios, totalEnPantalla, valoresDelEditor } from '../services/editor';
-import { fechaCorta, porcentajeDescuento, precioConDescuento } from '../services/textos-cotizaciones';
+import { fechaCorta, porcentajeDescuento, precioDesdePorcentaje } from '../services/textos-cotizaciones';
 import { EstadoCotizacionBadge, TablaLineas, Totales } from './comunes';
 
 /** /admin/cotizaciones/:id: revisar, ajustar (R5), enviar (R6) o rechazar (R7). */
@@ -26,6 +26,8 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
   const [mensaje, setMensaje] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState<'guardar' | 'enviar' | null>(null);
   const [rechazando, setRechazando] = useState(false);
+  /** Lo que se escribe en "% desc." por línea; si no hay nada, se muestra el % del precio acordado. */
+  const [porcentajes, setPorcentajes] = useState<Record<number, string>>({});
 
   const editor = useForm<EditorFormData>({ resolver: zodResolver(editorFormSchema), defaultValues: { lineas: [], nota: '', fechaVencimiento: '' } });
   const { fields } = useFieldArray({ control: editor.control, name: 'lineas', keyName: 'clave' });
@@ -34,6 +36,7 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
 
   const cargar = (d: CotizacionDetalle): void => {
     setC(d);
+    setPorcentajes({});
     editor.reset(valoresDelEditor(d));
   };
 
@@ -227,15 +230,17 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
                           inputMode="decimal"
                           disabled={!incluida}
                           placeholder="%"
-                          defaultValue={precio === null ? '' : String(porcentajeDescuento(linea.precioReferencia, precio))}
-                          key={`${f.clave}-${precioTexto}`}
-                          onBlur={(e) => {
-                            const p = Number(e.target.value.replace(',', '.'));
-                            if (e.target.value.trim() !== '' && Number.isFinite(p) && p >= 0 && p < 100) {
-                              editor.setValue(`lineas.${i}.precio`, String(precioConDescuento(linea.precioReferencia, p)), {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                              });
+                          value={
+                            porcentajes[linea.idLinea] ??
+                            (precio === null || !Number.isFinite(precio) ? '' : String(porcentajeDescuento(linea.precioReferencia, precio)))
+                          }
+                          onChange={(e) => {
+                            // El precio y el subtotal se calculan mientras se escribe el %.
+                            const texto = e.target.value;
+                            setPorcentajes((p) => ({ ...p, [linea.idLinea]: texto }));
+                            const nuevo = precioDesdePorcentaje(linea.precioReferencia, texto);
+                            if (nuevo !== null) {
+                              editor.setValue(`lineas.${i}.precio`, String(nuevo), { shouldDirty: true, shouldValidate: true });
                             }
                           }}
                         />
@@ -247,7 +252,15 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
                           inputMode="decimal"
                           disabled={!incluida}
                           placeholder="Sin precio"
-                          {...editor.register(`lineas.${i}.precio`)}
+                          {...editor.register(`lineas.${i}.precio`, {
+                            // Si se escribe el precio a mano, el % se vuelve a calcular desde ese precio.
+                            onChange: () =>
+                              setPorcentajes((p) => {
+                                const resto = { ...p };
+                                delete resto[linea.idLinea];
+                                return resto;
+                              }),
+                          })}
                           {...(errores?.precio?.message === undefined ? {} : { error: errores.precio.message })}
                         />
                       </td>
@@ -310,9 +323,12 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
               >
                 Enviar al cliente
               </Button>
-              <Button type="button" variant="ghost" fullWidth disabled={ocupado !== null} onClick={() => setRechazando(true)} leftIcon={<X aria-hidden className="h-4 w-4" />}>
-                Rechazar
-              </Button>
+              {/* Fondo gris fijo (el que el botón fantasma solo muestra al pasar el mouse). */}
+              <div className="rounded-btn bg-neutral-light/60">
+                <Button type="button" variant="ghost" fullWidth disabled={ocupado !== null} onClick={() => setRechazando(true)} leftIcon={<X aria-hidden className="h-4 w-4" />}>
+                  Rechazar
+                </Button>
+              </div>
             </aside>
           </div>
         </form>

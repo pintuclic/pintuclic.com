@@ -9,6 +9,7 @@ import {
   paginaDeUrl,
   porcentajeDescuento,
   precioConDescuento,
+  precioDesdePorcentaje,
   textoSiguientePaso,
 } from '../services/textos-cotizaciones';
 
@@ -88,6 +89,10 @@ describe('M21 · editor del panel', () => {
 
   it('el atajo de % calcula el precio y al revés', () => {
     expect(precioConDescuento(85_900, 10)).toBe(77_310);
+    expect(precioDesdePorcentaje(34_900, '3')).toBe(33_853);
+    expect(precioDesdePorcentaje(100_000, '12,5')).toBe(87_500);
+    expect(precioDesdePorcentaje(100_000, '1.')).toBe(99_000);
+    for (const t of ['', 'abc', '100', '-5', '10.555']) expect(precioDesdePorcentaje(100_000, t)).toBeNull();
     expect(porcentajeDescuento(100_000, 90_000)).toBe(10);
     expect(porcentajeDescuento(0, 1)).toBe(0);
   });
