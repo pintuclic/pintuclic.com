@@ -4,7 +4,9 @@
  */
 
 export type TipoSolicitudContacto = 'consulta' | 'cotizacion' | 'reclamo';
-export type EstadoSolicitudContacto = 'pendiente' | 'atendida';
+export type EstadoSolicitudContacto = 'en_revision' | 'atendida' | 'rechazada';
+export type RolAutorMensaje = 'cliente' | 'equipo';
+export type CalificacionAtencion = 1 | 2 | 3 | 4 | 5;
 export type DiaSemana =
   | 'lunes'
   | 'martes'
@@ -20,6 +22,16 @@ export interface RemitenteSolicitud {
   telefono: string | null;
 }
 
+export interface MensajeSolicitudContacto {
+  idMensaje: string;
+  idSolicitud: string;
+  idAutor: number;
+  rolAutor: RolAutorMensaje;
+  nombreAutor: string;
+  contenido: string;
+  fechaCreacion: string;
+}
+
 export interface SolicitudContacto {
   idSolicitud: string;
   idUsuario: number;
@@ -27,7 +39,14 @@ export interface SolicitudContacto {
   tipo: TipoSolicitudContacto;
   descripcion: string;
   estado: EstadoSolicitudContacto;
+  calificacion: CalificacionAtencion | null;
+  fechaCalificacion: string | null;
+  totalMensajes: number;
   fechaCreacion: string;
+}
+
+export interface SolicitudContactoDetalle extends SolicitudContacto {
+  mensajes: MensajeSolicitudContacto[];
 }
 
 export interface ConfirmacionContacto {

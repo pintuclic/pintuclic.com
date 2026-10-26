@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { canalFormSchema, contactoFormSchema, horarioFormSchema } from '../dtos/m15-atencion.dto';
+import {
+  ESTADOS_SOLICITUD,
+  calificacionSolicitudSchema,
+  canalFormSchema,
+  contactoFormSchema,
+  horarioFormSchema,
+  mensajeSolicitudFormSchema,
+} from '../dtos/m15-atencion.dto';
 import type { CanalWhatsappPublico } from '../interfaces/atencion.interface';
 import { enlaceDelCanal } from '../services/enlace-canal';
 
@@ -82,6 +89,44 @@ describe('contactoFormSchema (HU-ATC-02)', () => {
 
     expect(resultado.success).toBe(false);
     expect(resultado.error?.issues[0]?.message).toContain('5 caracteres');
+  });
+});
+
+describe('mensajeSolicitudFormSchema y calificacionSolicitudSchema (HU-ATC-05, HU-ATC-06)', () => {
+  it('expone los tres estados de solicitud del contrato (en_revision, atendida, rechazada)', () => {
+    expect(ESTADOS_SOLICITUD.map((e) => e.valor)).toEqual([
+      'en_revision',
+      'atendida',
+      'rechazada',
+    ]);
+  });
+
+  it('acepta un mensaje válido y recorta espacios', () => {
+    const resultado = mensajeSolicitudFormSchema.safeParse({
+      contenido: '  Hola, adjunto el detalle de los galones requeridos.  ',
+    });
+
+    expect(resultado.success).toBe(true);
+    if (resultado.success) {
+      expect(resultado.data.contenido).toBe(
+        'Hola, adjunto el detalle de los galones requeridos.',
+      );
+    }
+  });
+
+  it('rechaza un mensaje vacío o en blanco con mensaje específico', () => {
+    const resultado = mensajeSolicitudFormSchema.safeParse({ contenido: '   ' });
+
+    expect(resultado.success).toBe(false);
+    expect(resultado.error?.issues[0]?.message).toContain('Escribe un mensaje');
+  });
+
+  it('acepta calificaciones enteras de 1 a 5 estrellas y rechaza valores fuera de rango', () => {
+    expect(calificacionSolicitudSchema.safeParse({ calificacion: 1 }).success).toBe(true);
+    expect(calificacionSolicitudSchema.safeParse({ calificacion: 5 }).success).toBe(true);
+    expect(calificacionSolicitudSchema.safeParse({ calificacion: 0 }).success).toBe(false);
+    expect(calificacionSolicitudSchema.safeParse({ calificacion: 6 }).success).toBe(false);
+    expect(calificacionSolicitudSchema.safeParse({ calificacion: 3.5 }).success).toBe(false);
   });
 });
 
