@@ -17,7 +17,7 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  * (+ enums `enum_ubicacion_patrocinio`, `enum_tipo_objetivo_patrocinio`, `enum_espacio_publicitario`) y se RETIRA la
  * columna `producto.patrocinado` (A13). Todo en un PR de BD aparte, antes del módulo.
  * Depende de M01 (marcas, líneas y productos) y M17 (permisos nuevos `patrocinios.ver` / `patrocinios.editar`).
- * Lo consumen M02 (listado), M01 (complementarios) y las vistas del cliente (inicio, catálogo, ficha, carrito).
+ * Lo consumen M02 (listado), M01 (complementarios) y las vistas del cliente (inicio, catálogo y ficha).
  *
  * FUENTE: «Pintu Clic — Documento de Historias de Usuario v5.2» (14 oct 2026), HU-PAT-01 a HU-PAT-04, y las
  * decisiones del Tech Lead de esta revisión (el cliente quiere patrocinar PRODUCTOS y poner PUBLICIDAD con imagen y
@@ -33,17 +33,19 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *     Aparece de primero en el listado del catálogo y de la búsqueda, en un bloque del inicio y en los
  *     complementarios de la ficha (UBICACIONES_PATROCINIO).
  *
- *  B. ESPACIOS PUBLICITARIOS (HU-PAT-02). Huecos fijos y cuidados en cuatro vistas del cliente (inicio, catálogo,
- *     ficha de producto y carrito) donde se muestra un slider de anuncios: una IMAGEN con un ENLACE «invisible» (la
- *     imagen entera es el enlace) que lleva al anunciante. El responsable comercial los sube desde el panel, sin
- *     intervención del equipo de desarrollo. Cada anuncio tiene vigencia, orden y su espacio.
+ *  B. ESPACIOS PUBLICITARIOS (HU-PAT-02). Huecos fijos y cuidados en tres vistas del cliente (inicio, catálogo y
+ *     ficha de producto) donde se muestra un slider de anuncios: una IMAGEN con un ENLACE «invisible» (la
+ *     imagen entera es el enlace) que lleva al anunciante. Los sube el administrador o un empleado con el permiso
+ *     `patrocinios.editar`, desde el panel, sin intervención del equipo de desarrollo. Pintu Clic solo ofrece el
+ *     ESPACIO: los acuerdos y los cobros con los anunciantes se hacen fuera del sistema. Cada anuncio tiene vigencia, orden y su espacio.
  *
  * ── Qué NO hace ─────────────────────────────────────────────────────────────
  *  · NO mide (HU-PAT-04 está BLOQUEADA en el documento de HU, cap. 7: espera la decisión de analítica propia o
  *    servicio externo, la misma de HU-RPT-06). Ni cuenta impresiones ni clics, y el enlace del anuncio va DIRECTO al
  *    anunciante, sin redirección por Pintu Clic. Por eso M14 ya no depende de M19.
  *  · NO guarda contratos, montos ni cobros: el modelo de cobro es comercial y está fuera del sistema.
- *  · NO tiene cuentas de anunciante: los anuncios los sube el personal de Pintu Clic (Q1).
+ *  · NO tiene cuentas de anunciante: los anuncios los sube solo el administrador o un empleado con permiso.
+ *  · NO pone publicidad en el carrito ni en el pago: distrae de la compra (decisión del Tech Lead).
  *  · NO sustituye al banner principal del inicio (M16 / FP-01, HU-CNT-03): ese es contenido propio de Pintu Clic;
  *    los anuncios son de terceros y llevan la etiqueta «Publicidad».
  *  · NO edita productos, marcas ni precios (solo lee el catálogo de M01), y no cambia el orden por precio o novedad
@@ -97,7 +99,6 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *        inicio    franja bajo el banner principal del inicio
  *        catalogo  franja sobre el listado del catálogo y de la búsqueda
  *        ficha     franja bajo los datos del producto, antes de los complementarios
- *        carrito   franja bajo la lista de productos del carrito
  *      Agregar un espacio es un cambio de este contrato y de la pantalla que lo pinta, no un dato.
  *  B2  UN ANUNCIO, UN ESPACIO. Un anuncio vive en un solo espacio y tiene la forma de ese espacio. Para el mismo
  *      anunciante en dos espacios se crean dos anuncios (cada imagen se prepara para su tamaño).
@@ -140,21 +141,19 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *  · M02: `PatrocinioPort` en el listado (A8), campo `patrocinado` en cada resultado, y su spec y contrato: la v5.2
  *    de las HU ya NO dice que HU-BUS-04 esté descartada (el repositorio aún dice «Bloqueada / Descartada»).
  *  · Vistas del cliente: el componente `EspacioPublicitario` y el bloque de productos patrocinados los entrega M14.
- *    Montarlos en el inicio (FP-01), el catálogo (M02) y la ficha (M01) es una línea en cada vista; en el CARRITO lo
- *    monta quien haga M05 (otro módulo, otro equipo).
+ *    Montarlos en el inicio (FP-01), el catálogo (M02) y la ficha (M01) es una línea en cada vista.
  *  · Entrega en dos fases, como M01: E1 = patrocinio de productos (A) con el retiro del interruptor; E2 = espacios
  *    publicitarios (B). Se pueden aprobar juntos y construir por separado.
  *
  * ── Preguntas abiertas (para el Tech Lead / cliente) ────────────────────────
- *  Q1  ¿Quién sube los anuncios? Se asume que el personal de Pintu Clic, desde el panel, a pedido del anunciante.
- *      Que el anunciante entre solo a subir su imagen exige cuentas, revisión previa y facturación: es otro módulo.
+ *  Q1  RESUELTA: los anuncios los sube el administrador o un empleado con `patrocinios.editar`; los negocios con
+ *      los anunciantes se hacen fuera del sistema.
  *  Q2  Medir (clics, impresiones) está bloqueado (HU-PAT-04). Con el enlace directo no se puede contar. Si el
  *      cliente exige reporte a los anunciantes, la salida es una redirección propia (`/patrocinios/anuncios/:id/ir`)
  *      que cuente y reenvíe; el contrato la admitiría sin cambiar lo demás. ¿La dejamos prevista?
- *  Q3  Tamaños de los espacios (DEFINICION_ESPACIOS): son propuesta. `carrito` depende del diseño de M05, que aún no
- *      existe: hay que confirmarlo con quien lo haga. ¿Hay un tamaño que Pintuco ya tenga para sus anuncios?
- *  Q4  Un espacio en el carrito puede distraer de pagar y bajar la conversión. Se incluye porque se pidió; conviene
- *      probar con y sin él.
+ *  Q3  Tamaños de los espacios (DEFINICION_ESPACIOS): son propuesta. ¿Hay un tamaño que Pintuco ya tenga para sus
+ *      anuncios?
+ *  Q4  RESUELTA: no hay espacio en el carrito ni en el pago.
  *  Q5  Cupo (A8): 8 productos patrocinados por delante en el listado. ¿Basta? Si debe poder cambiarse sin código, es
  *      un parámetro de M17 (cambio compartido).
  *  Q6  Entre campañas de la misma prioridad el orden es aleatorio (A10). ¿O fijo, por fecha de inicio?
@@ -386,7 +385,7 @@ export type BloqueResponseEnvelope = z.infer<typeof bloqueResponseEnvelopeSchema
  * ─────────────────────────────────────────────────────────────────────────── */
 
 /** Los espacios del sitio donde se muestran anuncios (B1). Conjunto cerrado. */
-export const ESPACIOS_PUBLICITARIOS = ['inicio', 'catalogo', 'ficha', 'carrito'] as const;
+export const ESPACIOS_PUBLICITARIOS = ['inicio', 'catalogo', 'ficha'] as const;
 export const espacioPublicitarioSchema = z.enum(ESPACIOS_PUBLICITARIOS);
 export type EspacioPublicitario = z.infer<typeof espacioPublicitarioSchema>;
 
@@ -401,7 +400,6 @@ export const DEFINICION_ESPACIOS: Readonly<
   inicio: { etiqueta: 'Inicio · bajo el banner principal', ancho: 1232, alto: 280 },
   catalogo: { etiqueta: 'Catálogo · sobre el listado', ancho: 1232, alto: 200 },
   ficha: { etiqueta: 'Ficha de producto · bajo los datos', ancho: 1232, alto: 200 },
-  carrito: { etiqueta: 'Carrito · bajo los productos', ancho: 1232, alto: 200 },
 };
 
 export const tipoMimeImagenSchema = tipoMimeLogotipoSchema;
@@ -611,7 +609,7 @@ export interface TarjetasPublicasPort {
  *
  *  Panel: /admin/patrocinios, con dos pestañas: «Campañas de productos» y «Anuncios».
  *  Vistas del cliente: bloque «Productos patrocinados» (inicio), etiqueta «Patrocinado» (listado y ficha) y
- *  componente `EspacioPublicitario` (inicio, catálogo, ficha y carrito).
+ *  componente `EspacioPublicitario` (inicio, catálogo y ficha).
  *
  *  INTERNO (sin HTTP): PatrocinioPort (de M14) · TarjetasPublicasPort (de M01).
  * ─────────────────────────────────────────────────────────────────────────── */
