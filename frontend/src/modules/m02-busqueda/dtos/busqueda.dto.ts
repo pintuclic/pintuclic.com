@@ -54,6 +54,10 @@ export interface ResultadoBusqueda {
   esCombo: boolean;
   compraBloqueada: boolean;
   oferta: OfertaListado | null;
+  /** true si el patrocinio de una campaña de M14 lo adelantó (se pinta la etiqueta «Patrocinado»). */
+  patrocinado: boolean;
+  /** La campaña que lo adelantó, para medir; null si `patrocinado` es false. */
+  idCampania: number | null;
   coincidenciaColor: string | null;
 }
 

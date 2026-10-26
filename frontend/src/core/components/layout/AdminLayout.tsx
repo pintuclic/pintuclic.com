@@ -18,6 +18,7 @@ import {
   Images,
   LogOut,
   Mail,
+  Megaphone,
   Menu,
   Package,
   Search,
@@ -71,6 +72,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Promociones',
     href: '/admin/promociones',
     icon: <Percent className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Patrocinios',
+    href: '/admin/patrocinios',
+    icon: <Megaphone className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {

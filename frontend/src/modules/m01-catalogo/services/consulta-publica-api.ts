@@ -8,7 +8,7 @@ import type {
   ProductoPublicoFicha,
   ProductoPublicoTarjeta,
 } from '../dtos/m01-catalogo-productos.dto';
-import type { TamanoImagen } from '../dtos/m01-catalogo-entrega3.dto';
+import type { Complementario, TamanoImagen } from '../dtos/m01-catalogo-entrega3.dto';
 import type { PaginaApi, PaginaColoresApi, ParametrosConsulta } from '../interfaces/catalogo.interface';
 import { obtener, obtenerColoresProducto, obtenerPagina } from './catalogo-api';
 
@@ -37,7 +37,7 @@ export const catalogoPublicoApi = {
     `${apiClient.defaults.baseURL ?? '/api/v1'}${PUBLICO}/imagenes/${idImagen}${tamano === 'original' ? '' : `?tamano=${tamano}`}`,
   /** Hasta 4 sugerencias para la ficha; vacío = no mostrar la sección (HU-CAT-08). */
   complementarios: (idProducto: number) =>
-    obtener<ProductoPublicoTarjeta[]>(`${PUBLICO}/productos/${idProducto}/complementarios`),
+    obtener<Complementario[]>(`${PUBLICO}/productos/${idProducto}/complementarios`),
   urlImagenMedida: (idMedida: number): string =>
     `${apiClient.defaults.baseURL ?? '/api/v1'}${PUBLICO}/medidas/${idMedida}/imagen`,
   urlLogotipo: (idMarca: number): string =>
