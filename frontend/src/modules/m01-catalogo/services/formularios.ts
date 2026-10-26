@@ -183,7 +183,6 @@ export function aCuerpoProducto(f: FormProducto, rel: RelacionesProductoForm): R
     descripcion: textoONulo(f.descripcion),
     usoInterior: f.usoInterior,
     usoExterior: f.usoExterior,
-    patrocinado: f.patrocinado,
     idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
     ficha: fichaDe(f),
     idsSuperficies: rel.idsSuperficies,
@@ -206,7 +205,6 @@ export function aCuerpoProductoEditado(f: FormProducto, rel: RelacionesProductoF
     descripcion: textoONulo(f.descripcion),
     usoInterior: f.usoInterior,
     usoExterior: f.usoExterior,
-    patrocinado: f.patrocinado,
     idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
     ficha: fichaDe(f),
     idsSuperficies: rel.idsSuperficies,
@@ -230,7 +228,6 @@ export function formDesdeProducto(p: ProductoDetalle): { form: FormProducto; rel
       descripcion: p.descripcion ?? '',
       usoInterior: p.usoInterior,
       usoExterior: p.usoExterior,
-      patrocinado: p.patrocinado,
       idCategoriaComplementaria: p.idCategoriaComplementaria === null ? '' : String(p.idCategoriaComplementaria),
       conFicha: p.ficha !== null,
       idTipoResina: p.ficha === null ? '' : String(p.ficha.idTipoResina),
@@ -260,7 +257,6 @@ export function formDeCombo(c: Combo): FormCombo {
     sku: c.sku,
     descripcion: c.descripcion ?? '',
     excluidoDeDescuentos: c.excluidoDeDescuentos,
-    patrocinado: c.patrocinado,
     idCategoriaComplementaria: c.idCategoriaComplementaria === null ? '' : String(c.idCategoriaComplementaria),
     existenciaInicial: '',
   };
@@ -276,7 +272,6 @@ export function aCuerpoCombo(f: FormCombo): Resultado<CrearComboRequest> {
     precio: aNumero(f.precio),
     ...(f.sku.trim() === '' ? {} : { sku: f.sku.trim() }),
     excluidoDeDescuentos: f.excluidoDeDescuentos,
-    patrocinado: f.patrocinado,
     idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
   });
   return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
@@ -291,7 +286,6 @@ export function aCuerpoComboEditado(f: FormCombo): Resultado<EditarComboRequest>
     precio: aNumero(f.precio),
     sku: f.sku.trim(),
     excluidoDeDescuentos: f.excluidoDeDescuentos,
-    patrocinado: f.patrocinado,
     idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
   });
   return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };

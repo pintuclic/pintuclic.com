@@ -55,7 +55,6 @@ export const comboSchema = z.object({
   idSubcategoria: idSchema,
   subcategoria: z.string(),
   idCategoriaComplementaria: idSchema.nullable(),
-  patrocinado: z.boolean(),
   excluidoDeDescuentos: z.boolean(),
   idMedida: idSchema,
   medida: z.string(),
@@ -82,7 +81,6 @@ export const crearComboRequestSchema = z.object({
   /** Si no se envía se genera `P{idProducto}-V{idVariante}`, como en cualquier variante. */
   sku: skuSchema.optional(),
   excluidoDeDescuentos: z.boolean().default(false),
-  patrocinado: z.boolean().default(false),
   idCategoriaComplementaria: idSchema.nullable().optional(),
 });
 export type CrearComboRequest = z.infer<typeof crearComboRequestSchema>;
@@ -98,7 +96,6 @@ export const editarComboRequestSchema = z
     precio: precioSchema.optional(),
     sku: skuSchema.optional(),
     excluidoDeDescuentos: z.boolean().optional(),
-    patrocinado: z.boolean().optional(),
     idCategoriaComplementaria: idSchema.nullable().optional(),
   })
   .refine(alMenosUnCampo, { message: 'Debe enviarse al menos un campo' });

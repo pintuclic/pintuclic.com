@@ -369,7 +369,6 @@ export const crearProductoRequestSchema = z
     usoInterior: z.boolean().default(false),
     usoExterior: z.boolean().default(false),
     idCategoriaComplementaria: idSchema.nullable().optional(),
-    patrocinado: z.boolean().default(false),
     ficha: fichaRecubrimientoRequestSchema.nullable().optional(),
     idsSuperficies: listaIdsSchema.default([]),
     idsAcabados: listaIdsSchema.default([]),
@@ -413,7 +412,6 @@ export const editarProductoRequestSchema = z
     usoInterior: z.boolean().optional(),
     usoExterior: z.boolean().optional(),
     idCategoriaComplementaria: idSchema.nullable().optional(),
-    patrocinado: z.boolean().optional(),
     ficha: fichaRecubrimientoRequestSchema.nullable().optional(),
     idsSuperficies: listaIdsSchema.optional(),
     idsAcabados: listaIdsSchema.optional(),
@@ -501,7 +499,6 @@ export const productoResumenSchema = z.object({
   claseColor: claseColorSchema,
   estado: estadoSchema,
   publicado: z.boolean(),
-  patrocinado: z.boolean(),
   /** Entrega 3 (K1, K4). */
   esCombo: z.boolean(),
   excluidoDeDescuentos: z.boolean(),

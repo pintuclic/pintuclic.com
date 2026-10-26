@@ -154,7 +154,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
 
   /** Un producto común, publicado, con una variante activa y una imagen (visible en la vitrina). */
   async function productoVisible(
-    extra: { patrocinado?: boolean; idCategoriaComplementaria?: number; idSubcategoria?: number } = {},
+    extra: { idCategoriaComplementaria?: number; idSubcategoria?: number } = {},
   ): Promise<{ idProducto: number; idVariante: number }> {
     const idProducto = await crearId(
       '/productos',
@@ -162,7 +162,6 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
         idMarca: fx.marca,
         idSubcategoria: extra.idSubcategoria ?? fx.subcategoria,
         nombre: nombre('prod'),
-        patrocinado: extra.patrocinado ?? false,
         ...(extra.idCategoriaComplementaria !== undefined
           ? { idCategoriaComplementaria: extra.idCategoriaComplementaria }
           : {}),
@@ -204,7 +203,6 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
         existenciaReferencial: 0,
         disponibilidad: 'agotado',
         excluidoDeDescuentos: false,
-        patrocinado: false,
         estado: 'activo',
         publicado: false,
         cantidadImagenes: 0,
@@ -217,20 +215,21 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
       expect(detalle.ficha).toBeNull();
     });
 
-    it('acepta SKU propio, exclusión de descuentos, patrocinio y categoría complementaria (K4)', async () => {
+    it('acepta SKU propio, exclusión de descuentos y categoría complementaria (K4); ya no tiene interruptor de patrocinio', async () => {
       const sku = codigo();
       const combo = await crearCombo({
         sku,
         excluidoDeDescuentos: true,
+        // Un cliente viejo que aún lo envíe no lo guarda ni lo recibe de vuelta: el patrocinio es de M14.
         patrocinado: true,
         idCategoriaComplementaria: fx.categoriaComp,
       });
       expect(combo).toMatchObject({
         sku,
         excluidoDeDescuentos: true,
-        patrocinado: true,
         idCategoriaComplementaria: fx.categoriaComp,
       });
+      expect(combo).not.toHaveProperty('patrocinado');
     });
 
     it.each([
@@ -374,7 +373,6 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
         sku,
         nombre: nombre('editado'),
         excluidoDeDescuentos: true,
-        patrocinado: true,
         descripcion: null,
         idMarca: fx.marcaInactiva,
         idMedida: fx.medidaGalon,
@@ -384,7 +382,6 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
         precio: 49900.5,
         sku,
         excluidoDeDescuentos: true,
-        patrocinado: true,
         descripcion: null,
         idMarca: fx.marca,
         idMedida: fx.medidaUnidad,
@@ -503,11 +500,8 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
   /* ─── Complementarios (X1–X5) ─── */
 
   describe('productos complementarios (HU-CAT-08)', () => {
-    /** Una categoría propia con `n` productos visibles; el primero, patrocinado si `patrocinado`. */
-    async function categoriaConProductos(
-      cantidad: number,
-      opciones: { patrocinados?: number } = {},
-    ): Promise<{ idCategoria: number; ids: number[]; patrocinados: number[] }> {
+    /** Una categoría propia con `cantidad` productos visibles. */
+    async function categoriaConProductos(cantidad: number): Promise<{ idCategoria: number; ids: number[] }> {
       const idCategoria = await crearId('/categorias', { nombre: nombre('catc') }, 'idCategoria');
       const idSubcategoria = await crearId(
         `/categorias/${idCategoria}/subcategorias`,
@@ -515,14 +509,10 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
         'idSubcategoria',
       );
       const ids: number[] = [];
-      const patrocinados: number[] = [];
       for (let i = 0; i < cantidad; i += 1) {
-        const esPatrocinado = i < (opciones.patrocinados ?? 0);
-        const p = await productoVisible({ idSubcategoria, patrocinado: esPatrocinado });
-        ids.push(p.idProducto);
-        if (esPatrocinado) patrocinados.push(p.idProducto);
+        ids.push((await productoVisible({ idSubcategoria })).idProducto);
       }
-      return { idCategoria, ids, patrocinados };
+      return { idCategoria, ids };
     }
 
     it('con categoría complementaria sugiere hasta 4 productos de esa categoría, sin el propio (X1, X2, X4)', async () => {
@@ -544,25 +534,6 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
       });
     });
 
-    it('los patrocinados van primero y el resto completa hasta 4 (X2)', async () => {
-      const comp = await categoriaConProductos(7, { patrocinados: 2 });
-      const origen = await productoVisible({ idCategoriaComplementaria: comp.idCategoria });
-      for (let intento = 0; intento < 5; intento += 1) {
-        const ids = lista(await complementarios(origen.idProducto)).map((t) => t.idProducto as number);
-        expect(ids).toHaveLength(4);
-        expect(new Set(ids.slice(0, 2))).toEqual(new Set(comp.patrocinados));
-        expect(ids.slice(2).every((id) => !comp.patrocinados.includes(id))).toBe(true);
-      }
-    });
-
-    it('si hay más de 4 patrocinados, solo salen patrocinados', async () => {
-      const comp = await categoriaConProductos(6, { patrocinados: 5 });
-      const origen = await productoVisible({ idCategoriaComplementaria: comp.idCategoria });
-      const ids = lista(await complementarios(origen.idProducto)).map((t) => t.idProducto as number);
-      expect(ids).toHaveLength(4);
-      expect(ids.every((id) => comp.patrocinados.includes(id))).toBe(true);
-    });
-
     it('es al azar: con varias consultas no siempre devuelve el mismo orden o los mismos productos', async () => {
       const comp = await categoriaConProductos(9);
       const origen = await productoVisible({ idCategoriaComplementaria: comp.idCategoria });
@@ -577,21 +548,27 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 3 (HTTP + PostgreSQL)', ()
       expect(vistos.size).toBeGreaterThan(1);
     });
 
-    it('sin categoría complementaria muestra solo patrocinados (X3)', async () => {
+    it('sin campañas de patrocinio, el orden es al azar y ninguna tarjeta trae la marca «patrocinado» (X2)', async () => {
+      // El orden de los patrocinados por campaña (prioridad, vigencia, ubicación) se prueba con M14 (A7).
+      const comp = await categoriaConProductos(6);
+      const origen = await productoVisible({ idCategoriaComplementaria: comp.idCategoria });
+      const tarjetas = lista(await complementarios(origen.idProducto));
+      expect(tarjetas).toHaveLength(4);
+      for (const t of tarjetas) expect([t.patrocinado, t.idCampania]).toEqual([false, null]);
+    });
+
+    it('sin categoría complementaria solo salen productos de campañas: nunca el propio ni uno sin campaña (X3)', async () => {
       const sinNada = await productoVisible();
-      const patrocinador = await productoVisible({ patrocinado: true });
+      const otroSinCampania = await productoVisible();
       const tarjetas = lista(await complementarios(sinNada.idProducto));
       expect(tarjetas.length).toBeLessThanOrEqual(4);
+      // La base compartida puede tener campañas de otras pruebas: lo que salga viene de una campaña, no de un interruptor.
       for (const t of tarjetas) {
-        const enBd = await prisma.producto.findUniqueOrThrow({ where: { idProducto: t.idProducto as number } });
-        expect(enBd.patrocinado).toBe(true);
+        expect(t.patrocinado).toBe(true);
+        expect(t.idCampania).toEqual(expect.any(Number));
         expect(t.idProducto).not.toBe(sinNada.idProducto);
+        expect(t.idProducto).not.toBe(otroSinCampania.idProducto);
       }
-      // La base compartida de pruebas puede tener otros patrocinados: solo se exige ver el nuestro si caben.
-      const visibles = await prisma.producto.count({
-        where: { patrocinado: true, publicado: true, estado: 'activo', NOT: { idProducto: sinNada.idProducto } },
-      });
-      if (visibles <= 4) expect(tarjetas.map((t) => t.idProducto)).toContain(patrocinador.idProducto);
     });
 
     it('la subcategoría aporta la categoría complementaria por defecto (D6) y la del producto manda', async () => {

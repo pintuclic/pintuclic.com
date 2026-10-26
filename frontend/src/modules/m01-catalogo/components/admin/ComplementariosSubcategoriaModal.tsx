@@ -60,14 +60,14 @@ export const ComplementariosSubcategoriaModal: React.FC<ComplementariosSubcatego
         {error !== null && <Alert variant="error">{error}</Alert>}
         <p className="font-sans text-sm text-neutral-dark">
           En la ficha de los productos de esta subcategoría se sugieren hasta 4 productos de la categoría que elija, con
-          los patrocinados primero. Si un producto tiene su propia categoría complementaria, esa manda.
+          los de campañas de patrocinio primero. Si un producto tiene su propia categoría complementaria, esa manda.
         </p>
         <SelectorBuscable
           label="Categoría de la que se sugieren"
           value={valor}
           onChange={setValor}
           options={categorias.map((c) => ({ value: String(c.idCategoria), label: c.nombre }))}
-          textoSinElegir="Ninguna (solo patrocinados)"
+          textoSinElegir="Ninguna (solo los de campañas de patrocinio)"
         />
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={onClose}>

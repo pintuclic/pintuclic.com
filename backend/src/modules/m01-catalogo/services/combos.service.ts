@@ -62,7 +62,6 @@ export class CombosService extends ServicioCatalogoBase {
       precio: peticion.precio,
       sku: peticion.sku ?? null,
       excluidoDeDescuentos: peticion.excluidoDeDescuentos,
-      patrocinado: peticion.patrocinado,
       idCategoriaComplementaria: peticion.idCategoriaComplementaria ?? null,
     };
     return this.combos.crear(datos).catch(traducirUnico);
@@ -100,7 +99,6 @@ export class CombosService extends ServicioCatalogoBase {
       ...(peticion.precio !== undefined ? { precio: peticion.precio } : {}),
       ...(peticion.sku !== undefined ? { sku: peticion.sku } : {}),
       ...(peticion.excluidoDeDescuentos !== undefined ? { excluidoDeDescuentos: peticion.excluidoDeDescuentos } : {}),
-      ...(peticion.patrocinado !== undefined ? { patrocinado: peticion.patrocinado } : {}),
       ...(peticion.idCategoriaComplementaria !== undefined
         ? { idCategoriaComplementaria: peticion.idCategoriaComplementaria }
         : {}),

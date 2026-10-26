@@ -24,7 +24,6 @@ const VACIO: FormProducto = {
   descripcion: '',
   usoInterior: false,
   usoExterior: false,
-  patrocinado: false,
   idCategoriaComplementaria: '',
   conFicha: true,
   idTipoResina: '',
@@ -252,7 +251,6 @@ const Formulario: React.FC<{
         <div className="flex flex-wrap gap-6 sm:col-span-2">
           <CampoCheck control={control} name="usoInterior" label="Uso interior" />
           <CampoCheck control={control} name="usoExterior" label="Uso exterior" />
-          <CampoCheck control={control} name="patrocinado" label="Patrocinado" />
         </div>
       </fieldset>
 

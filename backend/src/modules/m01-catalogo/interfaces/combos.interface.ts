@@ -12,7 +12,6 @@ export interface CrearComboDatos {
   /** null → el repositorio genera `P{idProducto}-V{idVariante}`. */
   sku: string | null;
   excluidoDeDescuentos: boolean;
-  patrocinado: boolean;
   idCategoriaComplementaria: number | null;
 }
 
@@ -24,7 +23,6 @@ export interface EditarComboDatos {
   precio?: number;
   sku?: string;
   excluidoDeDescuentos?: boolean;
-  patrocinado?: boolean;
   idCategoriaComplementaria?: number | null;
 }
 

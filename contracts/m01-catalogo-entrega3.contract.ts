@@ -46,7 +46,8 @@ import {
  *  · Descuentos y precio B2B: son de M06. M01 solo informa el precio base y si el combo está
  *    excluido de descuentos.
  *  · Búsqueda y filtros avanzados: son de M02.
- *  · Campañas de patrocinio: son de M14. Aquí `patrocinado` sigue siendo una marca del producto.
+ *  · Patrocinio: es de M14 (campañas). El producto y el combo YA NO tienen un interruptor `patrocinado`; lo único que
+ *    queda aquí es la marca de cada complementario, que sale de las campañas de M14.
  *  · Importación desde SAMIT: módulo futuro. Debe saltarse siempre los combos (CA-CAT-13-08).
  *
  * ── Reglas de combos ────────────────────────────────────────────────────────
@@ -78,9 +79,10 @@ import {
  * ── Reglas de complementarios ───────────────────────────────────────────────
  *  X1  GET público de hasta 4 productos para la ficha de un producto.
  *  X2  Origen: los productos visibles de la categoría complementaria del producto o, si no
- *      tiene, la de su subcategoría (D6). Los patrocinados van primero; el resto, al azar.
- *  X3  Sin categoría complementaria (ni en el producto ni en su subcategoría) solo se muestran
- *      patrocinados; si no hay ninguno, la lista va vacía y la pantalla oculta la sección.
+ *      tiene, la de su subcategoría (D6). Primero van los patrocinados por una campaña de M14 con ubicación
+ *      «complementarios» (por prioridad); el resto, al azar.
+ *  X3  Sin categoría complementaria (ni en el producto ni en su subcategoría) solo se muestran los
+ *      patrocinados por una campaña; si no hay ninguno, la lista va vacía y la pantalla oculta la sección.
  *  X4  Se excluyen: el propio producto, los no visibles (producto o variantes inactivas, cadena
  *      inactiva) y los combos agotados.
  *  X5  Solo se sugieren en la ficha. El carrito no llama a este endpoint (CA-CAT-08-05).
@@ -166,7 +168,6 @@ export const comboSchema = z.object({
   idSubcategoria: idSchema,
   subcategoria: z.string(),
   idCategoriaComplementaria: idSchema.nullable(),
-  patrocinado: z.boolean(),
   excluidoDeDescuentos: z.boolean(),
   idMedida: idSchema,
   medida: z.string(),
@@ -193,7 +194,6 @@ export const crearComboRequestSchema = z.object({
   /** Si no se envía se genera `P{idProducto}-V{idVariante}`, como en cualquier variante. */
   sku: skuSchema.optional(),
   excluidoDeDescuentos: z.boolean().default(false),
-  patrocinado: z.boolean().default(false),
   idCategoriaComplementaria: idSchema.nullable().optional(),
 });
 export type CrearComboRequest = z.infer<typeof crearComboRequestSchema>;
@@ -209,7 +209,6 @@ export const editarComboRequestSchema = z
     precio: precioSchema.optional(),
     sku: skuSchema.optional(),
     excluidoDeDescuentos: z.boolean().optional(),
-    patrocinado: z.boolean().optional(),
     idCategoriaComplementaria: idSchema.nullable().optional(),
   })
   .refine(alMenosUnCampo, { message: 'Debe enviarse al menos un campo' });
