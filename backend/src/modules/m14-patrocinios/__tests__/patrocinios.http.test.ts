@@ -384,4 +384,33 @@ describe.skipIf(URL_BD === undefined)('M14 · patrocinio de productos (HTTP + Po
       expect((await servidor.publico('/productos')).status).toBe(200);
     });
   });
+
+  describe('complementarios de la ficha (A7, R12)', () => {
+    const complementarios = async (idProducto: number): Promise<number[]> =>
+      lista(await servidor.catalogo(`/productos/${idProducto}/complementarios`)).map((t) => t.idProducto as number);
+
+    it('sin categoría complementaria van primero los de campañas vigentes con esa ubicación, por prioridad, y luego los marcados a mano', async () => {
+      // La base de pruebas trae productos con el interruptor manual `patrocinado` (el seed): quedan detrás de las campañas.
+      const aMano = await complementarios(f.p1);
+      await campaniaEnBd('Baja', [{ tipo: 'producto', id: f.p3 }], { ubicaciones: ['complementarios'], prioridad: 10 });
+      await campaniaEnBd('Alta', [{ tipo: 'producto', id: f.p4 }], { ubicaciones: ['complementarios'], prioridad: 90 });
+      await campaniaEnBd('Otra ubicacion', [{ tipo: 'producto', id: f.p5 }], { ubicaciones: ['listado'], prioridad: 100 });
+      expect(await complementarios(f.p1)).toEqual([f.p4, f.p3, ...aMano].slice(0, 4));
+    });
+
+    it('nunca sugiere el propio producto ni uno que no se muestra', async () => {
+      await campaniaEnBd('Marca', [{ tipo: 'marca', id: f.marca }], { ubicaciones: ['complementarios'] });
+      const ids = await complementarios(f.p1);
+      expect(ids).not.toContain(f.p1);
+      expect(ids).not.toContain(f.inactivo);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('una campaña vencida o inactiva no cuenta', async () => {
+      const aMano = await complementarios(f.p1);
+      await campaniaEnBd('Inactiva', [{ tipo: 'producto', id: f.p2 }], { ubicaciones: ['complementarios'], estado: 'inactivo' });
+      await campaniaEnBd('Vencida', [{ tipo: 'producto', id: f.p3 }], { ubicaciones: ['complementarios'], fechaInicio: HACE_UN_MES, fechaFin: HACE_UNA_SEMANA });
+      expect(await complementarios(f.p1)).toEqual(aMano);
+    });
+  });
 });

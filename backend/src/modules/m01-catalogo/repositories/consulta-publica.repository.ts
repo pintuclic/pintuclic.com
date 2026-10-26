@@ -13,6 +13,7 @@ import type {
 } from '../dtos/m01-catalogo-productos.dto';
 import type { ImagenBytes, LogotipoMarca, Pagina } from '../interfaces/catalogo.interface';
 import type { ConsultaPublicaRepositoryPort } from '../interfaces/consulta-publica.interface';
+import type { PrioridadProductoPort } from '../interfaces/patrocinio.port';
 import type { ColoresDeProducto } from '../interfaces/productos.interface';
 import type { DerivadaGuardada, ImagenesRepositoryPort, TamanoDerivado } from '../interfaces/imagenes.interface';
 import { ImagenesRepository, ORDEN_GALERIA } from './imagenes.repository';
@@ -342,6 +343,7 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
   async complementarios(
     idProducto: number,
     limite: number,
+    patrocinadosPorCampania: readonly PrioridadProductoPort[] = [],
     aleatorio: () => number = Math.random,
   ): Promise<ProductoPublicoTarjeta[] | null> {
     const origen = await prisma.producto.findFirst({
@@ -365,14 +367,26 @@ export class ConsultaPublicaRepository implements ConsultaPublicaRepositoryPort 
         })
       ).map((f) => f.idProducto);
 
+    const enCategoria: Prisma.ProductoWhereInput = idCategoria === null ? {} : { subcategoria: { idCategoria } };
     const elegidos: number[] = [];
+    // Primero los de campañas vigentes de M14 (por prioridad y, entre iguales, al azar), luego los marcados a mano.
+    if (patrocinadosPorCampania.length > 0) {
+      const prioridad = new Map(patrocinadosPorCampania.map((p) => [p.idProducto, p.prioridad]));
+      const visiblesDeCampania = await ids({ ...enCategoria, idProducto: { in: [...prioridad.keys()] } });
+      const conAzar = barajar(visiblesDeCampania, aleatorio);
+      conAzar.sort((a, b) => (prioridad.get(b) ?? 0) - (prioridad.get(a) ?? 0));
+      elegidos.push(...conAzar.slice(0, limite));
+    }
     const patrocinados = barajar(
-      await ids(idCategoria === null ? { patrocinado: true } : { patrocinado: true, subcategoria: { idCategoria } }),
+      (await ids({ ...enCategoria, patrocinado: true })).filter((id) => !elegidos.includes(id)),
       aleatorio,
     );
-    elegidos.push(...patrocinados.slice(0, limite));
+    elegidos.push(...patrocinados.slice(0, limite - elegidos.length));
     if (idCategoria !== null && elegidos.length < limite) {
-      const resto = barajar(await ids({ patrocinado: false, subcategoria: { idCategoria } }), aleatorio);
+      const resto = barajar(
+        (await ids({ patrocinado: false, subcategoria: { idCategoria } })).filter((id) => !elegidos.includes(id)),
+        aleatorio,
+      );
       elegidos.push(...resto.slice(0, limite - elegidos.length));
     }
     return this.tarjetas(elegidos);

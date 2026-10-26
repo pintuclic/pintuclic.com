@@ -31,6 +31,8 @@ export interface ServidorPrueba {
   modulo: ModuloM14;
   admin: (actor: NombreActor | null, metodo: 'GET' | 'POST' | 'PUT' | 'PATCH', ruta: string, cuerpo?: unknown) => Promise<RespuestaHttp>;
   publico: (ruta: string) => Promise<RespuestaHttp>;
+  /** El catálogo público de M01 (para ver los complementarios de la ficha, A7). */
+  catalogo: (ruta: string) => Promise<RespuestaHttp>;
   cerrar: () => Promise<void>;
 }
 
@@ -55,8 +57,18 @@ export async function levantarServidor(
     tienePermiso: (idUsuario, codigo) => Promise.resolve(permisos[idUsuario]?.includes(codigo) === true),
   };
   const autorizacion = new AutorizacionService(resolutor, auditoria);
-  const m01 = construirModuloM01(autorizacion);
+  // M01 pide a M14 de forma diferida (M14 pide a M01 las tarjetas), como en `app.routes.ts`.
+  const construido: { m14?: ModuloM14 } = {};
+  const m01 = construirModuloM01(autorizacion, {
+    patrocinio: {
+      prioridadesDeProductos: (ubicacion) => {
+        if (construido.m14 === undefined) throw new Error('M14 todavía no está construido');
+        return construido.m14.patrocinio.prioridadesDeProductos(ubicacion);
+      },
+    },
+  });
   const modulo = construirModuloM14(autorizacion, { tarjetas: tarjetas ?? m01.consultaPublicaService });
+  construido.m14 = modulo;
 
   const app: Express = express();
   app.use(express.json({ limit: '1mb' }));
@@ -66,6 +78,7 @@ export async function levantarServidor(
     next();
   }, modulo.adminRouter);
   app.use('/api/v1/patrocinios', modulo.publicRouter);
+  app.use('/api/v1/catalogo', m01.publicRouter);
   app.use(errorHandler);
 
   const servidor: Server = await new Promise((resolver) => {
@@ -92,6 +105,7 @@ export async function levantarServidor(
         ...(cuerpo !== undefined ? { body: JSON.stringify(cuerpo) } : {}),
       }),
     publico: (ruta) => leer(`${baseUrl}/api/v1/patrocinios${ruta}`, { method: 'GET' }),
+    catalogo: (ruta) => leer(`${baseUrl}/api/v1/catalogo${ruta}`, { method: 'GET' }),
     cerrar: () => new Promise<void>((resolver, rechazar) => servidor.close((e) => (e ? rechazar(e) : resolver()))),
   };
 }

@@ -88,6 +88,8 @@ export const PESOS_RELEVANCIA = {
   descripcion: 1,
 } as const;
 export const FACTOR_COINCIDENCIA_EXACTA = 2;
+/** Cuántos productos patrocinados pueden pasar por delante en el listado (M14 · A8; mismo valor que allí). */
+export const CUPO_PATROCINADOS_LISTADO = 8;
 
 export const PERIODOS_ESTADISTICA = ['diario', 'semanal', 'mensual', 'anual'] as const;
 export const periodoEstadisticaSchema = z.enum(PERIODOS_ESTADISTICA);
@@ -174,6 +176,8 @@ export type ListarSinResultadoRequest = z.infer<typeof listarSinResultadoRequest
 
 export const resultadoBusquedaSchema = productoPublicoTarjetaSchema.extend({
   coincidenciaColor: z.string().nullable(),
+  patrocinado: z.boolean(),
+  idCampania: idSchema.nullable(),
 });
 export type ResultadoBusqueda = z.infer<typeof resultadoBusquedaSchema>;
 
@@ -262,6 +266,12 @@ export type ErrorBusquedaEnvelope = z.infer<typeof errorBusquedaEnvelopeSchema>;
 
 export interface ContextoPrecio {
   readonly idUsuario: number | null;
+}
+
+export interface PatrocinioListadoPort {
+  prioridadesDeProductos(
+    ubicacion: 'listado',
+  ): Promise<ReadonlyArray<{ idProducto: number; prioridad: number; idCampania: number }>>;
 }
 
 export interface OfertasListadoPort {

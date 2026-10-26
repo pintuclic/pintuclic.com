@@ -9,6 +9,7 @@ import type {
 import type { ImagenBytes, LogotipoMarca, Pagina } from './catalogo.interface';
 import type { DerivadaGuardada, TamanoDerivado } from './imagenes.interface';
 import type { ColoresDeProducto } from './productos.interface';
+import type { PrioridadProductoPort } from './patrocinio.port';
 
 /**
  * Lectura pública del catálogo (U1–U7). Todo responde solo con productos visibles:
@@ -30,7 +31,11 @@ export interface ConsultaPublicaRepositoryPort {
   imagenDerivada(idImagen: number, tamano: TamanoDerivado): Promise<DerivadaGuardada | null>;
   guardarDerivada(idImagen: number, tamano: TamanoDerivado, bytes: Buffer): Promise<void>;
   /** X1–X4: complementarios de un producto visible; null si el producto no es visible. */
-  complementarios(idProducto: number, limite: number): Promise<ProductoPublicoTarjeta[] | null>;
+  complementarios(
+    idProducto: number,
+    limite: number,
+    patrocinadosPorCampania?: readonly PrioridadProductoPort[],
+  ): Promise<ProductoPublicoTarjeta[] | null>;
   /** Imagen de una medida usada por un producto visible. */
   imagenMedida(idMedida: number): Promise<ImagenBytes | null>;
   /** Solo marcas activas. */

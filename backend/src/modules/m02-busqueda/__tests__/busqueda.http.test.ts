@@ -41,6 +41,8 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       esCombo: false,
       compraBloqueada: false,
       oferta: null,
+      patrocinado: false,
+      idCampania: null,
       coincidenciaColor: null,
     },
     {
@@ -57,6 +59,8 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       esCombo: false,
       compraBloqueada: false,
       oferta: null,
+      patrocinado: false,
+      idCampania: null,
       coincidenciaColor: 'Amarillo Cromo',
     },
     {
@@ -73,6 +77,8 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       esCombo: false,
       compraBloqueada: false,
       oferta: null,
+      patrocinado: false,
+      idCampania: null,
       coincidenciaColor: null,
     },
   ];

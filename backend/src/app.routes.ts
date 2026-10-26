@@ -101,6 +101,8 @@ export function construirAppRoutes(): Router {
       preciosDeVariantes: (consultas) => m06.precios.preciosDeVariantes(consultas),
     },
     impactoReglas: { contarEventosVigentes: (objetivos) => m06.impacto.contarEventosVigentes(objetivos) },
+    // M14 (campañas de patrocinio): los productos patrocinados van primero en los complementarios de la ficha.
+    patrocinio: { prioridadesDeProductos: (ubicacion) => m14.patrocinio.prioridadesDeProductos(ubicacion) },
   });
   router.use('/admin/catalogo', exigirSesionSalvo(auth, []), m01.adminRouter);
   router.use('/catalogo', m01.publicRouter);
@@ -113,6 +115,8 @@ export function construirAppRoutes(): Router {
       idsProductosEnOferta: () => m06.precios.idsProductosEnOferta(),
       ofertasDeProductos: (ids) => m06.precios.ofertasDeProductos(ids),
     },
+    // Las campañas de M14 (se piden de forma diferida: M14 se construye después, porque pide a M01 las tarjetas).
+    patrocinio: { prioridadesDeProductos: (ubicacion) => m14.patrocinio.prioridadesDeProductos(ubicacion) },
   });
   router.use('/admin/busqueda', exigirSesionSalvo(auth, []), m02.adminRouter);
   router.use('/busqueda', m02.publicRouter);

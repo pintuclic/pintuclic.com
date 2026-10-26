@@ -14,6 +14,7 @@ import type {
 import type { ImagenBytes, LogotipoMarca, Pagina } from '../interfaces/catalogo.interface';
 import type { ConsultaPublicaRepositoryPort } from '../interfaces/consulta-publica.interface';
 import type { OfertaPort, OfertasPort } from '../interfaces/ofertas.port';
+import type { PatrocinioPort, PrioridadProductoPort } from '../interfaces/patrocinio.port';
 import type { ColoresDeProducto } from '../interfaces/productos.interface';
 import { errores, ServicioCatalogoBase } from './catalogo-base.service';
 import { servirImagen } from './imagen-derivadas';
@@ -32,6 +33,7 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
   constructor(
     private readonly consulta: ConsultaPublicaRepositoryPort,
     private readonly ofertas?: OfertasPort,
+    private readonly patrocinio?: PatrocinioPort,
   ) {
     super();
   }
@@ -134,7 +136,20 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
 
   /** X1–X5: hasta 4 sugerencias para la ficha; vacío cuando no hay nada que sugerir (la pantalla oculta la sección). */
   async complementarios(idProducto: number): Promise<ProductoPublicoTarjeta[]> {
-    return this.conOfertas(this.exigir(await this.consulta.complementarios(idProducto, MAXIMO_COMPLEMENTARIOS)));
+    const deCampanias = await this.patrocinadosPorCampania();
+    return this.conOfertas(
+      this.exigir(await this.consulta.complementarios(idProducto, MAXIMO_COMPLEMENTARIOS, deCampanias)),
+    );
+  }
+
+  /** Los productos de campañas vigentes de M14 para los complementarios; si M14 falla, la ficha se ve igual. */
+  private async patrocinadosPorCampania(): Promise<PrioridadProductoPort[]> {
+    if (this.patrocinio === undefined) return [];
+    try {
+      return await this.patrocinio.prioridadesDeProductos('complementarios');
+    } catch {
+      return [];
+    }
   }
 
   async imagenMedida(idMedida: number): Promise<ImagenBytes> {
