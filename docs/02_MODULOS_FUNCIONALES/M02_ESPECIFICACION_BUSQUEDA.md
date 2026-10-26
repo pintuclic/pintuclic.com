@@ -124,9 +124,9 @@ Este módulo está diseñado para responder con alto rendimiento (paginación y 
   - **Cuando** intento aplicarlo
   - **Entonces** el sistema lo impide e informa del error.
 - **CA-BUS-02-07:**
-  - **Dado que** soy cliente empresa con condiciones vigentes
+  - **Dado que** hay un evento de descuento en curso (M06)
   - **Cuando** filtro por rango de precio
-  - **Entonces** el filtro opera sobre los precios que a mí se me aplican.
+  - **Entonces** el filtro opera sobre el precio con el evento. El descuento de empresa no entra: depende del total del carrito y solo se ve allí (M06 · R10).
 - **CA-BUS-02-08:**
   - **Dado que** filtro por un color de carta
   - **Cuando** se cargan los resultados
@@ -171,9 +171,9 @@ Este módulo está diseñado para responder con alto rendimiento (paginación y 
   - **Cuando** su marca está patrocinada
   - **Entonces** no aparece entre los resultados (relevancia 0 no se eleva por patrocinio).
 - **CA-BUS-03-05:**
-  - **Dado que** soy cliente empresa y ordeno por precio ascendente
+  - **Dado que** hay un evento de descuento en curso (M06) y ordeno por precio ascendente
   - **Cuando** se cargan los resultados
-  - **Entonces** el orden corresponde a los precios que a mí se me aplican.
+  - **Entonces** el orden corresponde al precio con el evento (el mismo que muestra la tarjeta). El descuento de empresa no entra: solo se ve en el carrito.
 
 #### Diagramas de Referencia
 ![Flujo del Proceso](../assets/diagrams/M02/HU-BUS-03.png)

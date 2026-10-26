@@ -103,7 +103,7 @@ export const header: HeaderProps = {
   navItems: [
     { label: 'Inicio', href: '/' },
     { label: 'Productos', href: '/productos' },
-    { label: 'Ofertas', href: '/ofertas', variant: 'pill' },
+    { label: 'Ofertas', href: '/productos?enOferta=true', variant: 'pill' },
     { label: 'Ayuda y FAQ', href: '/centro-de-ayuda' },
     { label: 'Sobre Nosotros', href: '/sobre-nosotros' },
   ],

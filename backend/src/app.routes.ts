@@ -3,6 +3,7 @@ import { construirRutasLandingBanners } from './core/landing/banners.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
+import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-final-m06.adapter';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
 import { construirModuloM06 } from './modules/m06-precios/m06.routes';
 import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
@@ -103,7 +104,14 @@ export function construirAppRoutes(): Router {
   router.use('/catalogo', m01.publicRouter);
 
   // M02: búsqueda, filtros y descubrimiento (público) y analítica de búsquedas sin resultado (admin).
-  const m02 = construirModuloM02(m17.autorizacionService);
+  // El precio final y las ofertas los da M06 (se pide de forma diferida: se construye después, por M01).
+  const m02 = construirModuloM02(m17.autorizacionService, {
+    precioFinal: new PrecioFinalM06Adapter({ preciosDeVariantes: (consultas) => m06.precios.preciosDeVariantes(consultas) }),
+    ofertas: {
+      idsProductosEnOferta: () => m06.precios.idsProductosEnOferta(),
+      ofertasDeProductos: (ids) => m06.precios.ofertasDeProductos(ids),
+    },
+  });
   router.use('/admin/busqueda', exigirSesionSalvo(auth, []), m02.adminRouter);
   router.use('/busqueda', m02.publicRouter);
 

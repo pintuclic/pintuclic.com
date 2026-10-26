@@ -6,6 +6,7 @@ import {
 } from './m01-catalogo.contract';
 import {
   ambienteSchema,
+  ofertaPublicaSchema,
   productoPublicoTarjetaSchema,
   referenciaSchema,
 } from './m01-catalogo-productos.contract';
@@ -81,13 +82,17 @@ import {
  *      sumar valores dentro de un grupo sin quedarse sin opciones.
  *  F4  Quitar un filtro recalcula con los restantes (CA-BUS-02-05). Todo el estado de búsqueda,
  *      filtros, orden y página viaja en la URL del navegador para poder compartirla (RF-BUS-02-05).
- *  F5  Rango de precio: `precioMin` y `precioMax` sobre el PRECIO FINAL (descuentos e IVA incluidos)
- *      que informa el puerto de M06 (Q1). Un `precioMin` mayor que `precioMax` se rechaza con
+ *  F5  Rango de precio: `precioMin` y `precioMax` sobre el PRECIO FINAL que informa M06 por el puerto:
+ *      el precio de la variante con el evento en curso (IVA incluido). El descuento de empresa NO entra:
+ *      depende del total del carrito y solo se ve allí (M06 · R10). Un `precioMin` mayor que `precioMax` se rechaza con
  *      400 PARAMETRO_INVALIDO (RF-BUS-02-04, CA-BUS-02-06). Un producto cumple si AL MENOS UNA de
  *      sus variantes activas queda dentro del rango.
  *  F6  Presentación = medida de una variante activa del producto.
  *  F7  Tipo de resina = el de la ficha de recubrimiento. Los productos sin ficha (herramientas)
  *      no cumplen un filtro de resina.
+ *  F9  `enOferta=true`: solo productos con un evento de M06 en curso ahora mismo (menú «Ofertas»).
+ *      Se combina con el resto de filtros y del orden. Si M06 no responde, el filtro falla con 500 en vez de
+ *      mostrar «ninguna oferta»; sin el filtro, un fallo de M06 solo quita las etiquetas y el precio vuelve al base.
  *  F8  Los filtros de M01 que ya existen (superficie, ambiente) se conservan con el mismo nombre,
  *      para no romper las direcciones actuales (`?ambiente=interior`, `?idCategoria=3`).
  *
@@ -101,8 +106,8 @@ import {
  *      (CA-BUS-03-04).
  *  O4  Desempate estable por nombre y luego por id del producto: la misma consulta devuelve el
  *      mismo orden (RF-BUS-03-03, CA-BUS-03-03, y evita saltos entre páginas).
- *  O5  Precio: se ordena por el precio final MÍNIMO de las variantes activas del producto, el
- *      mismo que muestra la tarjeta como "desde" (CA-BUS-03-05 con precios de empresa vía Q1).
+ *  O5  Precio: se ordena por el precio final MÍNIMO de las variantes activas del producto (con el evento en
+ *      curso), el mismo que usa `precioDesde` (CA-BUS-03-05). El descuento de empresa no entra (ver F5).
  *  O6  Novedad = `producto.fecha_creacion` descendente.
  *
  * ── Reglas de paginación ────────────────────────────────────────────────────
@@ -147,10 +152,10 @@ import {
  *      parámetro del sistema si el Tech Lead lo pide.
  *
  * ── Preguntas abiertas (para el Tech Lead / cliente) ────────────────────────
- *  Q1  PRECIO FINAL (M06 no existe). Se asume un puerto `PrecioFinalPort` con un adaptador inicial
- *      que devuelve el precio base de la variante. Falta confirmar: ¿`variante.precio_vigente` ya
- *      incluye IVA? Y cuando llegue M06: filtrar y ordenar por un precio calculado fuera de SQL no
- *      se puede paginar bien; M06 debe aportar una regla expresable en SQL o un precio precalculado.
+ *  Q1  RESUELTA con M06: `PrecioFinalPort` lo implementa M06 (`preciosDeVariantes`, precio con evento, IVA
+ *      incluido) y `OfertasListadoPort` aporta la etiqueta de cada tarjeta. M02 sigue filtrando y ordenando
+ *      en memoria sobre ese precio (la paginación es correcta). Sin M06 conectado, el adaptador base devuelve
+ *      el precio de la variante y no hay ofertas.
  *  Q2  ¿M02 REEMPLAZA el listado público de M01 (`GET /catalogo/productos`) y la página `/productos`
  *      pasa a usarlo, o conviven? Cambiarlo toca código de M01 (otro módulo, PR aparte).
  *  Q3  ¿Buscar "amarillo" debe devolver los productos que ofrecen cualquier color de la FAMILIA
@@ -216,6 +221,8 @@ const listaIdsSchema = z.preprocess((valor) => {
 
 const precioSchema = z.coerce.number().min(0).max(PRECIO_MAXIMO);
 
+const booleanoQuerySchema = z.enum(['true', 'false']).transform((v) => v === 'true');
+
 const MENSAJE_RANGO_PRECIO = 'El precio mínimo no puede ser mayor que el máximo.';
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -237,6 +244,8 @@ export const filtrosBusquedaBaseSchema = z.object({
   ambiente: ambienteSchema.optional(),
   precioMin: precioSchema.optional(),
   precioMax: precioSchema.optional(),
+  /** Solo productos con un evento de M06 en curso (F9). */
+  enOferta: booleanoQuerySchema.optional(),
 });
 export type FiltrosBusquedaBase = z.infer<typeof filtrosBusquedaBaseSchema>;
 
@@ -376,21 +385,38 @@ export type ErrorBusquedaEnvelope = z.infer<typeof errorBusquedaEnvelopeSchema>;
  * 5. PUERTOS (ADR-009)
  * ─────────────────────────────────────────────────────────────────────────── */
 
-/** Quién consulta: null si es anónimo. Solo M06 lo usa para precios de cliente empresa. */
+/** Quién consulta: null si es anónimo. Los listados no llevan el descuento de empresa (F5): se reserva. */
 export interface ContextoPrecio {
   readonly idUsuario: number | null;
 }
 
 /**
- * Precio final por variante, con descuentos e IVA incluido (F5, O5, CA-BUS-02-07, CA-BUS-03-05).
- * Lo implementará M06. Mientras no exista, el adaptador por defecto devuelve el precio base de la
- * variante (Q1). Recibe y devuelve LISTAS para no consultar de a una variante.
+ * Precio final por variante, con el evento en curso e IVA incluido (F5, O5, CA-BUS-02-07, CA-BUS-03-05).
+ * Lo implementa M06 (Q1). Sin M06 conectado, el adaptador por defecto devuelve el precio base de la
+ * variante. Recibe y devuelve LISTAS para no consultar de a una variante; una variante que el puerto
+ * no devuelve conserva su precio base.
  */
 export interface PrecioFinalPort {
   preciosFinales(
     idsVariante: readonly number[],
     contexto: ContextoPrecio,
   ): Promise<ReadonlyMap<number, number>>;
+}
+
+/** Oferta de un producto para su tarjeta (la misma forma que M01: `ofertaPublicaSchema`). */
+export type OfertaListado = z.infer<typeof ofertaPublicaSchema>;
+
+/**
+ * Ofertas de los eventos de M06 para el listado: qué productos están en oferta ahora (F9) y la oferta de
+ * cada tarjeta de la página. Lo implementa M06; sin M06 no hay ofertas.
+ */
+export interface OfertasListadoPort {
+  /** Ids de los productos con un evento en curso ahora. */
+  idsProductosEnOferta(): Promise<number[]>;
+  /** Hasta 100 productos (una página); una respuesta por producto. */
+  ofertasDeProductos(
+    idsProducto: readonly number[],
+  ): Promise<ReadonlyArray<{ idProducto: number; oferta: OfertaListado | null }>>;
 }
 
 /* ───────────────────────────────────────────────────────────────────────────

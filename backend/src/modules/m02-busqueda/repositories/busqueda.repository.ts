@@ -14,6 +14,8 @@ import type {
   OpcionLinea,
   OpcionSubcategoria,
   PeriodoEstadistica,
+  OfertaListado,
+  OfertasListadoPort,
   PrecioFinalPort,
   ResultadoBusqueda,
 } from '../dtos/m02-busqueda.dto';
@@ -52,6 +54,7 @@ interface ProductoCrudo {
   fechaCreacion: Date;
   idImagenPrincipal: number | null;
   precioDesde: number;
+  enOferta: boolean;
   disponibilidad: 'disponible' | 'agotado';
   tieneColor: boolean;
   esCombo: boolean;
@@ -63,9 +66,43 @@ interface ProductoCrudo {
 }
 
 export class BusquedaRepository implements BusquedaRepositoryPort {
-  constructor(private readonly precioFinalPort: PrecioFinalPort = new PrecioFinalBaseAdapter()) {}
+  constructor(
+    private readonly precioFinalPort: PrecioFinalPort = new PrecioFinalBaseAdapter(),
+    private readonly ofertasPort: OfertasListadoPort | null = null,
+  ) {}
 
-  private async cargarProductosBase(): Promise<ProductoCrudo[]> {
+  /** Ids de los productos en oferta ahora (F9). Solo se pide con el filtro: un fallo de M06 se propaga. */
+  private async idsEnOferta(filtros: { enOferta?: boolean | undefined }): Promise<ReadonlySet<number>> {
+    if (filtros.enOferta !== true) return new Set();
+    if (this.ofertasPort === null) return new Set();
+    return new Set(await this.ofertasPort.idsProductosEnOferta());
+  }
+
+  /** La oferta de cada tarjeta de la página. Si M06 falla, las tarjetas salen sin etiqueta. */
+  private async ofertasDeLaPagina(ids: readonly number[]): Promise<ReadonlyMap<number, OfertaListado | null>> {
+    if (this.ofertasPort === null || ids.length === 0) return new Map();
+    try {
+      const filas = await this.ofertasPort.ofertasDeProductos(ids);
+      // Solo la forma pública: M06 también informa el evento (`idEvento`), que no sale de la API.
+      return new Map(
+        filas.map((f) => [
+          f.idProducto,
+          f.oferta === null
+            ? null
+            : {
+                nombre: f.oferta.nombre,
+                porcentaje: f.oferta.porcentaje,
+                precioAntes: f.oferta.precioAntes,
+                precioConOferta: f.oferta.precioConOferta,
+              },
+        ]),
+      );
+    } catch {
+      return new Map();
+    }
+  }
+
+  private async cargarProductosBase(enOferta: ReadonlySet<number>): Promise<ProductoCrudo[]> {
     const productosDb = await prisma.producto.findMany({
       where: productoVisible(),
       include: {
@@ -113,7 +150,10 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     });
 
     const todosIdsVariante = productosDb.flatMap((p) => p.variantes.map((v) => v.idVariante));
-    const mapaPrecios = await this.precioFinalPort.preciosFinales(todosIdsVariante, { idUsuario: null });
+    // Si M06 falla, los listados siguen con el precio base: el catálogo no se cae por las promociones.
+    const mapaPrecios = await this.precioFinalPort
+      .preciosFinales(todosIdsVariante, { idUsuario: null })
+      .catch((): ReadonlyMap<number, number> => new Map());
 
     return productosDb.map((p) => {
       const preciosVariantes = p.variantes.map(
@@ -164,6 +204,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
         fechaCreacion: p.fechaCreacion,
         idImagenPrincipal: portada,
         precioDesde: precioMin,
+        enOferta: enOferta.has(p.idProducto),
         disponibilidad: tieneStock ? 'disponible' : 'agotado',
         tieneColor,
         esCombo: p.esCombo,
@@ -296,6 +337,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       if (f.ambiente === 'interior' && !p.usoInterior) return false;
       if (f.ambiente === 'exterior' && !p.usoExterior) return false;
     }
+    if (omitirGrupo !== 'enOferta' && f.enOferta === true && !p.enOferta) return false;
     if (omitirGrupo !== 'precio') {
       if (f.precioMin !== undefined && p.precioDesde < f.precioMin) return false;
       if (f.precioMax !== undefined && p.precioDesde > f.precioMax) return false;
@@ -307,7 +349,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     filtros: BuscarProductosRequest,
     _contexto: ContextoPrecio,
   ): Promise<PaginaResultado<ResultadoBusqueda>> {
-    const productosBase = await this.cargarProductosBase();
+    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros));
     const terminoNorm = normalizarTexto(filtros.q ?? '');
 
     const evaluados: Array<{
@@ -361,6 +403,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     const inicio = (pagina - 1) * limite;
     const paginados = evaluados.slice(inicio, inicio + limite);
 
+    const ofertas = await this.ofertasDeLaPagina(paginados.map(({ producto }) => producto.idProducto));
     const items: ResultadoBusqueda[] = paginados.map(({ producto, coincidenciaColor }) => ({
       idProducto: producto.idProducto,
       nombre: producto.nombre,
@@ -374,6 +417,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       idImagenPrincipal: producto.idImagenPrincipal,
       esCombo: producto.esCombo,
       compraBloqueada: producto.compraBloqueada,
+      oferta: ofertas.get(producto.idProducto) ?? null,
       coincidenciaColor,
     }));
 
@@ -390,7 +434,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     filtros: OpcionesFiltroRequest,
     _contexto: ContextoPrecio,
   ): Promise<OpcionesFiltro> {
-    const productosBase = await this.cargarProductosBase();
+    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros));
     const terminoNorm = normalizarTexto(filtros.q ?? '');
 
     // 1. Filtrar los que coinciden con el término de búsqueda

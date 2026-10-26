@@ -17,6 +17,14 @@ export const referenciaSchema = z.object({
   nombre: z.string(),
 });
 
+export const ofertaPublicaSchema = z.object({
+  nombre: z.string(),
+  porcentaje: z.number().gt(0).max(100),
+  precioAntes: z.number().nonnegative(),
+  precioConOferta: z.number().nonnegative(),
+});
+export type OfertaListado = z.infer<typeof ofertaPublicaSchema>;
+
 export const productoPublicoTarjetaSchema = z.object({
   idProducto: idSchema,
   nombre: z.string(),
@@ -30,6 +38,7 @@ export const productoPublicoTarjetaSchema = z.object({
   idImagenPrincipal: idSchema.nullable(),
   esCombo: z.boolean(),
   compraBloqueada: z.boolean(),
+  oferta: ofertaPublicaSchema.nullable(),
 });
 export type ProductoPublicoTarjeta = z.infer<typeof productoPublicoTarjetaSchema>;
 
@@ -96,6 +105,8 @@ const listaIdsSchema = z.preprocess((valor) => {
 
 const precioSchema = z.coerce.number().min(0).max(PRECIO_MAXIMO);
 
+const booleanoQuerySchema = z.enum(['true', 'false']).transform((v) => v === 'true');
+
 const MENSAJE_RANGO_PRECIO = 'El precio mínimo no puede ser mayor que el máximo.';
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -116,6 +127,7 @@ export const filtrosBusquedaBaseSchema = z.object({
   ambiente: ambienteSchema.optional(),
   precioMin: precioSchema.optional(),
   precioMax: precioSchema.optional(),
+  enOferta: booleanoQuerySchema.optional(),
 });
 export type FiltrosBusquedaBase = z.infer<typeof filtrosBusquedaBaseSchema>;
 
@@ -250,6 +262,13 @@ export type ErrorBusquedaEnvelope = z.infer<typeof errorBusquedaEnvelopeSchema>;
 
 export interface ContextoPrecio {
   readonly idUsuario: number | null;
+}
+
+export interface OfertasListadoPort {
+  idsProductosEnOferta(): Promise<number[]>;
+  ofertasDeProductos(
+    idsProducto: readonly number[],
+  ): Promise<ReadonlyArray<{ idProducto: number; oferta: OfertaListado | null }>>;
 }
 
 export interface PrecioFinalPort {

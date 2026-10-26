@@ -75,7 +75,7 @@ describe('Landing · cabecera y pie (UI Spec §3.1)', () => {
   it('la navegación incluye "Ofertas" como insignia', () => {
     const ofertas = header.navItems.find((item) => item.variant === 'pill');
     expect(ofertas?.label).toBe('Ofertas');
-    expect(ofertas?.href).toBe('/ofertas');
+    expect(ofertas?.href).toBe('/productos?enOferta=true');
   });
 
   it('el mega-menú tiene los 3 grupos de la UI Spec §3.2', () => {

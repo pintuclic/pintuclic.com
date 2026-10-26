@@ -40,6 +40,7 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       idImagenPrincipal: 10,
       esCombo: false,
       compraBloqueada: false,
+      oferta: null,
       coincidenciaColor: null,
     },
     {
@@ -55,6 +56,7 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       idImagenPrincipal: 11,
       esCombo: false,
       compraBloqueada: false,
+      oferta: null,
       coincidenciaColor: 'Amarillo Cromo',
     },
     {
@@ -70,6 +72,7 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       idImagenPrincipal: null,
       esCombo: false,
       compraBloqueada: false,
+      oferta: null,
       coincidenciaColor: null,
     },
   ];

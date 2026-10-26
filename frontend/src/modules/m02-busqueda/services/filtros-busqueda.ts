@@ -14,6 +14,8 @@ export interface FiltrosBusqueda {
   ambiente?: 'interior' | 'exterior';
   precioMin?: number;
   precioMax?: number;
+  /** Solo productos con un evento de M06 en curso (menú «Ofertas»). */
+  enOferta: boolean;
   ordenar: OrdenResultados;
   pagina: number;
   limite: number;
@@ -30,6 +32,7 @@ export const FILTROS_BUSQUEDA_POR_DEFECTO: FiltrosBusqueda = {
   idColor: [],
   idMedida: [],
   idSuperficie: [],
+  enOferta: false,
   ordenar: 'relevancia',
   pagina: 1,
   limite: 12,
@@ -97,6 +100,7 @@ export function filtrosDesdeUrl(params: URLSearchParams): FiltrosBusqueda {
     ...(ambiente ? { ambiente } : {}),
     ...(precioMin !== undefined ? { precioMin } : {}),
     ...(precioMax !== undefined ? { precioMax } : {}),
+    enOferta: params.get('enOferta') === 'true',
     ordenar,
     pagina,
     limite,
@@ -120,6 +124,7 @@ export function filtrosAUrl(filtros: FiltrosBusqueda): URLSearchParams {
   if (filtros.ambiente) params.set('ambiente', filtros.ambiente);
   if (filtros.precioMin !== undefined) params.set('precioMin', String(filtros.precioMin));
   if (filtros.precioMax !== undefined) params.set('precioMax', String(filtros.precioMax));
+  if (filtros.enOferta) params.set('enOferta', 'true');
 
   if (filtros.ordenar !== 'relevancia') params.set('ordenar', filtros.ordenar);
   if (filtros.pagina > 1) params.set('pagina', String(filtros.pagina));
@@ -142,6 +147,7 @@ export function hayFiltrosActivos(filtros: FiltrosBusqueda): boolean {
     filtros.idSuperficie.length > 0 ||
     filtros.ambiente !== undefined ||
     filtros.precioMin !== undefined ||
-    filtros.precioMax !== undefined
+    filtros.precioMax !== undefined ||
+    filtros.enOferta
   );
 }

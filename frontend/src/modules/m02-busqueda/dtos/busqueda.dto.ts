@@ -32,6 +32,14 @@ export interface OpcionesFiltro {
   precio: { minimo: number; maximo: number } | null;
 }
 
+/** Oferta de un evento de M06 en curso (etiqueta y precio tachado). Nunca incluye el descuento de empresa. */
+export interface OfertaListado {
+  nombre: string;
+  porcentaje: number;
+  precioAntes: number;
+  precioConOferta: number;
+}
+
 export interface ResultadoBusqueda {
   idProducto: number;
   nombre: string;
@@ -45,6 +53,7 @@ export interface ResultadoBusqueda {
   idImagenPrincipal: number | null;
   esCombo: boolean;
   compraBloqueada: boolean;
+  oferta: OfertaListado | null;
   coincidenciaColor: string | null;
 }
 

@@ -62,6 +62,18 @@ describe('M02 Frontend — Filtros y Serialización de URLs', () => {
     ).toBe(true);
   });
 
+  it('«enOferta» solo se activa con "true", viaja en la URL y en la consulta a la API', () => {
+    expect(filtrosDesdeUrl(new URLSearchParams('enOferta=true')).enOferta).toBe(true);
+    expect(filtrosDesdeUrl(new URLSearchParams('enOferta=1')).enOferta).toBe(false);
+    expect(FILTROS_BUSQUEDA_POR_DEFECTO.enOferta).toBe(false);
+
+    const f = { ...FILTROS_BUSQUEDA_POR_DEFECTO, enOferta: true };
+    expect(filtrosAUrl(f).toString()).toBe('enOferta=true');
+    expect(filtrosDesdeUrl(filtrosAUrl(f))).toEqual(f);
+    expect(filtrosAUrl(FILTROS_BUSQUEDA_POR_DEFECTO).has('enOferta')).toBe(false);
+    expect(hayFiltrosActivos(f)).toBe(true);
+  });
+
   it('genera URLs canónicas de imágenes de productos', () => {
     const urlMin = busquedaApi.urlImagen(42, 'miniatura');
     expect(urlMin).toContain('/catalogo/imagenes/42?tamano=miniatura');
