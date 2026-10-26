@@ -6,6 +6,7 @@ import type { ProductoPatrocinado } from '../dtos/m14-patrocinios.dto';
 import { catalogoPublicoApi } from '@/modules/m01-catalogo/services/consulta-publica-api';
 import { precioVisible } from '@/modules/m01-catalogo/services/ofertas-visuales';
 import { patrociniosPublicoApi } from '../services/patrocinios-api';
+import { MedidorPatrocinio } from './MedidorPatrocinio';
 
 /** Cuántas tarjetas caben en una fila del bloque del inicio. */
 const TARJETAS = 5;
@@ -37,6 +38,7 @@ export const ProductosPatrocinados: React.FC = () => {
       <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         {productos.map((p) => (
           <li key={p.idProducto} className="flex">
+            <MedidorPatrocinio idCampania={p.idCampania} ubicacion="inicio" className="flex w-full">
             <ProductCard
               id={String(p.idProducto)}
               name={p.nombre}
@@ -50,6 +52,7 @@ export const ProductosPatrocinados: React.FC = () => {
                 : { imageUrl: catalogoPublicoApi.urlImagen(p.idImagenPrincipal, 'miniatura') })}
               className="w-full"
             />
+            </MedidorPatrocinio>
           </li>
         ))}
       </ul>

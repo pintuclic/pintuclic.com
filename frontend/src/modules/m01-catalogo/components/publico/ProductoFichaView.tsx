@@ -12,6 +12,7 @@ import { imagenParaSeleccion } from '../../services/galeria';
 import { etiquetaOferta, ofertaDePresentacion } from '../../services/ofertas-visuales';
 import { textoRendimiento } from '../../services/rendimiento';
 import { AgregarAlCarrito } from './AgregarAlCarrito';
+import { EspacioPublicitario } from '@/modules/m14-patrocinios/components/EspacioPublicitario';
 import { ComplementariosProducto } from './ComplementariosProducto';
 import { GaleriaProducto } from './GaleriaProducto';
 import { ColorProducto } from './SelectorColorProducto';
@@ -268,6 +269,8 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
           )}
         </div>
       </div>
+      {/* Espacio publicitario bajo los datos, antes de los complementarios (M14 · B1) */}
+      <EspacioPublicitario espacio="ficha" className="mt-10" />
       <ComplementariosProducto idProducto={p.idProducto} />
     </Container>
   );
