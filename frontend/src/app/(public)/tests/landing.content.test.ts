@@ -68,6 +68,10 @@ describe('Landing · cabecera y pie (UI Spec §3.1)', () => {
     expect(telefono?.href).toMatch(/^tel:\+57\d{10}$/);
   });
 
+  it('el carrito de la cabecera lleva a /carrito (M05)', () => {
+    expect(header.cart.href).toBe('/carrito');
+  });
+
   it('la navegación incluye "Ofertas" como insignia', () => {
     const ofertas = header.navItems.find((item) => item.variant === 'pill');
     expect(ofertas?.label).toBe('Ofertas');

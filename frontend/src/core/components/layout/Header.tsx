@@ -8,6 +8,7 @@ import { Button } from '../buttons/Button';
 import { IconButton } from '../buttons/IconButton';
 import { Badge } from '../data-display/Badge';
 import { Modal } from '../overlays/Modal';
+import { useResumenCarrito } from '../../hooks/useResumenCarrito';
 import { useAuthStore } from '../../store/authStore';
 import type { UsuarioAutenticado } from '../../types/usuario.type';
 import { formatCOP } from '../../utils/moneda';
@@ -79,8 +80,11 @@ export function Header({
   const esActivo = (href: string): boolean =>
     href === '/' ? pathname === '/' : pathname === href || Boolean(pathname?.startsWith(`${href}/`));
 
-  const total = formatCOP(cart.total);
-  const etiquetaCarrito = `Carrito, ${cart.count} ${cart.count === 1 ? 'producto' : 'productos'}, total ${total}`;
+  // El carrito real (M05) manda sobre los valores por defecto de `cart`.
+  const resumen = useResumenCarrito();
+  const cantidad = resumen?.cantidadItems ?? cart.count;
+  const total = formatCOP(resumen?.total ?? cart.total);
+  const etiquetaCarrito = `Carrito, ${cantidad} ${cantidad === 1 ? 'producto' : 'productos'}, total ${total}`;
 
   return (
     <header className="border-b border-neutral-light bg-neutral-white">
@@ -160,12 +164,12 @@ export function Header({
           >
             <span className="relative shrink-0">
               <ShoppingCart className="h-6 w-6 text-neutral-dark" aria-hidden="true" />
-              {cart.count > 0 && (
+              {cantidad > 0 && (
                 <span
                   aria-hidden="true"
                   className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-neutral-white"
                 >
-                  {cart.count}
+                  {cantidad}
                 </span>
               )}
             </span>
