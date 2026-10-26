@@ -20,7 +20,7 @@ interface FilaConRemitente {
   idUsuario: number;
   tipo: TipoSolicitudContacto;
   descripcion: string;
-  estado: 'pendiente' | 'atendida';
+  estado: 'en_revision' | 'atendida' | 'rechazada';
   fechaCreacion: Date;
   usuario: { nombre: string; correo: string; telefono: string | null };
 }

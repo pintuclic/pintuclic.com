@@ -19,7 +19,7 @@ export const TIPOS_SOLICITUD_CONTACTO = ['consulta', 'cotizacion', 'reclamo'] as
 export const tipoSolicitudContactoSchema = z.enum(TIPOS_SOLICITUD_CONTACTO);
 export type TipoSolicitudContacto = z.infer<typeof tipoSolicitudContactoSchema>;
 
-export const ESTADOS_SOLICITUD_CONTACTO = ['pendiente', 'atendida'] as const;
+export const ESTADOS_SOLICITUD_CONTACTO = ['en_revision', 'atendida', 'rechazada'] as const;
 export const estadoSolicitudContactoSchema = z.enum(ESTADOS_SOLICITUD_CONTACTO);
 export type EstadoSolicitudContacto = z.infer<typeof estadoSolicitudContactoSchema>;
 

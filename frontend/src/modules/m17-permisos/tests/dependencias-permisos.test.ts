@@ -51,10 +51,10 @@ describe('alternarPermiso — cascadas de la matriz de permisos (ADR-008)', () =
     expect(resultado.has('notificaciones.ver')).toBe(true);
   });
 
-  it('atencion.atender_clientes es independiente: no arrastra nada', () => {
+  it('atencion.atender_clientes concede atencion.ver para consultar la bandeja (M15 · R12)', () => {
     const resultado = alternarPermiso(conjunto(), 'atencion.atender_clientes');
 
-    expect([...resultado]).toEqual(['atencion.atender_clientes']);
+    expect([...resultado].sort()).toEqual(['atencion.atender_clientes', 'atencion.ver']);
   });
 
   it('no muta el conjunto recibido', () => {

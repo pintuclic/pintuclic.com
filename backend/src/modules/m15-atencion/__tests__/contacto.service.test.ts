@@ -47,7 +47,7 @@ class ContactoRepositorioFalso implements ContactoRepositoryPort {
       remitente: { nombre: 'Cliente Activo', correo: 'cliente@pintuclic.co', telefono: '3001234567' },
       tipo,
       descripcion,
-      estado: 'pendiente',
+      estado: 'en_revision',
       fechaCreacion: LUNES_10_00.toISOString(),
     };
     this.creadas.push(solicitud);
@@ -119,7 +119,7 @@ describe('ContactoService (HU-ATC-02)', () => {
     const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Tengo una duda' }, LUNES_10_00);
 
     expect(solicitud.idUsuario).toBe(7);
-    expect(solicitud.estado).toBe('pendiente');
+    expect(solicitud.estado).toBe('en_revision');
   });
 
   it('una cotización remite al carrito y no crea ninguna cotización (R4, CA-ATC-02-03)', async () => {
