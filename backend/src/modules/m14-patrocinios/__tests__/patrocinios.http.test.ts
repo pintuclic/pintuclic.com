@@ -313,9 +313,13 @@ describe.skipIf(URL_BD === undefined)('M14 · patrocinio de productos (HTTP + Po
   });
 
   describe('PatrocinioPort (A1, A4, A5, A7)', () => {
+    // Otros archivos de prueba comparten la base y pueden tener campañas vigentes: solo se miran los productos de esta.
+    const propios = (): number[] => [f.p1, f.p2, f.p3, f.p4, f.p5, f.inactivo];
     const prioridades = async (ubicacion: 'listado' | 'inicio' | 'complementarios', momento?: string) =>
       Object.fromEntries(
-        (await servidor.modulo.patrocinio.prioridadesDeProductos(ubicacion, momento)).map((p) => [p.idProducto, [p.prioridad, p.idCampania]]),
+        (await servidor.modulo.patrocinio.prioridadesDeProductos(ubicacion, momento))
+          .filter((p) => propios().includes(p.idProducto))
+          .map((p) => [p.idProducto, [p.prioridad, p.idCampania]]),
       );
 
     it('devuelve los productos de campañas vigentes en esa ubicación con la prioridad más alta (A5)', async () => {
@@ -355,9 +359,15 @@ describe.skipIf(URL_BD === undefined)('M14 · patrocinio de productos (HTTP + Po
   });
 
   describe('bloque «Productos patrocinados» del inicio (A10)', () => {
-    it('sin campañas vigentes responde una lista vacía', async () => {
-      const r = await servidor.publico('/productos');
-      expect([r.status, r.cuerpo.data]).toEqual([200, []]);
+    // El bloque es global: se piden hasta 24 y solo se miran los productos de esta prueba.
+    const bloque = async (consulta = '?limite=24') => {
+      const r = await servidor.publico(`/productos${consulta}`);
+      return { r, propios: lista(r).filter((p) => String(p.nombre).startsWith(PREFIJO)) };
+    };
+
+    it('sin campañas vigentes no trae productos de esta prueba (y responde 200)', async () => {
+      const { r, propios } = await bloque();
+      expect([r.status, propios]).toEqual([200, []]);
     });
 
     it('responde las tarjetas de los productos visibles, con la marca de patrocinio, la campaña y por prioridad', async () => {
@@ -365,9 +375,8 @@ describe.skipIf(URL_BD === undefined)('M14 · patrocinio de productos (HTTP + Po
       const alta = await campaniaEnBd('Alta', [{ tipo: 'producto', id: f.p1 }], { ubicaciones: ['inicio'], prioridad: 90 });
       await campaniaEnBd('Invisible', [{ tipo: 'producto', id: f.inactivo }], { ubicaciones: ['inicio'], prioridad: 100 });
       await campaniaEnBd('Otra ubicacion', [{ tipo: 'producto', id: f.p2 }], { ubicaciones: ['listado'], prioridad: 100 });
-      const r = await servidor.publico('/productos');
+      const { r, propios: items } = await bloque();
       expect(r.status).toBe(200);
-      const items = lista(r);
       expect(items.map((p) => p.idProducto)).toEqual([f.p1, f.p4]);
       expect(items[0]).toMatchObject({ patrocinado: true, idCampania: alta, nombre: nombre('P1'), oferta: null });
       expect(items[1]).toMatchObject({ patrocinado: true, idCampania: baja });
@@ -375,7 +384,8 @@ describe.skipIf(URL_BD === undefined)('M14 · patrocinio de productos (HTTP + Po
 
     it('respeta el límite y valida que sea un entero de 1 a 24', async () => {
       await campaniaEnBd('Marca', [{ tipo: 'marca', id: f.marca }], { ubicaciones: ['inicio'] });
-      expect(lista(await servidor.publico('/productos?limite=2'))).toHaveLength(2);
+      expect(lista(await servidor.publico('/productos?limite=2')).length).toBeLessThanOrEqual(2);
+      expect(lista(await servidor.publico('/productos?limite=24')).filter((p) => String(p.nombre).startsWith(PREFIJO)).length).toBeGreaterThanOrEqual(4);
       expect((await servidor.publico('/productos?limite=25')).status).toBe(400);
       expect((await servidor.publico('/productos?limite=0')).status).toBe(400);
     });
@@ -390,12 +400,21 @@ describe.skipIf(URL_BD === undefined)('M14 · patrocinio de productos (HTTP + Po
       lista(await servidor.catalogo(`/productos/${idProducto}/complementarios`)).map((t) => t.idProducto as number);
 
     it('sin categoría complementaria van primero los de campañas vigentes con esa ubicación, por prioridad, y luego los marcados a mano', async () => {
-      // La base de pruebas trae productos con el interruptor manual `patrocinado` (el seed): quedan detrás de las campañas.
-      const aMano = await complementarios(f.p1);
-      await campaniaEnBd('Baja', [{ tipo: 'producto', id: f.p3 }], { ubicaciones: ['complementarios'], prioridad: 10 });
-      await campaniaEnBd('Alta', [{ tipo: 'producto', id: f.p4 }], { ubicaciones: ['complementarios'], prioridad: 90 });
+      // La base de pruebas trae productos con el interruptor manual `patrocinado` (el seed): quedan detrás de las
+      // campañas y, entre ellos, en orden aleatorio.
+      const baja = await campaniaEnBd('Baja', [{ tipo: 'producto', id: f.p3 }], { ubicaciones: ['complementarios'], prioridad: 10 });
+      const alta = await campaniaEnBd('Alta', [{ tipo: 'producto', id: f.p4 }], { ubicaciones: ['complementarios'], prioridad: 90 });
       await campaniaEnBd('Otra ubicacion', [{ tipo: 'producto', id: f.p5 }], { ubicaciones: ['listado'], prioridad: 100 });
-      expect(await complementarios(f.p1)).toEqual([f.p4, f.p3, ...aMano].slice(0, 4));
+      const ids = await complementarios(f.p1);
+      expect(ids.slice(0, 2)).toEqual([f.p4, f.p3]);
+      expect(ids.length).toBeLessThanOrEqual(4);
+      // La etiqueta «Patrocinado» y la campaña viajan con cada tarjeta puesta por una campaña (A9)
+      const tarjetas = lista(await servidor.catalogo(`/productos/${f.p1}/complementarios`));
+      expect(tarjetas.slice(0, 2)).toMatchObject([
+        { idProducto: f.p4, patrocinado: true, idCampania: alta },
+        { idProducto: f.p3, patrocinado: true, idCampania: baja },
+      ]);
+      expect(tarjetas.slice(2).every((t) => t.patrocinado === false && t.idCampania === null)).toBe(true);
     });
 
     it('nunca sugiere el propio producto ni uno que no se muestra', async () => {
@@ -407,10 +426,11 @@ describe.skipIf(URL_BD === undefined)('M14 · patrocinio de productos (HTTP + Po
     });
 
     it('una campaña vencida o inactiva no cuenta', async () => {
-      const aMano = await complementarios(f.p1);
       await campaniaEnBd('Inactiva', [{ tipo: 'producto', id: f.p2 }], { ubicaciones: ['complementarios'], estado: 'inactivo' });
       await campaniaEnBd('Vencida', [{ tipo: 'producto', id: f.p3 }], { ubicaciones: ['complementarios'], fechaInicio: HACE_UN_MES, fechaFin: HACE_UNA_SEMANA });
-      expect(await complementarios(f.p1)).toEqual(aMano);
+      const ids = await complementarios(f.p1);
+      expect(ids).not.toContain(f.p2);
+      expect(ids).not.toContain(f.p3);
     });
   });
 });

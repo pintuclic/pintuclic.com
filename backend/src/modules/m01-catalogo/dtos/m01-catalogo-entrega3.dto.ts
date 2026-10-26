@@ -121,8 +121,18 @@ export type ListarCombosResponseEnvelope = z.infer<typeof listarCombosResponseEn
  * 3. COMPLEMENTARIOS (público, /api/v1/catalogo)
  * ─────────────────────────────────────────────────────────────────────────── */
 
-/** GET /productos/:idProducto/complementarios — hasta 4 tarjetas, las mismas del listado (X1–X4). */
-export const listarComplementariosResponseEnvelopeSchema = respuestaLista(productoPublicoTarjetaSchema);
+/**
+ * Una sugerencia de la ficha: la tarjeta del listado más la marca de patrocinio (M14 · A9: la pantalla pone la etiqueta
+ * «Patrocinado» y mide). `idCampania` es la campaña de M14 que la puso primero; null si no la puso ninguna.
+ */
+export const complementarioSchema = productoPublicoTarjetaSchema.extend({
+  patrocinado: z.boolean(),
+  idCampania: idSchema.nullable(),
+});
+export type Complementario = z.infer<typeof complementarioSchema>;
+
+/** GET /productos/:idProducto/complementarios — hasta 4 tarjetas, las del listado más la marca de patrocinio (X1–X4). */
+export const listarComplementariosResponseEnvelopeSchema = respuestaLista(complementarioSchema);
 export type ListarComplementariosResponseEnvelope = z.infer<typeof listarComplementariosResponseEnvelopeSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────

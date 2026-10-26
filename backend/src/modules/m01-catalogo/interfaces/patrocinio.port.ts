@@ -5,6 +5,7 @@
 export interface PrioridadProductoPort {
   idProducto: number;
   prioridad: number;
+  idCampania: number;
 }
 
 export interface PatrocinioPort {

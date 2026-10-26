@@ -1,4 +1,4 @@
-import { MAXIMO_COMPLEMENTARIOS, type TamanoImagen } from '../dtos/m01-catalogo-entrega3.dto';
+import { MAXIMO_COMPLEMENTARIOS, type Complementario, type TamanoImagen } from '../dtos/m01-catalogo-entrega3.dto';
 import { listarProductosPublicosRequestSchema } from '../dtos/m01-catalogo-productos.dto';
 import type {
   CategoriaPublica,
@@ -135,11 +135,13 @@ export class ConsultaPublicaService extends ServicioCatalogoBase {
   }
 
   /** X1–X5: hasta 4 sugerencias para la ficha; vacío cuando no hay nada que sugerir (la pantalla oculta la sección). */
-  async complementarios(idProducto: number): Promise<ProductoPublicoTarjeta[]> {
+  async complementarios(idProducto: number): Promise<Complementario[]> {
     const deCampanias = await this.patrocinadosPorCampania();
-    return this.conOfertas(
+    const campania = new Map(deCampanias.map((p) => [p.idProducto, p.idCampania]));
+    const tarjetas = await this.conOfertas(
       this.exigir(await this.consulta.complementarios(idProducto, MAXIMO_COMPLEMENTARIOS, deCampanias)),
     );
+    return tarjetas.map((t) => ({ ...t, patrocinado: campania.has(t.idProducto), idCampania: campania.get(t.idProducto) ?? null }));
   }
 
   /** Los productos de campañas vigentes de M14 para los complementarios; si M14 falla, la ficha se ve igual. */
