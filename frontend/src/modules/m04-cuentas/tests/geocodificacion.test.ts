@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { direccionDesdeCoordenadas, sugerirDireccion } from '../services/geocodificacion';
+import { direccionDesdeCoordenadas, motivoFalloUbicacion, sugerirDireccion } from '../services/geocodificacion';
 
 describe('M04 Frontend — dirección a partir de la ubicación (CA-CUE-07-04)', () => {
   describe('sugerirDireccion', () => {
@@ -55,6 +55,20 @@ describe('M04 Frontend — dirección a partir de la ubicación (CA-CUE-07-04)',
 
       vi.stubGlobal('fetch', responder({ error: 'Unable to geocode' }));
       expect(await direccionDesdeCoordenadas(0, 0)).toBeNull();
+    });
+  });
+
+  describe('motivoFalloUbicacion', () => {
+    it('distingue permiso denegado, posición no disponible y tiempo agotado', () => {
+      expect(motivoFalloUbicacion(1, true)).toBe('permiso');
+      expect(motivoFalloUbicacion(2, true)).toBe('no-disponible');
+      expect(motivoFalloUbicacion(3, true)).toBe('tiempo');
+      expect(motivoFalloUbicacion(null, true)).toBe('no-disponible');
+    });
+
+    it('sin conexión segura la causa es el https, sea cual sea el código', () => {
+      expect(motivoFalloUbicacion(1, false)).toBe('conexion-insegura');
+      expect(motivoFalloUbicacion(3, false)).toBe('conexion-insegura');
     });
   });
 });

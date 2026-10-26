@@ -7,7 +7,7 @@ import { LocateFixed } from 'lucide-react';
 import { Alert, Button, Input, TextButton } from '@/core/components';
 import { direccionClienteFormSchema, type DireccionClienteFormData } from '../../dtos/m04-cuentas.dto';
 import type { Direccion } from '../../interfaces/api.interfaces';
-import { direccionDesdeCoordenadas } from '../../services/geocodificacion';
+import { direccionDesdeCoordenadas, motivoFalloUbicacion, type FalloUbicacion } from '../../services/geocodificacion';
 
 export interface DireccionFormProps {
   /** Dirección a editar; sin ella el formulario crea una nueva. */
@@ -39,6 +39,15 @@ const AVISO_UBICACION: Record<Autocompletado, { variante: 'success' | 'info' | '
   },
 };
 
+const AVISO_FALLO_UBICACION: Record<FalloUbicacion, string> = {
+  'conexion-insegura': 'Tu navegador solo permite usar la ubicación en conexiones seguras (https). Escribe la dirección manualmente.',
+  permiso:
+    'El navegador no nos dejó usar tu ubicación. Actívala en los permisos del sitio o escribe la dirección manualmente.',
+  'no-disponible':
+    'Tu dispositivo no pudo determinar dónde estás. Revisa que la ubicación esté activada o escribe la dirección manualmente.',
+  tiempo: 'Tardamos demasiado en obtener tu ubicación. Inténtalo de nuevo o escribe la dirección manualmente.',
+};
+
 /**
  * HU-CUE-07 · Alta y edición de la dirección de entrega. La ubicación del dispositivo es
  * opcional (CA-CUE-07-04): con ella se completan la dirección y el barrio para que el
@@ -50,6 +59,7 @@ export function DireccionForm({ inicial, onGuardar, onCancelar }: DireccionFormP
     inicial?.latitud != null && inicial?.longitud != null ? 'capturada' : 'inactiva',
   );
   const [autocompletado, setAutocompletado] = useState<Autocompletado | null>(null);
+  const [falloUbicacion, setFalloUbicacion] = useState<FalloUbicacion>('no-disponible');
   const {
     register,
     handleSubmit,
@@ -85,18 +95,25 @@ export function DireccionForm({ inicial, onGuardar, onCancelar }: DireccionFormP
   };
 
   const usarUbicacion = () => {
+    const contextoSeguro = typeof window === 'undefined' || window.isSecureContext;
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setFalloUbicacion(motivoFalloUbicacion(null, contextoSeguro));
       setUbicacion('denegada');
       return;
     }
     setUbicacion('buscando');
     setAutocompletado(null);
+    // Precisión normal (Wi-Fi o red): basta para la dirección y responde rápido; el GPS de alta
+    // precisión en un equipo de escritorio suele agotar el tiempo sin dar nada.
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         void completarConUbicacion(Number(coords.latitude.toFixed(6)), Number(coords.longitude.toFixed(6)));
       },
-      () => setUbicacion('denegada'),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+      (error) => {
+        setFalloUbicacion(motivoFalloUbicacion(error.code, contextoSeguro));
+        setUbicacion('denegada');
+      },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
     );
   };
 
@@ -142,11 +159,7 @@ export function DireccionForm({ inicial, onGuardar, onCancelar }: DireccionFormP
             </TextButton>
           </Alert>
         )}
-        {ubicacion === 'denegada' && (
-          <Alert variant="warning">
-            No pudimos obtener tu ubicación. Puedes escribir la dirección manualmente.
-          </Alert>
-        )}
+        {ubicacion === 'denegada' && <Alert variant="warning">{AVISO_FALLO_UBICACION[falloUbicacion]}</Alert>}
       </div>
 
       <Input id="dir-direccion" label="Dirección" autoComplete="street-address" placeholder="Ej. Calle 10 # 20-30" error={errors.direccion?.message} {...register('direccion')} />

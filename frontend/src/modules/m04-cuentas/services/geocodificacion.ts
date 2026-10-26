@@ -58,3 +58,18 @@ export async function direccionDesdeCoordenadas(latitud: number, longitud: numbe
     clearTimeout(temporizador);
   }
 }
+
+/** Por qué el navegador no entregó la ubicación del dispositivo. */
+export type FalloUbicacion = 'conexion-insegura' | 'permiso' | 'no-disponible' | 'tiempo';
+
+/**
+ * Traduce el error de `navigator.geolocation` a una causa que el cliente pueda resolver.
+ * Códigos de `GeolocationPositionError`: 1 permiso denegado, 2 posición no disponible, 3 tiempo agotado.
+ * Sin HTTPS el navegador rechaza la ubicación aunque el usuario quiera darla.
+ */
+export function motivoFalloUbicacion(codigo: number | null, contextoSeguro: boolean): FalloUbicacion {
+  if (!contextoSeguro) return 'conexion-insegura';
+  if (codigo === 1) return 'permiso';
+  if (codigo === 3) return 'tiempo';
+  return 'no-disponible';
+}
