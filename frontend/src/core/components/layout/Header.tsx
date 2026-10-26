@@ -11,7 +11,12 @@ import { Modal } from '../overlays/Modal';
 import { useAuthStore } from '../../store/authStore';
 import type { UsuarioAutenticado } from '../../types/usuario.type';
 import { formatCOP } from '../../utils/moneda';
-import { CategoriesMegaMenu, type MegaMenuAssistant, type MegaMenuGroup } from './CategoriesMegaMenu';
+import {
+  CategoriesMegaMenu,
+  type MegaMenuAssistant,
+  type MegaMenuGroup,
+  type MegaMenuTab,
+} from './CategoriesMegaMenu';
 import { Container } from './Container';
 import { Logo, type LogoProps } from './Logo';
 
@@ -26,7 +31,11 @@ export interface HeaderProps {
   logo: LogoProps;
   navItems: ReadonlyArray<HeaderNavItem>;
   categoriesLabel?: string;
-  megaMenu: { groups: ReadonlyArray<MegaMenuGroup>; assistant: MegaMenuAssistant };
+  megaMenu: {
+    groups: ReadonlyArray<MegaMenuGroup>;
+    tabs?: ReadonlyArray<MegaMenuTab>;
+    assistant: MegaMenuAssistant;
+  };
   account: { label: string; sublabel: string; href: string };
   cart: { count: number; total: number; href: string };
 }
@@ -54,7 +63,7 @@ export function cuentaDeEncabezado(
 export function Header({
   logo,
   navItems,
-  categoriesLabel = 'Categorías',
+  categoriesLabel = '¿Qué buscas?',
   megaMenu,
   account,
   cart,
@@ -172,7 +181,9 @@ export function Header({
         isOpen={megaAbierto}
         onClose={cerrarMega}
         groups={megaMenu.groups}
+        tabs={megaMenu.tabs}
         assistant={megaMenu.assistant}
+        title={categoriesLabel}
       />
 
       <Modal isOpen={movilAbierto} onClose={cerrarMovil} size="sm" title="Menú">

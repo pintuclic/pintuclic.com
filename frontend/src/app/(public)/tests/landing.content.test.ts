@@ -83,7 +83,13 @@ describe('Landing · cabecera y pie (UI Spec §3.1)', () => {
   it('ningún enlace interno queda vacío o como "#"', () => {
     const enlaces = [
       ...header.navItems.map((n) => n.href),
-      ...header.megaMenu.groups.flatMap((g) => g.items.map((i) => i.href)),
+      ...((header.megaMenu.groups ?? []).flatMap((g) => g.items.map((i) => i.href))),
+      ...((header.megaMenu.tabs ?? []).flatMap((t) =>
+        t.columns.flatMap((c) => [
+          ...c.items.map((i) => i.href),
+          ...(c.verMasHref ? [c.verMasHref] : []),
+        ])
+      )),
       ...footer.columns.flatMap((c) => c.links.map((l) => l.href)),
       ...footer.legalLinks.map((l) => l.href),
     ];
