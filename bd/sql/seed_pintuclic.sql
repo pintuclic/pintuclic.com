@@ -357,10 +357,21 @@ ON CONFLICT (id_linea_carrito) DO NOTHING;
 -- ==============================================================================
 
 -- 5.1 Cotización
-INSERT INTO cotizacion (id_cotizacion, id_usuario, id_rol, estado, fecha_creacion) VALUES
-    (1, 4, 3, 'aprobada', now() - interval '2 days'),
-    (2, 2, 2, 'borrador', now())
+INSERT INTO cotizacion (id_cotizacion, id_usuario, id_rol, estado, fecha_creacion, comentario_cliente, nota_para_cliente,
+                        fecha_envio, fecha_vencimiento, fecha_respuesta, id_usuario_responde, total_referencia, total_acordado) VALUES
+    (1, 4, 3, 'aprobada', now() - interval '2 days', 'Pintura para la bodega nueva', 'Precio especial por volumen',
+        now() - interval '1 day', CURRENT_DATE + 14, now() - interval '12 hours', 1, 859000.00, 790000.00),
+    (2, 2, 2, 'solicitada', now(), '¿Tienen precio si llevo varias unidades?', NULL,
+        NULL, NULL, NULL, NULL, 114800.00, NULL)
 ON CONFLICT (id_cotizacion) DO NOTHING;
+
+-- 5.1.1 Líneas de cotización (M21): copia del carrito al pedirla.
+INSERT INTO linea_cotizacion (id_linea_cotizacion, id_cotizacion, id_variante, id_color, cantidad, precio_referencia,
+                              precio_acordado, nombre_producto, marca, medida, sku, color_nombre, color_hexadecimal) VALUES
+    (1, 1, 1, 13, 10, 85900.00, 79000.00, 'Viniltex Ultralavable', 'Pintuco', '1 galón', 'VIN-ULT-GAL', 'Azul Cielo', '#9CC9E8'),
+    (2, 2, 1, 13, 1, 85900.00, NULL, 'Viniltex Ultralavable', 'Pintuco', '1 galón', 'VIN-ULT-GAL', 'Azul Cielo', '#9CC9E8'),
+    (3, 2, 2, 19, 1, 28900.00, NULL, 'Viniltex Ultralavable', 'Pintuco', '1/4 de galón', 'VIN-ULT-QT', 'Maní', '#C9A16A')
+ON CONFLICT (id_linea_cotizacion) DO NOTHING;
 
 -- 5.2 Orden (v3.9: modo de entrega, IVA congelado y solicitud SOL de origen).
 -- En bases creadas antes de v3.9, ORD-2026-0001 y 0002 ya existen: conservan los campos nuevos en NULL.
@@ -536,7 +547,8 @@ INSERT INTO parametro_sistema (id_parametro, clave, area, tipo_dato, descripcion
     (10, 'comercial.umbral_envio_gratis', 'comercial', 'numero', 'Monto mínimo de compra para exoneración de costos de envío', '200000'::jsonb, '200000'::jsonb, 0, NULL),
     (11, 'auth.vigencia_enlace_activacion_horas', 'autenticacion', 'numero', 'Vigencia en horas del enlace con el que un colaborador nuevo define su contraseña', '72'::jsonb, '72'::jsonb, 1, 168),
     (12, 'comercial.umbral_sugerir_empresa', 'comercial', 'numero', 'Total del carrito desde el que se invita a un cliente registrado a solicitar la cuenta empresa (M06 · R12)', '500000'::jsonb, '500000'::jsonb, 0, NULL),
-    (13, 'comercial.dias_vigencia_carrito_visitante', 'comercial', 'numero', 'Días sin actividad tras los cuales se borra el carrito de un visitante sin sesión (M05 · C13)', '30'::jsonb, '30'::jsonb, 1, 365)
+    (13, 'comercial.dias_vigencia_carrito_visitante', 'comercial', 'numero', 'Días sin actividad tras los cuales se borra el carrito de un visitante sin sesión (M05 · C13)', '30'::jsonb, '30'::jsonb, 1, 365),
+    (14, 'comercial.dias_vigencia_cotizacion', 'comercial', 'numero', 'Días que una cotización enviada sigue vigente si el equipo comercial no pone otra fecha (M21 · D4)', '15'::jsonb, '15'::jsonb, 1, 90)
 ON CONFLICT (clave) DO NOTHING;
 
 -- Alineación con el piso de contraseña de M20 (12 caracteres, RN-SEG-01 / RFC-M17-001 D-5).
@@ -827,6 +839,7 @@ SELECT setval('variante_combo_id_variante_combo_seq',            COALESCE((SELEC
 SELECT setval('carrito_id_carrito_seq',                          COALESCE((SELECT MAX(id_carrito) FROM carrito), 1));
 SELECT setval('linea_carrito_id_linea_carrito_seq',              COALESCE((SELECT MAX(id_linea_carrito) FROM linea_carrito), 1));
 SELECT setval('cotizacion_id_cotizacion_seq',                    COALESCE((SELECT MAX(id_cotizacion) FROM cotizacion), 1));
+SELECT setval('linea_cotizacion_id_linea_cotizacion_seq',        COALESCE((SELECT MAX(id_linea_cotizacion) FROM linea_cotizacion), 1));
 SELECT setval('orden_id_orden_seq',                              COALESCE((SELECT MAX(id_orden) FROM orden), 1));
 SELECT setval('linea_orden_id_linea_orden_seq',                  COALESCE((SELECT MAX(id_linea_orden) FROM linea_orden), 1));
 SELECT setval('linea_orden_descuento_id_linea_orden_descuento_seq', COALESCE((SELECT MAX(id_linea_orden_descuento) FROM linea_orden_descuento), 1));

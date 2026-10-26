@@ -1,8 +1,8 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.17 — esquema 4.17 (M14: se elimina `producto.patrocinado`; el patrocinio es de las campañas).  
+> **Versión Actual:** 3.19 — esquema 4.18 (M21 Cotizaciones: solicitud desde el carrito, líneas y precio acordado).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
-> **Total de Tablas:** 78  
+> **Total de Tablas:** 79  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script de Mocks / Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Guía Oficial de Mocks y Datos de Prueba:** [`./GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./GUIA_MOCKS_Y_DATOS_PRUEBA.md)  
@@ -14,6 +14,7 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.19** (esquema 4.18) | 2026-10-27 | `linea_cotizacion` (1) | Ninguna | M21: estado `solicitada`; columnas de la cotización (código, notas, fechas, totales); líneas con precio de referencia y acordado; `linea_carrito.id_cotizacion` y `precio_acordado`; parámetro de vigencia. Total 79 tablas. | [Ver v3.19](./CHANGELOG_DATABASE.md#v319---2026-10-27) |
 | **v3.17** (esquema 4.17) | 2026-10-27 | Ninguna | Ninguna | M14 · A13: se elimina la columna `producto.patrocinado` (interruptor manual que M01 ya no usa); el patrocinio queda solo en las campañas de M14. Total 78 tablas. | [Ver v3.17](./CHANGELOG_DATABASE.md#v317---2026-10-27) |
 | **v3.16** (esquema 4.16) | 2026-10-26 | `campania_patrocinio`, `campania_objetivo`, `anuncio_publicitario`, `anuncio_imagen`, `medicion_patrocinio` (5) | Ninguna | M14: campañas de patrocinio de productos (por producto, línea o marca, con vigencia y prioridad), anuncios de espacios publicitarios con sus imágenes y medición diaria de impresiones y clics sin datos personales. Siete ENUMs nuevos. Total 78 tablas. | [Ver v3.16](./CHANGELOG_DATABASE.md#v316---2026-10-26) |
 | **v3.15** (esquema 4.15) | 2026-10-26 | Ninguna | Ninguna | M14: permisos `patrocinios.ver` y `patrocinios.editar` (27-28) en el seed. Total 73 tablas. | [Ver v3.15](./CHANGELOG_DATABASE.md#v315---2026-10-26) |

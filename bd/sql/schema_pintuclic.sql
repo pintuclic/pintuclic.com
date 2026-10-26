@@ -52,7 +52,7 @@ BEGIN
 
     -- Estado del ciclo de vida de una cotización
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_cotizacion') THEN
-        CREATE TYPE enum_estado_cotizacion AS ENUM ('borrador', 'enviada', 'aprobada', 'rechazada', 'vencida');
+        CREATE TYPE enum_estado_cotizacion AS ENUM ('solicitada', 'borrador', 'enviada', 'aprobada', 'rechazada', 'vencida');
     END IF;
 
     -- Estado de la transacción de pago
@@ -237,6 +237,8 @@ ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'devuelto' AFTER 'cancelado
 ALTER TYPE enum_origen_ajuste_inventario ADD VALUE IF NOT EXISTS 'orden' AFTER 'samit';
 ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'venta' AFTER 'carga_masiva';
 ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'devolucion' AFTER 'venta';
+-- M21 (v4.18): el cliente pide la cotización desde el carrito; 'borrador' queda por datos anteriores.
+ALTER TYPE enum_estado_cotizacion ADD VALUE IF NOT EXISTS 'solicitada' BEFORE 'borrador';
 
 -- M15 (v4.12): migración idempotente de enum_estado_solicitud_contacto ('pendiente' -> 'en_revision') y adición de 'rechazada'
 DO $$
@@ -983,7 +985,7 @@ CREATE TABLE IF NOT EXISTS cotizacion (
     id_cotizacion SERIAL PRIMARY KEY,
     id_usuario INT,
     id_rol INT,
-    estado enum_estado_cotizacion NOT NULL DEFAULT 'borrador',
+    estado enum_estado_cotizacion NOT NULL DEFAULT 'solicitada',
     fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_cotizacion_usuario FOREIGN KEY (id_usuario)
         REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
@@ -991,7 +993,87 @@ CREATE TABLE IF NOT EXISTS cotizacion (
         REFERENCES rol (id_rol) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
-COMMENT ON TABLE cotizacion IS 'Cotizaciones comerciales B2B / B2C vinculadas a usuario y rol que pueden originar órdenes';
+-- M21 (v4.18): datos de la cotización (contrato m21-cotizaciones). Columnas nuevas, idempotentes.
+ALTER TABLE cotizacion ALTER COLUMN estado SET DEFAULT 'solicitada';
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS codigo_visible VARCHAR(20)
+    GENERATED ALWAYS AS ('COT-' || lpad(id_cotizacion::text, 6, '0')) STORED;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS comentario_cliente VARCHAR(500);
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS nota_para_cliente VARCHAR(1000);
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS motivo_rechazo VARCHAR(500);
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS fecha_envio TIMESTAMPTZ;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS fecha_vencimiento DATE;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS fecha_respuesta TIMESTAMPTZ;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS id_usuario_responde INT;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS total_referencia NUMERIC(14, 2) NOT NULL DEFAULT 0;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS total_acordado NUMERIC(14, 2);
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now();
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_cotizacion_usuario_responde') THEN
+        ALTER TABLE cotizacion ADD CONSTRAINT fk_cotizacion_usuario_responde FOREIGN KEY (id_usuario_responde)
+            REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_cotizacion_totales') THEN
+        ALTER TABLE cotizacion ADD CONSTRAINT chk_cotizacion_totales
+            CHECK (total_referencia >= 0 AND (total_acordado IS NULL OR total_acordado >= 0));
+    END IF;
+END $$;
+
+COMMENT ON TABLE cotizacion IS 'Cotización pedida por un cliente desde su carrito y respondida por el equipo comercial (M21)';
+COMMENT ON COLUMN cotizacion.codigo_visible IS 'Código para el cliente (COT-000123); lo calcula la base a partir del id (M21 · R13)';
+COMMENT ON COLUMN cotizacion.nota_para_cliente IS 'Nota del equipo comercial que ve el cliente (M21 · R5)';
+COMMENT ON COLUMN cotizacion.fecha_vencimiento IS 'Último día de vigencia en hora de Colombia; pasada, una enviada queda vencida (M21 · R10)';
+COMMENT ON COLUMN cotizacion.total_referencia IS 'Suma de precio_referencia × cantidad de sus líneas (M21 · R11)';
+COMMENT ON COLUMN cotizacion.total_acordado IS 'Suma de precio_acordado × cantidad al enviarla; null mientras no se envía (M21 · R11)';
+
+-- Tabla: linea_cotizacion
+-- Copia de una línea del carrito al pedir la cotización, con el precio que fija el equipo comercial (M21 · R2, R5).
+CREATE TABLE IF NOT EXISTS linea_cotizacion (
+    id_linea_cotizacion SERIAL PRIMARY KEY,
+    id_cotizacion INT NOT NULL,
+    id_variante INT NOT NULL,
+    id_color INT,
+    cantidad INT NOT NULL,
+    precio_referencia NUMERIC(12, 2) NOT NULL,
+    precio_acordado NUMERIC(12, 2),
+    nombre_producto VARCHAR(150) NOT NULL,
+    marca VARCHAR(100),
+    medida VARCHAR(100),
+    sku VARCHAR(60),
+    color_nombre VARCHAR(100),
+    color_hexadecimal CHAR(7),
+    CONSTRAINT fk_lineacotizacion_cotizacion FOREIGN KEY (id_cotizacion)
+        REFERENCES cotizacion (id_cotizacion) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_lineacotizacion_variante FOREIGN KEY (id_variante)
+        REFERENCES variante (id_variante) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_lineacotizacion_color FOREIGN KEY (id_color)
+        REFERENCES color (id_color) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT chk_lineacotizacion_cantidad CHECK (cantidad BETWEEN 1 AND 9999),
+    CONSTRAINT chk_lineacotizacion_precios CHECK (precio_referencia >= 0 AND (precio_acordado IS NULL OR precio_acordado >= 0)),
+    CONSTRAINT chk_lineacotizacion_hex CHECK (color_hexadecimal IS NULL OR color_hexadecimal ~ '^#[0-9A-Fa-f]{6}$'),
+    CONSTRAINT uq_lineacotizacion_variante_color UNIQUE NULLS NOT DISTINCT (id_cotizacion, id_variante, id_color)
+);
+
+COMMENT ON TABLE linea_cotizacion IS 'Líneas de una cotización: copia del carrito al pedirla y precio acordado por el equipo comercial (M21)';
+COMMENT ON COLUMN linea_cotizacion.precio_referencia IS 'Precio unitario que veía el cliente al pedirla, calculado por M06 (M21 · R2)';
+COMMENT ON COLUMN linea_cotizacion.precio_acordado IS 'Precio unitario que fija el equipo comercial; null mientras no lo define (M21 · R5)';
+
+-- M21 (v4.18): líneas del carrito que vienen de una cotización aceptada, con su precio fijo (M05 · C15).
+ALTER TABLE linea_carrito ADD COLUMN IF NOT EXISTS id_cotizacion INT;
+ALTER TABLE linea_carrito ADD COLUMN IF NOT EXISTS precio_acordado NUMERIC(12, 2);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_lineacarrito_cotizacion') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT fk_lineacarrito_cotizacion FOREIGN KEY (id_cotizacion)
+            REFERENCES cotizacion (id_cotizacion) ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_lineacarrito_acordada') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT chk_lineacarrito_acordada
+            CHECK ((id_cotizacion IS NULL) = (precio_acordado IS NULL) AND (precio_acordado IS NULL OR precio_acordado >= 0));
+    END IF;
+END $$;
+COMMENT ON COLUMN linea_carrito.id_cotizacion IS 'Cotización aceptada de la que viene la línea; null en una línea normal (M05 · C15)';
+COMMENT ON COLUMN linea_carrito.precio_acordado IS 'Precio unitario pactado en la cotización; M06 lo respeta sin descuentos (R3)';
 
 -- Tabla: orden
 -- Reemplazo inmutable de pedido. Posee código visible, origen y trazabilidad legal.
@@ -2354,6 +2436,12 @@ CREATE INDEX IF NOT EXISTS idx_campania_objetivo_referencia ON campania_objetivo
 CREATE INDEX IF NOT EXISTS idx_anuncio_espacio_vigencia ON anuncio_publicitario(espacio, estado, fecha_inicio, fecha_fin);
 CREATE INDEX IF NOT EXISTS idx_medicion_entidad_fecha ON medicion_patrocinio(entidad, id_entidad, fecha);
 
+-- M21: cotizaciones del cliente, bandeja del equipo comercial y líneas
+CREATE INDEX IF NOT EXISTS idx_cotizacion_usuario_estado ON cotizacion(id_usuario, estado);
+CREATE INDEX IF NOT EXISTS idx_cotizacion_estado_fecha ON cotizacion(estado, fecha_creacion DESC);
+CREATE INDEX IF NOT EXISTS idx_lineacotizacion_cotizacion ON linea_cotizacion(id_cotizacion);
+CREATE INDEX IF NOT EXISTS idx_lineacarrito_cotizacion ON linea_carrito(id_cotizacion) WHERE id_cotizacion IS NOT NULL;
+
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (78 TABLAS - v4.17)
+-- FIN DEL SCRIPT DDL (79 TABLAS - v4.18)
 -- ==============================================================================
