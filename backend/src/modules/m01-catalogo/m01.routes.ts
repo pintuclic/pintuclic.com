@@ -52,6 +52,7 @@ import { CombosService } from './services/combos.service';
 import { ConsultaPublicaService } from './services/consulta-publica.service';
 import { ImagenesService } from './services/imagenes.service';
 import { LineasService } from './services/lineas.service';
+import type { ImpactoReglasPort, OfertasPort } from './interfaces/ofertas.port';
 import { MarcasService } from './services/marcas.service';
 import { MedidasService } from './services/medidas.service';
 import { ProductosService } from './services/productos.service';
@@ -101,7 +102,13 @@ function permisoDeCambioEstado(autorizacion: AutorizacionService): RequestHandle
   };
 }
 
-export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01 {
+/** Lo que M01 pide a M06 (los puertos viven en `interfaces/ofertas.port.ts`). Sin ellos no hay ofertas ni conteo de eventos. */
+export interface DependenciasM01 {
+  ofertas?: OfertasPort;
+  impactoReglas?: ImpactoReglasPort;
+}
+
+export function construirModuloM01(autorizacion: AutorizacionService, dependencias: DependenciasM01 = {}): ModuloM01 {
   const ver = requirePermission(autorizacion, PERMISOS_CATALOGO.ver) as RequestHandler;
   const crear = requirePermission(autorizacion, PERMISOS_CATALOGO.crear) as RequestHandler;
   const editar = requirePermission(autorizacion, PERMISOS_CATALOGO.editar) as RequestHandler;
@@ -150,7 +157,9 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const combos = new CombosController(combosService);
   const imagenes = new ImagenesController(imagenesService);
   const imagenMedida = new ImagenMedidaController(medidasService);
-  const consultaPublica = new ConsultaPublicaController(new ConsultaPublicaService(new ConsultaPublicaRepository()));
+  const consultaPublica = new ConsultaPublicaController(
+    new ConsultaPublicaService(new ConsultaPublicaRepository(), dependencias.ofertas),
+  );
   const superficies = controladorSimple({
     servicio: new CatalogoSimpleService(new SuperficiesRepository(), 'una superficie'),
     esquemaCrear: crearSuperficieRequestSchema,
@@ -301,10 +310,18 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   publicRouter.get('/productos', consultaPublica.listar as RequestHandler);
   publicRouter.get('/productos/:idProducto', consultaPublica.ficha as RequestHandler);
   publicRouter.get('/productos/:idProducto/colores', consultaPublica.colores as RequestHandler);
+  publicRouter.get('/productos/:idProducto/ofertas', consultaPublica.ofertas as RequestHandler);
   publicRouter.get('/productos/:idProducto/complementarios', consultaPublica.complementarios as RequestHandler);
   publicRouter.get('/imagenes/:idImagen', consultaPublica.imagen as RequestHandler);
   publicRouter.get('/medidas/:idMedida/imagen', consultaPublica.imagenMedida as RequestHandler);
   publicRouter.get('/marcas/:idMarca/logotipo', consultaPublica.logotipo as RequestHandler);
+
+  // M06: el impacto de desactivar cuenta los eventos que apuntan a la entidad (HU-CAT-11).
+  if (dependencias.impactoReglas !== undefined) {
+    for (const servicio of [clasificacionService, marcasService, lineasService, productosService, variantesService]) {
+      servicio.conectarImpactoReglas(dependencias.impactoReglas);
+    }
+  }
 
   return {
     adminRouter,

@@ -81,7 +81,7 @@ export class VariantesService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.variantes.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.variantes.contarImpacto(id), { tipo: 'variante', id }),
       padreActivo: () => this.variantes.padreActivo(id),
       etiquetaPadre: 'el producto o la medida',
       cambiar: (estado) => this.variantes.cambiarEstado(id, estado),
@@ -90,7 +90,7 @@ export class VariantesService extends ServicioCatalogoBase {
 
   async impacto(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.variantes.obtener(id));
-    return this.variantes.contarImpacto(id);
+    return this.conReglasComerciales(this.variantes.contarImpacto(id), { tipo: 'variante', id });
   }
 }
 

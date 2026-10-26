@@ -134,7 +134,7 @@ export type Medida = z.infer<typeof medidaSchema>;
 
 /**
  * Efecto de una desactivación (R6). Cada recurso llena solo lo que le aplica; el
- * resto vale 0. `reglasComerciales` es de M06 y vale 0 hasta que exista.
+ * resto vale 0. `reglasComerciales` son los eventos de M06 (en curso o programados) que apuntan a la marca, línea, categoría, subcategoría, producto o variante.
  */
 export const impactoDesactivacionSchema = z.object({
   productos: z.number().int().nonnegative(),

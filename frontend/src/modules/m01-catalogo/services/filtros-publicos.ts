@@ -8,6 +8,8 @@ export interface FiltrosVitrina {
   idMarca: string;
   idSuperficie: string;
   ambiente: '' | 'interior' | 'exterior';
+  /** Solo productos con un evento de M06 en curso (menú «Ofertas»). */
+  enOferta: boolean;
   ordenar: 'nombre' | 'precio_asc' | 'precio_desc';
   pagina: number;
 }
@@ -19,6 +21,7 @@ export const FILTROS_INICIALES: FiltrosVitrina = {
   idMarca: '',
   idSuperficie: '',
   ambiente: '',
+  enOferta: false,
   ordenar: 'nombre',
   pagina: 1,
 };
@@ -42,6 +45,7 @@ export function filtrosDesdeUrl(params: URLSearchParams): FiltrosVitrina {
     idMarca: entero(params.get('marca')),
     idSuperficie: entero(params.get('superficie')),
     ambiente: ambiente === 'interior' || ambiente === 'exterior' ? ambiente : '',
+    enOferta: params.get('enOferta') === 'true',
     ordenar: ordenar === 'precio_asc' || ordenar === 'precio_desc' ? ordenar : 'nombre',
     pagina: Number.isInteger(pagina) && pagina >= 1 ? pagina : 1,
   };
@@ -59,6 +63,7 @@ export function filtrosAUrl(f: FiltrosVitrina): URLSearchParams {
   poner('marca', f.idMarca);
   poner('superficie', f.idSuperficie);
   poner('ambiente', f.ambiente);
+  if (f.enOferta) params.set('enOferta', 'true');
   if (f.ordenar !== 'nombre') params.set('orden', f.ordenar);
   if (f.pagina > 1) params.set('pagina', String(f.pagina));
   return params;
@@ -73,6 +78,7 @@ export function filtrosAConsulta(f: FiltrosVitrina): Record<string, string | num
     ...(f.idMarca === '' ? {} : { idMarca: f.idMarca }),
     ...(f.idSuperficie === '' ? {} : { idSuperficie: f.idSuperficie }),
     ...(f.ambiente === '' ? {} : { ambiente: f.ambiente }),
+    ...(f.enOferta ? { enOferta: 'true' } : {}),
     ordenar: f.ordenar,
     pagina: f.pagina,
     limite: PRODUCTOS_POR_PAGINA,
@@ -93,6 +99,7 @@ export function hayFiltros(f: FiltrosVitrina): boolean {
     f.idSubcategoria !== '' ||
     f.idMarca !== '' ||
     f.idSuperficie !== '' ||
-    f.ambiente !== ''
+    f.ambiente !== '' ||
+    f.enOferta
   );
 }

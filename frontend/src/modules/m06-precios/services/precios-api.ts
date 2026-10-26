@@ -10,6 +10,7 @@ import type {
   Cupon,
   Estado,
   Evento,
+  EventoPublico,
   EventoResumen,
   ProductoAfectado,
   ReferenciaCatalogo,
@@ -99,4 +100,9 @@ export const tiposClienteApi = {
 
 export const simuladorApi = {
   simular: (cuerpo: SimularRequest) => enviar<Calculo>('post', `${BASE}/simular`, cuerpo),
+};
+
+/** Rutas públicas (sin sesión): lo que ve cualquier visitante en la pestaña «Ofertas». */
+export const eventosPublicosApi = {
+  enCurso: () => obtener<EventoPublico[]>('/precios/eventos-en-curso'),
 };

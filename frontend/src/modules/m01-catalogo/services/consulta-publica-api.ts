@@ -4,6 +4,7 @@ import type {
   ColorOfrecido,
   FamiliaDisponible,
   FiltrosPublicos,
+  OfertaVariante,
   ProductoPublicoFicha,
   ProductoPublicoTarjeta,
 } from '../dtos/m01-catalogo-productos.dto';
@@ -25,6 +26,12 @@ export const catalogoPublicoApi = {
     params?: ParametrosConsulta,
   ): Promise<PaginaColoresApi<ColorOfrecido, FamiliaDisponible>> =>
     obtenerColoresProducto(`${PUBLICO}/productos/${idProducto}/colores`, params),
+  /** Ofertas de las presentaciones; con color elegido se aplican las excepciones por color de los eventos. */
+  ofertas: (idProducto: number, idColor?: number) =>
+    obtener<OfertaVariante[]>(
+      `${PUBLICO}/productos/${idProducto}/ofertas`,
+      idColor === undefined ? undefined : { idColor },
+    ),
   /** Los listados piden la miniatura y la ficha la versión mediana (I7). */
   urlImagen: (idImagen: number, tamano: TamanoImagen = 'original'): string =>
     `${apiClient.defaults.baseURL ?? '/api/v1'}${PUBLICO}/imagenes/${idImagen}${tamano === 'original' ? '' : `?tamano=${tamano}`}`,

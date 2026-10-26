@@ -1,6 +1,7 @@
 import type { CambiarEstadoRequest, Estado, ImpactoDesactivacion } from '../dtos/m01-catalogo.dto';
 import type { CODIGOS_ERROR_CATALOGO } from '../dtos/m01-catalogo.dto';
 import type { CODIGOS_ERROR_PRODUCTOS } from '../dtos/m01-catalogo-productos.dto';
+import type { ImpactoReglasPort, ObjetivoReglaPort } from '../interfaces/ofertas.port';
 
 /** Códigos de las dos entregas del contrato; comparten el mismo envelope. */
 export type CodigoErrorCatalogo = (typeof CODIGOS_ERROR_CATALOGO)[number] | (typeof CODIGOS_ERROR_PRODUCTOS)[number];
@@ -92,6 +93,24 @@ interface CambioEstado<E extends { estado: Estado }> {
 
 /** Reglas comunes a todos los servicios del catálogo. */
 export abstract class ServicioCatalogoBase {
+  private impactoReglas: ImpactoReglasPort | undefined;
+
+  /** Conecta M06 para que el impacto de desactivar cuente los eventos que apuntan a la entidad (HU-CAT-11). */
+  conectarImpactoReglas(puerto: ImpactoReglasPort): this {
+    this.impactoReglas = puerto;
+    return this;
+  }
+
+  /** Suma al impacto de la entidad los eventos de M06 (en curso o programados) que la tienen como objetivo. */
+  protected async conReglasComerciales(
+    impacto: Promise<ImpactoDesactivacion>,
+    objetivo: ObjetivoReglaPort,
+  ): Promise<ImpactoDesactivacion> {
+    const base = await impacto;
+    if (this.impactoReglas === undefined) return base;
+    return { ...base, reglasComerciales: await this.impactoReglas.contarEventosVigentes([objetivo]) };
+  }
+
   /** Convierte "no encontrado" en el 404 estándar. */
   protected exigir<T>(valor: T | null | undefined): T {
     if (valor === null || valor === undefined) {
