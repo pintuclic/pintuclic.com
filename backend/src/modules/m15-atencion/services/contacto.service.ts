@@ -113,12 +113,16 @@ export class ContactoService {
     idSolicitud: string,
     datos: CrearMensajeSolicitudRequest,
   ): Promise<MensajeSolicitudContacto> {
-    const solicitud = await this.repo.obtener(idSolicitud);
-    if (solicitud === null || solicitud.idUsuario !== idUsuario) {
+    const detalle = await this.repo.obtenerDetalle(idSolicitud);
+    if (detalle === null || detalle.idUsuario !== idUsuario) {
       throw errores.noDisponible();
     }
-    if (solicitud.estado !== 'en_revision') {
+    if (detalle.estado !== 'en_revision') {
       throw errores.solicitudCerrada();
+    }
+    const ultimoMensaje = detalle.mensajes[detalle.mensajes.length - 1];
+    if (ultimoMensaje !== undefined && ultimoMensaje.rolAutor === 'cliente') {
+      throw errores.esperandoRespuestaEquipo();
     }
     return this.repo.agregarMensaje(idSolicitud, idUsuario, 'cliente', datos.contenido);
   }

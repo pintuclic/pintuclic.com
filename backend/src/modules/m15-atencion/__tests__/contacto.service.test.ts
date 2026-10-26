@@ -243,17 +243,26 @@ describe('ContactoService (HU-ATC-02, R12, R13)', () => {
   });
 
   describe('hilo de conversación ping-pong, estados y bloqueo (R11, R12)', () => {
-    it('permite enviar varios mensajes consecutivos tanto al cliente como al equipo mientras está en_revision', async () => {
+    it('permite máximo 1 mensaje del cliente sin respuesta del equipo (409 ESPERANDO_RESPUESTA_EQUIPO) y habilita otro cuando el equipo responde, mientras el equipo puede enviar varios seguidos', async () => {
       const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Consulta inicial' }, LUNES_10_00);
 
       await servicio.agregarMensajeCliente(7, solicitud.idSolicitud, { contenido: 'Primer mensaje adicional del cliente' });
-      await servicio.agregarMensajeCliente(7, solicitud.idSolicitud, { contenido: 'Segundo mensaje seguido del cliente' });
+
+      await expect(
+        servicio.agregarMensajeCliente(7, solicitud.idSolicitud, { contenido: 'Segundo mensaje seguido sin respuesta del equipo' }),
+      ).rejects.toMatchObject({
+        code: 'ESPERANDO_RESPUESTA_EQUIPO',
+        status: 409,
+      });
+
       await servicio.agregarMensajeEquipo(1, solicitud.idSolicitud, { contenido: 'Primera respuesta del asesor' });
       await servicio.agregarMensajeEquipo(1, solicitud.idSolicitud, { contenido: 'Segunda aclaración seguida del asesor' });
 
+      await servicio.agregarMensajeCliente(7, solicitud.idSolicitud, { contenido: 'Respuesta del cliente tras ser atendido' });
+
       const detalle = await servicio.obtenerDetalleDeUsuario(7, solicitud.idSolicitud);
       expect(detalle.mensajes).toHaveLength(4);
-      expect(detalle.mensajes.map((m) => m.rolAutor)).toEqual(['cliente', 'cliente', 'equipo', 'equipo']);
+      expect(detalle.mensajes.map((m) => m.rolAutor)).toEqual(['cliente', 'equipo', 'equipo', 'cliente']);
     });
 
     it('bloquea nuevos mensajes del cliente cuando la solicitud pasa a atendida o rechazada (409 SOLICITUD_CERRADA)', async () => {

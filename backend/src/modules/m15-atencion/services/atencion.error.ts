@@ -28,6 +28,13 @@ export const errores = {
       'Esta solicitud ya fue cerrada y no admite nuevos mensajes. Si tienes otra inquietud, crea una solicitud nueva.',
       409,
     ),
+  /** R12: el cliente solo puede enviar 1 mensaje seguido mientras el equipo no haya respondido. */
+  esperandoRespuestaEquipo: (): AtencionError =>
+    new AtencionError(
+      'ESPERANDO_RESPUESTA_EQUIPO',
+      'Ya enviaste un mensaje. Podrás enviar otro cuando nuestro equipo te responda.',
+      409,
+    ),
   /** R13: solo se puede calificar una solicitud que esté en estado atendida. */
   solicitudNoCalificable: (): AtencionError =>
     new AtencionError(

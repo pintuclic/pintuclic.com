@@ -224,20 +224,27 @@ function HiloSolicitudCliente({ idSolicitud, onActualizado }: HiloClienteProps) 
       {error !== null && <Alert variant="error">{error}</Alert>}
 
       {detalle.estado === 'en_revision' && (
-        <form onSubmit={enviarMensaje} className="space-y-3" noValidate>
-          <Textarea
-            label="Escribe un mensaje"
-            rows={3}
-            placeholder="Agrega más información o responde a nuestro equipo..."
-            error={errors.contenido?.message}
-            {...register('contenido')}
-          />
-          <div className="flex justify-end">
-            <Button type="submit" variant="primary-action" size="sm" isLoading={isSubmitting}>
-              Enviar mensaje
-            </Button>
+        detalle.mensajes[detalle.mensajes.length - 1]?.rolAutor === 'cliente' ? (
+          <div className="rounded-card border border-neutral-light bg-neutral-lightest p-3 font-sans text-sm text-neutral-dark">
+            Ya enviaste un mensaje adicional. Podrás escribir otro mensaje cuando nuestro equipo te
+            responda.
           </div>
-        </form>
+        ) : (
+          <form onSubmit={enviarMensaje} className="space-y-3" noValidate>
+            <Textarea
+              label="Escribe un mensaje"
+              rows={3}
+              placeholder="Agrega más información o responde a nuestro equipo..."
+              error={errors.contenido?.message}
+              {...register('contenido')}
+            />
+            <div className="flex justify-end">
+              <Button type="submit" variant="primary-action" size="sm" isLoading={isSubmitting}>
+                Enviar mensaje
+              </Button>
+            </div>
+          </form>
+        )
       )}
 
       {detalle.estado === 'rechazada' && (
