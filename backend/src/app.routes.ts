@@ -5,6 +5,7 @@ import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
 import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-final-m06.adapter';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
+import { construirModuloM05 } from './modules/m05-carrito/m05.routes';
 import { construirModuloM06 } from './modules/m06-precios/m06.routes';
 import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
 import { construirModuloM15 } from './modules/m15-atencion/m15.routes';
@@ -136,6 +137,15 @@ export function construirAppRoutes(): Router {
   });
   router.use('/admin/precios', exigirSesionSalvo(auth, []), m06.adminRouter);
   router.use('/precios', m06.publicRouter);
+
+  // M05: carrito de compras. Público con sesión opcional: el dueño sale de la sesión o de la cookie `pc_cart` del
+  // visitante, nunca del cliente. Los precios los calcula M06 y los datos de cada línea vienen de M01.
+  const m05 = construirModuloM05({
+    sesiones: m20.sesionService,
+    precios: m06.precios,
+    catalogo: m01.catalogoParaCompra,
+  });
+  router.use('/carrito', m05.publicRouter);
 
   // M16: gestión administrativa de contenido institucional y FAQ (exige sesión y permisos
   // `configuracion.*`) y consulta pública de páginas publicadas y FAQ activas (sin sesión).
