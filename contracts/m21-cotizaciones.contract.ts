@@ -66,7 +66,8 @@ import { cantidadSchema, dineroSchema, fechaSchema } from './m06-precios.contrac
  *  R7  RECHAZO DEL ADMIN: desde solicitada, borrador o enviada, con motivo obligatorio. Avisa al cliente.
  *  R8  ACEPTAR (D5): solo `enviada` y vigente. Queda `aprobada` con fecha de respuesta, y sus líneas pasan al
  *      carrito de la cuenta con su `precioAcordado` (C15 de M05): si ya había una línea igual (variante +
- *      color), se reemplaza. Aceptar dos veces responde 409 ESTADO_NO_PERMITE.
+ *      color), se reemplaza. Si el carrito no tiene espacio (límite de M05) responde 409 CARRITO_LLENO y la
+ *      cotización sigue `enviada`. Aceptar dos veces responde 409 ESTADO_NO_PERMITE.
  *  R9  RECHAZO DEL CLIENTE: solo `enviada`, con motivo opcional.
  *  R10 VENCIMIENTO: una `enviada` cuya fecha de vencimiento (hora de Colombia) ya pasó queda `vencida` en
  *      cuanto se consulta (lista o detalle, cliente o admin); aceptarla responde 409 COTIZACION_VENCIDA.
@@ -273,7 +274,8 @@ export type ListarCotizacionesResponseEnvelope = z.infer<typeof listarCotizacion
  * Envelope global: `{ success: false, error: { code, message, details } }`.
  * 400 PARAMETRO_INVALIDO · 400 CARRITO_VACIO (R2) · 400 COTIZACION_INCOMPLETA (R6) ·
  * 404 RECURSO_NO_DISPONIBLE (ajena, inexistente o sin permiso) · 409 LIMITE_COTIZACIONES (R4) ·
- * 409 ESTADO_NO_PERMITE (R5, R7, R8, R9) · 409 COTIZACION_VENCIDA (R10) · 500 ERROR_INTERNO.
+ * 409 ESTADO_NO_PERMITE (R5, R7, R8, R9) · 409 COTIZACION_VENCIDA (R10) · 409 CARRITO_LLENO (R8) ·
+ * 500 ERROR_INTERNO.
  */
 export const CODIGOS_ERROR_COTIZACIONES = [
   'PARAMETRO_INVALIDO',
@@ -283,6 +285,7 @@ export const CODIGOS_ERROR_COTIZACIONES = [
   'LIMITE_COTIZACIONES',
   'ESTADO_NO_PERMITE',
   'COTIZACION_VENCIDA',
+  'CARRITO_LLENO',
   'ERROR_INTERNO',
 ] as const;
 export type CodigoErrorCotizaciones = (typeof CODIGOS_ERROR_COTIZACIONES)[number];
