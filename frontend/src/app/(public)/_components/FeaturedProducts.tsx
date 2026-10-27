@@ -189,7 +189,7 @@ export function FeaturedProducts() {
       ) : (
         <div
           aria-busy={cargando}
-          className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+          className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5"
         >
           {productos.map((producto) => (
             <ProductCard key={producto.id} {...producto} className="h-full" />

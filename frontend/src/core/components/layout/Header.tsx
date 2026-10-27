@@ -18,6 +18,7 @@ import {
   type MegaMenuGroup,
   type MegaMenuTab,
 } from './CategoriesMegaMenu';
+import { Container } from './Container';
 import { Logo, type LogoProps } from './Logo';
 
 export interface HeaderNavItem {
@@ -79,9 +80,6 @@ export function cuentaDeEncabezado(
  * modal), navegación, acceso a "Mi cuenta" y carrito con contador y monto.
  * Por debajo de `xl` la navegación pasa a un panel modal: con sus siete enlaces, el botón de categorías, la cuenta
  * y el carrito, en menos de 1280px las palabras se montaban unas sobre otras.
- *
- * La fila usa un ancho mayor que el contenido (hasta 1536px): en pantallas grandes el menú aprovecha los lados en vez
- * de apretarse en la columna de 1280px.
  */
 export function Header({
   logo,
@@ -110,7 +108,7 @@ export function Header({
 
   return (
     <header className="border-b border-neutral-light bg-neutral-white">
-      <div className="mx-auto flex h-16 w-full max-w-[96rem] items-center gap-4 px-4 md:px-6 lg:h-[88px] xl:gap-6 2xl:gap-10 2xl:px-10">
+      <Container className="flex h-16 items-center gap-4 lg:h-[88px] xl:gap-6 2xl:gap-10">
         <IconButton
           variant="ghost"
           aria-label="Abrir menú"
@@ -209,7 +207,7 @@ export function Header({
             </span>
           </Link>
         </div>
-      </div>
+      </Container>
 
       <CategoriesMegaMenu
         isOpen={megaAbierto}
