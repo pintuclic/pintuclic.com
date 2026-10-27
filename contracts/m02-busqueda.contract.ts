@@ -23,8 +23,8 @@ import {
  * lo da por bueno. Lo que depende de una decisión suya está en "Preguntas abiertas" (Q1…Q7)
  * con la opción que se asume mientras tanto; ninguna bloquea el resto del contrato.
  *
- * Ajustes del catálogo (2026-10): tolerancia a errores sin extensiones (B11–B14, D3), color de
- * muestra en la tarjeta (T1–T3), pantalla /productos (V1–V4) y compra rápida desde la tarjeta (P2).
+ * Ajustes del catálogo (2026-10): tolerancia a errores sin extensiones (B11–B14, D3), tarjeta de "producto
+ * en un color" (T1–T4), pantalla /productos e inicio (V1–V5) y ficha abierta en el color de la tarjeta (P2).
  *
  * ── Qué hace ────────────────────────────────────────────────────────────────
  *  HU-BUS-01 Búsqueda de productos por texto libre, tolerante a mayúsculas, acentos, plurales y
@@ -94,8 +94,9 @@ import {
  *      buscar (D3). No usa extensiones de la base ni cambia el esquema.
  *
  * ── Color de muestra de la tarjeta ──────────────────────────────────────────
- *  T1  Cada resultado trae `colorMuestra` (nombre y hexadecimal) para pintar el fondo de su imagen,
- *      o null si el producto no se vende con color (sin bases ni colores de fábrica).
+ *  T1  Cada resultado trae `colorMuestra` (id, nombre y hexadecimal): el color en que se muestra el
+ *      producto en su tarjeta y en el que se abre su ficha (V3). Es null si el producto no se vende con color
+ *      (sin bases ni colores de fábrica).
  *  T2  Cuál color, en este orden:
  *        · si se filtró por un color (`idColor`) que el producto ofrece, ese color;
  *        · si el término coincidió con un color del producto, ese color;
@@ -105,27 +106,35 @@ import {
  *  T3  Se calcula solo para los productos de la página pedida, con una consulta, sin cargar la carta
  *      completa (U3 de M01, D4). Si esa consulta falla, los resultados salen con `colorMuestra` null:
  *      el listado no se cae por el color.
+ *  T4  `totalColores`: cuántos colores ofrece el producto (P5 de M01), para decir "y 45 colores más"; 0 si
+ *      no se vende con color. Se cuenta en la misma consulta de T3 y con el mismo cuidado si falla.
+ *
+ *  Por qué la muestra cambia con la búsqueda: cada tarjeta es el producto EN UN COLOR (como en una tienda de
+ *  pinturas, donde cada color es su propia ficha). Sin búsqueda se ve el primero de la carta; al buscar "gris"
+ *  se ve el gris que coincidió, y la tarjeta lleva a la ficha en ese mismo gris. Lo que se ve es lo que se abre.
  *
  * ── Pantalla /productos ─────────────────────────────────────────────────────
  *  V1  Orden del panel de filtros: Ofertas, Categorías, Ambiente, Marcas, Líneas, Familias de color,
  *      Presentación, Tipo de resina, Superficie y Rango de precio.
- *  V2  Tarjeta: con `colorMuestra`, un panel redondeado de ese color ocupa la mitad de abajo de la
- *      imagen y el envase queda por delante, como una muestra de pintura. La foto no se mezcla con el
- *      color (un color oscuro no debe tapar el producto). Los colores muy claros llevan un borde suave
- *      para que se vean sobre el blanco. El panel es decorativo (no se lee en voz alta). Sin color, se
- *      queda el fondo neutro de hoy.
- *  V3  Sin botón "Ver producto": el nombre y la imagen llevan a la ficha completa
- *      (`/productos/:idProducto`) y el botón del carrito queda junto al precio.
- *  V4  El botón del carrito NO navega: abre la compra rápida de M01 (U8 del contrato
- *      m01-catalogo-productos) para elegir presentación, color y cantidad sin salir del listado. Con
- *      `compraBloqueada` (combo agotado) el botón se muestra deshabilitado.
+ *  V2  Tarjeta del producto en su color: con `colorMuestra`, un panel redondeado de ese color ocupa la
+ *      mitad de abajo de la imagen y el envase queda por delante, como una muestra de pintura. La foto no se
+ *      mezcla con el color (un color oscuro no debe tapar el producto); los colores muy claros llevan un
+ *      borde suave. Bajo el nombre, un punto del color con su nombre y "y N colores más" (T4). Sin color, el
+ *      fondo neutro de siempre y sin esa línea.
+ *  V3  Sin botón "Ver producto". El nombre, la imagen y el botón del carrito (junto al precio) llevan a la
+ *      ficha ABIERTA EN ESE COLOR: `/productos/:idProducto?color=:idColor` (U8 de m01-catalogo-productos);
+ *      sin color, `/productos/:idProducto`. La presentación, el color y la cantidad se eligen en la ficha:
+ *      no hay ventanas encima del listado.
+ *  V4  Un combo agotado (`compraBloqueada`) también lleva a su ficha, que avisa que no se puede comprar.
+ *  V5  INICIO: "Productos destacados" y la búsqueda de "¿Qué buscas?" usan esta misma búsqueda
+ *      (GET /busqueda/productos, con su tolerancia a errores) y la misma tarjeta que /productos.
  *
  * ── Piezas fuera de M02 (cada una en su PR) ─────────────────────────────────
- *  P1  Core Kit: `ProductCard` acepta un color de muestra opcional (V2), un botón del carrito
- *      deshabilitado (V4) y la opción de no mostrar "Ver producto" (V3). Sin esas propiedades se ve igual
- *      que hoy en el resto de pantallas.
- *  P2  M01: ventana de compra rápida (U8 de m01-catalogo-productos). Usa la ficha pública, el selector
- *      de color y el "Agregar al carrito" que ya existen; no hay rutas nuevas.
+ *  P1  Core Kit: `ProductCard` acepta un color de muestra con su texto (V2) y la opción de no mostrar
+ *      "Ver producto" (V3). Sin esas propiedades se ve igual que hoy en el resto de pantallas.
+ *  P2  M01: la ficha se abre en el color de `?color=` (U8 de m01-catalogo-productos) y la carta pública de
+ *      colores de un producto acepta `idColor` para traer ese color.
+ *  P3  Inicio (fuera de los módulos): las tarjetas destacadas usan la búsqueda de M02 (V5).
  *
  * ── Reglas de filtros ───────────────────────────────────────────────────────
  *  F1  Los filtros se combinan con Y entre grupos y O dentro de un mismo grupo
@@ -220,9 +229,8 @@ import {
  *      parámetro del sistema si el Tech Lead lo pide.
  *  D7  La búsqueda de colores de la carta (B7, entonables) ignora mayúsculas, pero no acentos ni
  *      errores: hacerlo exigiría cargar la carta completa o `unaccent` en la base.
- *  D8  El color de muestra (V2) y la compra rápida (V4) se usan solo en `/productos`. Las demás
- *      tarjetas (inicio, vitrina de M01, "Completa tu trabajo con" y patrocinados de M14) quedan igual
- *      hasta que se pida (Q7).
+ *  D8  La tarjeta en un color (V2, V3) se usa en `/productos` y en el inicio (V5). Las demás tarjetas
+ *      (vitrina de M01, "Completa tu trabajo con" y patrocinados de M14) quedan igual hasta que se pida (Q7).
  *
  * ── Preguntas abiertas (para el Tech Lead / cliente) ────────────────────────
  *  Q1  RESUELTA con M06: `PrecioFinalPort` lo implementa M06 (`preciosDeVariantes`, precio con evento, IVA
@@ -240,9 +248,8 @@ import {
  *      el cliente no diga otro. También es un parámetro de sistema si debe ser editable.
  *  Q6  Caché: la spec habla de "paginación y caché". No se define caché de respuestas en este contrato;
  *      si se quiere, hay que decidir dónde vive y cuánto dura.
- *  Q7  ¿El color de muestra y la compra rápida deben llegar también a las tarjetas del inicio, de la
- *      ficha ("Completa tu trabajo con") y de los patrocinados? Se asume que no por ahora (D8); cada una
- *      es de otro módulo y sería un PR aparte.
+ *  Q7  ¿La tarjeta en un color debe llegar también a "Completa tu trabajo con" de la ficha y a los
+ *      patrocinados? Se asume que no por ahora (D8); cada una es de otro módulo y sería un PR aparte.
  *
  * Regla de Oro #1: Cero código sin contrato previo.
  * Regla de Oro #11: Tolerancia Cero al tipo `any`.
@@ -384,6 +391,7 @@ export type ListarSinResultadoRequest = z.infer<typeof listarSinResultadoRequest
 
 /** Color con el que se pinta el fondo de la imagen de la tarjeta (T1, T2). */
 export const colorMuestraSchema = z.object({
+  idColor: idSchema,
   nombre: z.string(),
   hexadecimal: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
 });
@@ -396,6 +404,8 @@ export type ColorMuestra = z.infer<typeof colorMuestraSchema>;
 export const resultadoBusquedaSchema = productoPublicoTarjetaSchema.extend({
   /** Fondo de la imagen (T1–T3); null si el producto no se vende con color o no se pudo calcular. */
   colorMuestra: colorMuestraSchema.nullable(),
+  /** Cuántos colores ofrece el producto (T4); 0 si no se vende con color. */
+  totalColores: z.number().int().nonnegative(),
   /** Nombre del color o de la familia que coincidió con el término; null si no fue por color. */
   coincidenciaColor: z.string().nullable(),
   /** true si el patrocinio de una campaña de M14 lo adelantó en este resultado (O7). */
