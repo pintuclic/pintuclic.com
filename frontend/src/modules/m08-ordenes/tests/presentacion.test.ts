@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ESTADOS_ORDEN } from '../dtos/m08-ordenes.dto';
 import {
+  conteosNavegacion,
   desgloseTotales,
   ETIQUETA_ESTADO,
   formatearDuracion,
   formatearFecha,
   formatearFechaHora,
+  totalPendientes,
   varianteEstado,
 } from '../services/presentacion';
 
@@ -31,6 +33,28 @@ describe('presentación de la orden (HU-ORD-03, HU-ORD-07)', () => {
 
   it('el momento de un cambio se muestra en hora de Colombia', () => {
     expect(formatearFechaHora('2026-05-12T20:30:00.000Z')).toContain('3:30');
+  });
+
+  describe('contador de la navegación del panel (RF-ORD-05-04, CA-ORD-05-05)', () => {
+    const resumen = [
+      { estado: 'orden_confirmada' as const, cantidad: 4 },
+      { estado: 'revision_disponibilidad' as const, cantidad: 0 },
+      { estado: 'en_preparacion' as const, cantidad: 2 },
+      { estado: 'preparada' as const, cantidad: 0 },
+    ];
+
+    it('muestra cuántos esperan en cada estado, sin listar los que no tienen ninguno', () => {
+      expect(conteosNavegacion(resumen)).toEqual([
+        { etiqueta: 'Confirmado', cantidad: 4 },
+        { etiqueta: 'En preparación', cantidad: 2 },
+      ]);
+    });
+
+    it('el total pendiente suma solo los estados en curso', () => {
+      expect(totalPendientes(resumen)).toBe(6);
+      expect(totalPendientes([...resumen, { estado: 'entregado' as const, cantidad: 50 }])).toBe(6);
+      expect(totalPendientes([])).toBe(0);
+    });
   });
 
   describe('desglose de totales (los precios incluyen IVA)', () => {

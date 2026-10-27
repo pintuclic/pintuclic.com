@@ -55,6 +55,19 @@ export function formatearFechaHora(iso: string): string {
   }).format(new Date(iso));
 }
 
+/** Cuántas órdenes esperan en cada estado en curso, sin listar los vacíos (RF-ORD-05-04). */
+export function conteosNavegacion(
+  resumen: ReadonlyArray<{ estado: EstadoOrden; cantidad: number }>,
+): Array<{ etiqueta: string; cantidad: number }> {
+  return resumen
+    .filter((r) => ESTADOS_EN_CURSO.includes(r.estado) && r.cantidad > 0)
+    .map((r) => ({ etiqueta: ETIQUETA_ESTADO[r.estado], cantidad: r.cantidad }));
+}
+
+export function totalPendientes(resumen: ReadonlyArray<{ estado: EstadoOrden; cantidad: number }>): number {
+  return resumen.filter((r) => ESTADOS_EN_CURSO.includes(r.estado)).reduce((suma, r) => suma + r.cantidad, 0);
+}
+
 export interface ImportesOrden {
   subTotal: number;
   descuento: number;

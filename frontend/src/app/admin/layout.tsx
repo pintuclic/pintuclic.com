@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { AdminLayout } from '@/core/components';
+import { AdminShell } from './AdminShell';
 
 export const metadata: Metadata = {
   title: 'Panel Administrativo — Pintu Clic',
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return <AdminLayout>{children}</AdminLayout>;
+  return <AdminShell>{children}</AdminShell>;
 }
