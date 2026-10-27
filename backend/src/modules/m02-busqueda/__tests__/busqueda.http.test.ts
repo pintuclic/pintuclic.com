@@ -44,6 +44,7 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       patrocinado: false,
       idCampania: null,
       colorMuestra: null,
+      totalColores: 0,
       coincidenciaColor: null,
     },
     {
@@ -62,7 +63,8 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       oferta: null,
       patrocinado: false,
       idCampania: null,
-      colorMuestra: { nombre: 'Amarillo Cromo', hexadecimal: '#F2C200' },
+      colorMuestra: { idColor: 3, nombre: 'Amarillo Cromo', hexadecimal: '#F2C200' },
+      totalColores: 40,
       coincidenciaColor: 'Amarillo Cromo',
     },
     {
@@ -82,6 +84,7 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       patrocinado: false,
       idCampania: null,
       colorMuestra: null,
+      totalColores: 0,
       coincidenciaColor: null,
     },
   ];
@@ -337,7 +340,7 @@ describe('M02 — Búsqueda, filtros y descubrimiento (HTTP + Dominio)', () => {
       const { cuerpo } = await peticionPublica('/productos');
       const data = cuerpo.data as ResultadoBusqueda[];
       expect(data.map((p) => p.colorMuestra)).toEqual(
-        expect.arrayContaining([null, { nombre: 'Amarillo Cromo', hexadecimal: '#F2C200' }]),
+        expect.arrayContaining([null, { idColor: 3, nombre: 'Amarillo Cromo', hexadecimal: '#F2C200' }]),
       );
     });
 

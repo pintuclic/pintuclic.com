@@ -11,7 +11,10 @@ const URL_BD = process.env.M01_TEST_DATABASE_URL;
 
 describe.skipIf(URL_BD === undefined)('M02 · búsqueda (PostgreSQL real)', () => {
   let repo: BusquedaRepository;
-  let primerColorDeLaFicha: (idProducto: number, idFamiliaColor?: number) => Promise<{ nombre: string; hexadecimal: string } | null>;
+  let cartaDeLaFicha: (
+    idProducto: number,
+    idFamiliaColor?: number,
+  ) => Promise<{ primero: { idColor: number; nombre: string; hexadecimal: string } | null; total: number }>;
 
   const buscar = async (cambios: Partial<BuscarProductosRequest> = {}): Promise<readonly ResultadoBusqueda[]> =>
     (await repo.buscarProductos({ ordenar: 'relevancia', pagina: 1, limite: 48, ...cambios }, { idUsuario: null })).items;
@@ -22,14 +25,20 @@ describe.skipIf(URL_BD === undefined)('M02 · búsqueda (PostgreSQL real)', () =
     const { BusquedaRepository: Repositorio } = await import('../repositories/busqueda.repository.js');
     const { consultarColoresOfrecidos } = await import('../../m01-catalogo/repositories/productos.repository.js');
     repo = new Repositorio();
-    primerColorDeLaFicha = async (idProducto, idFamiliaColor) => {
+    cartaDeLaFicha = async (idProducto, idFamiliaColor) => {
       const carta = await consultarColoresOfrecidos(idProducto, {
         pagina: 1,
         limite: 1,
         ...(idFamiliaColor === undefined ? {} : { idFamiliaColor }),
       });
       const primero = carta?.items[0];
-      return primero === undefined ? null : { nombre: primero.nombre, hexadecimal: primero.hexadecimal.trim() };
+      return {
+        primero:
+          primero === undefined
+            ? null
+            : { idColor: primero.idColor, nombre: primero.nombre, hexadecimal: primero.hexadecimal.trim() },
+        total: carta?.total ?? 0,
+      };
     };
   });
 
@@ -50,12 +59,16 @@ describe.skipIf(URL_BD === undefined)('M02 · búsqueda (PostgreSQL real)', () =
     expect(primero?.nombre).toBe('Koraza Sol & Lluvia');
   });
 
-  it('el color de muestra es el primero de la carta de la ficha; sin color, null (T1, T2)', async () => {
+  it('el color de muestra es el primero de la carta de la ficha y cuenta sus colores; sin color, null (T1, T2, T4)', async () => {
     const todos = await buscar();
     expect(todos.length).toBeGreaterThan(0);
     for (const p of todos) {
-      const esperado = p.tieneColor ? await primerColorDeLaFicha(p.idProducto) : null;
-      expect({ producto: p.nombre, color: p.colorMuestra }).toEqual({ producto: p.nombre, color: esperado });
+      const carta = p.tieneColor ? await cartaDeLaFicha(p.idProducto) : { primero: null, total: 0 };
+      expect({ producto: p.nombre, color: p.colorMuestra, total: p.totalColores }).toEqual({
+        producto: p.nombre,
+        color: carta.primero,
+        total: carta.total,
+      });
     }
     expect(todos.find((p) => p.nombre === 'Brocha de cerda natural')?.colorMuestra).toBeNull();
   });
@@ -68,7 +81,7 @@ describe.skipIf(URL_BD === undefined)('M02 · búsqueda (PostgreSQL real)', () =
     const lista = await buscar({ idFamiliaColor: [familia.id] });
     expect(lista.length).toBe(familia.total);
     for (const p of lista) {
-      expect(p.colorMuestra).toEqual(await primerColorDeLaFicha(p.idProducto, familia.id));
+      expect(p.colorMuestra).toEqual((await cartaDeLaFicha(p.idProducto, familia.id)).primero);
     }
   });
 

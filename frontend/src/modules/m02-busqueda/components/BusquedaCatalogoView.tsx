@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { Alert, Button, Container, ProductCard, Select, Skeleton } from '@/core/components';
-import { CompraRapidaModal } from '@/modules/m01-catalogo/components/publico/CompraRapidaModal';
-import { precioVisible } from '@/modules/m01-catalogo/services/ofertas-visuales';
 import { EventosEnCurso } from '@/modules/m06-precios/components/publico/EventosEnCurso';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { Paginador } from '@/modules/m01-catalogo/components/admin/comunes';
@@ -14,6 +12,7 @@ import { EspacioPublicitario } from '@/modules/m14-patrocinios/components/Espaci
 import { MedidorPatrocinio } from '@/modules/m14-patrocinios/components/MedidorPatrocinio';
 import type { OpcionesFiltro, PaginaBusqueda, ResultadoBusqueda } from '../dtos/busqueda.dto';
 import { busquedaApi } from '../services/busqueda-api';
+import { tarjetaDeResultado } from '../services/tarjeta-resultado';
 import type { FiltrosBusqueda } from '../services/filtros-busqueda';
 import {
   filtrosAUrl,
@@ -40,8 +39,6 @@ export const BusquedaCatalogoView: React.FC = () => {
   );
 
   const [panelMovilAbierto, setPanelMovilAbierto] = useState(false);
-  /** Producto abierto en la compra rápida (V4); null = cerrada. */
-  const [compraRapida, setCompraRapida] = useState<number | null>(null);
   const [textoBusqueda, setTextoBusqueda] = useState(filtros.q);
 
   const [cargando, setCargando] = useState(true);
@@ -457,25 +454,7 @@ export const BusquedaCatalogoView: React.FC = () => {
               {resultado.items.map((p) => (
                 <li key={p.idProducto} className="flex flex-col">
                   <MedidorPatrocinio idCampania={p.patrocinado ? p.idCampania : null} ubicacion="listado" className="relative flex-1">
-                    <ProductCard
-                      id={String(p.idProducto)}
-                      name={p.nombre}
-                      brand={p.marca}
-                      description={`${p.esCombo ? 'Combo · ' : ''}${p.subcategoria}${
-                        p.precioDesde === null ? '' : ' · Precio desde'
-                      }${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
-                      {...precioVisible(p.precioDesde, p.oferta)}
-                      isSponsored={p.patrocinado}
-                      href={`/productos/${p.idProducto}`}
-                      showViewDetails={false}
-                      onAddToCart={() => setCompraRapida(p.idProducto)}
-                      addToCartDisabled={p.compraBloqueada}
-                      {...(p.colorMuestra === null ? {} : { swatchColor: p.colorMuestra.hexadecimal })}
-                      {...(p.idImagenPrincipal === null
-                        ? {}
-                        : { imageUrl: busquedaApi.urlImagen(p.idImagenPrincipal, 'miniatura') })}
-                      className="h-full w-full"
-                    />
+                    <ProductCard {...tarjetaDeResultado(p)} className="h-full w-full" />
 
                     {/* Badge de coincidencia de color si aplica (B7/B8) */}
                     {p.coincidenciaColor && (
@@ -507,9 +486,6 @@ export const BusquedaCatalogoView: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* V4: el carrito de la tarjeta abre la compra rápida de M01 sin salir del listado. */}
-      <CompraRapidaModal idProducto={compraRapida} onClose={() => setCompraRapida(null)} />
     </Container>
   );
 };

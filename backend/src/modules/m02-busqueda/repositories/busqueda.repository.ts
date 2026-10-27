@@ -5,7 +5,6 @@ import type {
   BuscarProductosRequest,
   BusquedaSinResultado,
   ColorBuscado,
-  ColorMuestra,
   ContextoPrecio,
   ListarSinResultadoRequest,
   OpcionesFiltro,
@@ -31,7 +30,7 @@ import {
 } from '../services/coincidencia-texto';
 import { PrecioFinalBaseAdapter } from '../services/precio-final.adapter';
 import { compararPorRelevancia, elegirPatrocinados } from '../services/patrocinio-listado';
-import { CartaColoresRepository, type ColorCoincidente } from './carta-colores.repository';
+import { CartaColoresRepository, type ColorCoincidente, type MuestraDeProducto } from './carta-colores.repository';
 
 export { normalizarTexto };
 
@@ -432,7 +431,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
   private async coloresDeMuestra(
     pagina: ReadonlyArray<{ producto: ProductoCrudo; idColorCoincidente: number | null }>,
     filtros: BuscarProductosRequest,
-  ): Promise<ReadonlyMap<number, ColorMuestra>> {
+  ): Promise<ReadonlyMap<number, MuestraDeProducto>> {
     const conColor = pagina.filter(({ producto }) => producto.tieneColor);
     try {
       return await this.carta.coloresDeMuestra(
@@ -533,7 +532,8 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       oferta: ofertas.get(producto.idProducto) ?? null,
       patrocinado: patrocinados.has(producto.idProducto),
       idCampania: patrocinados.get(producto.idProducto)?.idCampania ?? null,
-      colorMuestra: muestras.get(producto.idProducto) ?? null,
+      colorMuestra: muestras.get(producto.idProducto)?.colorMuestra ?? null,
+      totalColores: muestras.get(producto.idProducto)?.totalColores ?? 0,
       coincidenciaColor,
     }));
 

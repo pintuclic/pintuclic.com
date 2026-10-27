@@ -182,6 +182,7 @@ export type ListarSinResultadoRequest = z.infer<typeof listarSinResultadoRequest
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export const colorMuestraSchema = z.object({
+  idColor: idSchema,
   nombre: z.string(),
   hexadecimal: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
 });
@@ -189,6 +190,7 @@ export type ColorMuestra = z.infer<typeof colorMuestraSchema>;
 
 export const resultadoBusquedaSchema = productoPublicoTarjetaSchema.extend({
   colorMuestra: colorMuestraSchema.nullable(),
+  totalColores: z.number().int().nonnegative(),
   coincidenciaColor: z.string().nullable(),
   patrocinado: z.boolean(),
   idCampania: idSchema.nullable(),

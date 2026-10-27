@@ -34,6 +34,12 @@ export interface ColorCoincidente {
   nombre: string;
 }
 
+/** T1 y T4: el color de muestra del producto y cuántos colores ofrece. */
+export interface MuestraDeProducto {
+  colorMuestra: ColorMuestra;
+  totalColores: number;
+}
+
 export interface PreferenciasMuestra {
   /** T2: los colores del filtro `idColor`. */
   idsColorFiltro: readonly number[];
@@ -97,16 +103,20 @@ export class CartaColoresRepository {
   /**
    * T1–T3: el color de muestra de cada producto de la página, en una consulta. Primero el del filtro de color, luego
    * el que coincidió con el término, luego uno de la familia filtrada y, si no, el primero por nombre e id (el orden
-   * de la ficha). Un producto sin colores no aparece en el resultado.
+   * de la ficha). En la misma consulta cuenta cuántos colores ofrece cada uno (T4: la ventana se calcula antes de
+   * quedarse con una fila por producto). Un producto sin colores no aparece en el resultado.
    */
   async coloresDeMuestra(
     idsProducto: readonly number[],
     preferencias: PreferenciasMuestra,
-  ): Promise<Map<number, ColorMuestra>> {
+  ): Promise<Map<number, MuestraDeProducto>> {
     if (idsProducto.length === 0) return new Map();
     const delTermino = [...preferencias.colorDelTermino.entries()];
-    const filas = await prisma.$queryRaw<Array<{ id_producto: number; nombre: string; hexadecimal: string }>>`
-      SELECT DISTINCT ON (p.id_producto) p.id_producto, c.nombre, c.hexadecimal
+    const filas = await prisma.$queryRaw<
+      Array<{ id_producto: number; id_color: number; nombre: string; hexadecimal: string; total: bigint | number }>
+    >`
+      SELECT DISTINCT ON (p.id_producto)
+        p.id_producto, c.id_color, c.nombre, c.hexadecimal, COUNT(*) OVER (PARTITION BY p.id_producto) AS total
       FROM producto p
       JOIN color c ON ${COLOR_OFRECIDO}
       WHERE p.id_producto = ANY(${[...idsProducto]}::int[])
@@ -120,6 +130,14 @@ export class CartaColoresRepository {
         c.nombre,
         c.id_color
     `;
-    return new Map(filas.map((f) => [f.id_producto, { nombre: f.nombre, hexadecimal: f.hexadecimal.trim() }]));
+    return new Map(
+      filas.map((f) => [
+        f.id_producto,
+        {
+          colorMuestra: { idColor: f.id_color, nombre: f.nombre, hexadecimal: f.hexadecimal.trim() },
+          totalColores: Number(f.total),
+        },
+      ]),
+    );
   }
 }
