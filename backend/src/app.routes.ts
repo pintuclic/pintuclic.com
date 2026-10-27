@@ -3,6 +3,7 @@ import { construirRutasLandingBanners } from './core/landing/banners.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { BusquedaM02Adapter } from './modules/m03-asesoria/adapters/busqueda-m02.adapter';
+import { ContextoCatalogoAdapter } from './modules/m03-asesoria/adapters/contexto-catalogo.adapter';
 import { construirModuloM03 } from './modules/m03-asesoria/m03.routes';
 import { construirModuloM14 } from './modules/m14-patrocinios/m14.routes';
 import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
@@ -193,6 +194,7 @@ export function construirAppRoutes(): Router {
   // que el número que anuncia y lo que muestra el catálogo al pulsar sean lo mismo (M03 · R7).
   const m03 = construirModuloM03(m17.autorizacionService, {
     catalogo: new BusquedaM02Adapter(m02.busquedaService),
+    contextoCatalogo: new ContextoCatalogoAdapter(m02.busquedaService),
     auditoria: m20.auditoria,
   });
   router.use('/admin/asesoria', exigirSesionSalvo(auth, []), m03.adminRouter);

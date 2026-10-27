@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { Container, SegmentedTabs } from '@/core/components';
+import { AsistenteView } from './AsistenteView';
 import { CalculadoraGeneralView } from './CalculadoraGeneralView';
 import { CuestionarioGuiadoView } from './CuestionarioGuiadoView';
 
-type Seccion = 'asistida' | 'calculadora';
+type Seccion = 'asistida' | 'calculadora' | 'asistente';
 
 /**
  * Las dos herramientas de asesoría sin IA: la búsqueda asistida (HU-ASE-01) y la calculadora
@@ -37,11 +38,14 @@ export function AsesoriaView() {
           options={[
             { value: 'asistida', label: 'Qué pintura necesito' },
             { value: 'calculadora', label: 'Cuánta pintura necesito' },
+            { value: 'asistente', label: 'Preguntar al asistente' },
           ]}
         />
 
         <div id="panel-asesoria" role="tabpanel">
-          {seccion === 'asistida' ? <CuestionarioGuiadoView /> : <CalculadoraGeneralView />}
+          {seccion === 'asistida' && <CuestionarioGuiadoView />}
+          {seccion === 'calculadora' && <CalculadoraGeneralView />}
+          {seccion === 'asistente' && <AsistenteView />}
         </div>
       </div>
     </Container>
