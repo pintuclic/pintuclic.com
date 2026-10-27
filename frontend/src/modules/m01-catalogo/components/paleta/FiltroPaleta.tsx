@@ -17,6 +17,12 @@ export interface FiltroPaletaProps {
   onTexto: (texto: string) => void;
 }
 
+/** El fondo y el borde de la pestaña de una familia: su propio color, suave (más fuerte cuando está elegida). */
+const tinteDeFamilia = (hex: string, elegida: boolean): React.CSSProperties => ({
+  backgroundColor: `color-mix(in srgb, ${hex} ${elegida ? 30 : 13}%, white)`,
+  borderColor: `color-mix(in srgb, ${hex} ${elegida ? 85 : 38}%, white)`,
+});
+
 /**
  * El filtro de la paleta (contrato M01 · P2, P3): pestañas de familia (cada una con su muestra y cuántos colores trae),
  * marca y búsqueda por nombre o código. Elegir una no vacía las demás.
@@ -50,6 +56,7 @@ export const FiltroPaleta: React.FC<FiltroPaletaProps> = ({ titulo, familias, ma
           size="md"
           onClick={() => onFamilia(f.idFamiliaColor)}
           className="shrink-0"
+          style={tinteDeFamilia(f.hexadecimal, familia === f.idFamiliaColor)}
           leftIcon={<span aria-hidden="true" className="h-3.5 w-3.5 rounded-full border border-neutral-light" style={{ background: f.hexadecimal }} />}
         >
           {f.nombre}

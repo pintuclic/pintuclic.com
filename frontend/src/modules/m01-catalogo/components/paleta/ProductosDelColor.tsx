@@ -17,10 +17,11 @@ export interface ProductosDelColorProps {
 }
 
 /**
- * Productos recomendados y productos que podrían interesar (contrato M01 · P9, P10). Los recomendados son los que se
- * entregan en el color elegido, tal como los devuelve M02 (con sus ofertas y la etiqueta «Patrocinado»); la tarjeta es la
- * estándar del catálogo, así que seguirá la que M01 defina para «variante real con su color». Cada uno lleva a la ficha con
- * el color puesto (P11).
+ * Productos del color y productos recomendados (contrato M01 · P9, P10). Los del color son los que se entregan en el color
+ * elegido, tal como los devuelve M02 (con sus ofertas y la etiqueta «Patrocinado»); la tarjeta es la estándar del catálogo,
+ * así que seguirá la que M01 defina para «variante real con su color». Cada uno lleva a la ficha con el color puesto (P11).
+ * Los recomendados son los que el sistema sugiere aparte de las pinturas (complementarios de los primeros productos del
+ * color) para completar el trabajo.
  */
 export const ProductosDelColor: React.FC<ProductosDelColorProps> = ({ color, id }) => {
   const idColor = color?.idColor ?? null;
@@ -32,7 +33,8 @@ export const ProductosDelColor: React.FC<ProductosDelColorProps> = ({ color, id 
     'No se pudieron cargar los productos de este color.',
   );
   const items = productos.datos?.items ?? [];
-  const primero = items[0]?.idProducto ?? null;
+  const ids = items.slice(0, 3).map((p) => p.idProducto);
+  const primero = ids[0] ?? null;
 
   return (
     <>
@@ -40,7 +42,7 @@ export const ProductosDelColor: React.FC<ProductosDelColorProps> = ({ color, id 
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="titulo-productos-color" className="font-title text-2xl font-bold text-corporate">
-              Productos recomendados
+              {color === null ? 'Productos en este color' : `Productos en ${color.nombre}`}
             </h2>
             <p className="font-sans text-sm text-neutral-medium">
               {color === null ? (
@@ -95,7 +97,7 @@ export const ProductosDelColor: React.FC<ProductosDelColorProps> = ({ color, id 
           </ul>
         )}
       </section>
-      {primero !== null && <ComplementariosProducto idProducto={primero} titulo="Productos que podrían interesar" />}
+      {primero !== null && <ComplementariosProducto idProducto={primero} tambienDe={ids.slice(1)} titulo="Recomendados para tu proyecto" />}
     </>
   );
 };

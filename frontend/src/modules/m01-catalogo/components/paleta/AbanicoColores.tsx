@@ -5,16 +5,17 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { BareButton, Button, IconButton } from '@/core/components';
 import type { ColorPaleta } from '../../dtos/m01-catalogo-paleta.dto';
 import {
+  DERIVA_MAXIMA,
   PX_RUEDA_POR_LAMINA,
   acotarCentro,
-  anguloDeLamina,
   centroAlSoltar,
   centroTrasArrastre,
+  estiloDeLamina,
   geometriaAbanico,
   laminaCentral,
-  laminaVisible,
   necesitaMasColores,
   pasoDeTecla,
+  rangoDibujado,
 } from '../../services/abanico';
 import { colorDeTexto } from '../../services/contraste';
 
@@ -35,8 +36,56 @@ export interface AbanicoColoresProps {
 }
 
 const UMBRAL_ARRASTRE_PX = 6;
-/** Cuánto sube la lámina elegida, como fracción de su alto. */
-const LEVANTE = 0.05;
+
+interface LaminaProps {
+  color: ColorPaleta;
+  indice: number;
+  marcada: boolean;
+  enFoco: boolean;
+  ancho: number;
+  alto: number;
+  transicion: string;
+  onElegir: (color: ColorPaleta, indice: number) => void;
+  registrar: (id: number, el: HTMLButtonElement | null) => void;
+}
+
+/**
+ * Una lámina del abanico. Está memorizada y NO escribe giro, opacidad ni capa: eso lo aplica `aplicar` directamente al DOM
+ * (al montarla y en cada cuadro del arrastre), así que mover el abanico no vuelve a pintar las láminas con React.
+ */
+const Lamina = React.memo(function Lamina({ color: c, indice, marcada, enFoco, ancho, alto, transicion, onElegir, registrar }: LaminaProps) {
+  const texto = colorDeTexto(c.hexadecimal);
+  return (
+    <BareButton
+      ref={(el) => registrar(c.idColor, el)}
+      role="radio"
+      data-i={indice}
+      data-id={c.idColor}
+      aria-checked={marcada}
+      aria-label={`${c.nombre}${c.codigo === null ? '' : `, código ${c.codigo}`}${c.familia === null ? '' : `, ${c.familia}`}`}
+      tabIndex={enFoco ? 0 : -1}
+      onClick={() => onElegir(c, indice)}
+      className={`absolute bottom-0 left-1/2 flex flex-col items-center justify-start overflow-hidden rounded-t-[22px] rounded-b-md border border-neutral-white/70 pt-3 shadow-[0_10px_24px_-8px_rgba(0,20,50,0.55)] ${
+        marcada ? 'ring-4 ring-neutral-white' : ''
+      }`}
+      // Cada lámina gira desde el mismo punto inferior y vive en su propia capa (moverla no obliga a repintar).
+      style={{ width: ancho, height: alto, marginLeft: -ancho / 2, background: c.hexadecimal, color: texto, transformOrigin: '50% 100%', transition: transicion, willChange: 'transform' }}
+    >
+      <span
+        aria-hidden="true"
+        className="font-title text-[11px] font-bold leading-tight"
+        style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', maxHeight: '62%', overflow: 'hidden' }}
+      >
+        {c.nombre}
+      </span>
+      {c.codigo !== null && (
+        <span aria-hidden="true" className="mt-2 font-mono text-[10px] opacity-80" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+          {c.codigo}
+        </span>
+      )}
+    </BareButton>
+  );
+});
 
 /**
  * El abanico de la paleta (contrato M01 · P14): la tabla de colores abierta en abanico, grande, que se desliza con el
@@ -57,7 +106,13 @@ export const AbanicoColores: React.FC<AbanicoColoresProps> = ({
 }) => {
   const contenedor = useRef<HTMLDivElement>(null);
   const [medidas, setMedidas] = useState({ ancho: 1000, alto: 560 });
+  /**
+   * El «ancla»: de ella depende qué láminas se dibujan. El centro que se ve (`vivo`, fraccionario mientras se arrastra) se
+   * mueve directo en el DOM y solo vuelve a React cuando se aleja del ancla o cuando el gesto termina.
+   */
   const [centro, setCentro] = useState(0);
+  const vivo = useRef(0);
+  const cuadro = useRef<number | null>(null);
   /** La lámina que recibe el foco del teclado (puede estar lejos del centro cuando la ventana llega a un borde). */
   const [foco, setFoco] = useState(0);
   const [arrastrando, setArrastrando] = useState(false);
@@ -70,6 +125,48 @@ export const AbanicoColores: React.FC<AbanicoColoresProps> = ({
   const geo = useMemo(() => geometriaAbanico(medidas.ancho, medidas.alto), [medidas]);
   const n = colores.length;
   const centroEntero = laminaCentral(centro, n);
+  const geoRef = useRef(geo);
+  geoRef.current = geo;
+  const elegidoRef = useRef(elegidoId);
+  elegidoRef.current = elegidoId;
+
+  /** Aplica el centro vivo a una lámina: giro, opacidad y capa son cosa de este código, no de React. */
+  const aplicar = useCallback((el: HTMLButtonElement): void => {
+    const e = estiloDeLamina(Number(el.dataset.i), vivo.current, geoRef.current, el.dataset.id === String(elegidoRef.current));
+    el.style.transform = e.transform;
+    el.style.opacity = String(e.opacity);
+    el.style.zIndex = String(e.zIndex);
+    el.style.pointerEvents = e.visible ? 'auto' : 'none';
+    el.disabled = !e.visible;
+  }, []);
+
+  const pintar = useCallback((): void => {
+    cuadro.current = null;
+    for (const el of laminas.current.values()) aplicar(el);
+  }, [aplicar]);
+
+  const registrar = useCallback(
+    (id: number, el: HTMLButtonElement | null): void => {
+      if (el === null) {
+        laminas.current.delete(id);
+        return;
+      }
+      laminas.current.set(id, el);
+      aplicar(el);
+    },
+    [aplicar],
+  );
+
+  /** Mueve el centro con transición (teclado, flechas, rueda, soltar el gesto): React vuelve a pintar y la transición hace el resto. */
+  const fijar = useCallback((valor: number): void => {
+    vivo.current = valor;
+    setCentro(valor);
+  }, []);
+
+  // Tras cada pintado de React el DOM queda igual que el centro vivo (React no reescribe estilos que cree iguales).
+  useEffect(() => {
+    pintar();
+  });
 
   useEffect(() => {
     const consulta = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -97,13 +194,13 @@ export const AbanicoColores: React.FC<AbanicoColoresProps> = ({
     ultimaClave.current = claveFiltro;
     const i = colores.findIndex((c) => c.idColor === elegidoId);
     setFoco(Math.max(0, i));
-    setCentro(acotarCentro(i >= 0 ? i : 0, colores.length, geo.visibles));
-  }, [claveFiltro, cargando, colores, elegidoId, geo.visibles]);
+    fijar(acotarCentro(i >= 0 ? i : 0, colores.length, geo.visibles));
+  }, [claveFiltro, cargando, colores, elegidoId, geo.visibles, fijar]);
 
   // Si la cantidad de colores o el tamaño cambian, el centro se mantiene dentro de sus límites.
   useEffect(() => {
-    setCentro((c) => acotarCentro(c, n, geo.visibles));
-  }, [n, geo.visibles]);
+    fijar(acotarCentro(vivo.current, n, geo.visibles));
+  }, [n, geo.visibles, fijar]);
 
   // P4: al acercarse al final de lo cargado se pide la siguiente página.
   useEffect(() => {
@@ -123,10 +220,11 @@ export const AbanicoColores: React.FC<AbanicoColoresProps> = ({
     (destino: number, enfocar = false): void => {
       const i = Math.min(Math.max(0, destino), Math.max(0, n - 1));
       setFoco(i);
-      setCentro((c) => (Math.abs(i - c) > (geo.visibles - 1) / 2 || !enfocar ? acotarCentro(i, n, geo.visibles) : c));
+      const c = vivo.current;
+      fijar(Math.abs(i - c) > (geo.visibles - 1) / 2 || !enfocar ? acotarCentro(i, n, geo.visibles) : c);
       if (enfocar) enfocarTras.current = i;
     },
-    [n, geo.visibles],
+    [n, geo.visibles, fijar],
   );
 
   // La rueda horizontal desliza el abanico; la vertical sigue desplazando la página (no se intercepta).
@@ -141,16 +239,16 @@ export const AbanicoColores: React.FC<AbanicoColoresProps> = ({
       const pasos = Math.trunc(acumuladoRueda.current / PX_RUEDA_POR_LAMINA);
       if (pasos !== 0) {
         acumuladoRueda.current -= pasos * PX_RUEDA_POR_LAMINA;
-        setCentro((c) => acotarCentro(Math.round(c) + pasos, n, geo.visibles));
+        fijar(acotarCentro(Math.round(vivo.current) + pasos, n, geo.visibles));
       }
     };
     el.addEventListener('wheel', alRueda, { passive: false });
     return () => el.removeEventListener('wheel', alRueda);
-  }, [n, geo.visibles]);
+  }, [n, geo.visibles, fijar]);
 
   const alPresionar = (e: React.PointerEvent<HTMLDivElement>): void => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    gesto.current = { x: e.clientX, centro, moviendo: false, muestras: [{ x: e.clientX, t: e.timeStamp }] };
+    gesto.current = { x: e.clientX, centro: vivo.current, moviendo: false, muestras: [{ x: e.clientX, t: e.timeStamp }] };
   };
 
   const alMover = (e: React.PointerEvent<HTMLDivElement>): void => {
@@ -166,7 +264,10 @@ export const AbanicoColores: React.FC<AbanicoColoresProps> = ({
     }
     g.muestras.push({ x: e.clientX, t: e.timeStamp });
     if (g.muestras.length > 5) g.muestras.shift();
-    setCentro(centroTrasArrastre(g.centro, dx, geo.pxPorLamina, n, geo.visibles));
+    vivo.current = centroTrasArrastre(g.centro, dx, geo.pxPorLamina, n, geo.visibles);
+    if (cuadro.current === null) cuadro.current = window.requestAnimationFrame(pintar);
+    // Solo cuando el centro se aleja del ancla se pide a React qué láminas dibujar.
+    if (Math.abs(vivo.current - centro) >= DERIVA_MAXIMA) setCentro(vivo.current);
   };
 
   const alSoltar = (e: React.PointerEvent<HTMLDivElement>): void => {
@@ -181,8 +282,10 @@ export const AbanicoColores: React.FC<AbanicoColoresProps> = ({
     const dt = primera !== undefined && ultima !== undefined ? Math.max(1, ultima.t - primera.t) : 1;
     const velocidad = primera !== undefined && ultima !== undefined ? (ultima.x - primera.x) / dt : 0;
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-    const nuevo = centroAlSoltar(centro, velocidad, geo.pxPorLamina, n, geo.visibles, !menosMovimiento);
-    setCentro(nuevo);
+    const nuevo = centroAlSoltar(vivo.current, velocidad, geo.pxPorLamina, n, geo.visibles, !menosMovimiento);
+    if (cuadro.current !== null) window.cancelAnimationFrame(cuadro.current);
+    cuadro.current = null;
+    fijar(nuevo);
     setFoco(laminaCentral(nuevo, n));
   };
 
@@ -193,15 +296,19 @@ export const AbanicoColores: React.FC<AbanicoColoresProps> = ({
     irA(nuevo, true);
   };
 
-  const elegir = (c: ColorPaleta, indice: number): void => {
+  // Estable entre pintados: las láminas son memorizadas y solo se vuelven a pintar las que de verdad cambian.
+  const alElegir = useRef(onElegir);
+  alElegir.current = onElegir;
+  const irARef = useRef(irA);
+  irARef.current = irA;
+  const elegir = useCallback((c: ColorPaleta, indice: number): void => {
     if (hubo.current) return;
-    irA(indice);
-    onElegir(c);
-  };
+    irARef.current(indice);
+    alElegir.current(c);
+  }, []);
 
   const transicion = arrastrando || menosMovimiento ? 'none' : 'transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms';
-  const primero = Math.max(0, Math.floor(centro) - geo.visibles);
-  const ultimo = Math.min(n - 1, Math.ceil(centro) + geo.visibles);
+  const { primero, ultimo } = rangoDibujado(centro, n, geo.visibles);
   const elegido = colores.find((c) => c.idColor === elegidoId) ?? null;
 
   if (!cargando && n === 0) {
@@ -238,59 +345,20 @@ export const AbanicoColores: React.FC<AbanicoColoresProps> = ({
           </p>
         )}
         {n > 0 &&
-          colores.slice(primero, ultimo + 1).map((c, desde) => {
-            const i = primero + desde;
-            const angulo = anguloDeLamina(i, centro, geo.paso);
-            const visible = laminaVisible(i, centro, geo.visibles);
-            const marcada = c.idColor === elegidoId;
-            const texto = colorDeTexto(c.hexadecimal);
-            const sube = marcada ? geo.altoLamina * LEVANTE : 0;
-            return (
-              <BareButton
-                key={c.idColor}
-                ref={(el) => {
-                  if (el === null) laminas.current.delete(c.idColor);
-                  else laminas.current.set(c.idColor, el);
-                }}
-                role="radio"
-                aria-checked={marcada}
-                aria-label={`${c.nombre}${c.codigo === null ? '' : `, código ${c.codigo}`}${c.familia === null ? '' : `, ${c.familia}`}`}
-                tabIndex={i === foco ? 0 : -1}
-                disabled={!visible}
-                onClick={() => elegir(c, i)}
-                className={`absolute bottom-0 left-1/2 flex flex-col items-center justify-start overflow-hidden rounded-t-[22px] rounded-b-md border border-neutral-white/70 pt-3 shadow-[0_10px_24px_-8px_rgba(0,20,50,0.55)] ${
-                  marcada ? 'ring-4 ring-neutral-white' : ''
-                }`}
-                // Cada lámina gira desde el mismo punto inferior; las que no caben en la ventana se desvanecen.
-                style={{
-                  width: geo.anchoLamina,
-                  height: geo.altoLamina,
-                  marginLeft: -geo.anchoLamina / 2,
-                  background: c.hexadecimal,
-                  color: texto,
-                  transformOrigin: '50% 100%',
-                  transform: `rotate(${angulo}deg) translateY(${-sube}px) scale(${marcada ? 1.04 : 1})`,
-                  transition: transicion,
-                  opacity: visible ? 1 : 0,
-                  pointerEvents: visible ? 'auto' : 'none',
-                  zIndex: marcada ? 40 : 10 + Math.round(10 - Math.abs(i - centro)),
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  className="font-title text-[11px] font-bold leading-tight"
-                  style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', maxHeight: '62%', overflow: 'hidden' }}
-                >
-                  {c.nombre}
-                </span>
-                {c.codigo !== null && (
-                  <span aria-hidden="true" className="mt-2 font-mono text-[10px] opacity-80" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                    {c.codigo}
-                  </span>
-                )}
-              </BareButton>
-            );
-          })}
+          colores.slice(primero, ultimo + 1).map((c, desde) => (
+            <Lamina
+              key={c.idColor}
+              color={c}
+              indice={primero + desde}
+              marcada={c.idColor === elegidoId}
+              enFoco={primero + desde === foco}
+              ancho={geo.anchoLamina}
+              alto={geo.altoLamina}
+              transicion={transicion}
+              onElegir={elegir}
+              registrar={registrar}
+            />
+          ))}
       </div>
 
       {n > 0 && (
