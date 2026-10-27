@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   ANCHO_ABANICO_ANGOSTO,
+  DERIVA_MAXIMA,
+  LEVANTE_LAMINA,
   acotarCentro,
   anguloDeLamina,
   centroAlSoltar,
   centroTrasArrastre,
+  estiloDeLamina,
   geometriaAbanico,
   laminaCentral,
   laminaVisible,
@@ -12,6 +15,7 @@ import {
   limitesCentro,
   necesitaMasColores,
   pasoDeTecla,
+  rangoDibujado,
 } from '../services/abanico';
 import { colorDeTexto, luminanciaRelativa, parecidoEnPalabras, razonDeContraste } from '../services/contraste';
 import { paletaAUrl, paletaDesdeUrl } from '../services/filtros-paleta';
@@ -163,5 +167,49 @@ describe('estado de la página en la dirección (P5)', () => {
     expect(paletaAUrl({ familia: 3, idMarca: null, q: '  azul  ', color: 15 })).toBe('?familia=3&q=azul&color=15');
     const estado = { familia: 3, idMarca: 2, q: 'azul océano', color: 15 };
     expect(desde(paletaAUrl(estado).slice(1))).toEqual(estado);
+  });
+});
+
+describe('láminas del abanico sin React (fluidez del arrastre)', () => {
+  const geo = geometriaAbanico(1200, 700);
+
+  it('estiloDeLamina: la central no gira y las lejanas se esconden', () => {
+    const central = estiloDeLamina(10, 10, geo, false);
+    expect(central.transform).toContain('rotate(0deg)');
+    expect(central.opacity).toBe(1);
+    expect(central.visible).toBe(true);
+    const lejana = estiloDeLamina(40, 10, geo, false);
+    expect(lejana.opacity).toBe(0);
+    expect(lejana.visible).toBe(false);
+  });
+
+  it('estiloDeLamina: la elegida sube, crece y queda al frente', () => {
+    const marcada = estiloDeLamina(10, 10, geo, true);
+    expect(marcada.transform).toContain('scale(1.04)');
+    expect(marcada.transform).toContain(`translateY(${-geo.altoLamina * LEVANTE_LAMINA}px)`);
+    expect(marcada.zIndex).toBe(40);
+    expect(estiloDeLamina(10, 10, geo, false).zIndex).toBeLessThan(40);
+  });
+
+  it('estiloDeLamina: con el centro a medio camino el giro es proporcional (arrastre continuo)', () => {
+    const a = estiloDeLamina(5, 4.5, geo, false).transform;
+    expect(a).toContain(`rotate(${0.5 * geo.paso}deg)`);
+  });
+
+  it('rangoDibujado: cubre la ventana visible aunque el centro vivo se aleje DERIVA_MAXIMA del ancla', () => {
+    const ancla = 20;
+    const { primero, ultimo } = rangoDibujado(ancla, 100, geo.visibles);
+    const mitad = (geo.visibles - 1) / 2 + 0.5;
+    for (const vivo of [ancla - DERIVA_MAXIMA, ancla + DERIVA_MAXIMA]) {
+      expect(primero).toBeLessThanOrEqual(Math.ceil(vivo - mitad));
+      expect(ultimo).toBeGreaterThanOrEqual(Math.floor(vivo + mitad));
+    }
+  });
+
+  it('rangoDibujado: se acota a la lista y dibuja pocas láminas (no todas)', () => {
+    expect(rangoDibujado(0, 100, 13).primero).toBe(0);
+    expect(rangoDibujado(99, 100, 13).ultimo).toBe(99);
+    const r = rangoDibujado(50, 1000, 13);
+    expect(r.ultimo - r.primero + 1).toBeLessThan(30);
   });
 });

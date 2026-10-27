@@ -42,6 +42,41 @@ export const anguloDeLamina = (indice: number, centro: number, paso: number): nu
 export const laminaVisible = (indice: number, centro: number, visibles: number): boolean =>
   Math.abs(indice - centro) <= (visibles - 1) / 2 + 0.5;
 
+/** Cuánto sube la lámina elegida, como fracción de su alto. */
+export const LEVANTE_LAMINA = 0.05;
+
+export interface EstiloLamina {
+  transform: string;
+  opacity: number;
+  zIndex: number;
+  visible: boolean;
+}
+
+/**
+ * Lo que cambia de una lámina cuando el centro se mueve (giro, opacidad, capa). Se calcula aquí, sin React, para poder
+ * aplicarlo directamente al DOM mientras se arrastra: así el dedo no depende de volver a pintar todo el componente.
+ */
+export function estiloDeLamina(indice: number, centro: number, geo: GeometriaAbanico, marcada: boolean): EstiloLamina {
+  const visible = laminaVisible(indice, centro, geo.visibles);
+  const sube = marcada ? geo.altoLamina * LEVANTE_LAMINA : 0;
+  return {
+    transform: `rotate(${anguloDeLamina(indice, centro, geo.paso)}deg) translateY(${-sube}px) scale(${marcada ? 1.04 : 1})`,
+    opacity: visible ? 1 : 0,
+    zIndex: marcada ? 40 : 10 + Math.round(10 - Math.abs(indice - centro)),
+    visible,
+  };
+}
+
+/** Cuántas láminas se dibujan a cada lado del ancla: la ventana visible más un margen para que el arrastre no deje huecos. */
+export const MARGEN_LAMINAS = 4;
+/** Cuánto puede alejarse el centro vivo del ancla antes de volver a calcular qué láminas se dibujan. */
+export const DERIVA_MAXIMA = 2;
+
+export const rangoDibujado = (ancla: number, total: number, visibles: number): { primero: number; ultimo: number } => {
+  const alcance = Math.ceil(visibles / 2) + MARGEN_LAMINAS + DERIVA_MAXIMA;
+  return { primero: Math.max(0, Math.floor(ancla) - alcance), ultimo: Math.min(total - 1, Math.ceil(ancla) + alcance) };
+};
+
 /**
  * Entre qué valores puede estar el centro de la ventana: con más colores que láminas visibles, de manera que la ventana
  * nunca muestre huecos a los lados (la primera lámina queda en el borde izquierdo y la última en el derecho); con

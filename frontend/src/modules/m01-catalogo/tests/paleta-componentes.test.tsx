@@ -62,6 +62,12 @@ describe('CombinadorColores (P7–P10)', () => {
     expect(html).toContain('Elige un color en el abanico');
   });
 
+  it('es compacto: las armonías van en una fila, sin descripciones largas a la vista', () => {
+    const html = renderToStaticMarkup(<CombinadorColores color={AZUL} onElegir={() => undefined} />);
+    expect(html).toContain('p-4');
+    expect(html).not.toContain('p-5');
+  });
+
   it('ofrece las dos pestañas, con «En tu espacio» reservada', () => {
     const html = renderToStaticMarkup(<CombinadorColores color={AZUL} onElegir={() => undefined} />);
     expect(html).toContain('role="tablist"');
@@ -89,6 +95,10 @@ describe('FiltroPaleta (P2–P4)', () => {
   it('lista las familias con su cantidad y marca la elegida', () => {
     expect(html).toContain('Azules');
     expect(html).toContain('aria-pressed="true"');
+  });
+
+  it('cada familia lleva un tinte suave de su propio color', () => {
+    expect(html).toContain('color-mix(in srgb, #1F3A93');
   });
 
   it('conserva el texto de la búsqueda', () => {

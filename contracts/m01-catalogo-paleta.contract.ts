@@ -80,13 +80,15 @@ import {
  *      si no hay ninguno, `cercano` es null y la pantalla muestra la muestra sin enlace y con «Sin color parecido en la
  *      carta». Se informa `deltaE` (con un decimal) y la pantalla lo traduce a «muy parecido» (≤ 6), «parecido» (≤ 15) o
  *      «aproximado» (más). En empate de distancia gana el de menor id.
- *  P9  PRODUCTOS RECOMENDADOS. Los que se pueden entregar en el color elegido: `GET /busqueda/productos?idColor=…`
+ *  P9  PRODUCTOS DEL COLOR. Los que se pueden entregar en el color elegido: `GET /busqueda/productos?idColor=…`
  *      (M02), con sus ofertas y la etiqueta «Patrocinado» como en el catálogo. Hasta PRODUCTOS_RECOMENDADOS_MAXIMO. La
- *      sección se mantiene (el Tech Lead lo confirmó). Cada tarjeta lleva a la ficha con el color puesto (P11). La
+ *      sección se titula «Productos en <color>». Cada tarjeta lleva a la ficha con el color puesto (P11). La
  *      página solo CONSUME la tarjeta de M02: cuando la otra rama de M01 la cambie a «variante real con su color», este
  *      listado la mostrará sin cambios aquí. Sin color elegido la sección pide que elija uno en el abanico.
- *  P10 PRODUCTOS QUE PODRÍAN INTERESAR. Los complementarios (HU-CAT-08, X1 a X5) del primer producto recomendado: pinturas
- *      con sus brochas, rodillos, cintas. Si no hay ninguno, la sección no se pinta.
+ *  P10 PRODUCTOS RECOMENDADOS. Son los que el sistema sugiere APARTE de las pinturas para incitar a más compras (el Tech
+ *      Lead lo aclaró): los complementarios (HU-CAT-08, X1 a X5) de los tres primeros productos del color —brochas,
+ *      rodillos, cintas—, sin repetir y hasta 4. La sección se titula «Recomendados para tu proyecto»; si no hay ninguno,
+ *      no se pinta.
  *  P11 COLOR PUESTO EN LA FICHA. `GET /productos/:idProducto/colores` acepta un `idColor` opcional; si el color lo ofrece
  *      ese producto, responde solo ese (si no, lista vacía, sin error). La ficha lo usa al llegar con `?color=<id>` y deja
  *      el color ya elegido. Sin el parámetro no cambia nada (compatible con la entrega 2).
@@ -129,7 +131,11 @@ import {
  *  · HU básica: se confía más en el mockup para las FUNCIONES que para títulos e imágenes.
  *  · Ambientes: los hace M03; aquí solo la pestaña y el espacio (P6).
  *  · Umbral de color parecido: ΔE ≤ 25 (P8). Lugar en el menú: después de «Ofertas», con botón llamativo (P16).
- *  · Abanico: deslizable, grande y con onda al elegir (P14, P15). Productos recomendados: se mantienen (P9).
+ *  · Abanico: deslizable, grande y con onda al elegir (P14, P15). Debe sentirse fluido: el arrastre no puede depender de
+ *    volver a pintar el componente en cada movimiento.
+ *  · Productos recomendados = los complementarios que no son pintura (P10); los productos del color son otra sección (P9).
+ *  · Combinador compacto (P7): las cuatro armonías en una fila con su muestra y el color real más parecido como punto.
+ *  · Las pestañas de familia llevan un tinte suave de su propio color (P3).
  *  · Caché de 60 s (P13): es solo una memoria del servidor para no recalcular en cada visita; no afecta a la compra.
  *
  * Regla de Oro #1: Cero código sin contrato previo.

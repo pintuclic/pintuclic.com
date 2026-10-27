@@ -210,7 +210,7 @@ export const PaletaColorView: React.FC = () => {
         </section>
       </div>
 
-      <Container className="space-y-10 py-10">
+      <Container className="space-y-8 py-8">
         <CombinadorColores color={elegido} onElegir={elegirDesdeCombinador} />
         <ProductosDelColor color={elegido} id={ID_PRODUCTOS} />
       </Container>
