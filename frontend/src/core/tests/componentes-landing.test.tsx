@@ -4,7 +4,7 @@ import { getButtonClassName } from '../components/buttons/button-styles';
 import { CategoryCard } from '../components/data-display/CategoryCard';
 import { ProductCard } from '../components/data-display/ProductCard';
 import { SearchBar } from '../components/forms/SearchBar';
-import { Footer, type FooterProps } from '../components/layout/Footer';
+import { claveDeEnlace, Footer, type FooterProps } from '../components/layout/Footer';
 import { Header, type HeaderProps } from '../components/layout/Header';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
@@ -238,6 +238,14 @@ describe('Footer', () => {
     legalLinks: [{ label: 'Términos', href: '/terminos' }],
   };
   const html = renderToStaticMarkup(<Footer {...props} />);
+
+  it('dos enlaces a la misma página no repiten la clave', () => {
+    const enlaces = [
+      { label: 'Qué pintura necesito', href: '/asesoria' },
+      { label: 'Calculadora de pintura', href: '/asesoria' },
+    ];
+    expect(new Set(enlaces.map(claveDeEnlace)).size).toBe(2);
+  });
 
   it('calcula el año en lugar de fijarlo', () => {
     expect(html).toContain(`© ${new Date().getFullYear()} Pintu Clic`);
