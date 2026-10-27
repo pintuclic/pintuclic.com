@@ -139,6 +139,19 @@ describe.skipIf(URL_BD === undefined)('M05 · carrito (PostgreSQL + M01 + M06 re
     await prisma.carrito.update({ where: { idUsuario }, data: { fechaUltimaActividad: new Date() } });
   });
 
+  it('C15: guarda líneas acordadas, reemplaza la igual y M06 respeta el precio pactado', async () => {
+    const [l1] = lineasSeed;
+    if (l1 === undefined) throw new Error('sin datos');
+    const cot = await prisma.cotizacion.create({ data: { idUsuario: otroUsuario } });
+    await servicio.agregarLineasAcordadas(otroUsuario, cot.idCotizacion, [{ ...l1, cantidad: 4, precioAcordado: 1234.5 }]);
+    await servicio.agregarLineasAcordadas(otroUsuario, cot.idCotizacion, [{ ...l1, cantidad: 2, precioAcordado: 1000 }]);
+    const c = await servicio.carritoDeCuenta(otroUsuario);
+    const linea = c.lineas.find((l) => l.idVariante === l1.idVariante && l.idColor === l1.idColor);
+    expect(linea).toMatchObject({ cantidad: 2, idCotizacion: cot.idCotizacion, precioAcordado: 1000 });
+    expect(linea?.precio).toMatchObject({ precioAcordado: true, subtotal: 2000, descuentos: [] });
+    await prisma.cotizacion.delete({ where: { idCotizacion: cot.idCotizacion } });
+  });
+
   it('servicio + M06 real: el carrito trae el cálculo de M06 y cumple el contrato', async () => {
     const { carritoSchema } = await import('../dtos/m05-carrito.dto.js');
     const r = await servicio.consultar({ idUsuario, tokenVisitante: null }, 'ZZNOEXISTE');

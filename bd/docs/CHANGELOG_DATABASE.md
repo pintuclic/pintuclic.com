@@ -10,6 +10,19 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.19] - 2026-10-27
+### Esquema 4.18 (79 Tablas) - M21: cotizaciones desde el carrito
+- **Alcance General:** pedido por el contrato `contracts/m21-cotizaciones.contract.ts` (P1). Una tabla nueva.
+  - **`enum_estado_cotizacion`**: nuevo valor `solicitada` (el cliente la pide desde el carrito). `borrador` queda por datos anteriores y M21 lo trata igual.
+  - **`cotizacion`**: `codigo_visible` (generada: `COT-` + id con 6 dígitos), comentario del cliente, nota para el cliente, motivo de rechazo, fechas de envío, vencimiento (DATE) y respuesta, `id_usuario_responde`, `total_referencia`, `total_acordado` y `fecha_actualizacion`. El estado por defecto pasa a `solicitada`.
+  - **`linea_cotizacion`** (nueva): copia de cada línea del carrito (variante, color, cantidad, nombre, marca, medida, SKU y color) con `precio_referencia` y `precio_acordado`. Una sola línea por variante y color en cada cotización.
+  - **`linea_carrito`**: `id_cotizacion` y `precio_acordado` (las dos o ninguna) para las líneas que vienen de una cotización aceptada (C15 de M05).
+  - **Seed:** las dos cotizaciones de ejemplo con sus líneas y totales; parámetro 14 `comercial.dias_vigencia_cotizacion` (15 días, de 1 a 90), con su clave en `CLAVES_PARAMETROS` (contrato de M17 y sus dos espejos).
+  - **Prisma:** modelos `Cotizacion` y `LineaCotizacion`, enum `EstadoCotizacion` y los campos nuevos de `LineaCarrito`.
+  - **Bases existentes en 4.17:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` y `npm run db:seed` (idempotentes). Probado en PostgreSQL 18 sobre una base nueva y sobre una con el esquema anterior y su seed.
+
+---
+
 ## [v3.18] - 2026-10-27
 ### Esquema 4.17 (78 Tablas, sin cambios de DDL) - M17: parámetro `comercial.dias_vigencia_carrito_visitante`
 - **Seed:** parámetro 13 `comercial.dias_vigencia_carrito_visitante` (área `comercial`, número, 30 por defecto, de 1 a 365): días sin actividad tras los cuales M05 borra el carrito de un visitante sin sesión (C13 del contrato de M05, Q4 resuelta por el Tech Lead). Editable desde la configuración general.

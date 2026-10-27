@@ -27,6 +27,7 @@ import type {
   CarritoRepositoryPort,
   ConCookie,
   DuenoCarrito,
+  LineaAcordadaNueva,
   LineaGuardada,
   LineaNueva,
   Solicitante,
@@ -121,6 +122,7 @@ export class CarritoService {
 
     const r = await this.resolver(sol);
     const existente = r.carrito?.lineas.find((l) => mismaLinea(l, nueva));
+    if (existente?.idCotizacion !== undefined && existente.idCotizacion !== null) throw errores.lineaCotizada();
     const cantidad = (existente?.cantidad ?? 0) + nueva.cantidad;
     if (cantidad > CANTIDAD_MAXIMA_POR_LINEA) throw errores.cantidadFueraDeRango(CANTIDAD_MAXIMA_POR_LINEA);
     if (existente === undefined && (r.carrito?.lineas.length ?? 0) >= MAXIMO_LINEAS_CARRITO) {
@@ -139,6 +141,7 @@ export class CarritoService {
     const r = await this.resolver(sol);
     const linea = r.carrito?.lineas.find((l) => l.idLinea === idLinea);
     if (r.carrito === null || linea === undefined) throw errores.noDisponible();
+    if (linea.idCotizacion !== null) throw errores.lineaCotizada();
 
     const [enCatalogo] = await this.dep.catalogo.consultarLineas([
       { idVariante: linea.idVariante, idColor: linea.idColor },
@@ -159,6 +162,28 @@ export class CarritoService {
     }
     await this.dep.repo.registrarActividad(r.carrito.idCarrito);
     return this.recargar(r, r.cookie, sol.idUsuario, codigoCupon);
+  }
+
+  /* ── Puerto para M21 (C15, sin ruta HTTP) ─────────────────────────────── */
+
+  /** El carrito calculado de una cuenta. */
+  async carritoDeCuenta(idUsuario: number): Promise<Carrito> {
+    return (await this.consultar({ idUsuario, tokenVisitante: null })).datos;
+  }
+
+  /** C15: las líneas de una cotización aceptada entran con su precio fijo; reemplazan a las iguales. */
+  async agregarLineasAcordadas(
+    idUsuario: number,
+    idCotizacion: number,
+    lineas: readonly LineaAcordadaNueva[],
+  ): Promise<void> {
+    const sol: Solicitante = { idUsuario, tokenVisitante: null };
+    const r = await this.resolver(sol);
+    const actuales = r.carrito?.lineas ?? [];
+    const nuevas = lineas.filter((l) => !actuales.some((a) => mismaLinea(a, l))).length;
+    if (actuales.length + nuevas > MAXIMO_LINEAS_CARRITO) throw errores.limiteLineas(MAXIMO_LINEAS_CARRITO);
+    const { carrito } = await this.asegurarCarrito(r, sol);
+    await this.dep.repo.guardarLineasAcordadas(carrito.idCarrito, idCotizacion, lineas);
   }
 
   /** C11 (HU-CAR-05): compara lo que el cliente tiene en pantalla con un cálculo nuevo. */
@@ -182,6 +207,8 @@ export class CarritoService {
         cambios.push({ tipo: 'linea_nueva', idLinea: linea.idLinea });
         continue;
       }
+      // C15 (RF-CAR-05-06): el precio de una línea cotizada está pactado; no se compara.
+      if (linea.idCotizacion !== null) continue;
       const anterior = enPantalla.get(linea.idLinea) ?? null;
       const nuevo = precio.subtotal ?? 0;
       if (anterior === null || centavos(anterior) !== centavos(nuevo)) {
@@ -280,7 +307,10 @@ export class CarritoService {
     let cantidadesAjustadas = 0;
     for (const v of visitante.lineas) {
       const igual = cuenta.lineas.find((l) => mismaLinea(l, v));
-      if (igual !== undefined) {
+      if (igual !== undefined && igual.idCotizacion !== null) {
+        // C15: una línea cotizada no se suma; la del visitante no se trae.
+        lineasDescartadas += 1;
+      } else if (igual !== undefined) {
         const suma = igual.cantidad + v.cantidad;
         if (suma > CANTIDAD_MAXIMA_POR_LINEA) cantidadesAjustadas += 1;
         actualizar.push({ idLinea: igual.idLinea, cantidad: Math.min(suma, CANTIDAD_MAXIMA_POR_LINEA) });
@@ -356,6 +386,8 @@ export class CarritoService {
       cantidad: l.cantidad,
       producto: productoDeLinea(enCatalogo[i]),
       precio: calculo?.lineas.find((p) => p.indice === i) ?? null,
+      idCotizacion: l.idCotizacion,
+      precioAcordado: l.precioAcordado,
     }));
     const cantidadItems = vista.reduce((suma, l) => (l.precio?.vendible === true ? suma + l.cantidad : suma), 0);
     return { lineas: vista, cantidadItems, calculo, union: r.union };
@@ -369,7 +401,13 @@ export class CarritoService {
   ): Promise<Calculo | null> {
     try {
       return await this.dep.precios.calcular({
-        lineas: lineas.map((l) => ({ idVariante: l.idVariante, idColor: l.idColor, cantidad: l.cantidad })),
+        lineas: lineas.map((l) => ({
+          idVariante: l.idVariante,
+          idColor: l.idColor,
+          cantidad: l.cantidad,
+          // C15: M06 respeta el precio pactado sin descuentos (R3).
+          ...(l.precioAcordado === null ? {} : { precioAcordado: l.precioAcordado }),
+        })),
         ...(codigoCupon === undefined ? {} : { codigoCupon }),
         contexto: { idUsuario },
       });
