@@ -7,6 +7,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Edit3,
+  LayoutGrid,
+  type LucideIcon,
   Mail,
   RefreshCw,
   Save,
@@ -20,10 +22,13 @@ import {
   type EditarParametroFormData,
   validarValorParametro,
 } from '../../dtos/configuracion.dto';
-import type {
-  AreaParametro,
-  ParametroConfiguracion,
-} from '../../interfaces/configuracion.interface';
+import type { ParametroConfiguracion } from '../../interfaces/configuracion.interface';
+import {
+  ETIQUETAS_AREA,
+  type FiltroArea,
+  contarPorArea,
+  filtrarPorArea,
+} from '../../services/areas-configuracion';
 import { useConfiguracionStore } from '../../store/configuracionStore';
 
 export const ConfiguracionView: React.FC = () => {
@@ -77,15 +82,16 @@ export const ConfiguracionView: React.FC = () => {
     }
   };
 
-  const areas: { id: AreaParametro | 'todas'; label: string; icon: React.ReactNode }[] = [
-    { id: 'todas', label: 'Todos (10)', icon: <RefreshCw className="w-4 h-4" /> },
-    { id: 'autenticacion', label: 'Autenticación (6)', icon: <Shield className="w-4 h-4 text-action" /> },
-    { id: 'comunicaciones', label: 'Comunicaciones (1)', icon: <Mail className="w-4 h-4 text-conversion" /> },
-    { id: 'comercial', label: 'Comercial (3)', icon: <ShoppingBag className="w-4 h-4 text-highlight" /> },
+  // Los totales salen de los parámetros que devolvió el servidor: un parámetro nuevo aparece solo.
+  const conteo = contarPorArea(parametros);
+  const areas: { id: FiltroArea; label: string; Icono: LucideIcon }[] = [
+    { id: 'todas', label: 'Todos', Icono: LayoutGrid },
+    { id: 'autenticacion', label: ETIQUETAS_AREA.autenticacion, Icono: Shield },
+    { id: 'comunicaciones', label: ETIQUETAS_AREA.comunicaciones, Icono: Mail },
+    { id: 'comercial', label: ETIQUETAS_AREA.comercial, Icono: ShoppingBag },
   ];
 
-  const parametrosFiltrados =
-    areaActiva === 'todas' ? parametros : parametros.filter((p) => p.area === areaActiva);
+  const parametrosFiltrados = filtrarPorArea(parametros, areaActiva);
 
   return (
     <div className="space-y-6">
@@ -93,23 +99,35 @@ export const ConfiguracionView: React.FC = () => {
       {/* 1. CABECERA Y SELECTOR DE ÁREAS                                      */}
       {/* ==================================================================== */}
       <div className="bg-neutral-white border border-neutral-light/70 rounded-card p-5 shadow-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto">
-          {areas.map((area) => {
-            const activa = areaActiva === area.id;
+        <div
+          role="group"
+          aria-label="Filtrar parámetros por área"
+          className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto"
+        >
+          {areas.map(({ id, label, Icono }) => {
+            const activa = areaActiva === id;
             return (
               <Button
-                key={area.id}
+                key={id}
                 type="button"
                 variant={activa ? 'primary-action' : 'outline'}
                 size="sm"
+                aria-pressed={activa}
                 onClick={() => {
                   limpiarMensajes();
-                  establecerAreaActiva(area.id);
+                  establecerAreaActiva(id);
                 }}
-                leftIcon={area.icon}
+                leftIcon={<Icono aria-hidden className="w-4 h-4" />}
                 className="shrink-0 text-xs"
               >
-                {area.label}
+                {label}
+                <span
+                  className={`ml-1.5 inline-flex min-w-5 justify-center rounded-full px-1.5 text-[11px] font-bold ${
+                    activa ? 'bg-neutral-white/25 text-neutral-white' : 'bg-subaction text-corporate'
+                  }`}
+                >
+                  {conteo[id]}
+                </span>
               </Button>
             );
           })}
@@ -176,6 +194,10 @@ export const ConfiguracionView: React.FC = () => {
           <Skeleton className="h-44 w-full" />
           <Skeleton className="h-44 w-full" />
         </div>
+      ) : parametrosFiltrados.length === 0 ? (
+        <p className="rounded-card border border-neutral-light/70 bg-neutral-white p-6 text-center font-sans text-sm text-neutral-medium">
+          No hay parámetros en esta área.
+        </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {parametrosFiltrados.map((param) => (
@@ -188,7 +210,7 @@ export const ConfiguracionView: React.FC = () => {
                   <span className="font-mono text-xs font-bold text-corporate">
                     {param.clave}
                   </span>
-                  <Badge variant="action">{param.area}</Badge>
+                  <Badge variant="action">{ETIQUETAS_AREA[param.area]}</Badge>
                 </div>
 
                 <p className="font-sans text-xs text-neutral-medium mb-4 leading-relaxed">

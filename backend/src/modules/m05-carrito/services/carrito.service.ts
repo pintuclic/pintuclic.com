@@ -2,14 +2,18 @@ import type { LineaParaCompra } from '../../m01-catalogo/dtos/m01-catalogo-entre
 import type { Calculo } from '../../m06-precios/dtos/m06-precios.dto';
 import {
   CANTIDAD_MAXIMA_POR_LINEA,
+  CLAVE_DIAS_VIGENCIA,
   DIAS_VIGENCIA_CARRITO_VISITANTE,
+  INTERVALO_LIMPIEZA_MINUTOS,
   MAXIMO_LINEAS_CARRITO,
+  diasVigenciaSchema,
   type AgregarLineaRequest,
   type CambioRevalidacion,
   type CambiarCantidadRequest,
   type Carrito,
   type CatalogoCarritoPort,
   type LineaCarrito,
+  type ParametrosCarritoPort,
   type PreciosCarritoPort,
   type ProductoLinea,
   type ResumenCarrito,
@@ -23,6 +27,7 @@ import type {
   CarritoRepositoryPort,
   ConCookie,
   DuenoCarrito,
+  LineaAcordadaNueva,
   LineaGuardada,
   LineaNueva,
   Solicitante,
@@ -30,7 +35,7 @@ import type {
 import { errores } from './carrito-error';
 import { esTokenVisitanteValido, generarTokenVisitante, hashTokenVisitante } from './token-visitante';
 
-const VIGENCIA_VISITANTE_MS = DIAS_VIGENCIA_CARRITO_VISITANTE * 24 * 60 * 60 * 1000;
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
 const SIN_COOKIE: AccionCookie = { tipo: 'ninguna' };
 
 export interface DependenciasCarrito {
@@ -39,6 +44,8 @@ export interface DependenciasCarrito {
   precios: PreciosCarritoPort;
   /** M01 */
   catalogo: CatalogoCarritoPort;
+  /** M17 (C13). Sin él se usan DIAS_VIGENCIA_CARRITO_VISITANTE días. */
+  parametros?: ParametrosCarritoPort;
   reloj?: () => Date;
 }
 
@@ -48,6 +55,8 @@ interface Resolucion {
   carrito: CarritoGuardado | null;
   cookie: AccionCookie;
   union: UnionCarrito | null;
+  /** C13: días de vigencia del carrito de visitante en esta petición. */
+  dias: number;
 }
 
 function mismaLinea(a: { idVariante: number; idColor: number | null }, b: LineaNueva): boolean {
@@ -78,6 +87,8 @@ function productoDeLinea(c: LineaParaCompra | undefined): ProductoLinea {
  */
 export class CarritoService {
   private readonly reloj: () => Date;
+  /** C13: momento de la última limpieza de carritos vencidos (una por intervalo y por proceso). */
+  private ultimaLimpieza = Number.NEGATIVE_INFINITY;
 
   constructor(private readonly dep: DependenciasCarrito) {
     this.reloj = dep.reloj ?? (() => new Date());
@@ -111,6 +122,7 @@ export class CarritoService {
 
     const r = await this.resolver(sol);
     const existente = r.carrito?.lineas.find((l) => mismaLinea(l, nueva));
+    if (existente?.idCotizacion !== undefined && existente.idCotizacion !== null) throw errores.lineaCotizada();
     const cantidad = (existente?.cantidad ?? 0) + nueva.cantidad;
     if (cantidad > CANTIDAD_MAXIMA_POR_LINEA) throw errores.cantidadFueraDeRango(CANTIDAD_MAXIMA_POR_LINEA);
     if (existente === undefined && (r.carrito?.lineas.length ?? 0) >= MAXIMO_LINEAS_CARRITO) {
@@ -129,6 +141,7 @@ export class CarritoService {
     const r = await this.resolver(sol);
     const linea = r.carrito?.lineas.find((l) => l.idLinea === idLinea);
     if (r.carrito === null || linea === undefined) throw errores.noDisponible();
+    if (linea.idCotizacion !== null) throw errores.lineaCotizada();
 
     const [enCatalogo] = await this.dep.catalogo.consultarLineas([
       { idVariante: linea.idVariante, idColor: linea.idColor },
@@ -149,6 +162,28 @@ export class CarritoService {
     }
     await this.dep.repo.registrarActividad(r.carrito.idCarrito);
     return this.recargar(r, r.cookie, sol.idUsuario, codigoCupon);
+  }
+
+  /* ── Puerto para M21 (C15, sin ruta HTTP) ─────────────────────────────── */
+
+  /** El carrito calculado de una cuenta. */
+  async carritoDeCuenta(idUsuario: number): Promise<Carrito> {
+    return (await this.consultar({ idUsuario, tokenVisitante: null })).datos;
+  }
+
+  /** C15: las líneas de una cotización aceptada entran con su precio fijo; reemplazan a las iguales. */
+  async agregarLineasAcordadas(
+    idUsuario: number,
+    idCotizacion: number,
+    lineas: readonly LineaAcordadaNueva[],
+  ): Promise<void> {
+    const sol: Solicitante = { idUsuario, tokenVisitante: null };
+    const r = await this.resolver(sol);
+    const actuales = r.carrito?.lineas ?? [];
+    const nuevas = lineas.filter((l) => !actuales.some((a) => mismaLinea(a, l))).length;
+    if (actuales.length + nuevas > MAXIMO_LINEAS_CARRITO) throw errores.limiteLineas(MAXIMO_LINEAS_CARRITO);
+    const { carrito } = await this.asegurarCarrito(r, sol);
+    await this.dep.repo.guardarLineasAcordadas(carrito.idCarrito, idCotizacion, lineas);
   }
 
   /** C11 (HU-CAR-05): compara lo que el cliente tiene en pantalla con un cálculo nuevo. */
@@ -172,6 +207,8 @@ export class CarritoService {
         cambios.push({ tipo: 'linea_nueva', idLinea: linea.idLinea });
         continue;
       }
+      // C15 (RF-CAR-05-06): el precio de una línea cotizada está pactado; no se compara.
+      if (linea.idCotizacion !== null) continue;
       const anterior = enPantalla.get(linea.idLinea) ?? null;
       const nuevo = precio.subtotal ?? 0;
       if (anterior === null || centavos(anterior) !== centavos(nuevo)) {
@@ -199,6 +236,8 @@ export class CarritoService {
   /* ── Dueño y unión (C1, C2, C9, C13) ─────────────────────────────────── */
 
   private async resolver(sol: Solicitante): Promise<Resolucion> {
+    const dias = await this.diasVigencia();
+    this.limpiarVencidos(dias);
     const token = esTokenVisitanteValido(sol.tokenVisitante) ? sol.tokenVisitante : null;
 
     if (sol.idUsuario !== null) {
@@ -207,30 +246,52 @@ export class CarritoService {
       if (token === null) {
         // Una cookie con otra forma se borra para no arrastrarla.
         const cookie: AccionCookie = sol.tokenVisitante === null ? SIN_COOKIE : { tipo: 'borrar' };
-        return { dueno, carrito: cuenta, cookie, union: null };
+        return { dueno, carrito: cuenta, cookie, union: null, dias };
       }
       const visitante = await this.dep.repo.buscar({ tipo: 'visitante', hashToken: hashTokenVisitante(token) });
-      if (visitante === null || this.vencido(visitante) || visitante.lineas.length === 0) {
-        return { dueno, carrito: cuenta, cookie: { tipo: 'borrar' }, union: null };
+      if (visitante === null || this.vencido(visitante, dias) || visitante.lineas.length === 0) {
+        return { dueno, carrito: cuenta, cookie: { tipo: 'borrar' }, union: null, dias };
       }
       const union = await this.unir(visitante, cuenta, sol.idUsuario);
-      return { dueno, carrito: await this.dep.repo.buscar(dueno), cookie: { tipo: 'borrar' }, union };
+      return { dueno, carrito: await this.dep.repo.buscar(dueno), cookie: { tipo: 'borrar' }, union, dias };
     }
 
     if (token === null) {
-      return { dueno: null, carrito: null, cookie: sol.tokenVisitante === null ? SIN_COOKIE : { tipo: 'borrar' }, union: null };
+      const cookie: AccionCookie = sol.tokenVisitante === null ? SIN_COOKIE : { tipo: 'borrar' };
+      return { dueno: null, carrito: null, cookie, union: null, dias };
     }
     const dueno: DuenoCarrito = { tipo: 'visitante', hashToken: hashTokenVisitante(token) };
     const carrito = await this.dep.repo.buscar(dueno);
-    if (carrito !== null && this.vencido(carrito)) {
-      // C13: el vencido se ve vacío; se vacía de verdad al volver a agregar.
-      return { dueno, carrito: { ...carrito, lineas: [] }, cookie: SIN_COOKIE, union: null };
+    if (carrito !== null && this.vencido(carrito, dias)) {
+      // C13: el vencido se ve vacío; se vacía al volver a agregar o lo borra la limpieza.
+      return { dueno, carrito: { ...carrito, lineas: [] }, cookie: SIN_COOKIE, union: null, dias };
     }
-    return { dueno, carrito, cookie: SIN_COOKIE, union: null };
+    return { dueno, carrito, cookie: SIN_COOKIE, union: null, dias };
   }
 
-  private vencido(c: CarritoGuardado): boolean {
-    return this.reloj().getTime() - c.fechaUltimaActividad.getTime() > VIGENCIA_VISITANTE_MS;
+  /** C13: días del parámetro de M17; si no se puede leer o está fuera de rango, el valor por defecto. */
+  private async diasVigencia(): Promise<number> {
+    try {
+      const valor = await this.dep.parametros?.obtenerNumero(CLAVE_DIAS_VIGENCIA);
+      const r = diasVigenciaSchema.safeParse(valor);
+      return r.success ? r.data : DIAS_VIGENCIA_CARRITO_VISITANTE;
+    } catch {
+      return DIAS_VIGENCIA_CARRITO_VISITANTE;
+    }
+  }
+
+  private vencido(c: CarritoGuardado, dias: number): boolean {
+    return this.reloj().getTime() - c.fechaUltimaActividad.getTime() > dias * MS_POR_DIA;
+  }
+
+  /** C13: borra los carritos de visitante vencidos, como máximo una vez por intervalo y sin esperar. */
+  private limpiarVencidos(dias: number): void {
+    const ahora = this.reloj().getTime();
+    if (ahora - this.ultimaLimpieza < INTERVALO_LIMPIEZA_MINUTOS * 60 * 1000) return;
+    this.ultimaLimpieza = ahora;
+    void this.dep.repo.borrarVisitantesVencidos(new Date(ahora - dias * MS_POR_DIA)).catch(() => {
+      // Si falla, se intenta en el siguiente intervalo; la petición del cliente sigue normal.
+    });
   }
 
   /** C9: une el carrito del visitante al de la cuenta (o se lo pasa si la cuenta no tenía). */
@@ -246,7 +307,10 @@ export class CarritoService {
     let cantidadesAjustadas = 0;
     for (const v of visitante.lineas) {
       const igual = cuenta.lineas.find((l) => mismaLinea(l, v));
-      if (igual !== undefined) {
+      if (igual !== undefined && igual.idCotizacion !== null) {
+        // C15: una línea cotizada no se suma; la del visitante no se trae.
+        lineasDescartadas += 1;
+      } else if (igual !== undefined) {
         const suma = igual.cantidad + v.cantidad;
         if (suma > CANTIDAD_MAXIMA_POR_LINEA) cantidadesAjustadas += 1;
         actualizar.push({ idLinea: igual.idLinea, cantidad: Math.min(suma, CANTIDAD_MAXIMA_POR_LINEA) });
@@ -282,7 +346,7 @@ export class CarritoService {
     }
     const token = generarTokenVisitante();
     const carrito = await this.dep.repo.crear({ tipo: 'visitante', hashToken: hashTokenVisitante(token) });
-    return { carrito, cookie: { tipo: 'fijar', token } };
+    return { carrito, cookie: { tipo: 'fijar', token, diasVigencia: r.dias } };
   }
 
   private comprobarTope(enCatalogo: LineaParaCompra, cantidad: number): void {
@@ -322,6 +386,8 @@ export class CarritoService {
       cantidad: l.cantidad,
       producto: productoDeLinea(enCatalogo[i]),
       precio: calculo?.lineas.find((p) => p.indice === i) ?? null,
+      idCotizacion: l.idCotizacion,
+      precioAcordado: l.precioAcordado,
     }));
     const cantidadItems = vista.reduce((suma, l) => (l.precio?.vendible === true ? suma + l.cantidad : suma), 0);
     return { lineas: vista, cantidadItems, calculo, union: r.union };
@@ -335,7 +401,13 @@ export class CarritoService {
   ): Promise<Calculo | null> {
     try {
       return await this.dep.precios.calcular({
-        lineas: lineas.map((l) => ({ idVariante: l.idVariante, idColor: l.idColor, cantidad: l.cantidad })),
+        lineas: lineas.map((l) => ({
+          idVariante: l.idVariante,
+          idColor: l.idColor,
+          cantidad: l.cantidad,
+          // C15: M06 respeta el precio pactado sin descuentos (R3).
+          ...(l.precioAcordado === null ? {} : { precioAcordado: l.precioAcordado }),
+        })),
         ...(codigoCupon === undefined ? {} : { codigoCupon }),
         contexto: { idUsuario },
       });

@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, RotateCcw } from 'lucide-react';
-import { Button, ProductCard } from '@/core/components';
-import { catalogoPublicoApi } from '@/modules/m01-catalogo/services/consulta-publica-api';
+import { Button, ProductCard, type ProductCardProps } from '@/core/components';
+import { busquedaApi } from '@/modules/m02-busqueda/services/busqueda-api';
+import { tarjetaDeResultado } from '@/modules/m02-busqueda/services/tarjeta-resultado';
 import { featuredLink, featuredProducts, type FeaturedProduct } from '../_data/home.content';
 import {
   emitirFiltroLanding,
@@ -34,14 +35,30 @@ function resolverImagenRespaldo(idProducto: number, categoria: string, subcatego
   return '/images/landing/catalogo-viniltex.png';
 }
 
+/** La colección fija del inicio, con la misma tarjeta del catálogo (sin "Ver producto", carrito junto al precio). */
+function tarjetaDestacada(p: FeaturedProduct): ProductCardProps {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: p.price,
+    ...(p.originalPrice === undefined ? {} : { originalPrice: p.originalPrice }),
+    ...(p.imageUrl === undefined ? {} : { imageUrl: p.imageUrl }),
+    isOffer: Boolean(p.offerBadge),
+    ...(p.offerBadge === undefined ? {} : { offerBadgeText: p.offerBadge }),
+    href: p.href,
+    showViewDetails: false,
+  };
+}
+
 /**
  * Sección "Productos destacados" (UI Spec §4.1, punto 5).
- * Muestra los productos reales del catálogo (`M01`) hacia abajo en una cuadrícula
- * responsiva y reacciona en tiempo real cuando el usuario escribe o elige una
- * categoría en la barra de búsqueda superior.
+ * Muestra los productos reales del catálogo con la búsqueda de M02 (tolerante a errores de escritura) y la misma
+ * tarjeta de /productos: cada producto en su color, llevando a su ficha en ese color (contrato M02 · V5). Reacciona en
+ * tiempo real cuando el usuario escribe o elige una categoría en la barra de búsqueda superior.
  */
 export function FeaturedProducts() {
-  const [productos, setProductos] = useState<ReadonlyArray<FeaturedProduct>>(featuredProducts);
+  const [productos, setProductos] = useState<ReadonlyArray<ProductCardProps>>(featuredProducts.map(tarjetaDestacada));
   const [filtro, setFiltro] = useState<DetalleFiltroLanding>({ busqueda: '', idCategoria: '' });
   const [cargando, setCargando] = useState(false);
 
@@ -61,30 +78,24 @@ export function FeaturedProducts() {
     const temporizador = setTimeout(() => {
       setCargando(true);
       const termino = filtro.busqueda.trim();
-      catalogoPublicoApi
+      busquedaApi
         .productos({
-          ...(termino !== '' ? { busqueda: termino } : {}),
-          ...(filtro.idCategoria !== '' ? { idCategoria: Number(filtro.idCategoria) } : {}),
-          ordenar: 'nombre',
+          q: termino,
+          idCategoria: filtro.idCategoria !== '' ? [Number(filtro.idCategoria)] : [],
           pagina: 1,
           limite: 12,
         })
         .then((pagina) => {
           if (!activo) return;
-          const reales: FeaturedProduct[] = pagina.items.map((item) => ({
-            id: String(item.idProducto),
-            name: item.nombre,
-            description: `${item.marca}${item.linea ? ` · ${item.linea}` : ''} · ${item.subcategoria}${
-              item.tieneColor ? ' · Carta de colores' : ''
-            }`,
-            price: item.precioDesde ?? 0,
-            imageUrl:
-              item.idImagenPrincipal !== null
-                ? catalogoPublicoApi.urlImagen(item.idImagenPrincipal)
-                : resolverImagenRespaldo(item.idProducto, item.categoria, item.subcategoria),
-            href: `/productos/${item.idProducto}`,
-          }));
-          setProductos(reales);
+          setProductos(
+            pagina.items.map((item) => ({
+              ...tarjetaDeResultado(item),
+              // Sin foto propia, la ilustración del inicio que corresponde al producto.
+              ...(item.idImagenPrincipal === null
+                ? { imageUrl: resolverImagenRespaldo(item.idProducto, item.categoria, item.subcategoria) }
+                : {}),
+            })),
+          );
         })
         .catch(() => {
           // Si el backend o la base de datos están temporalmente inaccesibles en el VPS,
@@ -104,7 +115,7 @@ export function FeaturedProducts() {
 
             return coincideTexto && coincideCategoria;
           });
-          setProductos(filtrados);
+          setProductos(filtrados.map(tarjetaDestacada));
         })
         .finally(() => {
           if (activo) setCargando(false);
@@ -181,19 +192,7 @@ export function FeaturedProducts() {
           className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
         >
           {productos.map((producto) => (
-            <ProductCard
-              key={producto.id}
-              id={producto.id}
-              name={producto.name}
-              description={producto.description}
-              price={producto.price}
-              originalPrice={producto.originalPrice}
-              imageUrl={producto.imageUrl}
-              isOffer={Boolean(producto.offerBadge)}
-              offerBadgeText={producto.offerBadge}
-              href={producto.href}
-              className="h-full"
-            />
+            <ProductCard key={producto.id} {...producto} className="h-full" />
           ))}
         </div>
       )}

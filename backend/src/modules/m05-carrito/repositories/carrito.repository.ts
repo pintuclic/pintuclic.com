@@ -4,6 +4,7 @@ import type {
   CarritoGuardado,
   CarritoRepositoryPort,
   DuenoCarrito,
+  LineaAcordadaNueva,
   LineaNueva,
   PlanUnion,
 } from '../interfaces/carrito.interface';
@@ -12,7 +13,7 @@ const SELECCION_CARRITO = {
   idCarrito: true,
   fechaUltimaActividad: true,
   lineas: {
-    select: { idLineaCarrito: true, idVariante: true, idColor: true, cantidad: true },
+    select: { idLineaCarrito: true, idVariante: true, idColor: true, cantidad: true, idCotizacion: true, precioAcordado: true },
     orderBy: { idLineaCarrito: 'asc' },
   },
 } satisfies Prisma.CarritoSelect;
@@ -28,6 +29,8 @@ function aDominio(c: CarritoDb): CarritoGuardado {
       idVariante: l.idVariante,
       idColor: l.idColor,
       cantidad: l.cantidad,
+      idCotizacion: l.idCotizacion,
+      precioAcordado: l.precioAcordado === null ? null : Number(l.precioAcordado),
     })),
   };
 }
@@ -115,6 +118,36 @@ export class CarritoRepository implements CarritoRepositoryPort {
       where: { idCarrito: idCarritoVisitante },
       data: { idUsuario, tokenVisitante: null, fechaUltimaActividad: new Date() },
     });
+  }
+
+  async guardarLineasAcordadas(
+    idCarrito: number,
+    idCotizacion: number,
+    lineas: readonly LineaAcordadaNueva[],
+  ): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      for (const l of lineas) {
+        const datos = { cantidad: l.cantidad, idCotizacion, precioAcordado: l.precioAcordado };
+        const existente = await tx.lineaCarrito.findFirst({
+          where: { idCarrito, idVariante: l.idVariante, idColor: l.idColor },
+          select: { idLineaCarrito: true },
+        });
+        if (existente === null) {
+          await tx.lineaCarrito.create({ data: { idCarrito, idVariante: l.idVariante, idColor: l.idColor, ...datos } });
+        } else {
+          await tx.lineaCarrito.update({ where: { idLineaCarrito: existente.idLineaCarrito }, data: datos });
+        }
+      }
+      await tx.carrito.update({ where: { idCarrito }, data: { fechaUltimaActividad: new Date() } });
+    });
+  }
+
+  async borrarVisitantesVencidos(antesDe: Date): Promise<number> {
+    // Solo carritos de visitante: los de una cuenta no vencen. Las líneas caen en cascada.
+    const r = await prisma.carrito.deleteMany({
+      where: { idUsuario: null, tokenVisitante: { not: null }, fechaUltimaActividad: { lt: antesDe } },
+    });
+    return r.count;
   }
 
   async unir(plan: PlanUnion): Promise<void> {

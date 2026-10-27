@@ -13,7 +13,10 @@ import { ColoresController } from './controllers/colores.controller';
 import { CombosController } from './controllers/combos.controller';
 import { ConsultaPublicaController } from './controllers/consulta-publica.controller';
 import { ImagenesController, ImagenMedidaController } from './controllers/imagenes.controller';
+import { PaletaController } from './controllers/paleta.controller';
 import { ProductosController, VariantesController } from './controllers/productos.controller';
+import { PaletaRepository } from './repositories/paleta.repository';
+import { PaletaService } from './services/paleta.service';
 import {
   crearAcabadoRequestSchema,
   crearBaseRequestSchema,
@@ -88,6 +91,7 @@ export interface ModuloM01 {
   catalogoParaCompra: CatalogoParaCompraService;
   /** Puerto interno para M14: tarjetas públicas, con su oferta, de una lista de productos (M14 · `TarjetasPublicasPort`). */
   consultaPublicaService: ConsultaPublicaService;
+  paletaService: PaletaService;
 }
 
 /**
@@ -168,6 +172,8 @@ export function construirModuloM01(autorizacion: AutorizacionService, dependenci
     dependencias.patrocinio,
   );
   const consultaPublica = new ConsultaPublicaController(consultaPublicaService);
+  const paletaService = new PaletaService(new PaletaRepository());
+  const paleta = new PaletaController(paletaService);
   const superficies = controladorSimple({
     servicio: new CatalogoSimpleService(new SuperficiesRepository(), 'una superficie'),
     esquemaCrear: crearSuperficieRequestSchema,
@@ -315,6 +321,9 @@ export function construirModuloM01(autorizacion: AutorizacionService, dependenci
   const publicRouter = Router();
   publicRouter.get('/categorias', consultaPublica.categorias as RequestHandler);
   publicRouter.get('/filtros', consultaPublica.filtros as RequestHandler);
+  // Paleta de color (entrega 4): los colores que se entregan hoy y sus armonías.
+  publicRouter.get('/paleta/colores', paleta.listar as RequestHandler);
+  publicRouter.get('/paleta/colores/:idColor/armonias', paleta.armonias as RequestHandler);
   publicRouter.get('/productos', consultaPublica.listar as RequestHandler);
   publicRouter.get('/productos/:idProducto', consultaPublica.ficha as RequestHandler);
   publicRouter.get('/productos/:idProducto/colores', consultaPublica.colores as RequestHandler);
@@ -345,5 +354,6 @@ export function construirModuloM01(autorizacion: AutorizacionService, dependenci
     combosService,
     catalogoParaCompra: new CatalogoParaCompraService(new CompraRepository()),
     consultaPublicaService,
+    paletaService,
   };
 }
