@@ -73,7 +73,7 @@ describe('ProductCard con href', () => {
 
 describe('ProductCard con color de muestra', () => {
   const panel = (html: string): string => /<div aria-hidden="true" data-muestra-color="[^"]*" class="([^"]*)"/.exec(html)?.[1] ?? '';
-  const tarjeta = (props: { swatchColor?: string; addToCartDisabled?: boolean; showViewDetails?: boolean } = {}): string =>
+  const tarjeta = (props: { swatchColor?: string; swatchLabel?: string; showViewDetails?: boolean } = {}): string =>
     renderToStaticMarkup(
       <ProductCard id="p2" name="Viniltex" price={85900} href="/productos/1" onAddToCart={() => undefined} {...props} />,
     );
@@ -96,9 +96,16 @@ describe('ProductCard con color de muestra', () => {
     }
   });
 
-  it('con callback, el carrito es un botón que se puede deshabilitar', () => {
+  it('con callback, el carrito es un botón y no otro enlace', () => {
     expect(tarjeta().match(/href="\/productos\/1"/g)).toHaveLength(2);
-    expect(tarjeta({ addToCartDisabled: true })).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Agregar Viniltex al carrito"|<button[^>]*aria-label="Agregar Viniltex al carrito"[^>]*disabled=""/);
+    expect(tarjeta()).toContain('aria-label="Agregar Viniltex al carrito"');
+  });
+
+  it('muestra el nombre del color bajo el nombre del producto, solo si hay muestra', () => {
+    expect(tarjeta({ swatchColor: '#9CC9E8', swatchLabel: 'Azul Cielo · y 45 colores más' })).toContain(
+      'Azul Cielo · y 45 colores más',
+    );
+    expect(tarjeta({ swatchLabel: 'Azul Cielo' })).not.toContain('Azul Cielo');
   });
 });
 
