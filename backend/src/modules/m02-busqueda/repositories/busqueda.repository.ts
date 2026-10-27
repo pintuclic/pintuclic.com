@@ -176,6 +176,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
           select: { idSuperficie: true },
         },
         bases: {
+          where: { base: { estado: 'activo' } },
           select: { idBase: true },
         },
         coloresFabrica: {

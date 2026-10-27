@@ -16,7 +16,7 @@ export default async function ProductoPage({
 }) {
   const { idProducto } = await params;
   if (!/^\d+$/.test(idProducto) || Number(idProducto) < 1) notFound();
-  // U8: la ficha abre en el color de la tarjeta (`?color=`); uno inválido se ignora.
+  // U8 y paleta de color (P11): la ficha abre en el color de `?color=` si el producto lo ofrece; uno inválido se ignora.
   const { color } = await searchParams;
   return <ProductoFichaView idProducto={Number(idProducto)} idColorInicial={colorDeLaDireccion(color)} />;
 }

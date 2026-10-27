@@ -1,3 +1,4 @@
+export * from './buttons/BareButton';
 export * from './buttons/Button';
 export * from './buttons/ButtonLink';
 export * from './buttons/IconButton';
@@ -23,6 +24,7 @@ export * from './feedback/Skeleton';
 export * from './layout/Container';
 export * from './layout/Logo';
 export * from './layout/Topbar';
+export * from './layout/EncabezadoFijo';
 export * from './layout/Header';
 export * from './layout/CategoriesMegaMenu';
 export * from './layout/Footer';

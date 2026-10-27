@@ -47,7 +47,7 @@ const ICONO_DATO: Record<ClaveDato, LucideIcon> = {
 
 export interface ProductoFichaViewProps {
   idProducto: number;
-  /** U8: el color con que se abre (la tarjeta del listado lo manda en `?color=`). */
+  /** U8 y P11: el color con que se abre (`?color=`), desde la tarjeta del listado o la paleta de color. */
   idColorInicial?: number | null;
 }
 

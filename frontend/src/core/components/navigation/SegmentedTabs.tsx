@@ -65,7 +65,7 @@ export function SegmentedTabs<T extends string>({
             tabIndex={activa ? 0 : -1}
             onClick={() => onChange(opcion.value)}
             onKeyDown={(e) => alPulsar(indice, e)}
-            className={`min-h-[40px] rounded-btn font-title text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
+            className={`min-h-[44px] rounded-btn font-title text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
               activa ? 'bg-neutral-white text-neutral-black shadow-card' : 'text-neutral-medium hover:text-neutral-dark'
             }`}
           >
