@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import { construirRutasLandingBanners } from './core/landing/banners.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
+import { construirModuloM03 } from './modules/m03-asesoria/m03.routes';
 import { construirModuloM14 } from './modules/m14-patrocinios/m14.routes';
 import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
 import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-final-m06.adapter';
@@ -184,6 +185,11 @@ export function construirAppRoutes(): Router {
     ]),
     m15.publicRouter,
   );
+
+  // M03: asesoría y asistencia. La calculadora de pintura es pública y no usa inteligencia
+  // artificial, así que responde aunque el servicio de IA esté caído (M03 · K11, I6).
+  const m03 = construirModuloM03();
+  router.use('/asesoria', m03.publicRouter);
 
   // M17: la confirmación del cambio de correo del admin llega desde un enlace y es
   // pública (HU-ADM-06); el resto de endpoints administrativos exige sesión.
