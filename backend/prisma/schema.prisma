@@ -136,6 +136,8 @@ enum TipoComunicacion {
   cambio_correo_otp
   cambio_correo_confirmado
   dictamen_empresa
+  /// M03 · I9: el servicio de IA acumuló los fallos consecutivos configurados
+  alerta_servicio_ia
 
   @@map("enum_tipo_comunicacion")
 }
@@ -387,6 +389,12 @@ model Usuario {
 
   // M05 Relaciones
   carrito Carrito?
+
+  // M03 Relaciones
+  configuracionAsesoriaActualizada ConfiguracionAsesoria[] @relation("ConfiguracionAsesoriaUsuarioActualizo")
+
+  // M20 Relaciones
+  registrosAuditoria RegistroAuditoria[]
 
   @@map("usuario")
 }
@@ -1562,4 +1570,209 @@ model MedicionPatrocinio {
   @@id([fecha, entidad, idEntidad, lugar, evento])
   @@index([entidad, idEntidad, fecha], map: "idx_medicion_entidad_fecha")
   @@map("medicion_patrocinio")
+}
+
+// =============================================================================
+// MÓDULO M03 — ASESORÍA Y ASISTENCIA (HU-ASE-01, HU-ASE-02, HU-ASE-05, HU-ASE-06)
+// =============================================================================
+
+/// Modo de cuestionario vigente (M03 · D3): se cambia desde el panel, sin despliegue.
+enum ModoCuestionario {
+  fijo
+  asistido
+
+  @@map("enum_modo_cuestionario")
+}
+
+/// De dónde salen las opciones de una pregunta del modo fijo (M03 · F3).
+enum OrigenOpcionesAsesoria {
+  manual
+  familias_color
+
+  @@map("enum_origen_opciones_asesoria")
+}
+
+/// Qué hace elegir una opción (M03 · F2).
+enum TipoEfectoAsesoria {
+  filtrar
+  filtrar_ambiente
+  incluir
+
+  @@map("enum_tipo_efecto_asesoria")
+}
+
+/// Dimensiones que M02 sabe filtrar y que viajan en la URL del catálogo (M03 · V1, V2).
+enum DimensionFiltroAsesoria {
+  categoria
+  subcategoria
+  superficie
+  familia_color
+  tipo_resina
+  linea
+
+  @@map("enum_dimension_filtro_asesoria")
+}
+
+/// Ambiente del producto, derivado de producto.uso_interior / uso_exterior de M01.
+enum AmbienteAsesoria {
+  interior
+  exterior
+
+  @@map("enum_ambiente_asesoria")
+}
+
+enum ServicioIa {
+  gemini
+
+  @@map("enum_servicio_ia")
+}
+
+enum FuncionIa {
+  chat
+  cuestionario
+
+  @@map("enum_funcion_ia")
+}
+
+enum TipoIncidenteIa {
+  tiempo_agotado
+  no_disponible
+  cuota_agotada
+  respuesta_no_procesable
+  error_configuracion
+
+  @@map("enum_tipo_incidente_ia")
+}
+
+enum ResultadoIncidenteIa {
+  recuperado
+  fallido
+  suspendido
+
+  @@map("enum_resultado_incidente_ia")
+}
+
+/// Pregunta del cuestionario guiado administrable (M03 · HU-ASE-01, modo fijo).
+/// No se borra: se desactiva (F5), para no romper un flujo a medias.
+model PreguntaAsesoria {
+  idPregunta Int    @id @default(autoincrement()) @map("id_pregunta")
+  texto      String @db.VarChar(200)
+  orden      Int    @default(0)
+  /// `familias_color` = las opciones son las familias cromáticas activas del catálogo (F3)
+  origenOpciones     OrigenOpcionesAsesoria @default(manual) @map("origen_opciones")
+  estado             EstadoGeneral          @default(activo)
+  fechaCreacion      DateTime               @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime               @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  opciones OpcionAsesoria[]
+
+  @@index([estado, orden], map: "idx_pregunta_asesoria_orden")
+  @@map("pregunta_asesoria")
+}
+
+/// Opción cerrada de una pregunta del cuestionario fijo (M03 · HU-ASE-01).
+model OpcionAsesoria {
+  idOpcion   Int           @id @default(autoincrement()) @map("id_opcion")
+  idPregunta Int           @map("id_pregunta")
+  texto      String        @db.VarChar(100)
+  orden      Int           @default(0)
+  estado     EstadoGeneral @default(activo)
+
+  pregunta PreguntaAsesoria       @relation(fields: [idPregunta], references: [idPregunta], onDelete: Cascade, map: "fk_opcion_asesoria_pregunta")
+  efectos  EfectoOpcionAsesoria[]
+
+  @@index([idPregunta, orden], map: "idx_opcion_asesoria_pregunta")
+  @@map("opcion_asesoria")
+}
+
+/// Correspondencia entre una opción y el filtro que aplica (M03 · RF-ASE-01-02, F2).
+/// `idObjetivo` no es FK: apunta a seis tablas según `dimension`. El servicio comprueba que
+/// exista y esté activo, y si no ignora el efecto sin error (M03 · F4).
+model EfectoOpcionAsesoria {
+  idEfecto   Int                      @id @default(autoincrement()) @map("id_efecto")
+  idOpcion   Int                      @map("id_opcion")
+  tipo       TipoEfectoAsesoria
+  dimension  DimensionFiltroAsesoria?
+  idObjetivo Int?                     @map("id_objetivo")
+  ambiente   AmbienteAsesoria?
+  /// Otras opciones que deben estar elegidas para que el efecto aplique, p. ej. Metal con Deteriorada (F2)
+  requiereOpciones Int[] @default([]) @map("requiere_opciones")
+
+  opcion OpcionAsesoria @relation(fields: [idOpcion], references: [idOpcion], onDelete: Cascade, map: "fk_efecto_asesoria_opcion")
+
+  @@index([idOpcion], map: "idx_efecto_asesoria_opcion")
+  @@map("efecto_opcion_asesoria")
+}
+
+/// Modo de cuestionario, guiones de la IA y parámetros de resiliencia; fila única (M03 · D3, D8).
+model ConfiguracionAsesoria {
+  idConfiguracion  Int              @id @default(1) @map("id_configuracion") @db.SmallInt
+  modoCuestionario ModoCuestionario @default(fijo) @map("modo_cuestionario")
+  /// K9: sugerencia de manos; null = no se sugiere ninguna (RF-ASE-02-06 prohíbe suponerlas)
+  manosPorDefecto            Int?     @map("manos_por_defecto") @db.SmallInt
+  guionCuestionario          String   @default("") @map("guion_cuestionario")
+  guionAsistente             String   @default("") @map("guion_asistente")
+  iaTiempoEsperaMs           Int      @default(8000) @map("ia_tiempo_espera_ms")
+  iaReintentos               Int      @default(2) @map("ia_reintentos") @db.SmallInt
+  iaSuspensionCuotaMinutos   Int      @default(60) @map("ia_suspension_cuota_minutos")
+  iaRetencionIncidentesDias  Int      @default(90) @map("ia_retencion_incidentes_dias")
+  iaFallosConsecutivosAlerta Int      @default(5) @map("ia_fallos_consecutivos_alerta") @db.SmallInt
+  fechaActualizacion         DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo         Int?     @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario? @relation("ConfiguracionAsesoriaUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_config_asesoria_usuario")
+
+  @@map("configuracion_asesoria")
+}
+
+/// Incidentes del servicio de IA, sin datos de la persona ni del contenido (M03 · I7).
+/// Se purgan por retención (I8) y por eso NO viven en `registro_auditoria`, que es inmutable (D10).
+model IncidenteIa {
+  idIncidente Int                  @id @default(autoincrement()) @map("id_incidente")
+  fecha       DateTime             @default(now()) @db.Timestamptz(6)
+  servicio    ServicioIa           @default(gemini)
+  funcion     FuncionIa
+  tipo        TipoIncidenteIa
+  intentos    Int                  @db.SmallInt
+  resultado   ResultadoIncidenteIa
+
+  @@index([fecha(sort: Desc)], map: "idx_incidente_ia_fecha")
+  @@index([tipo, fecha(sort: Desc)], map: "idx_incidente_ia_tipo_fecha")
+  @@map("incidente_ia")
+}
+
+// =============================================================================
+// MÓDULO M20 — REGISTRO DE AUDITORÍA (HU-SEG-04, parte de escritura)
+// =============================================================================
+
+enum ResultadoAuditoria {
+  exito
+  fallo
+
+  @@map("enum_resultado_auditoria")
+}
+
+/// Bitácora INMUTABLE de acciones relevantes (M20 · RF-SEG-04-02, RF-SEG-04-03).
+/// El DDL revoca UPDATE y DELETE y además lo impide con un disparador (RF-SEG-04-04):
+/// Prisma solo inserta y lee.
+model RegistroAuditoria {
+  idRegistro BigInt   @id @default(autoincrement()) @map("id_registro")
+  fecha      DateTime @default(now()) @db.Timestamptz(6)
+  idUsuario  Int?     @map("id_usuario")
+  /// Copia del nombre del actor: el registro sigue siendo legible si la cuenta se elimina
+  actor         String?            @db.VarChar(150)
+  accion        String             @db.VarChar(100)
+  entidad       String             @db.VarChar(60)
+  idEntidad     String?            @map("id_entidad") @db.VarChar(60)
+  valorAnterior String?            @map("valor_anterior")
+  valorNuevo    String?            @map("valor_nuevo")
+  resultado     ResultadoAuditoria @default(exito)
+  ipOrigen      String?            @map("ip_origen") @db.VarChar(45)
+
+  usuario Usuario? @relation(fields: [idUsuario], references: [idUsuario], onDelete: SetNull, map: "fk_auditoria_usuario")
+
+  @@index([fecha(sort: Desc)], map: "idx_auditoria_fecha")
+  @@index([entidad, idEntidad], map: "idx_auditoria_entidad")
+  @@index([idUsuario], map: "idx_auditoria_usuario")
+  @@map("registro_auditoria")
 }
