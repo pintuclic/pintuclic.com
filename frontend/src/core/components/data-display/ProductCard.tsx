@@ -5,10 +5,7 @@ import Link from 'next/link';
 import { PaintBucket, ShoppingCart } from 'lucide-react';
 import { Button } from '../buttons/Button';
 import { ButtonLink } from '../buttons/ButtonLink';
-import { esColorMuyClaro, esHexadecimal, luminancia } from '../../utils/color-muestra';
-
-/** Por debajo de esta luminancia el color es casi negro (negros, grafitos, azules muy profundos). */
-const LUMINANCIA_OSCURA = 0.04;
+import { esColorMuyClaro, esHexadecimal } from '../../utils/color-muestra';
 import { formatCOP } from '../../utils/moneda';
 import { Badge } from './Badge';
 
@@ -54,19 +51,6 @@ function resolverImagenPorDefecto(name: string, imageUrl?: string): string | und
   if (n.includes('rodillo')) return '/images/landing/producto-rodillo.png';
   if (n.includes('cinta')) return '/images/landing/producto-cinta.png';
   return undefined;
-}
-
-/**
- * Fondo de la muestra: un halo del color bajo el envase que se funde con el blanco. Un color casi blanco no se vería,
- * así que debajo lleva una sombra gris muy tenue para que el halo se note.
- */
-function resplandor(hexadecimal: string): string {
-  // Un color muy oscuro con toda su fuerza parece una sombra: se baja su intensidad.
-  const [centro, medio] = luminancia(hexadecimal) < LUMINANCIA_OSCURA ? ['73', '26'] : ['d9', '66'];
-  const halo = `radial-gradient(ellipse 75% 65% at 50% 78%, ${hexadecimal}${centro} 0%, ${hexadecimal}${medio} 40%, ${hexadecimal}00 72%)`;
-  return esColorMuyClaro(hexadecimal)
-    ? `${halo}, radial-gradient(ellipse 70% 55% at 50% 80%, rgb(17 24 39 / 0.08) 0%, rgb(17 24 39 / 0) 70%)`
-    : halo;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -157,15 +141,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {isOffer && <Badge variant="offer">{offerBadgeText}</Badge>}
         </div>
 
-        {/* Resplandor suave del color detrás del envase, que se desvanece hacia el blanco: insinúa el tono sin
-            tapar el producto (el color exacto va en el punto junto a su nombre). Es un dato del catálogo, no del
-            tema: por eso va en `style`. Es decorativo: no se lee en voz alta. */}
+        {/* Muestra de pintura en la mitad inferior detrás del envase (estilo Tienda Pintuco).
+            El color es un dato del catálogo, no del tema: por eso va en `style`. Es decorativo:
+            no se lee en voz alta. */}
         {muestra !== null && (
           <div
             aria-hidden="true"
             data-muestra-color={muestra}
-            className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-90"
-            style={{ background: resplandor(muestra) }}
+            className={`absolute inset-x-2.5 top-[44%] bottom-2 rounded-2xl transition-transform duration-300 group-hover:scale-[1.02] ${
+              esColorMuyClaro(muestra) ? 'ring-1 ring-inset ring-neutral-light' : ''
+            }`}
+            style={{ backgroundColor: muestra }}
           />
         )}
 

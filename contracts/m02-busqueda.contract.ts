@@ -116,10 +116,11 @@ import {
  * ── Pantalla /productos ─────────────────────────────────────────────────────
  *  V1  Orden del panel de filtros: Ofertas, Categorías, Ambiente, Marcas, Líneas, Familias de color,
  *      Presentación, Tipo de resina, Superficie y Rango de precio.
- *  V2  Tarjeta del producto en su color: con `colorMuestra`, un resplandor suave de ese color detrás del
- *      envase que se funde con el blanco (insinúa el tono sin tapar el producto; los muy oscuros van más
- *      tenues y los muy claros llevan una sombra leve para notarse). Bajo el nombre, un punto con el color
- *      exacto, su nombre y "y N colores más" (T4). Sin color, el fondo neutro de siempre y sin esa línea.
+ *  V2  Tarjeta del producto en su color: con `colorMuestra`, un panel redondeado de ese color ocupa la
+ *      mitad de abajo de la imagen y el envase queda por delante, como una muestra de pintura. La foto no se
+ *      mezcla con el color (un color oscuro no debe tapar el producto); los colores muy claros llevan un
+ *      borde suave. Bajo el nombre, un punto con el color, su nombre y "y N colores más" (T4). Sin color, el
+ *      fondo neutro de siempre y sin esa línea.
  *  V3  Sin botón "Ver producto". El nombre, la imagen y el botón del carrito (junto al precio) llevan a la
  *      ficha ABIERTA EN ESE COLOR: `/productos/:idProducto?color=:idColor` (U8 de m01-catalogo-productos);
  *      sin color, `/productos/:idProducto`. La presentación, el color y la cantidad se eligen en la ficha:
@@ -129,7 +130,7 @@ import {
  *      (GET /busqueda/productos, con su tolerancia a errores) y la misma tarjeta que /productos.
  *
  * ── Piezas fuera de M02 (cada una en su PR) ─────────────────────────────────
- *  P1  Core Kit: `ProductCard` acepta un color de muestra (resplandor) con su texto (V2) y la opción de no mostrar
+ *  P1  Core Kit: `ProductCard` acepta un color de muestra con su texto (V2) y la opción de no mostrar
  *      "Ver producto" (V3). Sin esas propiedades se ve igual que hoy en el resto de pantallas.
  *  P2  M01: la ficha se abre en el color de `?color=` (U8 de m01-catalogo-productos) y la carta pública de
  *      colores de un producto acepta `idColor` para traer ese color.

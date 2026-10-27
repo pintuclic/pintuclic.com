@@ -72,22 +72,23 @@ describe('ProductCard con href', () => {
 });
 
 describe('ProductCard con color de muestra', () => {
-  const fondo = (html: string): string => /data-muestra-color="[^"]*"[^>]*style="background:([^"]*)"/.exec(html)?.[1] ?? '';
+  const panel = (html: string): string =>
+    /<div aria-hidden="true" data-muestra-color="[^"]*" class="([^"]*)"/.exec(html)?.[1] ?? '';
   const tarjeta = (props: { swatchColor?: string; swatchLabel?: string; showViewDetails?: boolean } = {}): string =>
     renderToStaticMarkup(
       <ProductCard id="p2" name="Viniltex" price={85900} href="/productos/1" onAddToCart={() => undefined} {...props} />,
     );
 
-  it('pinta un resplandor del color detrás del envase, oculto para el lector de pantalla', () => {
+  it('pinta el panel de muestra detrás de la imagen, oculto para el lector de pantalla', () => {
     const html = tarjeta({ swatchColor: '#9CC9E8' });
     expect(html).toMatch(/<div aria-hidden="true" data-muestra-color="#9CC9E8"[^>]*>/);
-    expect(fondo(html)).toContain('radial-gradient(ellipse 75% 65% at 50% 78%, #9CC9E8d9 0%');
-    expect(fondo(html)).not.toContain('rgb(17 24 39');
+    expect(html).toContain('background-color:#9CC9E8');
+    expect(panel(html)).toContain('rounded-2xl');
+    expect(panel(html)).not.toContain('ring-neutral-light');
   });
 
-  it('un color muy claro lleva una sombra tenue para notarse; uno muy oscuro, menos intensidad', () => {
-    expect(fondo(tarjeta({ swatchColor: '#FDFDF8' }))).toContain('rgb(17 24 39 / 0.08)');
-    expect(fondo(tarjeta({ swatchColor: '#111111' }))).toContain('#11111173 0%');
+  it('un color muy claro lleva borde para verse sobre el blanco', () => {
+    expect(panel(tarjeta({ swatchColor: '#FDFDF8' }))).toContain('ring-1 ring-inset ring-neutral-light');
   });
 
   it('sin color, o con un color mal escrito, se queda el fondo neutro', () => {
