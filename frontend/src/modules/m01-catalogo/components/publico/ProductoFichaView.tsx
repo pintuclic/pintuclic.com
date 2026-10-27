@@ -1,36 +1,69 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import {
+  Award,
+  Brush,
+  Droplets,
+  FolderTree,
+  Home,
+  Layers,
+  ListChecks,
+  type LucideIcon,
+  Package,
+  Ruler,
+  Tag,
+} from 'lucide-react';
 import { Alert, Badge, Container, Skeleton } from '@/core/components';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { useFichaPublica } from '../../hooks/useFichaPublica';
 import { requiereColor } from '../../services/compra-rapida';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
+import { type ClaveDato, datosFichaTecnica, textoAmbiente } from '../../services/ficha-tecnica';
 import { imagenParaSeleccion } from '../../services/galeria';
 import { textoRendimiento } from '../../services/rendimiento';
 import { AgregarAlCarrito } from './AgregarAlCarrito';
 import { EspacioPublicitario } from '@/modules/m14-patrocinios/components/EspacioPublicitario';
 import { ComplementariosProducto } from './ComplementariosProducto';
 import { GaleriaProducto } from './GaleriaProducto';
+import { MuestrasColor } from './MuestrasColor';
 import { PrecioPresentacion, SelectorPresentacion } from './PresentacionProducto';
-import { ColorProducto } from './SelectorColorProducto';
+import { ModalColoresProducto } from './SelectorColorProducto';
 
-const TIPOS_CALIDAD: Record<number, string> = { 1: 'Tipo 1 (gama alta)', 2: 'Tipo 2', 3: 'Tipo 3' };
+const ICONO_DATO: Record<ClaveDato, LucideIcon> = {
+  marca: Tag,
+  categoria: FolderTree,
+  presentaciones: Package,
+  rendimiento: Ruler,
+  ambiente: Home,
+  superficies: Layers,
+  resina: Droplets,
+  calidad: Award,
+  acabados: Brush,
+  caracteristica: ListChecks,
+};
 
 export interface ProductoFichaViewProps {
   idProducto: number;
 }
 
-/** HU-CAT-06: ficha pública de un producto con presentaciones, rendimiento y selector de color. */
+/** HU-CAT-06: ficha pública de un producto con presentaciones, rendimiento, colores y ficha técnica. */
 export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto }) => {
   const { estado, variante, elegirVariante, color, elegirColor, oferta } = useFichaPublica(idProducto);
+  const [cartaAbierta, setCartaAbierta] = useState(false);
 
   if (estado.tipo === 'cargando') {
     return (
       <Container className="py-8">
-        <Skeleton className="h-8 w-2/3" rounded="btn" />
-        <Skeleton className="mt-6 h-96" rounded="card" />
+        <div className="grid gap-8 lg:grid-cols-2">
+          <Skeleton className="h-96" rounded="card" />
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-2/3" rounded="btn" />
+            <Skeleton className="h-5 w-1/2" rounded="btn" />
+            <Skeleton className="h-64" rounded="card" />
+          </div>
+        </div>
       </Container>
     );
   }
@@ -54,18 +87,10 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
 
   const p = estado.ficha;
   const rendimiento = variante === null ? null : textoRendimiento(variante.rendimiento, p.manos);
-  const ambientes = [p.usoInterior ? 'Interior' : null, p.usoExterior ? 'Exterior' : null].filter(
-    (x): x is string => x !== null,
-  );
-  const datosTecnicos: Array<[string, string]> = [
-    ...(p.tipoResina === null ? [] : ([['Tipo de resina', p.tipoResina]] as Array<[string, string]>)),
-    ...(p.tipoCalidad === null
-      ? []
-      : ([['Calidad', TIPOS_CALIDAD[p.tipoCalidad] ?? `Tipo ${p.tipoCalidad}`]] as Array<[string, string]>)),
-    ...(ambientes.length === 0 ? [] : ([['Ambiente', ambientes.join(' y ')]] as Array<[string, string]>)),
-    ...(p.superficies.length === 0 ? [] : ([['Superficies', p.superficies.join(', ')]] as Array<[string, string]>)),
-    ...p.caracteristicas.map((c): [string, string] => [c.nombre, c.valor]),
-  ];
+  const ambiente = textoAmbiente(p);
+  // Lo esencial a primera vista; el detalle completo va en la ficha técnica.
+  const destacados = [ambiente, p.tipoResina, rendimiento].filter((x): x is string => x !== null);
+  const fichaTecnica = datosFichaTecnica(p, variante);
 
   return (
     <Container className="py-8">
@@ -91,23 +116,25 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
         </ol>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <GaleriaProducto
-          nombre={p.nombre}
-          imagenes={p.imagenes.map((i) => ({
-            idImagen: i.idImagen,
-            url: catalogoPublicoApi.urlImagen(i.idImagen, 'mediana'),
-            urlMiniatura: catalogoPublicoApi.urlImagen(i.idImagen, 'miniatura'),
-          }))}
-          idImagenEnfocada={imagenParaSeleccion(p.imagenes, {
-            idColor: color?.idColor ?? null,
-            idVariante: variante?.idVariante ?? null,
-          })}
-          imagenMedidaUrl={
-            variante?.tieneImagenMedida === true ? catalogoPublicoApi.urlImagenMedida(variante.idMedida) : null
-          }
-          nombreMedida={variante?.medida ?? null}
-        />
+      <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <GaleriaProducto
+            nombre={p.nombre}
+            imagenes={p.imagenes.map((i) => ({
+              idImagen: i.idImagen,
+              url: catalogoPublicoApi.urlImagen(i.idImagen, 'mediana'),
+              urlMiniatura: catalogoPublicoApi.urlImagen(i.idImagen, 'miniatura'),
+            }))}
+            idImagenEnfocada={imagenParaSeleccion(p.imagenes, {
+              idColor: color?.idColor ?? null,
+              idVariante: variante?.idVariante ?? null,
+            })}
+            imagenMedidaUrl={
+              variante?.tieneImagenMedida === true ? catalogoPublicoApi.urlImagenMedida(variante.idMedida) : null
+            }
+            nombreMedida={variante?.medida ?? null}
+          />
+        </div>
 
         <div className="space-y-6">
           <div>
@@ -121,66 +148,107 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
               </p>
             )}
             <h1 className="mt-1 font-title text-3xl font-bold text-neutral-black">{p.nombre}</h1>
-            {p.descripcion !== null && <p className="mt-2 font-sans text-sm text-neutral-dark">{p.descripcion}</p>}
+            {p.descripcion !== null && (
+              <p className="mt-2 font-sans text-base text-neutral-dark">{p.descripcion}</p>
+            )}
+            {destacados.length > 0 && (
+              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Lo esencial del producto">
+                {destacados.map((d) => (
+                  <li
+                    key={d}
+                    className="rounded-full bg-subaction px-3 py-1 font-sans text-xs font-medium text-corporate"
+                  >
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {p.compraBloqueada && (
             <Alert variant="warning">Este combo está agotado por ahora y no se puede comprar.</Alert>
           )}
 
-          {variante !== null && <PrecioPresentacion variante={variante} oferta={oferta} rendimiento={rendimiento} />}
+          {/* Todo lo que hace falta para comprar, junto y en orden. */}
+          <section
+            aria-label="Comprar"
+            className="space-y-5 rounded-card border border-neutral-light bg-neutral-white p-5 shadow-card"
+          >
+            {variante !== null && <PrecioPresentacion variante={variante} oferta={oferta} rendimiento={rendimiento} />}
 
-          {p.variantes.length > 0 ? (
-            <SelectorPresentacion
-              variantes={p.variantes}
-              idElegida={variante?.idVariante ?? null}
-              onElegir={elegirVariante}
-            />
-          ) : (
-            <Alert variant="info">Este producto no tiene presentaciones disponibles por ahora.</Alert>
-          )}
+            {p.variantes.length > 0 ? (
+              <SelectorPresentacion
+                variantes={p.variantes}
+                idElegida={variante?.idVariante ?? null}
+                onElegir={elegirVariante}
+              />
+            ) : (
+              <Alert variant="info">Este producto no tiene presentaciones disponibles por ahora.</Alert>
+            )}
 
-          {p.claseColor !== 'sin_color' && (
-            <ColorProducto idProducto={p.idProducto} elegido={color} onElegir={elegirColor} />
-          )}
+            {requiereColor(p) && (
+              <MuestrasColor
+                idProducto={p.idProducto}
+                elegido={color}
+                onElegir={elegirColor}
+                onVerTodos={() => setCartaAbierta(true)}
+              />
+            )}
 
-          {p.acabados.length > 0 && (
-            <p className="font-sans text-sm text-neutral-dark">
-              <span className="font-title font-medium">Acabados: </span>
-              {p.acabados.map((a) => a.nombre).join(', ')}
-            </p>
-          )}
-
-          {/* M05 · P3: agregar la presentación y el color elegidos al carrito. */}
-          <AgregarAlCarrito
-            idVariante={variante?.idVariante ?? null}
-            idColor={color?.idColor ?? null}
-            requiereColor={requiereColor(p)}
-            bloqueado={p.compraBloqueada}
-          />
+            {/* M05 · P3: agregar la presentación y el color elegidos al carrito. */}
+            <div className="border-t border-neutral-light pt-4">
+              <AgregarAlCarrito
+                idVariante={variante?.idVariante ?? null}
+                idColor={color?.idColor ?? null}
+                requiereColor={requiereColor(p)}
+                bloqueado={p.compraBloqueada}
+              />
+            </div>
+          </section>
 
           {/* Contacto directo de M15 con la referencia del producto (HU-ATC-03). */}
           <BotonContactoDirecto
             referencia={`Me interesa ${p.marca} ${p.nombre}${variante === null ? '' : ` (${variante.medida})`}.`}
           />
-
-          {datosTecnicos.length > 0 && (
-            <details className="rounded-card border border-neutral-light bg-neutral-white" open>
-              <summary className="min-h-11 cursor-pointer px-4 py-3 font-title text-sm font-semibold text-corporate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50">
-                Ficha técnica
-              </summary>
-              <dl className="divide-y divide-neutral-light px-4 pb-2">
-                {datosTecnicos.map(([nombre, valor]) => (
-                  <div key={nombre} className="grid grid-cols-[1fr_2fr] gap-3 py-2 font-sans text-sm">
-                    <dt className="text-neutral-medium">{nombre}</dt>
-                    <dd className="text-neutral-black">{valor}</dd>
-                  </div>
-                ))}
-              </dl>
-            </details>
-          )}
         </div>
       </div>
+
+      {fichaTecnica.length > 0 && (
+        <section aria-labelledby="titulo-ficha-tecnica" className="mt-12">
+          <h2 id="titulo-ficha-tecnica" className="font-title text-xl font-bold text-corporate">
+            Ficha técnica
+          </h2>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {fichaTecnica.map((d) => {
+              const Icono = ICONO_DATO[d.clave];
+              return (
+                <div
+                  key={`${d.clave}-${d.etiqueta}`}
+                  className="flex gap-3 rounded-card border border-neutral-light bg-neutral-white p-4"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-subaction">
+                    <Icono className="h-5 w-5 text-action" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <dt className="font-sans text-xs text-neutral-medium">{d.etiqueta}</dt>
+                    <dd className="font-title text-sm font-medium text-neutral-black">{d.valor}</dd>
+                  </div>
+                </div>
+              );
+            })}
+          </dl>
+        </section>
+      )}
+
+      {cartaAbierta && (
+        <ModalColoresProducto
+          idProducto={p.idProducto}
+          elegido={color}
+          onElegir={elegirColor}
+          onClose={() => setCartaAbierta(false)}
+        />
+      )}
+
       {/* Espacio publicitario bajo los datos, antes de los complementarios (M14 · B1) */}
       <EspacioPublicitario espacio="ficha" className="mt-10" />
       <ComplementariosProducto idProducto={p.idProducto} />

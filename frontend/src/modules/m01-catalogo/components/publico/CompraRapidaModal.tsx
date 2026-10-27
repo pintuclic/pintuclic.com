@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, PaintBucket } from 'lucide-react';
+import { ArrowLeft, ArrowRight, PaintBucket } from 'lucide-react';
 import { Alert, Button, Modal, Skeleton } from '@/core/components';
+import { esColorMuyClaro } from '@/core/utils/color-muestra';
 import type {
   ColorOfrecido,
   OfertaPublica,
@@ -11,13 +12,52 @@ import type {
   VariantePublica,
 } from '../../dtos/m01-catalogo-productos.dto';
 import { useFichaPublica } from '../../hooks/useFichaPublica';
-import { presentacionInicial, requiereColor, subtituloProducto } from '../../services/compra-rapida';
+import { imagenDeCompra, presentacionInicial, requiereColor, subtituloProducto } from '../../services/compra-rapida';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
-import { imagenParaSeleccion } from '../../services/galeria';
 import { textoRendimiento } from '../../services/rendimiento';
 import { AgregarAlCarrito } from './AgregarAlCarrito';
+import { MuestrasColor } from './MuestrasColor';
 import { PrecioPresentacion, SelectorPresentacion } from './PresentacionProducto';
-import { CartaColores, ColorProducto } from './SelectorColorProducto';
+import { CartaColores } from './SelectorColorProducto';
+
+export interface ImagenConColorProps {
+  nombre: string;
+  /** null = sin foto: se muestra el ícono de pintura. */
+  url: string | null;
+  color: ColorOfrecido | null;
+  className?: string;
+}
+
+/**
+ * La foto del producto; con un color elegido, sobre un panel de ese color (la misma muestra de la tarjeta del listado),
+ * para ver el tono antes de agregarlo.
+ */
+export const ImagenConColor: React.FC<ImagenConColorProps> = ({ nombre, url, color, className = '' }) => (
+  <div className={`relative flex items-center justify-center overflow-hidden rounded-card bg-neutral-lightest p-4 ${className}`}>
+    {color !== null && (
+      <div
+        aria-hidden="true"
+        data-muestra-color={color.hexadecimal}
+        className={`absolute inset-x-5 top-[45%] bottom-4 rounded-card transition-colors duration-300 ${
+          esColorMuyClaro(color.hexadecimal) ? 'ring-1 ring-inset ring-neutral-light' : ''
+        }`}
+        style={{ backgroundColor: color.hexadecimal }}
+      />
+    )}
+    {url === null ? (
+      <PaintBucket className="relative h-14 w-14 text-action" strokeWidth={1.75} aria-hidden="true" />
+    ) : (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src={url}
+        alt={nombre}
+        width={400}
+        height={400}
+        className={`relative h-full w-full object-contain ${color === null ? 'mix-blend-multiply' : 'drop-shadow-md'}`}
+      />
+    )}
+  </div>
+);
 
 export interface PanelCompraRapidaProps {
   ficha: ProductoPublicoFicha;
@@ -26,11 +66,11 @@ export interface PanelCompraRapidaProps {
   color: ColorOfrecido | null;
   onElegirVariante: (idVariante: number) => void;
   onElegirColor: (color: ColorOfrecido) => void;
-  /** Cambia la ventana a la carta de colores. */
+  /** Cambia la ventana a la carta completa de colores. */
   onVerCarta: () => void;
 }
 
-/** Lo que se ve en la compra rápida cuando la ficha ya cargó: imagen, precio, presentación, color y cantidad. */
+/** Lo que se ve en la compra rápida cuando la ficha ya cargó: foto, precio, presentación, color y cantidad. */
 export const PanelCompraRapida: React.FC<PanelCompraRapidaProps> = ({
   ficha,
   variante,
@@ -40,29 +80,26 @@ export const PanelCompraRapida: React.FC<PanelCompraRapidaProps> = ({
   onElegirColor,
   onVerCarta,
 }) => {
-  const idImagen = imagenParaSeleccion(ficha.imagenes, {
+  const idImagen = imagenDeCompra(ficha.imagenes, {
     idColor: color?.idColor ?? null,
     idVariante: variante?.idVariante ?? null,
   });
 
   return (
-    <div className="grid gap-5 sm:grid-cols-[11rem_1fr]">
-      <div className="flex h-44 items-center justify-center rounded-card bg-neutral-lightest p-3 sm:h-52">
-        {idImagen === null ? (
-          <PaintBucket className="h-12 w-12 text-action" strokeWidth={1.75} aria-hidden="true" />
-        ) : (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={catalogoPublicoApi.urlImagen(idImagen, 'mediana')}
-            alt={ficha.nombre}
-            width={300}
-            height={300}
-            className="h-full w-full object-contain mix-blend-multiply"
-          />
+    <div className="grid gap-6 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      <div className="space-y-3">
+        <ImagenConColor
+          nombre={ficha.nombre}
+          url={idImagen === null ? null : catalogoPublicoApi.urlImagen(idImagen, 'mediana')}
+          color={color}
+          className="h-60 md:h-80"
+        />
+        {ficha.descripcion !== null && (
+          <p className="hidden font-sans text-sm text-neutral-dark md:block">{ficha.descripcion}</p>
         )}
       </div>
 
-      <div className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-5">
         {ficha.compraBloqueada && (
           <Alert variant="warning">Este combo está agotado por ahora y no se puede comprar.</Alert>
         )}
@@ -87,21 +124,24 @@ export const PanelCompraRapida: React.FC<PanelCompraRapidaProps> = ({
         )}
 
         {requiereColor(ficha) && (
-          <ColorProducto idProducto={ficha.idProducto} elegido={color} onElegir={onElegirColor} onVerCarta={onVerCarta} />
+          <MuestrasColor idProducto={ficha.idProducto} elegido={color} onElegir={onElegirColor} onVerTodos={onVerCarta} />
         )}
 
-        <AgregarAlCarrito
-          idVariante={variante?.idVariante ?? null}
-          idColor={color?.idColor ?? null}
-          requiereColor={requiereColor(ficha)}
-          bloqueado={ficha.compraBloqueada || variante?.compraBloqueada === true}
-        />
+        <div className="border-t border-neutral-light pt-4">
+          <AgregarAlCarrito
+            idVariante={variante?.idVariante ?? null}
+            idColor={color?.idColor ?? null}
+            requiereColor={requiereColor(ficha)}
+            bloqueado={ficha.compraBloqueada || variante?.compraBloqueada === true}
+          />
+        </div>
 
         <Link
           href={`/productos/${ficha.idProducto}`}
-          className="inline-block rounded-btn font-title text-sm font-medium text-action hover:text-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
+          className="inline-flex items-center gap-1.5 rounded-btn font-title text-sm font-medium text-action hover:text-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
         >
-          Ver ficha completa
+          Ver todos los detalles del producto
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
       </div>
     </div>
@@ -119,12 +159,13 @@ const VentanaCompraRapida: React.FC<{ idProducto: number; onClose: () => void }>
   let contenido: React.ReactNode;
   if (estado.tipo === 'cargando') {
     contenido = (
-      <div className="grid gap-5 sm:grid-cols-[11rem_1fr]" aria-busy="true">
-        <Skeleton className="h-44 sm:h-52" rounded="card" />
-        <div className="space-y-3">
-          <Skeleton className="h-8 w-1/2" rounded="btn" />
+      <div className="grid gap-6 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]" aria-busy="true">
+        <Skeleton className="h-60 md:h-80" rounded="card" />
+        <div className="space-y-4">
+          <Skeleton className="h-9 w-1/2" rounded="btn" />
           <Skeleton className="h-11 w-3/4" rounded="btn" />
-          <Skeleton className="h-20" rounded="card" />
+          <Skeleton className="h-24" rounded="card" />
+          <Skeleton className="h-11" rounded="btn" />
         </div>
       </div>
     );
@@ -173,7 +214,7 @@ const VentanaCompraRapida: React.FC<{ idProducto: number; onClose: () => void }>
       onClose={onClose}
       title={ficha?.nombre ?? 'Agregar al carrito'}
       subtitle={ficha === null ? undefined : vista === 'carta' ? 'Elige el color para tu producto.' : subtituloProducto(ficha)}
-      size="lg"
+      size="xl"
     >
       {contenido}
     </Modal>

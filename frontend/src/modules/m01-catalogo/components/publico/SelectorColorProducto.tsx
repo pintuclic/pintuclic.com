@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Palette } from 'lucide-react';
 import { Alert, Button, Input, Modal } from '@/core/components';
 import type { ColorOfrecido } from '../../dtos/m01-catalogo-productos.dto';
 import { useCargar, useRetardo } from '../../hooks/useCargar';
@@ -191,65 +190,3 @@ export const ModalColoresProducto: React.FC<ModalColoresProductoProps> = ({ idPr
     />
   </Modal>
 );
-
-export interface ColorProductoProps {
-  idProducto: number;
-  elegido: ColorOfrecido | null;
-  onElegir: (color: ColorOfrecido) => void;
-  /**
-   * Si se da, "Ver colores" lo llama en vez de abrir la carta en otra ventana: la compra rápida ya es una
-   * ventana y muestra la carta dentro de ella.
-   */
-  onVerCarta?: () => void;
-}
-
-/** Muestra solo el color elegido y el botón que abre la carta completa. */
-export const ColorProducto: React.FC<ColorProductoProps> = ({ idProducto, elegido, onElegir, onVerCarta }) => {
-  const [abierto, setAbierto] = useState(false);
-  return (
-    <div className="space-y-2">
-      <p className="font-title text-sm font-medium text-neutral-dark">Color</p>
-      <div className="flex items-center gap-3 rounded-card border border-neutral-light bg-neutral-white p-3">
-        {elegido === null ? (
-          <span
-            className="h-14 w-14 shrink-0 rounded-input border border-dashed border-neutral-medium"
-            aria-hidden="true"
-          />
-        ) : (
-          <span
-            role="img"
-            aria-label={`Muestra de ${elegido.nombre}`}
-            className="h-14 w-14 shrink-0 rounded-input border border-neutral-light"
-            style={{ backgroundColor: elegido.hexadecimal }}
-          />
-        )}
-        <div className="min-w-0 flex-1" role="status">
-          <p className="truncate font-title text-sm font-semibold text-neutral-black">
-            {elegido?.nombre ?? 'Aún no ha elegido un color'}
-          </p>
-          {elegido !== null && (
-            <p className="truncate font-sans text-xs text-neutral-medium">
-              {elegido.codigo !== null && `Código ${elegido.codigo} · `}
-              {elegido.acabado}
-            </p>
-          )}
-        </div>
-        <Button
-          variant="outline"
-          leftIcon={<Palette className="h-4 w-4" aria-hidden="true" />}
-          onClick={() => (onVerCarta === undefined ? setAbierto(true) : onVerCarta())}
-        >
-          {elegido === null ? 'Ver colores' : 'Cambiar color'}
-        </Button>
-      </div>
-      {abierto && (
-        <ModalColoresProducto
-          idProducto={idProducto}
-          elegido={elegido}
-          onElegir={onElegir}
-          onClose={() => setAbierto(false)}
-        />
-      )}
-    </div>
-  );
-};

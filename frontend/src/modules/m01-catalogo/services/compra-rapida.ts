@@ -1,4 +1,16 @@
-import type { ProductoPublicoFicha, VariantePublica } from '../dtos/m01-catalogo-productos.dto';
+import type { ImagenPublica, ProductoPublicoFicha, VariantePublica } from '../dtos/m01-catalogo-productos.dto';
+import { imagenParaSeleccion } from './galeria';
+
+/**
+ * La foto de la compra rápida (U8): la del color o la presentación elegidos (I6) y, si no hay ninguna asociada, la
+ * portada. A diferencia de la galería de la ficha, aquí no hay "imagen anterior" que conservar.
+ */
+export function imagenDeCompra(
+  imagenes: readonly ImagenPublica[],
+  seleccion: { idColor: number | null; idVariante: number | null },
+): number | null {
+  return imagenParaSeleccion(imagenes, seleccion) ?? imagenes[0]?.idImagen ?? null;
+}
 
 /**
  * Presentación con la que abre la compra rápida (U8): la primera disponible que se puede comprar; si ninguna
