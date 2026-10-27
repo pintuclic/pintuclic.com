@@ -1,20 +1,19 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { Alert, Badge, Container, Skeleton } from '@/core/components';
-import { formatCOP } from '@/core/utils/moneda';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
-import type { ColorOfrecido, OfertaPublica, ProductoPublicoFicha } from '../../dtos/m01-catalogo-productos.dto';
-import { leerErrorCatalogo } from '../../services/mensaje-error';
+import { useFichaPublica } from '../../hooks/useFichaPublica';
+import { requiereColor } from '../../services/compra-rapida';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
 import { imagenParaSeleccion } from '../../services/galeria';
-import { etiquetaOferta, ofertaDePresentacion } from '../../services/ofertas-visuales';
 import { textoRendimiento } from '../../services/rendimiento';
 import { AgregarAlCarrito } from './AgregarAlCarrito';
 import { EspacioPublicitario } from '@/modules/m14-patrocinios/components/EspacioPublicitario';
 import { ComplementariosProducto } from './ComplementariosProducto';
 import { GaleriaProducto } from './GaleriaProducto';
+import { PrecioPresentacion, SelectorPresentacion } from './PresentacionProducto';
 import { ColorProducto } from './SelectorColorProducto';
 
 const TIPOS_CALIDAD: Record<number, string> = { 1: 'Tipo 1 (gama alta)', 2: 'Tipo 2', 3: 'Tipo 3' };
@@ -24,55 +23,8 @@ export interface ProductoFichaViewProps {
 }
 
 /** HU-CAT-06: ficha pública de un producto con presentaciones, rendimiento y selector de color. */
-type EstadoFicha =
-  | { tipo: 'cargando' }
-  | { tipo: 'lista'; ficha: ProductoPublicoFicha }
-  | { tipo: 'no_disponible' }
-  | { tipo: 'error'; mensaje: string };
-
 export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto }) => {
-  const [estado, setEstado] = useState<EstadoFicha>({ tipo: 'cargando' });
-  const [idVariante, setIdVariante] = useState<number | null>(null);
-  const [color, setColor] = useState<ColorOfrecido | null>(null);
-  /** Ofertas con el color elegido (los eventos pueden excluir colores); null = las de la ficha, sin color. */
-  const [ofertasConColor, setOfertasConColor] = useState<Map<number, OfertaPublica | null> | null>(null);
-
-  useEffect(() => {
-    let vigente = true;
-    setEstado({ tipo: 'cargando' });
-    setColor(null);
-    setOfertasConColor(null);
-    catalogoPublicoApi
-      .ficha(idProducto)
-      .then((ficha) => {
-        if (!vigente) return;
-        setIdVariante(ficha.variantes[0]?.idVariante ?? null);
-        setEstado({ tipo: 'lista', ficha });
-      })
-      .catch((err: unknown) => {
-        if (!vigente) return;
-        const error = leerErrorCatalogo(err, 'No se pudo cargar el producto.');
-        // U1: 404 uniforme para lo que no existe, no está publicado o tiene un padre inactivo.
-        setEstado(error.status === 404 ? { tipo: 'no_disponible' } : { tipo: 'error', mensaje: error.message });
-      });
-    return () => {
-      vigente = false;
-    };
-  }, [idProducto]);
-
-  const idColorElegido = color?.idColor ?? null;
-  useEffect(() => {
-    if (idColorElegido === null) return;
-    let vigente = true;
-    catalogoPublicoApi
-      .ofertas(idProducto, idColorElegido)
-      .then((lista) => vigente && setOfertasConColor(new Map(lista.map((o) => [o.idVariante, o.oferta]))))
-      // Si falla, se conservan las ofertas de la ficha: el carrito vuelve a calcular con el color real.
-      .catch(() => undefined);
-    return () => {
-      vigente = false;
-    };
-  }, [idProducto, idColorElegido]);
+  const { estado, variante, elegirVariante, color, elegirColor, oferta } = useFichaPublica(idProducto);
 
   if (estado.tipo === 'cargando') {
     return (
@@ -101,8 +53,6 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
   }
 
   const p = estado.ficha;
-  const variante = p.variantes.find((v) => v.idVariante === idVariante) ?? p.variantes[0] ?? null;
-  const oferta = variante === null ? null : ofertaDePresentacion(variante.idVariante, variante.oferta, ofertasConColor);
   const rendimiento = variante === null ? null : textoRendimiento(variante.rendimiento, p.manos);
   const ambientes = [p.usoInterior ? 'Interior' : null, p.usoExterior ? 'Exterior' : null].filter(
     (x): x is string => x !== null,
@@ -178,58 +128,20 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
             <Alert variant="warning">Este combo está agotado por ahora y no se puede comprar.</Alert>
           )}
 
-          {variante !== null && (
-            <div>
-              {oferta !== null && (
-                <p className="flex items-center gap-2 font-sans text-sm">
-                  <Badge variant="offer">{etiquetaOferta(oferta.porcentaje)}</Badge>
-                  <span className="text-neutral-medium">
-                    <span className="sr-only">Precio anterior </span>
-                    <s>{formatCOP(oferta.precioAntes)} COP</s>
-                  </span>
-                </p>
-              )}
-              <p className="font-title text-3xl font-bold text-corporate">
-                {formatCOP(oferta?.precioConOferta ?? variante.precio)}{' '}
-                <span className="text-base font-medium">COP</span>
-              </p>
-              {oferta !== null && <p className="font-sans text-xs text-neutral-medium">{oferta.nombre}</p>}
-              <p className="mt-1 flex items-center gap-2 font-sans text-sm">
-                <Badge variant={variante.disponibilidad === 'disponible' ? 'success' : 'neutral'}>
-                  {variante.disponibilidad === 'disponible' ? 'Disponible' : 'Agotado por ahora'}
-                </Badge>
-                {rendimiento !== null && <span className="text-neutral-dark">{rendimiento}</span>}
-              </p>
-            </div>
-          )}
+          {variante !== null && <PrecioPresentacion variante={variante} oferta={oferta} rendimiento={rendimiento} />}
 
           {p.variantes.length > 0 ? (
-            <fieldset className="space-y-2">
-              <legend className="font-title text-sm font-medium text-neutral-dark">Presentación</legend>
-              <div className="flex flex-wrap gap-2">
-                {p.variantes.map((v) => (
-                  <button
-                    key={v.idVariante}
-                    type="button"
-                    aria-pressed={variante?.idVariante === v.idVariante}
-                    onClick={() => setIdVariante(v.idVariante)}
-                    className={`min-h-11 rounded-full border px-4 font-title text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
-                      variante?.idVariante === v.idVariante
-                        ? 'border-action bg-subaction text-corporate'
-                        : 'border-neutral-light bg-neutral-white text-neutral-dark hover:border-neutral-medium'
-                    }`}
-                  >
-                    {v.medida}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
+            <SelectorPresentacion
+              variantes={p.variantes}
+              idElegida={variante?.idVariante ?? null}
+              onElegir={elegirVariante}
+            />
           ) : (
             <Alert variant="info">Este producto no tiene presentaciones disponibles por ahora.</Alert>
           )}
 
           {p.claseColor !== 'sin_color' && (
-            <ColorProducto idProducto={p.idProducto} elegido={color} onElegir={setColor} />
+            <ColorProducto idProducto={p.idProducto} elegido={color} onElegir={elegirColor} />
           )}
 
           {p.acabados.length > 0 && (
@@ -243,7 +155,7 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
           <AgregarAlCarrito
             idVariante={variante?.idVariante ?? null}
             idColor={color?.idColor ?? null}
-            requiereColor={p.claseColor !== undefined && p.claseColor !== 'sin_color'}
+            requiereColor={requiereColor(p)}
             bloqueado={p.compraBloqueada}
           />
 
