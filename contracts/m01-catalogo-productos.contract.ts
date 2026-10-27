@@ -126,17 +126,22 @@ import {
  *  U7  No se exponen existencias exactas, códigos de proveedor ni ids internos de BD
  *      más allá de lo que la vista necesita (HU-SEG-06).
  *  U8  COMPRA RÁPIDA (pantalla; la abre la tarjeta del listado de M02, V4 de su contrato): ventana
- *      que carga la ficha pública del producto (GET /productos/:idProducto) y muestra su imagen,
- *      marca, nombre y precio con la oferta de la presentación elegida, las presentaciones, el
- *      selector de color de la ficha (solo si el producto lleva color) y la cantidad, con el mismo
- *      "Agregar al carrito" de la ficha (M05 · P3: variante + color + cantidad, de 1 a 9 999).
+ *      que carga la ficha pública del producto (GET /productos/:idProducto) y muestra su imagen
+ *      (la del color o la presentación elegidos, I6, o la portada), marca, nombre y precio con la
+ *      oferta de la presentación elegida, las presentaciones, los colores (solo si el producto lleva
+ *      color) y la cantidad, con el mismo "Agregar al carrito" de la ficha (M05 · P3: variante +
+ *      color + cantidad, de 1 a 9 999).
+ *        · Colores: los primeros de su carta como muestras que se eligen con un toque (una página
+ *          pequeña, U3) y un botón a la carta completa con buscador y familias (U4), que se abre
+ *          dentro de la misma ventana. Con un color elegido, la imagen va sobre una muestra de ese
+ *          color, igual que la tarjeta del listado. La ficha usa las mismas muestras.
  *        · Empieza con la primera presentación vendible elegida; el color NO viene elegido: el
  *          cliente lo escoge, igual que en la ficha.
  *        · Si el producto tiene una sola presentación y no lleva color, la ventana igual se abre
  *          para confirmar la cantidad (nunca se agrega sin que el cliente lo vea).
  *        · Al agregar muestra el mismo aviso de la ficha ("Agregaste… · Ver carrito") y se puede
  *          seguir comprando; los errores son los de M05, con el mismo texto de la ficha.
- *        · Tiene un enlace "Ver ficha completa". Con `compraBloqueada` no se agrega.
+ *        · Tiene un enlace a la ficha completa. Con `compraBloqueada` no se agrega.
  *        · No hay rutas nuevas: usa la ficha pública, la carta de colores y el servicio del carrito
  *          que ya existen.
  *

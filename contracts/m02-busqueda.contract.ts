@@ -109,18 +109,21 @@ import {
  * ── Pantalla /productos ─────────────────────────────────────────────────────
  *  V1  Orden del panel de filtros: Ofertas, Categorías, Ambiente, Marcas, Líneas, Familias de color,
  *      Presentación, Tipo de resina, Superficie y Rango de precio.
- *  V2  Tarjeta: con `colorMuestra`, la imagen del producto va sobre un panel redondeado de ese color,
- *      como una muestra de pintura; los colores muy claros llevan un borde suave para que se vean
- *      sobre el fondo blanco. El panel es decorativo (no se lee en voz alta). Sin color, se queda el
- *      fondo neutro de hoy.
- *  V3  El nombre y "Ver producto" llevan a la ficha completa (`/productos/:idProducto`).
+ *  V2  Tarjeta: con `colorMuestra`, un panel redondeado de ese color ocupa la mitad de abajo de la
+ *      imagen y el envase queda por delante, como una muestra de pintura. La foto no se mezcla con el
+ *      color (un color oscuro no debe tapar el producto). Los colores muy claros llevan un borde suave
+ *      para que se vean sobre el blanco. El panel es decorativo (no se lee en voz alta). Sin color, se
+ *      queda el fondo neutro de hoy.
+ *  V3  Sin botón "Ver producto": el nombre y la imagen llevan a la ficha completa
+ *      (`/productos/:idProducto`) y el botón del carrito queda junto al precio.
  *  V4  El botón del carrito NO navega: abre la compra rápida de M01 (U8 del contrato
  *      m01-catalogo-productos) para elegir presentación, color y cantidad sin salir del listado. Con
  *      `compraBloqueada` (combo agotado) el botón se muestra deshabilitado.
  *
  * ── Piezas fuera de M02 (cada una en su PR) ─────────────────────────────────
- *  P1  Core Kit: `ProductCard` acepta un color de muestra opcional (fondo de V2) y un botón del
- *      carrito deshabilitado (V4). Sin esas propiedades se ve igual que hoy en el resto de pantallas.
+ *  P1  Core Kit: `ProductCard` acepta un color de muestra opcional (V2), un botón del carrito
+ *      deshabilitado (V4) y la opción de no mostrar "Ver producto" (V3). Sin esas propiedades se ve igual
+ *      que hoy en el resto de pantallas.
  *  P2  M01: ventana de compra rápida (U8 de m01-catalogo-productos). Usa la ficha pública, el selector
  *      de color y el "Agregar al carrito" que ya existen; no hay rutas nuevas.
  *
