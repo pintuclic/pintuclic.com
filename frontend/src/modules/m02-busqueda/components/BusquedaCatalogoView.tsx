@@ -467,6 +467,7 @@ export const BusquedaCatalogoView: React.FC = () => {
                       {...precioVisible(p.precioDesde, p.oferta)}
                       isSponsored={p.patrocinado}
                       href={`/productos/${p.idProducto}`}
+                      showViewDetails={false}
                       onAddToCart={() => setCompraRapida(p.idProducto)}
                       addToCartDisabled={p.compraBloqueada}
                       {...(p.colorMuestra === null ? {} : { swatchColor: p.colorMuestra.hexadecimal })}
