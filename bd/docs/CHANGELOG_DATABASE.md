@@ -10,8 +10,8 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
-## [v3.18] - 2026-10-26
-### Esquema 4.18 (84 Tablas) - M03: asesoría y asistencia · M20: registro de auditoría (HU-SEG-04, escritura)
+## [v3.20] - 2026-10-27
+### Esquema 4.19 (85 Tablas) - M03: asesoría y asistencia · M20: registro de auditoría (HU-SEG-04, escritura)
 - **Alcance General:** seis tablas nuevas pedidas por el contrato `contracts/m03-asesoria.contract.ts` (sección «Fuera del módulo»). Cambio puramente aditivo: no se toca ni se borra nada de lo que ya existía. Es el PR general de M03; el módulo llega después.
   - **`pregunta_asesoria`**, **`opcion_asesoria`** y **`efecto_opcion_asesoria`**: el cuestionario guiado administrable del modo `fijo` (M03 · F1-F5). Las preguntas y opciones no se borran, se desactivan, para no romper un flujo a medias. `efecto_opcion_asesoria.id_objetivo` **no es FK**: apunta a seis tablas según `dimension` (categoría, subcategoría, superficie, familia de color, tipo de resina o línea), y el servicio comprueba que el objetivo exista y esté activo, ignorando el efecto sin error si se desactivó (M03 · F4). `ck_efecto_asesoria_forma` obliga a que cada tipo de efecto traiga solo las columnas que le corresponden.
   - **`configuracion_asesoria`** (fila única, como las de M15): el modo de cuestionario vigente, los dos guiones de la IA y los parámetros de resiliencia. `modo_cuestionario` es un parámetro del panel, no una bandera de despliegue: el Product Owner compara los dos cuestionarios y decide sin desplegar (M03 · D3).
@@ -24,7 +24,24 @@ Este documento constituye el registro histórico y oficial del versionamiento de
   - **Seed:** los permisos `asesoria.ver` (29) y `asesoria.editar` (30), la fila de configuración en modo `fijo` con los valores supuestos del anexo B (M03 · Q1), la plantilla `alerta_servicio_ia` de M18 y el cuestionario de partida: **5 preguntas, 13 opciones y 13 efectos**. Es el cuestionario de la spec **contrastado con lo que M01 tiene de verdad**: se omiten la opción «Zona húmeda» y la pregunta «¿Qué uso tendrá el espacio?», porque no existe el dato ni el filtro que las exprese (M03 · D11, V3).
   - **Prisma:** modelos `PreguntaAsesoria`, `OpcionAsesoria`, `EfectoOpcionAsesoria`, `ConfiguracionAsesoria`, `IncidenteIa` y `RegistroAuditoria`. `prisma migrate diff` contra una base creada con este DDL no reporta **ninguna** diferencia en estas tablas ni en sus ENUMs.
   - **Verificado el 2026-10-26** contra un PostgreSQL 18 real y desechable: DDL y seed corren limpios **dos veces seguidas** sobre la misma base (idempotentes) y dejan 84 tablas; los 13 efectos sembrados resuelven todos a valores **activos** del catálogo; las restricciones rechazan el efecto mal formado, la segunda fila de configuración y la acción con formato inválido; y con el cliente de Prisma el cuestionario se lee completo, el incidente se registra y se purga, la auditoría se escribe y el `UPDATE` y el `DELETE` sobre ella se rechazan.
-  - **Bases existentes en 4.17:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente: `IF NOT EXISTS`). Después, `npm run db:seed` para los permisos y el cuestionario de partida, que **no** se siembran solos.
+  - **Bases existentes en 4.18:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente: `IF NOT EXISTS`). Después, `npm run db:seed` para los permisos y el cuestionario de partida, que **no** se siembran solos.
+## [v3.19] - 2026-10-27
+### Esquema 4.18 (79 Tablas) - M21: cotizaciones desde el carrito
+- **Alcance General:** pedido por el contrato `contracts/m21-cotizaciones.contract.ts` (P1). Una tabla nueva.
+  - **`enum_estado_cotizacion`**: nuevo valor `solicitada` (el cliente la pide desde el carrito). `borrador` queda por datos anteriores y M21 lo trata igual.
+  - **`cotizacion`**: `codigo_visible` (generada: `COT-` + id con 6 dígitos), comentario del cliente, nota para el cliente, motivo de rechazo, fechas de envío, vencimiento (DATE) y respuesta, `id_usuario_responde`, `total_referencia`, `total_acordado` y `fecha_actualizacion`. El estado por defecto pasa a `solicitada`.
+  - **`linea_cotizacion`** (nueva): copia de cada línea del carrito (variante, color, cantidad, nombre, marca, medida, SKU y color) con `precio_referencia` y `precio_acordado`. Una sola línea por variante y color en cada cotización.
+  - **`linea_carrito`**: `id_cotizacion` y `precio_acordado` (las dos o ninguna) para las líneas que vienen de una cotización aceptada (C15 de M05).
+  - **Seed:** las dos cotizaciones de ejemplo con sus líneas y totales; parámetro 14 `comercial.dias_vigencia_cotizacion` (15 días, de 1 a 90), con su clave en `CLAVES_PARAMETROS` (contrato de M17 y sus dos espejos).
+  - **Prisma:** modelos `Cotizacion` y `LineaCotizacion`, enum `EstadoCotizacion` y los campos nuevos de `LineaCarrito`.
+  - **Bases existentes en 4.17:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` y `npm run db:seed` (idempotentes). Probado en PostgreSQL 18 sobre una base nueva y sobre una con el esquema anterior y su seed.
+
+---
+
+## [v3.18] - 2026-10-27
+### Esquema 4.17 (78 Tablas, sin cambios de DDL) - M17: parámetro `comercial.dias_vigencia_carrito_visitante`
+- **Seed:** parámetro 13 `comercial.dias_vigencia_carrito_visitante` (área `comercial`, número, 30 por defecto, de 1 a 365): días sin actividad tras los cuales M05 borra el carrito de un visitante sin sesión (C13 del contrato de M05, Q4 resuelta por el Tech Lead). Editable desde la configuración general.
+- Se agregó la clave a `CLAVES_PARAMETROS` (contrato de M17 y sus dos espejos). Idempotente: no pisa un valor ya modificado.
 
 ---
 

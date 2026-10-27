@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import Link from 'next/link';
 import { Minus, Plus, ShoppingCart } from 'lucide-react';
 import { Alert, Button, IconButton, Input } from '@/core/components';
@@ -17,8 +17,10 @@ export interface AgregarAlCarritoProps {
   bloqueado: boolean;
 }
 
-/** Cantidad y "Agregar al carrito" de la ficha (M05 · P3). */
+/** Cantidad y "Agregar al carrito" de la ficha (M05 · P3) y de la compra rápida (U8). */
 export function AgregarAlCarrito({ idVariante, idColor, requiereColor, bloqueado }: AgregarAlCarritoProps) {
+  // La ficha y la compra rápida pueden convivir en la misma página: el id del campo no se repite.
+  const idCantidad = useId();
   const [cantidad, setCantidad] = useState(1);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; mensaje: string } | null>(null);
@@ -60,7 +62,7 @@ export function AgregarAlCarrito({ idVariante, idColor, requiereColor, bloqueado
           </IconButton>
           <div className="w-20">
             <Input
-              id="cantidad-ficha"
+              id={idCantidad}
               aria-label="Cantidad"
               inputMode="numeric"
               value={String(cantidad)}

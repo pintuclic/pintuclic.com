@@ -337,6 +337,144 @@ describe('M05 · C11 revalidación (HU-CAR-05)', () => {
   });
 });
 
+describe('M05 · C13 vigencia y limpieza de carritos de visitante (Q4)', () => {
+  const conParametro = (valor: number | null, reloj: () => Date = () => AHORA): CarritoService =>
+    new CarritoService({
+      repo,
+      precios,
+      catalogo,
+      reloj,
+      parametros: { obtenerNumero: () => Promise.resolve(valor) },
+    });
+  const hace = (dias: number): Date => new Date(AHORA.getTime() - dias * 24 * 60 * 60 * 1000);
+
+  it('usa los días del parámetro de M17 para saber si un carrito venció', async () => {
+    const token = generarTokenVisitante();
+    repo.sembrar({ tipo: 'visitante', hashToken: hashTokenVisitante(token) }, [{ idVariante: 2, idColor: null, cantidad: 1 }], hace(8));
+    expect((await conParametro(10).consultar(visitante(token))).datos.lineas).toHaveLength(1);
+    expect((await conParametro(7).consultar(visitante(token))).datos.lineas).toHaveLength(0);
+  });
+
+  it('borra los de visitante vencidos y deja los vigentes y los de una cuenta', async () => {
+    const vencido = repo.sembrar({ tipo: 'visitante', hashToken: 'a'.repeat(64) }, [{ idVariante: 2, idColor: null, cantidad: 1 }], hace(8));
+    const vigente = repo.sembrar({ tipo: 'visitante', hashToken: 'b'.repeat(64) }, [{ idVariante: 2, idColor: null, cantidad: 1 }], hace(3));
+    const cuenta = repo.sembrar({ tipo: 'cuenta', idUsuario: ID_USUARIO_PARTICULAR }, [{ idVariante: 1, idColor: 13, cantidad: 1 }], hace(400));
+    await conParametro(7).consultar(visitante());
+    await Promise.resolve();
+    expect(repo.limpiezas.map((d) => d.toISOString())).toEqual([hace(7).toISOString()]);
+    expect(repo.carritos.map((c) => c.idCarrito).sort()).toEqual([vigente, cuenta].sort());
+    expect(repo.lineas.some((l) => l.idCarrito === vencido)).toBe(false);
+  });
+
+  it('limpia como máximo una vez por hora', async () => {
+    let ahora = AHORA.getTime();
+    const servicio = conParametro(7, () => new Date(ahora));
+    await servicio.consultar(visitante());
+    ahora += 30 * 60 * 1000;
+    await servicio.consultar(visitante());
+    expect(repo.limpiezas).toHaveLength(1);
+    ahora += 31 * 60 * 1000;
+    await servicio.consultar(visitante());
+    expect(repo.limpiezas).toHaveLength(2);
+  });
+
+  it('si el parámetro no se puede leer o está fuera de rango, usa 30 días', async () => {
+    for (const valor of [null, 0, 500, 2.5]) {
+      repo.limpiezas.length = 0;
+      await conParametro(valor).consultar(visitante());
+      expect(repo.limpiezas[0]?.toISOString()).toBe(hace(30).toISOString());
+    }
+    const fallo = new CarritoService({
+      repo,
+      precios,
+      catalogo,
+      reloj: () => AHORA,
+      parametros: { obtenerNumero: () => Promise.reject(new Error('M17 no responde')) },
+    });
+    await expect(fallo.consultar(visitante())).resolves.toBeDefined();
+  });
+
+  it('si borrar falla, el cliente igual recibe su carrito', async () => {
+    repo.borrarVisitantesVencidos = () => Promise.reject(new Error('BD caída'));
+    await expect(conParametro(7).consultar(visitante())).resolves.toMatchObject({ datos: { lineas: [] } });
+  });
+
+  it('la cookie nueva vive los días del parámetro', async () => {
+    const r = await conParametro(45).agregar(visitante(), { idVariante: 2, cantidad: 1 });
+    expect(r.cookie).toMatchObject({ tipo: 'fijar', diasVigencia: 45 });
+  });
+});
+
+describe('M05 · C15 líneas de una cotización aceptada (M21)', () => {
+  const yo = (): Solicitante => cliente(ID_USUARIO_PARTICULAR);
+
+  it('entran con su precio fijo, M06 las recibe con precioAcordado y no les aplica descuentos', async () => {
+    await servicio.agregarLineasAcordadas(ID_USUARIO_PARTICULAR, 9, [
+      { idVariante: 1, idColor: 13, cantidad: 10, precioAcordado: 79_000 },
+    ]);
+    const c = (await servicio.consultar(yo(), CUPON_VALIDO)).datos;
+    expect(carritoSchema.parse(c).lineas[0]).toMatchObject({ idCotizacion: 9, precioAcordado: 79_000, cantidad: 10 });
+    expect(precios.llamadas.at(-1)?.lineas[0]).toMatchObject({ idVariante: 1, precioAcordado: 79_000 });
+    expect(c.lineas[0]?.precio).toMatchObject({ precioAcordado: true, subtotal: 790_000, descuentos: [] });
+  });
+
+  it('reemplazan a una línea normal igual y crean el carrito si la cuenta no tenía', async () => {
+    await servicio.agregar(yo(), { idVariante: 1, idColor: 13, cantidad: 2 });
+    await servicio.agregarLineasAcordadas(ID_USUARIO_PARTICULAR, 9, [
+      { idVariante: 1, idColor: 13, cantidad: 5, precioAcordado: 80_000 },
+      { idVariante: 2, idColor: null, cantidad: 3, precioAcordado: 40_000 },
+    ]);
+    const c = (await servicio.consultar(yo())).datos;
+    expect(c.lineas.map((l) => [l.idVariante, l.cantidad, l.precioAcordado])).toEqual([
+      [1, 5, 80_000],
+      [2, 3, 40_000],
+    ]);
+    await servicio.agregarLineasAcordadas(ID_USUARIO_EMPRESA, 10, [{ idVariante: 2, idColor: null, cantidad: 1, precioAcordado: 1 }]);
+    expect((await servicio.consultar(cliente(ID_USUARIO_EMPRESA))).datos.lineas).toHaveLength(1);
+  });
+
+  it('su cantidad no se cambia ni se suma (409 LINEA_COTIZADA), pero se pueden quitar', async () => {
+    await servicio.agregarLineasAcordadas(ID_USUARIO_PARTICULAR, 9, [{ idVariante: 2, idColor: null, cantidad: 3, precioAcordado: 40_000 }]);
+    const idLinea = (await servicio.consultar(yo())).datos.lineas[0]?.idLinea ?? 0;
+    for (const p of [
+      servicio.cambiarCantidad(yo(), idLinea, { cantidad: 4 }),
+      servicio.agregar(yo(), { idVariante: 2, cantidad: 1 }),
+    ]) {
+      const e = await errorDe(p);
+      expect([e.status, e.code]).toEqual([409, 'LINEA_COTIZADA']);
+    }
+    expect((await servicio.quitar(yo(), idLinea)).datos.lineas).toHaveLength(0);
+  });
+
+  it('la revalidación no compara su precio (RF-CAR-05-06)', async () => {
+    await servicio.agregarLineasAcordadas(ID_USUARIO_PARTICULAR, 9, [{ idVariante: 2, idColor: null, cantidad: 1, precioAcordado: 40_000 }]);
+    const c = (await servicio.consultar(yo())).datos;
+    const r = await servicio.revalidar(yo(), {
+      lineas: [{ idLinea: c.lineas[0]?.idLinea ?? 0, subtotal: 1 }],
+      total: c.calculo?.resumen.total ?? 0,
+    });
+    expect(r.datos).toMatchObject({ cambios: [], puedeContinuar: true });
+  });
+
+  it('al unir el carrito del visitante no suma sobre una línea cotizada', async () => {
+    await servicio.agregarLineasAcordadas(ID_USUARIO_PARTICULAR, 9, [{ idVariante: 2, idColor: null, cantidad: 3, precioAcordado: 40_000 }]);
+    const token = generarTokenVisitante();
+    repo.sembrar({ tipo: 'visitante', hashToken: hashTokenVisitante(token) }, [{ idVariante: 2, idColor: null, cantidad: 5 }], AHORA);
+    const r = await servicio.consultar(cliente(ID_USUARIO_PARTICULAR, token));
+    expect(r.datos.union).toMatchObject({ lineasDescartadas: 1, lineasSumadas: 0 });
+    expect(r.datos.lineas[0]).toMatchObject({ cantidad: 3, precioAcordado: 40_000 });
+  });
+
+  it('respeta el límite de 100 líneas del carrito', async () => {
+    await repo.crear({ tipo: 'cuenta', idUsuario: ID_USUARIO_PARTICULAR });
+    for (let i = 0; i < MAXIMO_LINEAS_CARRITO; i++) await repo.guardarLinea(1, { idVariante: 2, idColor: 1000 + i, cantidad: 1 });
+    const e = await errorDe(
+      servicio.agregarLineasAcordadas(ID_USUARIO_PARTICULAR, 9, [{ idVariante: 1, idColor: 13, cantidad: 1, precioAcordado: 1 }]),
+    );
+    expect(e.code).toBe('LIMITE_LINEAS_ALCANZADO');
+  });
+});
+
 describe('M05 · resumen para el contador del Header', () => {
   it('cantidad de unidades vendibles y total sin cupón', async () => {
     const yo = cliente(ID_USUARIO_PARTICULAR);

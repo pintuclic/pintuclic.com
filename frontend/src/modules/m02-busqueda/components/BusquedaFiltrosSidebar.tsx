@@ -142,6 +142,38 @@ export const BusquedaFiltrosSidebar: React.FC<Props> = ({
         </section>
       )}
 
+      {/* Ambiente, después de las categorías (V1) */}
+      <section aria-labelledby="filtro-ambiente">
+        <h3 id="filtro-ambiente" className="mb-2 font-title text-sm font-semibold text-neutral-dark">
+          Ambiente
+        </h3>
+        <div className="grid grid-cols-2 gap-2">
+          {(['interior', 'exterior'] as const).map((amb) => {
+            const activa = filtros.ambiente === amb;
+            return (
+              <button
+                key={amb}
+                type="button"
+                aria-pressed={activa}
+                onClick={() =>
+                  onCambiar({
+                    ambiente: activa ? undefined : amb,
+                    pagina: 1,
+                  })
+                }
+                className={`rounded-btn border px-3 py-1.5 text-center text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
+                  activa
+                    ? 'border-action bg-action text-neutral-white font-semibold'
+                    : 'border-neutral-light bg-neutral-white text-neutral-dark hover:border-action/50'
+                }`}
+              >
+                {amb === 'interior' ? 'Interior' : 'Exterior'}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Marcas */}
       {opciones && opciones.marcas.length > 0 && (
         <section aria-labelledby="filtro-marcas">
@@ -387,38 +419,6 @@ export const BusquedaFiltrosSidebar: React.FC<Props> = ({
           </div>
         </section>
       )}
-
-      {/* Ambiente */}
-      <section aria-labelledby="filtro-ambiente">
-        <h3 id="filtro-ambiente" className="mb-2 font-title text-sm font-semibold text-neutral-dark">
-          Ambiente
-        </h3>
-        <div className="grid grid-cols-2 gap-2">
-          {(['interior', 'exterior'] as const).map((amb) => {
-            const activa = filtros.ambiente === amb;
-            return (
-              <button
-                key={amb}
-                type="button"
-                aria-pressed={activa}
-                onClick={() =>
-                  onCambiar({
-                    ambiente: activa ? undefined : amb,
-                    pagina: 1,
-                  })
-                }
-                className={`rounded-btn border px-3 py-1.5 text-center text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
-                  activa
-                    ? 'border-action bg-action text-neutral-white font-semibold'
-                    : 'border-neutral-light bg-neutral-white text-neutral-dark hover:border-action/50'
-                }`}
-              >
-                {amb === 'interior' ? 'Interior' : 'Exterior'}
-              </button>
-            );
-          })}
-        </div>
-      </section>
 
       {/* Rango de Precios */}
       {opciones && opciones.precio && (

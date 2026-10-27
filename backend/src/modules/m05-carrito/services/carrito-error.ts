@@ -45,6 +45,13 @@ export const errores = {
     new CarritoError('PRODUCTO_NO_DISPONIBLE', 'Este producto no se puede agregar al carrito en este momento.', 409, {
       motivo,
     }),
+  /** C15 */
+  lineaCotizada: (): CarritoError =>
+    new CarritoError(
+      'LINEA_COTIZADA',
+      'Este producto está en tu carrito con el precio de una cotización: quítalo si quieres cambiar la cantidad.',
+      409,
+    ),
   sinExistencia: (topeUnidades: number): CarritoError =>
     new CarritoError(
       'SIN_EXISTENCIA_SUFICIENTE',

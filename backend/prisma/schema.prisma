@@ -69,6 +69,18 @@ enum EstadoUsuario {
 }
 
 /// Estado general de entidades de configuración y catálogos (M17)
+/// Estado de una cotización (M21); `borrador` se trata igual que `solicitada`
+enum EstadoCotizacion {
+  solicitada
+  borrador
+  enviada
+  aprobada
+  rechazada
+  vencida
+
+  @@map("enum_estado_cotizacion")
+}
+
 enum EstadoGeneral {
   activo
   inactivo
@@ -390,6 +402,10 @@ model Usuario {
   // M05 Relaciones
   carrito Carrito?
 
+  // M21 Relaciones
+  cotizaciones           Cotizacion[] @relation("CotizacionCliente")
+  cotizacionesRespondidas Cotizacion[] @relation("CotizacionRespondidaPor")
+
   // M03 Relaciones
   configuracionAsesoriaActualizada ConfiguracionAsesoria[] @relation("ConfiguracionAsesoriaUsuarioActualizo")
 
@@ -445,6 +461,7 @@ model Rol {
   asignaciones     AsignacionPermiso[]
   usuariosConRol   UsuarioRol[]
   usuariosDirectos Usuario[]     @relation("UsuarioRolDirecto")
+  cotizaciones     Cotizacion[]
 
   @@map("rol")
 }
@@ -844,13 +861,79 @@ model LineaCarrito {
   /// Referencia viva del carrito (M21)
   refViva        Int  @default(1) @map("ref_viva")
   cantidad       Int  @default(1)
+  /// Cotización aceptada de la que viene la línea; null en una línea normal (M05 · C15)
+  idCotizacion   Int?     @map("id_cotizacion")
+  /// Precio unitario pactado en la cotización; M06 lo respeta sin descuentos (R3)
+  precioAcordado Decimal? @map("precio_acordado") @db.Decimal(12, 2)
 
-  carrito  Carrito  @relation(fields: [idCarrito], references: [idCarrito], onDelete: Cascade, map: "fk_lineacarrito_carrito")
-  variante Variante @relation(fields: [idVariante], references: [idVariante], onDelete: Cascade, map: "fk_lineacarrito_variante")
-  color    Color?   @relation(fields: [idColor], references: [idColor], onDelete: Restrict, map: "fk_lineacarrito_color")
+  carrito    Carrito     @relation(fields: [idCarrito], references: [idCarrito], onDelete: Cascade, map: "fk_lineacarrito_carrito")
+  variante   Variante    @relation(fields: [idVariante], references: [idVariante], onDelete: Cascade, map: "fk_lineacarrito_variante")
+  color      Color?      @relation(fields: [idColor], references: [idColor], onDelete: Restrict, map: "fk_lineacarrito_color")
+  cotizacion Cotizacion? @relation(fields: [idCotizacion], references: [idCotizacion], onDelete: Cascade, map: "fk_lineacarrito_cotizacion")
 
   // `uq_carrito_variante_color` (UNIQUE NULLS NOT DISTINCT) vive solo en el DDL: Prisma no expresa NULLS NOT DISTINCT.
   @@map("linea_carrito")
+}
+
+// =============================================================================
+// MÓDULO M21 — COTIZACIONES (esquema 4.18)
+// =============================================================================
+
+/// Cotización pedida por un cliente desde su carrito y respondida por el equipo comercial
+model Cotizacion {
+  idCotizacion       Int              @id @default(autoincrement()) @map("id_cotizacion")
+  idUsuario          Int?             @map("id_usuario")
+  idRol              Int?             @map("id_rol")
+  estado             EstadoCotizacion @default(solicitada)
+  fechaCreacion      DateTime         @default(now()) @map("fecha_creacion") @db.Timestamp(6)
+  /// COT-000123: columna generada por la base a partir del id; nunca se escribe (R13)
+  codigoVisible      String?          @map("codigo_visible") @db.VarChar(20)
+  comentarioCliente  String?          @map("comentario_cliente") @db.VarChar(500)
+  notaParaCliente    String?          @map("nota_para_cliente") @db.VarChar(1000)
+  motivoRechazo      String?          @map("motivo_rechazo") @db.VarChar(500)
+  fechaEnvio         DateTime?        @map("fecha_envio") @db.Timestamptz(6)
+  /// Último día de vigencia, en hora de Colombia
+  fechaVencimiento   DateTime?        @map("fecha_vencimiento") @db.Date
+  fechaRespuesta     DateTime?        @map("fecha_respuesta") @db.Timestamptz(6)
+  idUsuarioResponde  Int?             @map("id_usuario_responde")
+  totalReferencia    Decimal          @default(0) @map("total_referencia") @db.Decimal(14, 2)
+  totalAcordado      Decimal?         @map("total_acordado") @db.Decimal(14, 2)
+  fechaActualizacion DateTime         @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  usuario         Usuario?          @relation("CotizacionCliente", fields: [idUsuario], references: [idUsuario], onDelete: SetNull, map: "fk_cotizacion_usuario")
+  rol             Rol?              @relation(fields: [idRol], references: [idRol], onDelete: SetNull, map: "fk_cotizacion_rol")
+  usuarioResponde Usuario?          @relation("CotizacionRespondidaPor", fields: [idUsuarioResponde], references: [idUsuario], onDelete: SetNull, map: "fk_cotizacion_usuario_responde")
+  lineas          LineaCotizacion[]
+  lineasCarrito   LineaCarrito[]
+
+  @@index([idUsuario, estado], map: "idx_cotizacion_usuario_estado")
+  @@index([estado, fechaCreacion(sort: Desc)], map: "idx_cotizacion_estado_fecha")
+  @@map("cotizacion")
+}
+
+/// Línea de una cotización: copia del carrito al pedirla y precio acordado
+model LineaCotizacion {
+  idLineaCotizacion Int      @id @default(autoincrement()) @map("id_linea_cotizacion")
+  idCotizacion      Int      @map("id_cotizacion")
+  idVariante        Int      @map("id_variante")
+  idColor           Int?     @map("id_color")
+  cantidad          Int
+  precioReferencia  Decimal  @map("precio_referencia") @db.Decimal(12, 2)
+  precioAcordado    Decimal? @map("precio_acordado") @db.Decimal(12, 2)
+  nombreProducto    String   @map("nombre_producto") @db.VarChar(150)
+  marca             String?  @db.VarChar(100)
+  medida            String?  @db.VarChar(100)
+  sku               String?  @db.VarChar(60)
+  colorNombre       String?  @map("color_nombre") @db.VarChar(100)
+  colorHexadecimal  String?  @map("color_hexadecimal") @db.Char(7)
+
+  cotizacion Cotizacion @relation(fields: [idCotizacion], references: [idCotizacion], onDelete: Cascade, map: "fk_lineacotizacion_cotizacion")
+  variante   Variante   @relation(fields: [idVariante], references: [idVariante], onDelete: Restrict, map: "fk_lineacotizacion_variante")
+  color      Color?     @relation(fields: [idColor], references: [idColor], onDelete: Restrict, map: "fk_lineacotizacion_color")
+
+  // `uq_lineacotizacion_variante_color` (UNIQUE NULLS NOT DISTINCT) vive solo en el DDL.
+  @@index([idCotizacion], map: "idx_lineacotizacion_cotizacion")
+  @@map("linea_cotizacion")
 }
 
 // =============================================================================
@@ -1220,6 +1303,7 @@ model Color {
   productos ProductoColor[]
   imagenes  Imagen[]
   lineasCarrito LineaCarrito[]
+  lineasCotizacion LineaCotizacion[]
 
   @@unique([idMarca, nombre, idAcabado], map: "uq_color_nombre_marca_acabado")
   @@index([idMarca], map: "idx_color_marca")
@@ -1374,6 +1458,7 @@ model Variante {
   combos   VarianteCombo[]
   ajustes  AjusteInventario[]
   lineasCarrito LineaCarrito[]
+  lineasCotizacion LineaCotizacion[]
 
   @@unique([idProducto, idMedida], map: "uq_variante_producto_medida")
   @@index([idProducto], map: "idx_variante_producto")

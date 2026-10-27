@@ -20,12 +20,15 @@ import {
  * Diagramas de flujo: docs/assets/diagrams/M02/
  *
  * Este contrato ES la especificación del módulo. Nada se programa hasta que el Tech Lead
- * lo da por bueno. Lo que depende de una decisión suya está en "Preguntas abiertas" (Q1…Q6)
+ * lo da por bueno. Lo que depende de una decisión suya está en "Preguntas abiertas" (Q1…Q7)
  * con la opción que se asume mientras tanto; ninguna bloquea el resto del contrato.
  *
+ * Ajustes del catálogo (2026-10): tolerancia a errores sin extensiones (B11–B14, D3), tarjeta de "producto
+ * en un color" (T1–T4), pantalla /productos e inicio (V1–V5) y ficha abierta en el color de la tarjeta (P2).
+ *
  * ── Qué hace ────────────────────────────────────────────────────────────────
- *  HU-BUS-01 Búsqueda de productos por texto libre, tolerante a mayúsculas, acentos y errores
- *            de escritura, sobre nombre, marca, línea, color y descripción.
+ *  HU-BUS-01 Búsqueda de productos por texto libre, tolerante a mayúsculas, acentos, plurales y
+ *            errores de escritura, sobre nombre, marca, línea, categoría, color y descripción.
  *  HU-BUS-02 Filtros combinables y de varios valores: categoría, subcategoría, marca, línea,
  *            tipo de resina, color, familia cromática, presentación y rango de precio. Cada
  *            filtro ofrece solo valores que producen resultados.
@@ -53,9 +56,8 @@ import {
  *  B3  Normalización del término: se recortan espacios, se pasa a minúsculas, se quitan
  *      acentos y se colapsan espacios repetidos. Largo máximo 100. Se compara contra el texto
  *      normalizado de cada campo.
- *  B4  Campos que se buscan: nombre del producto, marca, línea, nombre de color, nombre de la
- *      familia cromática y descripción. Se tolera un error tipográfico leve (similitud por
- *      trigramas con umbral fijo en el servicio) sin devolver resultados sin relación.
+ *  B4  Campos que se buscan: nombre del producto, marca, línea, categoría, subcategoría, nombre de
+ *      color, nombre de la familia cromática y descripción. La tolerancia a errores sigue B11–B14.
  *  B5  Solo productos visibles al público, con las mismas condiciones de U1 de M01: activo,
  *      publicado y con marca, línea (si tiene), subcategoría y categoría activas. Los inactivos
  *      nunca aparecen (CA-BUS-01-03).
@@ -63,7 +65,10 @@ import {
  *      (CA-BUS-01-06). Se devuelven productos, nunca variantes.
  *  B7  COLOR: buscar o filtrar un color de la carta devuelve los productos que PUEDEN
  *      entregarse en ese color: los que lo traen de fábrica y los entonables cuya base y acabado
- *      lo permiten (P5 de M01) (RF-BUS-01-05, RF-BUS-02-03, CA-BUS-02-08).
+ *      lo permiten (P5 de M01) (RF-BUS-01-05, RF-BUS-02-03, CA-BUS-02-08). Los entonables se
+ *      encuentran por los colores de su carta (marca + base + acabado) con una consulta a la base por
+ *      cada palabra, sin cargar la carta completa (D4): ahí se ignoran las mayúsculas, pero no los
+ *      acentos ni los errores de escritura (D7).
  *  B8  FAMILIA CROMÁTICA: si el término coincide con el nombre de una familia (ej. "amarillo"),
  *      se devuelven los productos que pueden entregar CUALQUIER color de esa familia (Q3).
  *  B9  Un término sin resultados no produce error: se informa "sin resultados" y, si el término
@@ -71,6 +76,65 @@ import {
  *  B10 Si la búsqueda falla por un error del servidor, la respuesta es el error genérico
  *      ERROR_INTERNO sin detalles técnicos; el frontend informa y mantiene accesibles el inicio
  *      y el catálogo (RF-BUS-01-06).
+ *
+ * ── Tolerancia a errores de escritura ───────────────────────────────────────
+ *  B11 PALABRAS: el término normalizado (B3) se parte en palabras. Las de menos de
+ *      LARGO_MINIMO_PALABRA letras ("de", "la") se ignoran; si todas son cortas, se busca el término
+ *      completo como texto.
+ *  B12 TODAS LAS PALABRAS: un producto aparece solo si CADA palabra coincide con al menos un campo
+ *      (B4), en el campo que sea. Así "vinilo blanco" no trae todo lo que diga "vinilo".
+ *  B13 Una palabra coincide con un campo, de mayor a menor fuerza:
+ *        · exacta: es igual a una palabra del campo;
+ *        · contenida: aparece dentro del texto del campo ("vinil" en "viniltex");
+ *        · singular o plural: coinciden al quitar la "s" o "es" final ("pinturas" → "pintura");
+ *        · aproximada: a una palabra del campo le faltan, le sobran, le cambian o le invierten
+ *          letras hasta ERRORES_TOLERADOS ("vinilex" → "viniltex", "barnis" → "barniz"). Las palabras
+ *          de 3 letras no admiten errores, para no traer resultados sin relación.
+ *  B14 La tolerancia se resuelve en el servicio, sobre los productos visibles que ya se leen para
+ *      buscar (D3). No usa extensiones de la base ni cambia el esquema.
+ *
+ * ── Color de muestra de la tarjeta ──────────────────────────────────────────
+ *  T1  Cada resultado trae `colorMuestra` (id, nombre y hexadecimal): el color en que se muestra el
+ *      producto en su tarjeta y en el que se abre su ficha (V3). Es null si el producto no se vende con color
+ *      (sin bases ni colores de fábrica).
+ *  T2  Cuál color, en este orden:
+ *        · si se filtró por un color (`idColor`) que el producto ofrece, ese color;
+ *        · si el término coincidió con un color del producto, ese color;
+ *        · si se filtró por una familia (`idFamiliaColor`), el primer color del producto en esa familia;
+ *        · si no, el primer color que ofrece (P5 de M01: de fábrica y de su carta), por nombre y luego
+ *          por id, el mismo orden de la ficha.
+ *  T3  Se calcula solo para los productos de la página pedida, con una consulta, sin cargar la carta
+ *      completa (U3 de M01, D4). Si esa consulta falla, los resultados salen con `colorMuestra` null:
+ *      el listado no se cae por el color.
+ *  T4  `totalColores`: cuántos colores ofrece el producto (P5 de M01), para decir "y 45 colores más"; 0 si
+ *      no se vende con color. Se cuenta en la misma consulta de T3 y con el mismo cuidado si falla.
+ *
+ *  Por qué la muestra cambia con la búsqueda: cada tarjeta es el producto EN UN COLOR (como en una tienda de
+ *  pinturas, donde cada color es su propia ficha). Sin búsqueda se ve el primero de la carta; al buscar "gris"
+ *  se ve el gris que coincidió, y la tarjeta lleva a la ficha en ese mismo gris. Lo que se ve es lo que se abre.
+ *
+ * ── Pantalla /productos ─────────────────────────────────────────────────────
+ *  V1  Orden del panel de filtros: Ofertas, Categorías, Ambiente, Marcas, Líneas, Familias de color,
+ *      Presentación, Tipo de resina, Superficie y Rango de precio.
+ *  V2  Tarjeta del producto en su color: con `colorMuestra`, un panel redondeado de ese color ocupa la
+ *      mitad de abajo de la imagen y el envase queda por delante, como una muestra de pintura. La foto no se
+ *      mezcla con el color (un color oscuro no debe tapar el producto); los colores muy claros llevan un
+ *      borde suave. Bajo el nombre, un punto con el color, su nombre y "y N colores más" (T4). Sin color, el
+ *      fondo neutro de siempre y sin esa línea.
+ *  V3  Sin botón "Ver producto". El nombre, la imagen y el botón del carrito (junto al precio) llevan a la
+ *      ficha ABIERTA EN ESE COLOR: `/productos/:idProducto?color=:idColor` (U8 de m01-catalogo-productos);
+ *      sin color, `/productos/:idProducto`. La presentación, el color y la cantidad se eligen en la ficha:
+ *      no hay ventanas encima del listado.
+ *  V4  Un combo agotado (`compraBloqueada`) también lleva a su ficha, que avisa que no se puede comprar.
+ *  V5  INICIO: "Productos destacados" y la búsqueda de "¿Qué buscas?" usan esta misma búsqueda
+ *      (GET /busqueda/productos, con su tolerancia a errores) y la misma tarjeta que /productos.
+ *
+ * ── Piezas fuera de M02 (cada una en su PR) ─────────────────────────────────
+ *  P1  Core Kit: `ProductCard` acepta un color de muestra con su texto (V2) y la opción de no mostrar
+ *      "Ver producto" (V3). Sin esas propiedades se ve igual que hoy en el resto de pantallas.
+ *  P2  M01: la ficha se abre en el color de `?color=` (U8 de m01-catalogo-productos) y la carta pública de
+ *      colores de un producto acepta `idColor` para traer ese color.
+ *  P3  Inicio (fuera de los módulos): las tarjetas destacadas usan la búsqueda de M02 (V5).
  *
  * ── Reglas de filtros ───────────────────────────────────────────────────────
  *  F1  Los filtros se combinan con Y entre grupos y O dentro de un mismo grupo
@@ -99,9 +163,10 @@ import {
  * ── Reglas de orden y relevancia ────────────────────────────────────────────
  *  O1  Criterios: `relevancia`, `precio_asc`, `precio_desc`, `novedad`. Por defecto `relevancia` (Q4).
  *      Sin término de búsqueda, `relevancia` equivale al orden por nombre.
- *  O2  Relevancia = suma ponderada de las coincidencias, de mayor a menor peso: nombre,
- *      marca, línea, color, descripción (PESOS_RELEVANCIA). La coincidencia exacta pesa más que la
- *      aproximada (FACTOR_COINCIDENCIA_EXACTA).
+ *  O2  Relevancia = suma, por cada palabra (B11) y cada campo con el que coincide, del peso del campo
+ *      (PESOS_RELEVANCIA: nombre, marca, línea, categoría o subcategoría, color, descripción) por la
+ *      fuerza de la coincidencia (B13): exacta × FACTOR_COINCIDENCIA_EXACTA, contenida o singular/plural
+ *      × 1, aproximada × FACTOR_COINCIDENCIA_APROXIMADA. Escribir bien siempre pesa más que con errores.
  *  O3  Con término, un producto con relevancia 0 NO aparece, aunque su marca esté patrocinada
  *      (CA-BUS-03-04).
  *  O4  Desempate estable por nombre y luego por id del producto: la misma consulta devuelve el
@@ -153,14 +218,19 @@ import {
  *      M01 no se toca (ver Q2).
  *  D2  M02 lee las tablas del catálogo con sus propios repositorios y solo en lectura. No importa
  *      código de M01.
- *  D3  La tolerancia a errores y a acentos usa las extensiones `pg_trgm` y `unaccent` de PostgreSQL.
- *      REQUIEREN el PR general de archivos compartidos (esquema y despliegue) y que DevOps las habilite.
+ *  D3  La tolerancia a errores y a acentos se resuelve en el servicio (B14), sobre los productos visibles
+ *      que M02 ya lee para buscar: no hacen falta las extensiones `pg_trgm` ni `unaccent`, ni cambios de
+ *      esquema ni de despliegue. Si el catálogo crece tanto que se vuelve lento, se pasa a la base.
  *  D4  Los colores no se cargan completos en los filtros (U3 de M01): el filtro de color elige por
  *      familia, y para un color concreto se busca por nombre con `GET /busqueda/colores`.
  *  D5  Búsqueda sin resultados con filtros NO se registra: el vacío puede deberse a los filtros y no
  *      a un faltante del catálogo.
  *  D6  Tamaño de página por defecto 12 y máximo 48 (la vitrina ya usa 12). Se puede mover a un
  *      parámetro del sistema si el Tech Lead lo pide.
+ *  D7  La búsqueda de colores de la carta (B7, entonables) ignora mayúsculas, pero no acentos ni
+ *      errores: hacerlo exigiría cargar la carta completa o `unaccent` en la base.
+ *  D8  La tarjeta en un color (V2, V3) se usa en `/productos` y en el inicio (V5). Las demás tarjetas
+ *      (vitrina de M01, "Completa tu trabajo con" y patrocinados de M14) quedan igual hasta que se pida (Q7).
  *
  * ── Preguntas abiertas (para el Tech Lead / cliente) ────────────────────────
  *  Q1  RESUELTA con M06: `PrecioFinalPort` lo implementa M06 (`preciosDeVariantes`, precio con evento, IVA
@@ -178,6 +248,8 @@ import {
  *      el cliente no diga otro. También es un parámetro de sistema si debe ser editable.
  *  Q6  Caché: la spec habla de "paginación y caché". No se define caché de respuestas en este contrato;
  *      si se quiere, hay que decidir dónde vive y cuánto dura.
+ *  Q7  ¿La tarjeta en un color debe llegar también a "Completa tu trabajo con" de la ficha y a los
+ *      patrocinados? Se asume que no por ahora (D8); cada una es de otro módulo y sería un PR aparte.
  *
  * Regla de Oro #1: Cero código sin contrato previo.
  * Regla de Oro #11: Tolerancia Cero al tipo `any`.
@@ -205,11 +277,24 @@ export const PESOS_RELEVANCIA = {
   nombre: 5,
   marca: 4,
   linea: 3,
+  categoria: 2,
   color: 2,
   descripcion: 1,
 } as const;
-/** Multiplicador de una coincidencia exacta frente a una aproximada (O2). */
+/** Multiplicador de una coincidencia exacta frente a una contenida (O2). */
 export const FACTOR_COINCIDENCIA_EXACTA = 2;
+/** Multiplicador de una coincidencia con errores de escritura (O2, B13). */
+export const FACTOR_COINCIDENCIA_APROXIMADA = 0.5;
+/** Las palabras más cortas se ignoran al buscar (B11). */
+export const LARGO_MINIMO_PALABRA = 3;
+/**
+ * Letras que pueden faltar, sobrar, cambiar o invertirse según el largo de la palabra buscada (B13).
+ * Con 3 letras no se admiten errores.
+ */
+export const ERRORES_TOLERADOS = [
+  { desdeLetras: 8, errores: 2 },
+  { desdeLetras: 4, errores: 1 },
+] as const;
 /** Cuántos productos patrocinados pueden pasar por delante en el listado (M14 · A8; mismo valor que allí). */
 export const CUPO_PATROCINADOS_LISTADO = 8;
 
@@ -304,11 +389,23 @@ export type ListarSinResultadoRequest = z.infer<typeof listarSinResultadoRequest
  * 3. RESPUESTAS
  * ─────────────────────────────────────────────────────────────────────────── */
 
+/** Color con el que se pinta el fondo de la imagen de la tarjeta (T1, T2). */
+export const colorMuestraSchema = z.object({
+  idColor: idSchema,
+  nombre: z.string(),
+  hexadecimal: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+});
+export type ColorMuestra = z.infer<typeof colorMuestraSchema>;
+
 /**
  * Tarjeta de resultado: la misma de M01 (`precioDesde`, disponibilidad, imagen) más el motivo de la
  * coincidencia de color, para poder mostrar "Disponible en Amarillo Sol" (B7, B8).
  */
 export const resultadoBusquedaSchema = productoPublicoTarjetaSchema.extend({
+  /** Fondo de la imagen (T1–T3); null si el producto no se vende con color o no se pudo calcular. */
+  colorMuestra: colorMuestraSchema.nullable(),
+  /** Cuántos colores ofrece el producto (T4); 0 si no se vende con color. */
+  totalColores: z.number().int().nonnegative(),
   /** Nombre del color o de la familia que coincidió con el término; null si no fue por color. */
   coincidenciaColor: z.string().nullable(),
   /** true si el patrocinio de una campaña de M14 lo adelantó en este resultado (O7). */

@@ -12,6 +12,10 @@ export interface LineaGuardada {
   readonly idVariante: number;
   readonly idColor: number | null;
   readonly cantidad: number;
+  /** C15: la cotización de la que viene; null en una línea normal. */
+  readonly idCotizacion: number | null;
+  /** C15: precio unitario pactado; null en una línea normal. */
+  readonly precioAcordado: number | null;
 }
 
 export interface CarritoGuardado {
@@ -25,6 +29,11 @@ export interface LineaNueva {
   readonly idVariante: number;
   readonly idColor: number | null;
   readonly cantidad: number;
+}
+
+/** C15: línea que llega de una cotización aceptada, con su precio fijo. */
+export interface LineaAcordadaNueva extends LineaNueva {
+  readonly precioAcordado: number;
 }
 
 /** C9: lo que hay que escribir para unir el carrito del visitante al de la cuenta. */
@@ -54,6 +63,10 @@ export interface CarritoRepositoryPort {
   pasarACuenta(idCarritoVisitante: number, idUsuario: number): Promise<void>;
   /** C9: en una transacción aplica el plan y borra el carrito del visitante. */
   unir(plan: PlanUnion): Promise<void>;
+  /** C15: agrega o reemplaza (misma variante y color) las líneas de una cotización, en una transacción. */
+  guardarLineasAcordadas(idCarrito: number, idCotizacion: number, lineas: readonly LineaAcordadaNueva[]): Promise<void>;
+  /** C13: borra los carritos de VISITANTE sin actividad desde `antesDe` (con sus líneas). Devuelve cuántos. */
+  borrarVisitantesVencidos(antesDe: Date): Promise<number>;
 }
 
 /** Quién pide: la sesión (si la hay) y el token crudo de la cookie `pc_cart` (si lo hay). */
@@ -63,7 +76,11 @@ export interface Solicitante {
 }
 
 /** Qué hacer con la cookie `pc_cart` después de responder. */
-export type AccionCookie = { readonly tipo: 'ninguna' } | { readonly tipo: 'fijar'; readonly token: string } | { readonly tipo: 'borrar' };
+export type AccionCookie =
+  | { readonly tipo: 'ninguna' }
+  /** D4: la cookie vive los mismos días que el carrito de visitante (C13). */
+  | { readonly tipo: 'fijar'; readonly token: string; readonly diasVigencia: number }
+  | { readonly tipo: 'borrar' };
 
 export interface ConCookie<T> {
   readonly datos: T;

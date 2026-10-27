@@ -43,6 +43,8 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       oferta: null,
       patrocinado: false,
       idCampania: null,
+      colorMuestra: null,
+      totalColores: 0,
       coincidenciaColor: null,
     },
     {
@@ -61,6 +63,8 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       oferta: null,
       patrocinado: false,
       idCampania: null,
+      colorMuestra: { idColor: 3, nombre: 'Amarillo Cromo', hexadecimal: '#F2C200' },
+      totalColores: 40,
       coincidenciaColor: 'Amarillo Cromo',
     },
     {
@@ -79,6 +83,8 @@ class BusquedaMemoriaRepository implements BusquedaRepositoryPort {
       oferta: null,
       patrocinado: false,
       idCampania: null,
+      colorMuestra: null,
+      totalColores: 0,
       coincidenciaColor: null,
     },
   ];
@@ -328,6 +334,14 @@ describe('M02 — Búsqueda, filtros y descubrimiento (HTTP + Dominio)', () => {
       const data = cuerpo.data as ResultadoBusqueda[];
       expect(data).toHaveLength(1);
       expect(data[0]?.nombre).toBe('Vinilo Acrílico Tipo 1');
+    });
+
+    it('cada resultado trae su color de muestra, o null si no se vende con color (T1)', async () => {
+      const { cuerpo } = await peticionPublica('/productos');
+      const data = cuerpo.data as ResultadoBusqueda[];
+      expect(data.map((p) => p.colorMuestra)).toEqual(
+        expect.arrayContaining([null, { idColor: 3, nombre: 'Amarillo Cromo', hexadecimal: '#F2C200' }]),
+      );
     });
 
     it('ordena por precio ascendente y descendente', async () => {
