@@ -99,12 +99,6 @@ export function construirModuloM03(
   };
 
   const calculadoraService = new CalculadoraService(calculadoraRepo, configuracionRepo);
-  const cuestionarioService = new CuestionarioService(
-    cuestionarioRepo,
-    vocabularioRepo,
-    configuracionRepo,
-    catalogo,
-  );
   const adminService = new CuestionarioAdminService(
     cuestionarioRepo,
     vocabularioRepo,
@@ -147,6 +141,16 @@ export function construirModuloM03(
     vocabularioRepo,
     configuracionRepo,
     catalogo,
+  );
+
+  // El cuestionario consulta la disponibilidad de la IA para no ofrecer el modo asistido
+  // cuando el servicio está caído o suspendido (R10).
+  const cuestionarioService = new CuestionarioService(
+    cuestionarioRepo,
+    vocabularioRepo,
+    configuracionRepo,
+    catalogo,
+    () => asistenteService.estadoPublico().disponible,
   );
 
   const calculadora = new CalculadoraController(calculadoraService);

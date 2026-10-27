@@ -39,6 +39,11 @@ export class CuestionarioService {
     private readonly vocabulario: VocabularioRepositoryPort,
     private readonly configuracion: ConfiguracionRepositoryPort,
     private readonly catalogo: CatalogoPreviewPort,
+    /**
+     * R10: en modo `asistido`, si la IA no responde la pantalla no debe fingir que sí.
+     * Se inyecta como función para no acoplar este servicio al cliente de Gemini.
+     */
+    private readonly iaDisponible: () => boolean = () => false,
   ) {}
 
   /** GET /asesoria/cuestionario — el modo vigente y, si es `fijo`, las preguntas (R2). */
@@ -46,9 +51,9 @@ export class CuestionarioService {
     const { modoCuestionario } = await this.configuracion.obtener();
 
     if (modoCuestionario === 'asistido') {
-      // El modo `asistido` llega en la etapa E4; hasta entonces se declara no disponible y
-      // la pantalla ofrece el catálogo, que es la alternativa de R10.
-      return { modo: 'asistido', preguntas: [], disponible: false };
+      // Las preguntas las propone el modelo turno a turno, así que aquí no viaja ninguna.
+      // Si la IA no está disponible, se dice: la pantalla ofrece el catálogo (R10).
+      return { modo: 'asistido', preguntas: [], disponible: this.iaDisponible() };
     }
 
     const [preguntas, familias] = await Promise.all([

@@ -12,6 +12,7 @@ import type {
 } from '../../interfaces/cuestionario.interface';
 import { calcularResultado, obtenerCuestionario } from '../../services/cuestionario-api';
 import { mensajeDeError } from '../../services/mensaje-error';
+import { CuestionarioAsistidoFlow } from './CuestionarioAsistidoFlow';
 
 /**
  * HU-ASE-01 — Búsqueda asistida por preguntas guiadas.
@@ -118,6 +119,12 @@ export function CuestionarioGuiadoView() {
   // R10: si la búsqueda asistida no está disponible, se dice y se ofrece el catálogo.
   if (cuestionario !== null && !cuestionario.disponible) {
     return <NoDisponible />;
+  }
+
+  // El modo lo decide el panel y se cambia en caliente (D3). En `asistido` las preguntas
+  // las propone el modelo turno a turno, así que el flujo es otro; el resultado, el mismo.
+  if (cuestionario !== null && cuestionario.modo === 'asistido') {
+    return <CuestionarioAsistidoFlow />;
   }
 
   if (cuestionario === null || preguntas.length === 0) {
@@ -240,7 +247,11 @@ function Pregunta({
   );
 }
 
-function Resultado({
+/**
+ * El resultado es IDÉNTICO en los dos modos (contrato · D9), así que lo comparten: el modo
+ * asistido importa este mismo componente. Por eso cambiar de modo no duplica pantalla.
+ */
+export function Resultado({
   resultado,
   onRelajar,
   onEmpezarDeNuevo,
@@ -355,7 +366,7 @@ function Resultado({
 }
 
 /** R10 / I5: la alternativa cuando la búsqueda asistida no está disponible. */
-function NoDisponible() {
+export function NoDisponible() {
   return (
     <Alert variant="info" title="La búsqueda asistida no está disponible ahora">
       <p className="mb-3">

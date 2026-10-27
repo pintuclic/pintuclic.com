@@ -1,9 +1,12 @@
 import { apiClient } from '@/core/api/apiClient';
 import type { RespuestaExitosa } from '@/core/types/respuesta-api.type';
 import type {
+  AmbienteAsesoria,
   ConfiguracionAsesoria,
   CuestionarioAdmin,
   CuestionarioPublico,
+  DimensionComplemento,
+  DimensionFiltro,
   EfectoOpcion,
   OpcionAdmin,
   PreguntaAdmin,
@@ -108,6 +111,63 @@ export async function editarConfiguracion(
   const { data } = await apiClient.patch<RespuestaExitosa<ConfiguracionAsesoria>>(
     '/admin/asesoria/configuracion',
     datos,
+  );
+  return data.data;
+}
+
+/* ── Modo asistido (HU-ASE-01 · R6) ───────────────────────────────────────── */
+
+export interface FiltroTurno {
+  dimension: DimensionFiltro;
+  idValor: number;
+}
+
+export interface ComplementoTurno {
+  dimension: DimensionComplemento;
+  idValor: number;
+}
+
+export interface OpcionAsistida {
+  idOpcion: string;
+  texto: string;
+  filtros: FiltroTurno[];
+  ambiente: AmbienteAsesoria | null;
+  complementos: ComplementoTurno[];
+}
+
+export interface PreguntaAsistida {
+  idPregunta: string;
+  texto: string;
+  opciones: OpcionAsistida[];
+  omitible: true;
+}
+
+/**
+ * Una respuesta ya dada. Lleva consigo los filtros que el servidor validó al ofrecer la
+ * opción, porque el flujo es sin estado; el servidor los vuelve a comprobar en cada turno.
+ */
+export interface RespuestaDada {
+  idPregunta: string;
+  texto: string;
+  idOpcion: string | null;
+  opcionTexto: string | null;
+  filtros: FiltroTurno[];
+  ambiente: AmbienteAsesoria | null;
+  complementos: ComplementoTurno[];
+  omitida: boolean;
+}
+
+export type TurnoCuestionario =
+  | { fase: 'pregunta'; pregunta: PreguntaAsistida; numero: number }
+  | { fase: 'resultado'; resultado: ResultadoCuestionario };
+
+export async function pedirTurno(
+  respuestas: RespuestaDada[],
+  finalizar = false,
+): Promise<TurnoCuestionario> {
+  const { data } = await apiClient.post<RespuestaExitosa<TurnoCuestionario>>(
+    '/asesoria/cuestionario/turno',
+    { respuestas, finalizar },
   );
   return data.data;
 }

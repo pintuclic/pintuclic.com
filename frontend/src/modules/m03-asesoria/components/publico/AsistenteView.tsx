@@ -172,6 +172,7 @@ export function AsistenteView() {
 
       <form onSubmit={enviar} noValidate className="flex items-end gap-2">
         <Input
+          name="mensaje"
           aria-label="Tu pregunta para el asistente"
           placeholder="Escribe tu pregunta"
           value={texto}

@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { AdminPageHeader, SegmentedTabs } from '@/core/components';
 import { ConfiguracionAsesoriaPanel } from '@/modules/m03-asesoria/components/admin/ConfiguracionAsesoriaPanel';
 import { CuestionarioPanel } from '@/modules/m03-asesoria/components/admin/CuestionarioPanel';
+import { ServicioIaPanel } from '@/modules/m03-asesoria/components/admin/ServicioIaPanel';
 
-type Seccion = 'cuestionario' | 'configuracion';
+type Seccion = 'cuestionario' | 'configuracion' | 'servicio';
 
 /**
  * Panel de M03 — Asesoría. Exige el permiso «Ver asesoría» para consultar y «Editar
@@ -30,11 +31,14 @@ export default function AsesoriaAdminPage() {
         options={[
           { value: 'cuestionario', label: 'Cuestionario' },
           { value: 'configuracion', label: 'Configuración' },
+          { value: 'servicio', label: 'Servicio de IA' },
         ]}
       />
 
       <div id="panel-asesoria-admin" role="tabpanel">
-        {seccion === 'cuestionario' ? <CuestionarioPanel /> : <ConfiguracionAsesoriaPanel />}
+        {seccion === 'cuestionario' && <CuestionarioPanel />}
+        {seccion === 'configuracion' && <ConfiguracionAsesoriaPanel />}
+        {seccion === 'servicio' && <ServicioIaPanel />}
       </div>
     </div>
   );
