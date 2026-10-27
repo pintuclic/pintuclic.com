@@ -9,7 +9,7 @@ export default function ConfiguracionPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Configuración Global del Sistema"
-        subtitle="Administración centralizada y validada de los 10 parámetros operativos del ecosistema Pintu Clic (HU-ADM-06)."
+        subtitle="Parámetros operativos del sistema, agrupados por área. Cada cambio se valida contra su rango permitido (HU-ADM-06)."
       />
 
       <ConfiguracionView />
