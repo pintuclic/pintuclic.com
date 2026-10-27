@@ -11,6 +11,7 @@ import { Modal } from '../overlays/Modal';
 import { useResumenCarrito } from '../../hooks/useResumenCarrito';
 import { useAuthStore } from '../../store/authStore';
 import type { UsuarioAutenticado } from '../../types/usuario.type';
+import { abrirCarritoLateral } from '../../utils/eventos-carrito';
 import { formatCOP } from '../../utils/moneda';
 import {
   CategoriesMegaMenu,
@@ -187,6 +188,11 @@ export function Header({
 
           <Link
             href={cart.href}
+            // M05 · L1: con el panel lateral en la página se abre ahí; si no hay panel (o sin JavaScript), va a /carrito.
+            onClick={(e) => {
+              if (abrirCarritoLateral()) e.preventDefault();
+            }}
+            aria-haspopup="dialog"
             aria-label={etiquetaCarrito}
             className={`flex min-h-[44px] shrink-0 items-center gap-3 whitespace-nowrap rounded-btn p-2 ${FOCO}`}
           >
