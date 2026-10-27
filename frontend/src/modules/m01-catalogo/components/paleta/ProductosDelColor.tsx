@@ -64,8 +64,8 @@ export const ProductosDelColor: React.FC<ProductosDelColorProps> = ({ color, id 
 
         {productos.error !== null && <Alert variant="error">{productos.error}</Alert>}
         {color !== null && productos.cargando && productos.datos === null && (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5" aria-hidden="true">
-            {[0, 1, 2, 3, 4].map((i) => (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-72 w-full" />
             ))}
           </div>
@@ -76,7 +76,7 @@ export const ProductosDelColor: React.FC<ProductosDelColorProps> = ({ color, id 
           </p>
         )}
         {items.length > 0 && (
-          <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+          <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {items.map((p) => (
               <li key={p.idProducto} className="flex">
                 <MedidorPatrocinio idCampania={p.patrocinado ? p.idCampania : null} ubicacion="listado" className="flex w-full">
@@ -87,8 +87,10 @@ export const ProductosDelColor: React.FC<ProductosDelColorProps> = ({ color, id 
                     description={`${p.esCombo ? 'Combo · ' : ''}${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
                     {...precioVisible(p.precioDesde, p.oferta)}
                     isSponsored={p.patrocinado}
+                    showViewDetails={false}
                     href={`/productos/${p.idProducto}${color === null ? '' : `?color=${color.idColor}`}`}
                     {...(p.idImagenPrincipal === null ? {} : { imageUrl: busquedaApi.urlImagen(p.idImagenPrincipal, 'miniatura') })}
+                    {...(color === null ? {} : { swatchColor: color.hexadecimal, swatchLabel: color.nombre })}
                     className="w-full"
                   />
                 </MedidorPatrocinio>

@@ -141,14 +141,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {isOffer && <Badge variant="offer">{offerBadgeText}</Badge>}
         </div>
 
-        {/* Muestra de pintura en la mitad inferior detrás del envase (estilo Tienda Pintuco).
+        {/* Muestra de pintura proporcionada a la silueta del envase (ancho controlado y centrado).
             El color es un dato del catálogo, no del tema: por eso va en `style`. Es decorativo:
             no se lee en voz alta. */}
         {muestra !== null && (
           <div
             aria-hidden="true"
             data-muestra-color={muestra}
-            className={`absolute inset-x-2.5 top-[44%] bottom-2 rounded-2xl transition-transform duration-300 group-hover:scale-[1.02] ${
+            className={`absolute inset-x-0 mx-auto w-44 top-[38%] bottom-2.5 rounded-2xl transition-transform duration-300 group-hover:scale-[1.02] ${
               esColorMuyClaro(muestra) ? 'ring-1 ring-inset ring-neutral-light' : ''
             }`}
             style={{ backgroundColor: muestra }}
