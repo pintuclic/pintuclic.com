@@ -18,7 +18,6 @@ import {
   type MegaMenuGroup,
   type MegaMenuTab,
 } from './CategoriesMegaMenu';
-import { Container } from './Container';
 import { Logo, type LogoProps } from './Logo';
 
 export interface HeaderNavItem {
@@ -78,7 +77,11 @@ export function cuentaDeEncabezado(
 /**
  * Cabecera principal (UI Spec §3.1): logo, botón "Categorías" (abre el mega-menú
  * modal), navegación, acceso a "Mi cuenta" y carrito con contador y monto.
- * Por debajo de `lg` la navegación pasa a un panel modal.
+ * Por debajo de `xl` la navegación pasa a un panel modal: con sus siete enlaces, el botón de categorías, la cuenta
+ * y el carrito, en menos de 1280px las palabras se montaban unas sobre otras.
+ *
+ * La fila usa un ancho mayor que el contenido (hasta 1536px): en pantallas grandes el menú aprovecha los lados en vez
+ * de apretarse en la columna de 1280px.
  */
 export function Header({
   logo,
@@ -107,13 +110,13 @@ export function Header({
 
   return (
     <header className="border-b border-neutral-light bg-neutral-white">
-      <Container className="flex h-16 items-center gap-4 lg:h-[88px] lg:gap-3 xl:gap-5">
+      <div className="mx-auto flex h-16 w-full max-w-[96rem] items-center gap-4 px-4 md:px-6 lg:h-[88px] xl:gap-6 2xl:gap-10 2xl:px-10">
         <IconButton
           variant="ghost"
           aria-label="Abrir menú"
           aria-haspopup="dialog"
           aria-expanded={movilAbierto}
-          className="lg:hidden"
+          className="xl:hidden"
           onClick={() => setMovilAbierto(true)}
         >
           <Menu className="h-6 w-6" />
@@ -121,7 +124,7 @@ export function Header({
 
         <Logo {...logo} priority />
 
-        <div className="hidden shrink-0 lg:block">
+        <div className="hidden shrink-0 xl:block">
           <Button
             variant="primary-action"
             leftIcon={<Menu className="h-5 w-5" aria-hidden="true" />}
@@ -129,14 +132,14 @@ export function Header({
             aria-haspopup="dialog"
             aria-expanded={megaAbierto}
             onClick={() => setMegaAbierto(true)}
-            className="min-w-[150px] justify-between whitespace-nowrap xl:min-w-[164px]"
+            className="min-w-[164px] justify-between whitespace-nowrap"
           >
             {categoriesLabel}
           </Button>
         </div>
 
-        <nav aria-label="Principal" className="hidden min-w-0 flex-1 lg:block">
-          <ul className="flex items-center justify-center gap-1 xl:gap-3">
+        <nav aria-label="Principal" className="hidden min-w-0 flex-1 xl:block">
+          <ul className="flex items-center justify-center gap-3 2xl:gap-6">
             {navItems.map((item) => (
               <li key={item.href} className="shrink-0">
                 {item.variant === 'pill' ? (
@@ -157,7 +160,7 @@ export function Header({
                   <Link
                     href={item.href}
                     aria-current={esActivo(item.href) ? 'page' : undefined}
-                    className={`relative inline-flex min-h-[44px] items-center whitespace-nowrap rounded-btn px-1 font-sans text-sm font-medium transition-colors xl:px-1.5 ${FOCO} ${
+                    className={`relative inline-flex min-h-[44px] items-center whitespace-nowrap rounded-btn px-1.5 font-sans text-sm font-medium transition-colors 2xl:text-[15px] ${FOCO} ${
                       esActivo(item.href)
                         ? 'text-conversion-hover after:absolute after:inset-x-1.5 after:bottom-1 after:h-0.5 after:bg-conversion'
                         : 'text-neutral-dark hover:text-action'
@@ -171,14 +174,14 @@ export function Header({
           </ul>
         </nav>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3 xl:gap-5">
+        <div className="ml-auto flex shrink-0 items-center gap-2 xl:gap-3 2xl:gap-6">
           <Link
             href={cuenta.href}
             aria-label={`${cuenta.label}, ${cuenta.sublabel}`}
             className={`flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-btn p-2 ${FOCO}`}
           >
             <User className="h-6 w-6 shrink-0 text-neutral-dark" aria-hidden="true" />
-            <span className="hidden flex-col leading-tight whitespace-nowrap xl:flex">
+            <span className="hidden flex-col leading-tight whitespace-nowrap 2xl:flex">
               <span className="font-title text-sm font-semibold whitespace-nowrap text-neutral-black">{cuenta.label}</span>
               <span className="text-xs whitespace-nowrap text-neutral-medium">{cuenta.sublabel}</span>
             </span>
@@ -200,13 +203,13 @@ export function Header({
                 </span>
               )}
             </span>
-            <span className="hidden flex-col leading-tight whitespace-nowrap xl:flex">
+            <span className="hidden flex-col leading-tight whitespace-nowrap 2xl:flex">
               <span className="font-title text-sm font-semibold whitespace-nowrap text-neutral-black">Carrito</span>
               <span className="text-xs font-medium whitespace-nowrap text-neutral-dark">{total}</span>
             </span>
           </Link>
         </div>
-      </Container>
+      </div>
 
       <CategoriesMegaMenu
         isOpen={megaAbierto}
