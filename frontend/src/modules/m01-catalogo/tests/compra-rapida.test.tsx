@@ -2,7 +2,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { PanelCompraRapida } from '../components/publico/CompraRapidaModal';
 import type { ProductoPublicoFicha, VariantePublica } from '../dtos/m01-catalogo-productos.dto';
-import { presentacionInicial, requiereColor, subtituloProducto } from '../services/compra-rapida';
+import { imagenDeCompra, presentacionInicial, requiereColor, subtituloProducto } from '../services/compra-rapida';
+import { datosFichaTecnica, textoAmbiente } from '../services/ficha-tecnica';
 
 const variante = (id: number, cambios: Partial<VariantePublica> = {}): VariantePublica => ({
   idVariante: id,
@@ -87,19 +88,20 @@ describe('PanelCompraRapida', () => {
     );
 
   it('muestra presentaciones, color sin elegir, cantidad y el enlace a la ficha', () => {
-    const html = pintar(ficha());
+    const html = pintar(ficha({ imagenes: [{ idImagen: 3, idVariante: null, idColor: null }] }));
     expect(html).toContain('Medida 1');
     expect(html).toContain('Medida 2');
     expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain('Aún no ha elegido un color');
+    expect(html).toContain('· Elige uno');
     expect(html).toContain('Elige un color para agregarlo al carrito.');
     expect(html).toContain('href="/productos/7"');
-    expect(html).toContain('Ver ficha completa');
+    expect(html).toContain('Ver todos los detalles del producto');
+    expect(html).toMatch(/<img[^>]*src="[^"]*imagenes\/3[^"]*"/);
   });
 
   it('un producto sin color no muestra el selector y deja agregar', () => {
     const html = pintar(ficha({ claseColor: 'sin_color', variantes: [variante(1)] }));
-    expect(html).not.toContain('Aún no ha elegido un color');
+    expect(html).not.toContain('· Elige uno');
     expect(html).toMatch(/<button[^>]*>(?:(?!<\/button>).)*Agregar al carrito/);
     expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Agregar al carrito/);
   });
@@ -108,5 +110,60 @@ describe('PanelCompraRapida', () => {
     const html = pintar(ficha({ claseColor: 'sin_color', compraBloqueada: true }));
     expect(html).toContain('Este combo está agotado por ahora');
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Agregar al carrito/);
+  });
+});
+
+describe('imagenDeCompra', () => {
+  const imagenes = [
+    { idImagen: 1, idVariante: null, idColor: null },
+    { idImagen: 2, idVariante: 5, idColor: null },
+    { idImagen: 3, idVariante: null, idColor: 9 },
+  ];
+
+  it('la del color, luego la de la presentación y si no, la portada', () => {
+    expect(imagenDeCompra(imagenes, { idColor: 9, idVariante: 5 })).toBe(3);
+    expect(imagenDeCompra(imagenes, { idColor: 4, idVariante: 5 })).toBe(2);
+    expect(imagenDeCompra(imagenes, { idColor: null, idVariante: null })).toBe(1);
+    expect(imagenDeCompra([], { idColor: null, idVariante: null })).toBeNull();
+  });
+});
+
+describe('ficha técnica', () => {
+  it('nombra el ambiente', () => {
+    expect(textoAmbiente({ usoInterior: true, usoExterior: true })).toBe('Interior y exterior');
+    expect(textoAmbiente({ usoInterior: false, usoExterior: true })).toBe('Exterior');
+    expect(textoAmbiente({ usoInterior: false, usoExterior: false })).toBeNull();
+  });
+
+  it('reúne todos los datos que tiene el producto, en orden', () => {
+    const f = ficha({
+      tipoResina: 'Base agua',
+      tipoCalidad: 1,
+      manos: 2,
+      superficies: ['Paredes y techos'],
+      acabados: [{ id: 1, nombre: 'Mate' }],
+      caracteristicas: [{ nombre: 'Secado', valor: '1 hora', orden: 1 }],
+      variantes: [variante(1, { medida: '1 galón', rendimiento: { min: 40, max: 45, aproximado: true } })],
+    });
+    const datos = datosFichaTecnica(f, f.variantes[0] ?? null);
+    expect(datos.map((d) => d.etiqueta)).toEqual([
+      'Marca',
+      'Categoría',
+      'Presentaciones',
+      'Rendimiento (1 galón)',
+      'Ambiente',
+      'Superficies',
+      'Tipo de resina',
+      'Calidad',
+      'Acabados',
+      'Secado',
+    ]);
+    expect(datos[0]?.valor).toBe('Pintuco · línea Viniltex');
+    expect(datos[3]?.valor).toMatch(/^aprox\. 40 a 45 m² a 2 manos$/);
+  });
+
+  it('una herramienta sin ficha de recubrimiento solo muestra lo que tiene', () => {
+    const f = ficha({ linea: null, claseColor: 'sin_color', usoInterior: false });
+    expect(datosFichaTecnica(f, null).map((d) => d.clave)).toEqual(['marca', 'categoria', 'presentaciones']);
   });
 });
