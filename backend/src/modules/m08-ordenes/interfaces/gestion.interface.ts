@@ -11,10 +11,13 @@ export interface FiltroGestion {
   codigo?: string;
   /** Uno o varios estados; sin valor, todos. */
   estados?: readonly EstadoOrden[];
-  desde?: Date;
-  hasta?: Date;
+  /** Día `AAAA-MM-DD` (texto: un `Date` lo correría según la zona horaria de la base). */
+  desde?: string;
+  hasta?: string;
   /** Id del cliente (ficha). */
   cliente?: number;
+  /** Nombre del cliente, o parte de él. */
+  nombre?: string;
   correo?: string;
   telefono?: string;
   /** Solo órdenes que llevan al menos estos días en su estado actual. */

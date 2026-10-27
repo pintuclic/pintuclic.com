@@ -298,6 +298,53 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
       expect(ordenGestionResponseEnvelopeSchema.parse(json(abierta)).data.codigo).toBe('ORD-2026-0001');
     });
 
+    it.each([
+      ['diasEsperando=99999999999'],
+      ['diasEsperando=-1'],
+      ['cliente=99999999999'],
+      ['pagina=1000000'],
+      ['limite=101'],
+      ['desde=2026-13-45'],
+      ['desde=hoy'],
+      ['hasta=2026-02-30'],
+    ])('rechaza con 400 un valor fuera de rango o mal formado (%s), no un 500 de la base', async (consulta) => {
+      const r = await llamar('GET', `/gestion?${consulta}`, 'lector');
+
+      expect(r.status).toBe(400);
+      expect(json(r)).toMatchObject({ success: false, error: { code: 'PARAMETRO_INVALIDO' } });
+    });
+
+    it('las fechas del periodo llegan al repositorio como día (AAAA-MM-DD), sin zona horaria que las corra', async () => {
+      await llamar('GET', '/gestion?desde=2026-10-01&hasta=2026-10-31&pagina=1&limite=10', 'lector');
+
+      expect(repo.ultimoFiltro).toMatchObject({ desde: '2026-10-01', hasta: '2026-10-31' });
+    });
+
+    it('busca por el nombre del cliente (RF-ORD-08-01)', async () => {
+      const r = await llamar('GET', '/gestion?nombre=Ana&pagina=1&limite=10', 'lector');
+
+      expect(r.status).toBe(200);
+      expect(repo.ultimoFiltro).toMatchObject({ nombre: 'Ana' });
+    });
+
+    it('la bandeja agrupada tiene tope y avisa cuando hay más pedidos de los que muestra (nunca recorta en silencio)', async () => {
+      repo.ordenes = Array.from({ length: 501 }, (_, i) =>
+        detalle(`PC-2026-${String(i + 1).padStart(5, '0')}`, 'orden_confirmada'),
+      );
+
+      const r = await llamar('GET', '/gestion?agruparPorEstado=true', 'lector');
+
+      const cuerpo = bandejaAgrupadaResponseEnvelopeSchema.parse(json(r));
+      expect(cuerpo.truncada).toBe(true);
+      expect(cuerpo.data.flatMap((g) => g.ordenes)).toHaveLength(500);
+    });
+
+    it('sin exceder el tope, la bandeja agrupada no se marca como truncada', async () => {
+      const r = await llamar('GET', '/gestion?agruparPorEstado=true', 'lector');
+
+      expect(bandejaAgrupadaResponseEnvelopeSchema.parse(json(r)).truncada).toBe(false);
+    });
+
     it('rechaza un rango de fechas invertido con 400', async () => {
       const r = await llamar('GET', '/gestion?desde=2026-10-10&hasta=2026-10-01', 'lector');
       expect(r.status).toBe(400);

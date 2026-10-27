@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Package } from 'lucide-react';
 import { AdminPageHeader, Alert, Skeleton } from '@/core/components';
 import type { EstadoOrden } from '../../dtos/m08-ordenes.dto';
+import { aFormularioBandeja } from '../../services/formularios';
 import { ESTADOS_EN_CURSO, ETIQUETA_ESTADO } from '../../services/presentacion';
 import { hayFiltrosActivos, useGestionStore } from '../../store/gestionStore';
 import { FiltroPildoras, type OpcionPildora } from '../FiltroPildoras';
@@ -20,7 +21,8 @@ type FiltroEstado = 'todos' | EstadoOrden;
  * resultados paginados.
  */
 export function BandejaView() {
-  const { grupos, resultados, paginacion, resumen, filtros, cargando, error } = useGestionStore();
+  const { grupos, bandejaTruncada, resultados, paginacion, resumen, resumenObsoleto, filtros, cargando, error } =
+    useGestionStore();
   const { cargarBandeja, cargarResumen, establecerFiltros, limpiarFiltros, establecerPagina } = useGestionStore.getState();
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos');
 
@@ -30,11 +32,14 @@ export function BandejaView() {
   }, [cargarBandeja, cargarResumen]);
 
   const buscando = hayFiltrosActivos(filtros);
+  const valoresFormulario = useMemo(() => aFormularioBandeja(filtros), [filtros]);
 
   const opciones = useMemo<ReadonlyArray<OpcionPildora<FiltroEstado>>>(() => {
     const cuantas = new Map(grupos.map((g) => [g.estado, g.ordenes.length]));
     const pendientes = new Map(resumen.map((r) => [r.estado, r.cantidad]));
-    const cantidad = (estado: EstadoOrden): number => pendientes.get(estado) ?? cuantas.get(estado) ?? 0;
+    // Si el contador falló, lo que hay cargado en la lista es más fiable que el último valor guardado.
+    const cantidad = (estado: EstadoOrden): number =>
+      (resumenObsoleto ? cuantas.get(estado) : pendientes.get(estado)) ?? cuantas.get(estado) ?? 0;
     return [
       {
         valor: 'todos',
@@ -44,7 +49,7 @@ export function BandejaView() {
       },
       ...ESTADOS_EN_CURSO.map((estado) => ({ valor: estado, etiqueta: ETIQUETA_ESTADO[estado], cantidad: cantidad(estado) })),
     ];
-  }, [grupos, resumen]);
+  }, [grupos, resumen, resumenObsoleto]);
 
   // Las órdenes en curso, ya ordenadas por estado y por antigüedad dentro de cada uno.
   const visibles = grupos
@@ -59,6 +64,7 @@ export function BandejaView() {
       />
 
       <FiltrosBandejaForm
+        valores={valoresFormulario}
         deshabilitado={cargando}
         onBuscar={(f) => void establecerFiltros(f)}
         onLimpiar={() => void limpiarFiltros()}
@@ -68,6 +74,14 @@ export function BandejaView() {
         <FiltroPildoras opciones={opciones} valor={filtroEstado} onCambiar={setFiltroEstado} ariaLabel="Filtrar pedidos por estado" />
       )}
 
+      {resumenObsoleto && !buscando && (
+        <Alert variant="warning">Los contadores pueden estar desactualizados: no pudimos actualizarlos.</Alert>
+      )}
+      {bandejaTruncada && !buscando && (
+        <Alert variant="warning" title="Hay más pedidos de los que se muestran">
+          Se muestran los que más llevan esperando. Use el buscador para encontrar el resto.
+        </Alert>
+      )}
       {error && <Alert variant="error">{error}</Alert>}
 
       {cargando && grupos.length === 0 && resultados.length === 0 ? (

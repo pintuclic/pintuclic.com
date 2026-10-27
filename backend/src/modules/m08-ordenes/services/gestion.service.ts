@@ -2,6 +2,7 @@ import type { Actor } from '../../m20-seguridad/interfaces/actor.interface';
 import {
   ESTADOS_FINALIZADOS,
   ESTADOS_ORDEN,
+  TOPE_BANDEJA_AGRUPADA,
   type CambiarEstadoRequest,
   type EstadoOrden,
   type ListarGestionRequest,
@@ -43,13 +44,24 @@ export class GestionService {
     private readonly reloj: RelojPort,
   ) {}
 
-  /** RF-ORD-05-04: órdenes en curso agrupadas por estado, la que más lleva esperando primero. */
-  async bandejaAgrupada(consulta: ListarGestionRequest): Promise<GrupoBandeja[]> {
+  /**
+   * RF-ORD-05-04: órdenes en curso agrupadas por estado, la que más lleva esperando primero. Devuelve a
+   * lo sumo TOPE_BANDEJA_AGRUPADA; si hay más lo indica en `truncada` para que la pantalla avise.
+   */
+  async bandejaAgrupada(consulta: ListarGestionRequest): Promise<{ grupos: GrupoBandeja[]; truncada: boolean }> {
     const estados = consulta.estado === undefined ? ESTADOS_EN_CURSO : [consulta.estado];
-    const { filas } = await this.repo.listar({ ...this.filtroBase(consulta), estados, orden: 'antiguedad' });
+    // Se pide una más que el tope: si llega, hay más de las que se muestran.
+    const { filas } = await this.repo.listar({
+      ...this.filtroBase(consulta),
+      estados,
+      orden: 'antiguedad',
+      pagina: 1,
+      limite: TOPE_BANDEJA_AGRUPADA + 1,
+    });
 
-    const ordenes = filas.map((fila) => this.aFilaBandeja(fila));
-    return estados.map((estado) => ({ estado, ordenes: ordenes.filter((o) => o.estado === estado) }));
+    const truncada = filas.length > TOPE_BANDEJA_AGRUPADA;
+    const ordenes = filas.slice(0, TOPE_BANDEJA_AGRUPADA).map((fila) => this.aFilaBandeja(fila));
+    return { grupos: estados.map((estado) => ({ estado, ordenes: ordenes.filter((o) => o.estado === estado) })), truncada };
   }
 
   async bandejaPaginada(consulta: ListarGestionRequest): Promise<BandejaPaginada> {
@@ -98,6 +110,7 @@ export class GestionService {
       ...(consulta.desde === undefined ? {} : { desde: consulta.desde }),
       ...(consulta.hasta === undefined ? {} : { hasta: consulta.hasta }),
       ...(consulta.cliente === undefined ? {} : { cliente: consulta.cliente }),
+      ...(consulta.nombre === undefined || consulta.nombre === '' ? {} : { nombre: consulta.nombre }),
       ...(consulta.correo === undefined ? {} : { correo: consulta.correo }),
       ...(consulta.telefono === undefined ? {} : { telefono: consulta.telefono }),
       ...(consulta.diasEsperando === undefined ? {} : { diasEsperando: consulta.diasEsperando }),

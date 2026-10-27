@@ -11,6 +11,7 @@ import { ESTADOS_ORDEN, MEDIOS_CONTACTO, estadoOrdenSchema, type EstadoOrden } f
 export const filtrosBandejaFormSchema = z
   .object({
     codigo: z.string().trim().max(20, 'Máximo 20 caracteres'),
+    nombre: z.string().trim().max(100, 'Máximo 100 caracteres'),
     correo: z.string().trim().max(150, 'Máximo 150 caracteres'),
     telefono: z.string().trim().max(20, 'Máximo 20 caracteres'),
     estado: z.enum(['', ...ESTADOS_ORDEN]),
@@ -25,6 +26,7 @@ export type FiltrosBandejaForm = z.infer<typeof filtrosBandejaFormSchema>;
 
 export const FILTROS_BANDEJA_VACIOS: FiltrosBandejaForm = {
   codigo: '',
+  nombre: '',
   correo: '',
   telefono: '',
   estado: '',

@@ -32,7 +32,7 @@ function Tarjeta({ id, titulo, children }: { id: string; titulo: string; childre
  * y las compras anteriores del cliente. Desde aquí también se avanza el estado (HU-ORD-03).
  */
 export function DetallePedidoView({ codigo }: { codigo: string }) {
-  const { detalle, historialCliente, cargandoDetalle, operando, error, aviso } = useGestionStore();
+  const { detalle, historialCliente, historialClienteError, cargandoDetalle, operando, error, aviso } = useGestionStore();
   const { abrirDetalle, cerrarDetalle, cambiarEstado, agregarNota, agregarContacto } = useGestionStore.getState();
 
   useEffect(() => {
@@ -136,7 +136,11 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
             </Tarjeta>
 
             <Tarjeta id="anteriores" titulo="Compras del cliente">
-              {historialCliente.length === 0 ? (
+              {historialClienteError ? (
+                <p role="alert" className="text-sm text-danger-hover">
+                  No se pudo cargar el historial de compras del cliente. Vuelva a abrir el pedido para reintentar.
+                </p>
+              ) : historialCliente.length === 0 ? (
                 <p className="text-sm text-neutral-medium">Sin otras compras registradas.</p>
               ) : (
                 <ul className="space-y-2 text-sm">

@@ -321,6 +321,45 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     expect(await notas.agregarContacto('PC-2026-99999', ID_EMPLEADO, 'correo', null)).toBeNull();
   });
 
+  it('un autor inexistente no se confunde con una orden inexistente: falla y no guarda nada', async () => {
+    const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud());
+
+    await expect(notas.agregarNota(codigo, 99999999, 'x')).rejects.toThrow();
+    await expect(notas.agregarContacto(codigo, 99999999, 'correo', null)).rejects.toThrow();
+
+    const detalle = await gestion.buscarDetalle(codigo);
+    expect(detalle?.notas).toHaveLength(0);
+    expect(detalle?.contactos).toHaveLength(0);
+  });
+
+  it('el contacto devuelve el medio recibido sin volver a interpretarlo después de guardarlo', async () => {
+    const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud());
+
+    const contacto = await notas.agregarContacto(codigo, ID_EMPLEADO, 'correo', 'Aviso de demora');
+
+    expect(contacto).toMatchObject({ medio: 'correo', detalle: 'Aviso de demora' });
+  });
+
+  it('filtra por periodo con días AAAA-MM-DD y por nombre del cliente con SQL real (RF-ORD-08-01)', async () => {
+    const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud());
+    const hoy = new Date().toISOString().slice(0, 10);
+    const manana = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const ayer = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const nombre = (await prisma.usuario.findUnique({ where: { idUsuario: ID_CLIENTE } }))?.nombre ?? '';
+
+    const enPeriodo = await gestion.listar({ orden: 'reciente', desde: ayer, hasta: manana });
+    const fueraDePeriodo = await gestion.listar({ orden: 'reciente', desde: '2020-01-01', hasta: '2020-12-31' });
+    const unDia = await gestion.listar({ orden: 'reciente', desde: hoy, hasta: hoy });
+    const porNombre = await gestion.listar({ orden: 'reciente', nombre: nombre.slice(1, 5).toLowerCase() });
+    const ajeno = await gestion.listar({ orden: 'reciente', nombre: 'zzz-no-existe' });
+
+    expect(enPeriodo.filas.map((f) => f.codigo)).toContain(codigo);
+    expect(fueraDePeriodo.filas).toEqual([]);
+    expect(unDia.filas.map((f) => f.codigo)).toContain(codigo);
+    expect(porNombre.filas.map((f) => f.codigo)).toContain(codigo);
+    expect(ajeno.filas).toEqual([]);
+  });
+
   it('«Mis pedidos» lista solo del titular, busca por producto y pagina (HU-ORD-07)', async () => {
     await creacion.crearDesdePagoConfirmado(solicitud());
 

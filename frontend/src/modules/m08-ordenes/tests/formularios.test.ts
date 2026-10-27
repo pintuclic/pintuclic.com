@@ -7,7 +7,7 @@ import {
   notaFormSchema,
 } from '../dtos/formularios.dto';
 import { cambiarEstadoRequestSchema, crearContactoRequestSchema } from '../dtos/m08-ordenes.dto';
-import { aCambioEstado, aContacto, aFiltrosBandeja } from '../services/formularios';
+import { aCambioEstado, aContacto, aFiltrosBandeja, aFormularioBandeja } from '../services/formularios';
 
 describe('formularios de M08', () => {
   describe('búsqueda de pedidos (HU-ORD-08)', () => {
@@ -25,6 +25,21 @@ describe('formularios de M08', () => {
       const r = filtrosBandejaFormSchema.safeParse({ ...FILTROS_BANDEJA_VACIOS, desde: '2026-10-10', hasta: '2026-10-01' });
 
       expect(r.success).toBe(false);
+    });
+
+    it('busca por el nombre del cliente y lo envía recortado (RF-ORD-08-01)', () => {
+      const valores = filtrosBandejaFormSchema.parse({ ...FILTROS_BANDEJA_VACIOS, nombre: '  laura  ' });
+
+      expect(aFiltrosBandeja(valores)).toEqual({ nombre: 'laura' });
+      expect(filtrosBandejaFormSchema.safeParse({ ...FILTROS_BANDEJA_VACIOS, nombre: 'x'.repeat(101) }).success).toBe(false);
+    });
+
+    it('los filtros activos vuelven al formulario, así no quedan campos vacíos con la lista filtrada', () => {
+      const filtros = { nombre: 'laura', estado: 'preparada' as const, desde: '2026-10-01' };
+
+      expect(aFormularioBandeja(filtros)).toEqual({ ...FILTROS_BANDEJA_VACIOS, nombre: 'laura', estado: 'preparada', desde: '2026-10-01' });
+      expect(aFiltrosBandeja(aFormularioBandeja(filtros))).toEqual(filtros);
+      expect(aFormularioBandeja({})).toEqual(FILTROS_BANDEJA_VACIOS);
     });
 
     it('recorta espacios y limita el largo', () => {

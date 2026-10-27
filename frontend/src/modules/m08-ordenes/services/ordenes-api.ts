@@ -61,12 +61,19 @@ export async function listarBandeja(filtros: FiltrosBandeja = {}): Promise<Bande
   return { filas: cuerpo.data, paginacion: cuerpo.pagination };
 }
 
+export interface BandejaAgrupadaRespuesta {
+  grupos: GrupoBandeja[];
+  /** true = hay más pedidos en curso de los que se devuelven (los que más llevan esperando van primero). */
+  truncada: boolean;
+}
+
 /** Bandeja de las órdenes en curso agrupadas por estado, la más antigua primero (RF-ORD-05-04). */
-export async function listarBandejaAgrupada(filtros: FiltrosBandeja = {}): Promise<GrupoBandeja[]> {
+export async function listarBandejaAgrupada(filtros: FiltrosBandeja = {}): Promise<BandejaAgrupadaRespuesta> {
   const { data } = await apiClient.get<unknown>(`${BASE}/gestion`, {
     params: { ...filtros, agruparPorEstado: 'true' },
   });
-  return bandejaAgrupadaResponseEnvelopeSchema.parse(data).data;
+  const cuerpo = bandejaAgrupadaResponseEnvelopeSchema.parse(data);
+  return { grupos: cuerpo.data, truncada: cuerpo.truncada };
 }
 
 export async function obtenerResumenGestion(): Promise<Array<{ estado: EstadoOrden; cantidad: number }>> {

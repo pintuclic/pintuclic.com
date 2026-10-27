@@ -33,6 +33,7 @@ function condiciones(filtro: FiltroGestion): Prisma.Sql[] {
   if (filtro.desde !== undefined) c.push(Prisma.sql`o.fecha >= ${filtro.desde}::date`);
   if (filtro.hasta !== undefined) c.push(Prisma.sql`o.fecha <= ${filtro.hasta}::date`);
   if (filtro.cliente !== undefined) c.push(Prisma.sql`o.id_usuario = ${filtro.cliente}`);
+  if (filtro.nombre !== undefined) c.push(Prisma.sql`u.nombre ILIKE ${comodin(filtro.nombre)}`);
   if (filtro.correo !== undefined) c.push(Prisma.sql`u.correo ILIKE ${comodin(filtro.correo)}`);
   if (filtro.telefono !== undefined) c.push(Prisma.sql`u.telefono ILIKE ${comodin(filtro.telefono)}`);
   if (filtro.diasEsperando !== undefined) {

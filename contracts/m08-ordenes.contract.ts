@@ -63,7 +63,9 @@ import { z } from 'zod';
  *  D3  Medios de contacto: lista cerrada `correo` y `telefono`. Registrar el contacto
  *      NO envía el mensaje; solo deja constancia de que se inició.
  *  D4  Paginación por defecto 20, máximo 100. La bandeja agrupada por estado se obtiene
- *      con `agruparPorEstado` y devuelve todas las órdenes en curso sin paginar.
+ *      con `agruparPorEstado` y devuelve las órdenes en curso sin paginar, con un tope de
+ *      TOPE_BANDEJA_AGRUPADA (las que más llevan esperando); si hay más, `truncada` es true y la
+ *      pantalla lo avisa: nunca se recorta en silencio.
  *  D5  El correo del cliente va por un puerto (NotificacionesPort) con adaptador en
  *      memoria hasta que M18 esté en main; un fallo del correo no revierte la orden.
  *  D6  La existencia del producto en el catálogo se lee por un puerto de solo lectura
@@ -336,8 +338,21 @@ export type Paginacion = z.infer<typeof paginacionSchema>;
 
 export const codigoOrdenParamsSchema = z.object({ codigo: codigoOrdenSchema });
 
+/** Máximo de pedidos que devuelve la bandeja agrupada; si hay más, la respuesta lo avisa (`truncada`). */
+export const TOPE_BANDEJA_AGRUPADA = 500;
+
+/** Día `AAAA-MM-DD` que existe en el calendario. Se envía como texto: un `Date` lo correría según la zona horaria. */
+export const diaSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use el formato AAAA-MM-DD')
+  .refine((v) => {
+    // `toISOString` lanza con una fecha inválida y Zod ejecuta este refine aunque el patrón ya haya fallado.
+    const dia = new Date(`${v}T00:00:00Z`);
+    return !Number.isNaN(dia.getTime()) && dia.toISOString().slice(0, 10) === v;
+  }, 'La fecha no existe');
+
 export const paginacionQuerySchema = z.object({
-  pagina: z.coerce.number().int().min(1).default(1),
+  pagina: z.coerce.number().int().min(1).max(100_000).default(1),
   limite: z.coerce.number().int().min(1).max(100).default(20),
 });
 
@@ -352,13 +367,16 @@ export const listarGestionRequestSchema = paginacionQuerySchema
   .extend({
     codigo: z.string().trim().max(20).optional(),
     estado: estadoOrdenSchema.optional(),
-    desde: z.coerce.date().optional(),
-    hasta: z.coerce.date().optional(),
-    cliente: z.coerce.number().int().positive().optional(),
+    desde: diaSchema.optional(),
+    hasta: diaSchema.optional(),
+    /** Id del cliente (su ficha), con el máximo de un entero de PostgreSQL. */
+    cliente: z.coerce.number().int().positive().max(2_147_483_647).optional(),
+    /** Nombre del cliente, o parte de él (RF-ORD-08-01). */
+    nombre: z.string().trim().max(100).optional(),
     correo: z.string().trim().max(150).optional(),
     telefono: z.string().trim().max(20).optional(),
     orden: z.enum(['antiguedad', 'reciente']).default('antiguedad'),
-    diasEsperando: z.coerce.number().int().min(0).optional(),
+    diasEsperando: z.coerce.number().int().min(0).max(3650).optional(),
     agruparPorEstado: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   })
   .refine((v) => !v.desde || !v.hasta || v.desde <= v.hasta, {
@@ -487,6 +505,8 @@ export type BandejaResponseEnvelope = z.infer<typeof bandejaResponseEnvelopeSche
 export const bandejaAgrupadaResponseEnvelopeSchema = z.object({
   success: z.literal(true),
   data: z.array(z.object({ estado: estadoOrdenSchema, ordenes: z.array(ordenFilaBandejaSchema) })),
+  /** true = había más de TOPE_BANDEJA_AGRUPADA pedidos en curso y solo se devuelven los que más llevan esperando. */
+  truncada: z.boolean(),
 });
 export type BandejaAgrupadaResponseEnvelope = z.infer<typeof bandejaAgrupadaResponseEnvelopeSchema>;
 

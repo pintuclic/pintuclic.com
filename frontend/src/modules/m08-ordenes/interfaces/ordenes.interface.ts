@@ -14,6 +14,7 @@ export interface FiltrosBandeja {
   desde?: string;
   hasta?: string;
   cliente?: number;
+  nombre?: string;
   correo?: string;
   telefono?: string;
   orden?: 'antiguedad' | 'reciente';

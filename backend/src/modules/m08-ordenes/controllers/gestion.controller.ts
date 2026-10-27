@@ -21,7 +21,8 @@ export class GestionController {
     if (consulta === null) return;
 
     if (consulta.agruparPorEstado) {
-      res.json({ success: true, data: await this.servicio.bandejaAgrupada(consulta) });
+      const { grupos, truncada } = await this.servicio.bandejaAgrupada(consulta);
+      res.json({ success: true, data: grupos, truncada });
       return;
     }
     const { filas, paginacion } = await this.servicio.bandejaPaginada(consulta);

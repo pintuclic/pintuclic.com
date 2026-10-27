@@ -169,6 +169,9 @@ describe('M08 · store de gestión (HU-ORD-03, 05, 08, 09, 10, 11)', () => {
       resumen: [],
       detalle: null,
       historialCliente: [],
+      historialClienteError: false,
+      bandejaTruncada: false,
+      resumenObsoleto: false,
       cargando: false,
       cargandoDetalle: false,
       operando: false,
@@ -180,17 +183,122 @@ describe('M08 · store de gestión (HU-ORD-03, 05, 08, 09, 10, 11)', () => {
   it('hayFiltrosActivos distingue la bandeja agrupada de una búsqueda', () => {
     expect(hayFiltrosActivos({})).toBe(false);
     expect(hayFiltrosActivos({ pagina: 2 })).toBe(false);
+    expect(hayFiltrosActivos({ nombre: 'Ana' })).toBe(true);
     expect(hayFiltrosActivos({ correo: 'ana@' })).toBe(true);
     expect(hayFiltrosActivos({ estado: 'preparada' })).toBe(true);
   });
 
   it('sin filtros carga la bandeja agrupada por estado', async () => {
-    api.listarBandejaAgrupada.mockResolvedValue([{ estado: 'orden_confirmada', ordenes: [] }]);
+    api.listarBandejaAgrupada.mockResolvedValue({ grupos: [{ estado: 'orden_confirmada', ordenes: [] }], truncada: false });
 
     await useGestionStore.getState().cargarBandeja();
 
     expect(useGestionStore.getState().grupos).toHaveLength(1);
+    expect(useGestionStore.getState().bandejaTruncada).toBe(false);
     expect(api.listarBandeja).not.toHaveBeenCalled();
+  });
+
+  it('recuerda que la bandeja se truncó para avisar al empleado, no la recorta en silencio', async () => {
+    api.listarBandejaAgrupada.mockResolvedValue({ grupos: [], truncada: true });
+
+    await useGestionStore.getState().cargarBandeja();
+
+    expect(useGestionStore.getState().bandejaTruncada).toBe(true);
+  });
+
+  it('si el contador no se puede actualizar lo marca como desactualizado y lo registra, no lo deja en silencio', async () => {
+    const consola = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    api.obtenerResumenGestion.mockRejectedValue(new Error('caído'));
+
+    await useGestionStore.getState().cargarResumen();
+
+    expect(useGestionStore.getState().resumenObsoleto).toBe(true);
+    expect(consola).toHaveBeenCalledTimes(1);
+
+    api.obtenerResumenGestion.mockResolvedValue([{ estado: 'orden_confirmada', cantidad: 2 }]);
+    await useGestionStore.getState().cargarResumen();
+    expect(useGestionStore.getState().resumenObsoleto).toBe(false);
+  });
+
+  it('si no se pudo cargar el historial del cliente lo distingue de «sin compras»', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    api.obtenerDetalleGestion.mockResolvedValue(detalle());
+    api.listarHistorialCliente.mockRejectedValue(new Error('caído'));
+
+    await useGestionStore.getState().abrirDetalle('PC-2026-00001');
+
+    expect(useGestionStore.getState().historialClienteError).toBe(true);
+    expect(useGestionStore.getState().historialCliente).toEqual([]);
+  });
+
+  it('descarta el detalle de un pedido que llega tarde cuando ya se abrió otro (no opera sobre el equivocado)', async () => {
+    let resolverA: (v: OrdenDetalleGestion) => void = () => undefined;
+    api.obtenerDetalleGestion.mockImplementationOnce(() => new Promise((r) => (resolverA = r)));
+    api.obtenerDetalleGestion.mockResolvedValueOnce(detalle({ codigo: 'PC-2026-00002' }));
+    api.listarHistorialCliente.mockResolvedValue({ filas: [], paginacion: PAGINACION });
+
+    const lenta = useGestionStore.getState().abrirDetalle('PC-2026-00001');
+    await useGestionStore.getState().abrirDetalle('PC-2026-00002');
+    resolverA(detalle({ codigo: 'PC-2026-00001' }));
+    await lenta;
+
+    expect(useGestionStore.getState().detalle?.codigo).toBe('PC-2026-00002');
+  });
+
+  it('cerrar el detalle invalida lo que estaba en vuelo: no «resucita» al volver a la bandeja', async () => {
+    let resolver: (v: OrdenDetalleGestion) => void = () => undefined;
+    api.obtenerDetalleGestion.mockImplementationOnce(() => new Promise((r) => (resolver = r)));
+
+    const enVuelo = useGestionStore.getState().abrirDetalle('PC-2026-00001');
+    useGestionStore.getState().cerrarDetalle();
+    resolver(detalle());
+    await enVuelo;
+
+    expect(useGestionStore.getState().detalle).toBeNull();
+    expect(useGestionStore.getState().cargandoDetalle).toBe(false);
+  });
+
+  it('una nota que termina de guardarse tras abrir OTRO pedido no se muestra en ese otro', async () => {
+    useGestionStore.setState({ detalle: detalle({ codigo: 'PC-2026-00001' }) });
+    let terminar: (v: unknown) => void = () => undefined;
+    api.crearNota.mockImplementationOnce(() => new Promise((r) => (terminar = r)));
+
+    const guardando = useGestionStore.getState().agregarNota({ texto: 'x' });
+    useGestionStore.setState({ detalle: detalle({ codigo: 'PC-2026-00002' }) });
+    terminar({ idNota: 1, texto: 'x', autor: 'Luis', fecha: '2026-10-24T15:00:00.000Z' });
+    await guardando;
+
+    const actual = useGestionStore.getState().detalle;
+    expect(actual?.codigo).toBe('PC-2026-00002');
+    expect(actual?.notas).toEqual([]);
+    expect(useGestionStore.getState().operando).toBe(false);
+  });
+
+  it('mientras hay una operación en curso no admite otra', async () => {
+    useGestionStore.setState({ detalle: detalle(), operando: true });
+
+    expect(await useGestionStore.getState().agregarNota({ texto: 'x' })).toBe(false);
+    expect(await useGestionStore.getState().agregarContacto({ medio: 'correo' })).toBe(false);
+    expect(
+      await useGestionStore.getState().cambiarEstado({ estadoActual: 'orden_confirmada', estadoNuevo: 'revision_disponibilidad' }),
+    ).toBe(false);
+    expect(api.crearNota).not.toHaveBeenCalled();
+    expect(api.cambiarEstado).not.toHaveBeenCalled();
+  });
+
+  it('tras un conflicto recarga el pedido sin vaciar la pantalla (no parpadea con el esqueleto)', async () => {
+    useGestionStore.setState({ detalle: detalle() });
+    api.cambiarEstado.mockRejectedValue(errorApi(409, 'ESTADO_CAMBIADO', 'La orden cambió de estado.'));
+    api.obtenerDetalleGestion.mockResolvedValue(detalle({ estado: 'revision_disponibilidad' }));
+    api.listarHistorialCliente.mockResolvedValue({ filas: [], paginacion: PAGINACION });
+    const vistos: Array<string | null> = [];
+    const cancelar = useGestionStore.subscribe((s) => vistos.push(s.detalle?.estado ?? null));
+
+    await useGestionStore.getState().cambiarEstado({ estadoActual: 'orden_confirmada', estadoNuevo: 'revision_disponibilidad' });
+    cancelar();
+
+    expect(vistos).not.toContain(null);
+    expect(useGestionStore.getState().detalle?.estado).toBe('revision_disponibilidad');
   });
 
   it('con filtros hace una búsqueda paginada desde la página 1 (CA-ORD-08-02)', async () => {
@@ -203,7 +311,7 @@ describe('M08 · store de gestión (HU-ORD-03, 05, 08, 09, 10, 11)', () => {
   });
 
   it('limpiar los filtros vuelve a la bandeja agrupada', async () => {
-    api.listarBandejaAgrupada.mockResolvedValue([]);
+    api.listarBandejaAgrupada.mockResolvedValue({ grupos: [], truncada: false });
     useGestionStore.setState({ filtros: { correo: 'ana@' } });
 
     await useGestionStore.getState().limpiarFiltros();
