@@ -12,7 +12,6 @@ import { HistorialEstados } from '../HistorialEstados';
 import { LineasOrdenLista } from '../LineasOrdenLista';
 import { TotalesOrden } from '../TotalesOrden';
 import { CambiarEstadoPanel } from './CambiarEstadoPanel';
-import { ContactosPanel } from './ContactosPanel';
 import { NotasPanel } from './NotasPanel';
 
 function Tarjeta({ id, titulo, children }: { id: string; titulo: string; children: React.ReactNode }) {
@@ -33,7 +32,7 @@ function Tarjeta({ id, titulo, children }: { id: string; titulo: string; childre
  */
 export function DetallePedidoView({ codigo }: { codigo: string }) {
   const { detalle, historialCliente, historialClienteError, cargandoDetalle, operando, error, aviso } = useGestionStore();
-  const { abrirDetalle, cerrarDetalle, cambiarEstado, agregarNota, agregarContacto } = useGestionStore.getState();
+  const { abrirDetalle, cerrarDetalle, cambiarEstado, agregarNota } = useGestionStore.getState();
 
   useEffect(() => {
     void abrirDetalle(codigo);
@@ -132,10 +131,6 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
                 <CambiarEstadoPanel orden={detalle} operando={operando} onCambiar={cambiarEstado} />
               </Tarjeta>
             )}
-
-            <Tarjeta id="contactos" titulo="Contactos con el cliente">
-              <ContactosPanel contactos={detalle.contactos} operando={operando} onRegistrar={agregarContacto} />
-            </Tarjeta>
 
             <Tarjeta id="anteriores" titulo="Compras del cliente">
               {historialClienteError ? (
