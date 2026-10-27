@@ -249,34 +249,42 @@ export function CotizacionAdminView({ idCotizacion }: { idCotizacion: number }) 
         </div>
       ) : (
         <form noValidate className="space-y-6" onSubmit={(e) => void guardar(e)}>
-          <div className="flex flex-col gap-3 rounded-card border border-neutral-light/70 bg-neutral-white p-4 shadow-card sm:flex-row sm:items-end">
-            <div className="sm:w-56">
-              <Input
-                id="descuento-general"
-                label="Descuento para todos (%)"
-                inputMode="decimal"
-                placeholder="Ej.: 10"
-                value={porcentajeGeneral}
-                onChange={(e) => setPorcentajeGeneral(e.target.value)}
-                onKeyDown={(e) => {
-                  // Enter aplica el descuento en vez de guardar el formulario.
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    aplicarATodos();
-                  }
-                }}
-                {...(errorGeneral === null ? {} : { error: errorGeneral })}
-              />
-            </div>
-            <Button type="button" variant="outline" onClick={aplicarATodos}>
-              Aplicar a todos
-            </Button>
-            {generalAplicado !== null && (
-              <Button type="button" variant="ghost" onClick={quitarATodos} leftIcon={<X aria-hidden className="h-4 w-4" />}>
-                Quitar descuento
+          <div className="space-y-2 rounded-card border border-neutral-light/70 bg-neutral-white p-4 shadow-card">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-48">
+                <Input
+                  id="descuento-general"
+                  label="Descuento para todos (%)"
+                  inputMode="decimal"
+                  placeholder="Ej.: 10"
+                  value={porcentajeGeneral}
+                  onChange={(e) => setPorcentajeGeneral(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter aplica el descuento en vez de guardar el formulario.
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      aplicarATodos();
+                    }
+                  }}
+                  {...(errorGeneral === null ? {} : { error: errorGeneral })}
+                />
+              </div>
+              <Button type="button" variant="outline" className="shrink-0 whitespace-nowrap" onClick={aplicarATodos}>
+                Aplicar a todos
               </Button>
-            )}
-            <p className="text-sm text-neutral-medium sm:pb-2.5">
+              {generalAplicado !== null && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="shrink-0 whitespace-nowrap"
+                  onClick={quitarATodos}
+                  leftIcon={<X aria-hidden className="h-4 w-4" />}
+                >
+                  Quitar descuento
+                </Button>
+              )}
+            </div>
+            <p className="text-sm text-neutral-medium">
               Pone ese % sobre el precio de referencia de cada producto incluido. Luego puedes ajustar cualquiera a mano.
             </p>
           </div>
