@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { EncabezadoFijo, Footer, Header, Topbar } from '@/core/components';
 import { SesionBootstrap } from '@/modules/m04-cuentas/components/sesion/SesionBootstrap';
+import { CarritoLateral } from '@/modules/m05-carrito/components/CarritoLateral';
 import { footer, header, topbarItems } from './_data/shell.content';
 
 /**
@@ -8,6 +9,7 @@ import { footer, header, topbarItems } from './_data/shell.content';
  * contenido y pie.
  * Incluye el enlace "Saltar al contenido" para navegación por teclado (WCAG 2.4.1).
  * `modal` es el slot paralelo `@modal`: login y registro abiertos sobre la página actual.
+ * `CarritoLateral` es el panel del carrito (M05 · L1): uno solo para todas las páginas públicas.
  */
 export default function PublicLayout({ children, modal }: { children: ReactNode; modal: ReactNode }) {
   return (
@@ -26,6 +28,7 @@ export default function PublicLayout({ children, modal }: { children: ReactNode;
       </main>
       <Footer {...footer} />
       {modal}
+      <CarritoLateral />
       <SesionBootstrap />
     </>
   );
