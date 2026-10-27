@@ -68,10 +68,12 @@ export const OndaColor: React.FC<OndaColorProps> = ({ color, destinoId, onVerPro
           rightIcon={<ChevronsDown className="h-5 w-5" aria-hidden="true" />}
           onClick={onVerProductos}
           aria-controls={destinoId}
+          aria-label={`Ver productos en ${color.nombre}`}
           className="border-2 shadow-lg"
           style={{ backgroundColor: texto === '#000000' ? '#FFFFFF' : '#000000', color: texto === '#000000' ? '#000000' : '#FFFFFF', borderColor: texto }}
         >
-          Ver productos en {color.nombre}
+          <span className="sm:hidden">Ver productos</span>
+          <span className="hidden sm:inline">Ver productos en {color.nombre}</span>
         </Button>
       </div>
     </div>
