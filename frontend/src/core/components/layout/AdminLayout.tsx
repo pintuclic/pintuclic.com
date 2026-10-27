@@ -12,6 +12,7 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
   FileText,
   Headset,
   Home,
@@ -84,6 +85,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Colaboradores',
     href: '/admin/empleados',
     icon: <Users className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Cotizaciones',
+    href: '/admin/cotizaciones',
+    icon: <ClipboardList className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
