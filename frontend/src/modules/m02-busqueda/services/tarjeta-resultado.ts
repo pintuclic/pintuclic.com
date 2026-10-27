@@ -19,10 +19,11 @@ export function textoDelColor(p: Pick<ResultadoBusqueda, 'colorMuestra' | 'total
 }
 
 /**
- * La tarjeta de un resultado: el producto en su color de muestra, sin "Ver producto" y con el carrito junto al precio,
- * todo llevando a la ficha en ese color (V2, V3). La usan /productos y el inicio (V5), para que se vean iguales.
+ * La tarjeta de un resultado: el producto en su color de muestra, sin "Ver producto" y con el carrito junto al precio
+ * (V2, V3). El nombre y la imagen llevan a la ficha en ese color; el carrito llama a `onAgregar` (agrega y abre el
+ * panel lateral). La usan /productos y el inicio (V5), para que se vean iguales.
  */
-export function tarjetaDeResultado(p: ResultadoBusqueda): ProductCardProps {
+export function tarjetaDeResultado(p: ResultadoBusqueda, onAgregar?: (p: ResultadoBusqueda) => void): ProductCardProps {
   const color = textoDelColor(p);
   return {
     id: String(p.idProducto),
@@ -35,6 +36,7 @@ export function tarjetaDeResultado(p: ResultadoBusqueda): ProductCardProps {
     isSponsored: p.patrocinado,
     href: enlaceDeResultado(p),
     showViewDetails: false,
+    ...(onAgregar === undefined ? {} : { onAddToCart: () => onAgregar(p) }),
     ...(p.idImagenPrincipal === null ? {} : { imageUrl: busquedaApi.urlImagen(p.idImagenPrincipal, 'miniatura') }),
     ...(p.colorMuestra === null ? {} : { swatchColor: p.colorMuestra.hexadecimal }),
     ...(color === undefined ? {} : { swatchLabel: color }),

@@ -13,6 +13,7 @@ import { MedidorPatrocinio } from '@/modules/m14-patrocinios/components/MedidorP
 import type { OpcionesFiltro, PaginaBusqueda, ResultadoBusqueda } from '../dtos/busqueda.dto';
 import { busquedaApi } from '../services/busqueda-api';
 import { tarjetaDeResultado } from '../services/tarjeta-resultado';
+import { useAgregarDesdeTarjeta } from '../hooks/useAgregarDesdeTarjeta';
 import type { FiltrosBusqueda } from '../services/filtros-busqueda';
 import {
   filtrosAUrl,
@@ -39,6 +40,8 @@ export const BusquedaCatalogoView: React.FC = () => {
   );
 
   const [panelMovilAbierto, setPanelMovilAbierto] = useState(false);
+  // V3: el botón del carrito de la tarjeta agrega y abre el panel lateral del carrito (M05 · L2).
+  const agregarDesdeTarjeta = useAgregarDesdeTarjeta();
   const [textoBusqueda, setTextoBusqueda] = useState(filtros.q);
 
   const [cargando, setCargando] = useState(true);
@@ -454,7 +457,7 @@ export const BusquedaCatalogoView: React.FC = () => {
               {resultado.items.map((p) => (
                 <li key={p.idProducto} className="flex flex-col">
                   <MedidorPatrocinio idCampania={p.patrocinado ? p.idCampania : null} ubicacion="listado" className="relative flex-1">
-                    <ProductCard {...tarjetaDeResultado(p)} className="h-full w-full" />
+                    <ProductCard {...tarjetaDeResultado(p, agregarDesdeTarjeta)} className="h-full w-full" />
 
                     {/* Badge de coincidencia de color si aplica (B7/B8) */}
                     {p.coincidenciaColor && (
