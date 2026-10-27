@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ResultadoBusqueda } from '../../m02-busqueda/dtos/m02-busqueda.dto';
+import type { BuscarProductosRequest, ResultadoBusqueda } from '../../m02-busqueda/dtos/m02-busqueda.dto';
 import type { BusquedaServicePort, PaginaResultado } from '../../m02-busqueda/interfaces/busqueda.interface';
 import { ContextoCatalogoAdapter, palabrasClave } from '../adapters/contexto-catalogo.adapter';
 
@@ -30,7 +30,9 @@ function busquedaFalsa(porTermino: Record<string, ResultadoBusqueda[]>): {
 } {
   const terminos: string[] = [];
   const servicio = {
-    buscarProductos: async (filtros): Promise<PaginaResultado<ResultadoBusqueda>> => {
+    buscarProductos: async (
+      filtros: BuscarProductosRequest,
+    ): Promise<PaginaResultado<ResultadoBusqueda>> => {
       terminos.push(filtros.q ?? '');
       const items = porTermino[filtros.q ?? ''] ?? [];
       return { items, total: items.length, pagina: 1, limite: filtros.limite, totalPaginas: 1 };
