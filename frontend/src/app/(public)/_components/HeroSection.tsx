@@ -74,7 +74,7 @@ export function HeroSection() {
             alt=""
             fill
             priority={indice === 0}
-            sizes="(min-width: 1280px) 1232px, 100vw"
+            sizes="(min-width: 1536px) 1456px, 100vw"
             className="object-cover object-right"
           />
         )}
@@ -83,7 +83,9 @@ export function HeroSection() {
           aria-hidden="true"
           className="absolute inset-0 bg-corporate/70 lg:bg-transparent lg:bg-linear-to-r lg:from-corporate/80 lg:via-corporate/35 lg:to-transparent"
         />
-        <div className="relative z-10 flex h-full max-w-xl flex-col justify-center gap-4 pl-12 pr-6 sm:pl-16 sm:pr-10 lg:max-w-2xl lg:pl-16 lg:pr-14">
+        {/* En pantallas anchas el banner crece con el contenido (hasta 1536px): la columna de texto crece también, para
+            que la primera línea del título no se parta (por ejemplo, "para" sola en otra línea). */}
+        <div className="relative z-10 flex h-full max-w-xl flex-col justify-center gap-4 pl-12 pr-6 sm:pl-16 sm:pr-10 lg:max-w-3xl lg:pl-16 lg:pr-14 2xl:max-w-[52rem]">
           <Titulo className="font-title text-3xl font-bold leading-tight text-neutral-white sm:text-4xl lg:text-[2.5rem]">
             {slide.titleLine1}
             <br />
