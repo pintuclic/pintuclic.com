@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, Menu, ShoppingCart, User } from 'lucide-react';
+import { ChevronDown, Menu, Palette, ShoppingCart, User } from 'lucide-react';
 import { Button } from '../buttons/Button';
 import { IconButton } from '../buttons/IconButton';
 import { Badge } from '../data-display/Badge';
@@ -24,8 +24,11 @@ import { Logo, type LogoProps } from './Logo';
 export interface HeaderNavItem {
   label: string;
   href: string;
-  /** `pill` muestra el elemento como insignia roja (p. ej. "OFERTAS"). */
-  variant?: 'link' | 'pill';
+  /**
+   * `pill` muestra el elemento como insignia roja (p. ej. "OFERTAS"); `destacado` lo muestra como un botón con borde de
+   * colores y un ícono de paleta, para la entrada que se quiere hacer notar (p. ej. "Paleta de color").
+   */
+  variant?: 'link' | 'pill' | 'destacado';
 }
 
 export interface HeaderProps {
@@ -42,6 +45,22 @@ export interface HeaderProps {
 }
 
 const FOCO = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50';
+
+/** El botón llamativo del menú: borde en degradado de colores (como una paleta) y adentro un fondo claro de texto oscuro legible. */
+function BotonDestacado({ label, activo }: { label: string; activo: boolean }) {
+  return (
+    <span
+      className={`inline-flex rounded-full bg-gradient-to-r from-danger via-highlight via-45% to-action p-[2px] shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg ${
+        activo ? 'ring-2 ring-corporate/40' : ''
+      }`}
+    >
+      <span className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-neutral-white px-3 font-title text-sm font-bold text-corporate xl:px-4">
+        <Palette className="hidden h-4 w-4 text-action xl:block" aria-hidden="true" />
+        {label}
+      </span>
+    </span>
+  );
+}
 
 /** Con sesión abierta, "Mi cuenta" saluda por el primer nombre y lleva al perfil o al panel admin (M04 / M17). */
 export function cuentaDeEncabezado(
@@ -88,7 +107,7 @@ export function Header({
 
   return (
     <header className="border-b border-neutral-light bg-neutral-white">
-      <Container className="flex h-16 items-center gap-4 lg:h-[88px] lg:gap-7 xl:gap-9">
+      <Container className="flex h-16 items-center gap-4 lg:h-[88px] lg:gap-3 xl:gap-5">
         <IconButton
           variant="ghost"
           aria-label="Abrir menú"
@@ -110,14 +129,14 @@ export function Header({
             aria-haspopup="dialog"
             aria-expanded={megaAbierto}
             onClick={() => setMegaAbierto(true)}
-            className="min-w-[164px] justify-between whitespace-nowrap"
+            className="min-w-[150px] justify-between whitespace-nowrap xl:min-w-[164px]"
           >
             {categoriesLabel}
           </Button>
         </div>
 
         <nav aria-label="Principal" className="hidden min-w-0 flex-1 lg:block">
-          <ul className="flex items-center justify-center gap-6 xl:gap-8">
+          <ul className="flex items-center justify-center gap-1 xl:gap-3">
             {navItems.map((item) => (
               <li key={item.href} className="shrink-0">
                 {item.variant === 'pill' ? (
@@ -126,13 +145,21 @@ export function Header({
                       {item.label}
                     </Badge>
                   </Link>
+                ) : item.variant === 'destacado' ? (
+                  <Link
+                    href={item.href}
+                    aria-current={esActivo(item.href) ? 'page' : undefined}
+                    className={`inline-flex whitespace-nowrap rounded-full ${FOCO}`}
+                  >
+                    <BotonDestacado label={item.label} activo={esActivo(item.href)} />
+                  </Link>
                 ) : (
                   <Link
                     href={item.href}
                     aria-current={esActivo(item.href) ? 'page' : undefined}
-                    className={`relative inline-flex min-h-[44px] items-center whitespace-nowrap rounded-btn px-2 font-sans text-sm font-medium transition-colors ${FOCO} ${
+                    className={`relative inline-flex min-h-[44px] items-center whitespace-nowrap rounded-btn px-1 font-sans text-sm font-medium transition-colors xl:px-1.5 ${FOCO} ${
                       esActivo(item.href)
-                        ? 'text-conversion-hover after:absolute after:inset-x-2 after:bottom-1 after:h-0.5 after:bg-conversion'
+                        ? 'text-conversion-hover after:absolute after:inset-x-1.5 after:bottom-1 after:h-0.5 after:bg-conversion'
                         : 'text-neutral-dark hover:text-action'
                     }`}
                   >
@@ -144,14 +171,14 @@ export function Header({
           </ul>
         </nav>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-6 xl:gap-7">
+        <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3 xl:gap-5">
           <Link
             href={cuenta.href}
             aria-label={`${cuenta.label}, ${cuenta.sublabel}`}
             className={`flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-btn p-2 ${FOCO}`}
           >
             <User className="h-6 w-6 shrink-0 text-neutral-dark" aria-hidden="true" />
-            <span className="hidden flex-col leading-tight whitespace-nowrap lg:flex">
+            <span className="hidden flex-col leading-tight whitespace-nowrap xl:flex">
               <span className="font-title text-sm font-semibold whitespace-nowrap text-neutral-black">{cuenta.label}</span>
               <span className="text-xs whitespace-nowrap text-neutral-medium">{cuenta.sublabel}</span>
             </span>
@@ -173,7 +200,7 @@ export function Header({
                 </span>
               )}
             </span>
-            <span className="hidden flex-col leading-tight whitespace-nowrap lg:flex">
+            <span className="hidden flex-col leading-tight whitespace-nowrap xl:flex">
               <span className="font-title text-sm font-semibold whitespace-nowrap text-neutral-black">Carrito</span>
               <span className="text-xs font-medium whitespace-nowrap text-neutral-dark">{total}</span>
             </span>
@@ -217,6 +244,8 @@ export function Header({
                       <Badge variant="offer" pill>
                         {item.label}
                       </Badge>
+                    ) : item.variant === 'destacado' ? (
+                      <BotonDestacado label={item.label} activo={esActivo(item.href)} />
                     ) : (
                       item.label
                     )}

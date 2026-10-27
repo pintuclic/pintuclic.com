@@ -104,6 +104,7 @@ export const header: HeaderProps = {
     { label: 'Inicio', href: '/' },
     { label: 'Productos', href: '/productos' },
     { label: 'Ofertas', href: '/productos?enOferta=true', variant: 'pill' },
+    { label: 'Paleta de color', href: '/paleta-de-color', variant: 'destacado' },
     { label: 'Ayuda y FAQ', href: '/centro-de-ayuda' },
     { label: 'Sobre Nosotros', href: '/sobre-nosotros' },
   ],

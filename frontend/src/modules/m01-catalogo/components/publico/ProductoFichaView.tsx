@@ -21,6 +21,8 @@ const TIPOS_CALIDAD: Record<number, string> = { 1: 'Tipo 1 (gama alta)', 2: 'Tip
 
 export interface ProductoFichaViewProps {
   idProducto: number;
+  /** Color con el que se llegó desde la paleta (`?color=`); se aplica solo si el producto lo ofrece. */
+  idColorInicial?: number | null;
 }
 
 /** HU-CAT-06: ficha pública de un producto con presentaciones, rendimiento y selector de color. */
@@ -30,7 +32,7 @@ type EstadoFicha =
   | { tipo: 'no_disponible' }
   | { tipo: 'error'; mensaje: string };
 
-export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto }) => {
+export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto, idColorInicial = null }) => {
   const [estado, setEstado] = useState<EstadoFicha>({ tipo: 'cargando' });
   const [idVariante, setIdVariante] = useState<number | null>(null);
   const [color, setColor] = useState<ColorOfrecido | null>(null);
@@ -59,6 +61,19 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
       vigente = false;
     };
   }, [idProducto]);
+
+  // P11: llegar desde la paleta con un color lo deja elegido. Si el producto no lo ofrece, la ficha queda sin color.
+  useEffect(() => {
+    if (idColorInicial === null) return;
+    let vigente = true;
+    catalogoPublicoApi
+      .colores(idProducto, { idColor: idColorInicial })
+      .then((r) => vigente && r.items[0] !== undefined && setColor(r.items[0]))
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [idProducto, idColorInicial]);
 
   const idColorElegido = color?.idColor ?? null;
   useEffect(() => {

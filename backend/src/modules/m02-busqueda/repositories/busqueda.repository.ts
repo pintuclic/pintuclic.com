@@ -63,8 +63,11 @@ interface ProductoCrudo {
   compraBloqueada: boolean;
   superficies: readonly number[];
   medidas: readonly number[];
+  /** Familias de los colores que el producto entrega: los de fábrica y los de su carta (M02 · B7, B8). */
   familiasColor: readonly number[];
   colores: ReadonlyArray<{ idColor: number; nombre: string; familia: string | null }>;
+  /** De los colores pedidos en el filtro, los que el producto entrega por su carta (misma marca, base y acabado; M02 · B7). */
+  idsColorCarta: ReadonlySet<number>;
 }
 
 export class BusquedaRepository implements BusquedaRepositoryPort {
@@ -119,7 +122,36 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     }
   }
 
-  private async cargarProductosBase(enOferta: ReadonlySet<number>): Promise<ProductoCrudo[]> {
+  /**
+   * M02 · B7, B8: lo que un producto ENTONABLE puede entregar no está en una tabla, se deduce: los colores activos de su
+   * marca cuya base y acabado están entre los suyos (la misma regla P5 de M01 que usa la ficha). Se indexa por «marca, base y
+   * acabado» para saber, de cada producto, qué familias entrega y cuáles de los colores pedidos entrega.
+   */
+  private async indiceDeCarta(idsPedidos: readonly number[]): Promise<{
+    familiasPorClave: ReadonlyMap<string, ReadonlySet<number>>;
+    claveDeColorPedido: ReadonlyMap<number, string>;
+  }> {
+    const colores = await prisma.color.findMany({
+      where: { estado: 'activo', idBase: { not: null }, marca: { estado: 'activo' } },
+      select: { idColor: true, idMarca: true, idBase: true, idAcabado: true, idFamiliaColor: true },
+    });
+    const familiasPorClave = new Map<string, Set<number>>();
+    const claveDeColorPedido = new Map<number, string>();
+    const pedidos = new Set(idsPedidos);
+    for (const c of colores) {
+      const clave = `${c.idMarca}|${String(c.idBase)}|${c.idAcabado}`;
+      if (c.idFamiliaColor !== null) {
+        const familias = familiasPorClave.get(clave) ?? new Set<number>();
+        familias.add(c.idFamiliaColor);
+        familiasPorClave.set(clave, familias);
+      }
+      if (pedidos.has(c.idColor)) claveDeColorPedido.set(c.idColor, clave);
+    }
+    return { familiasPorClave, claveDeColorPedido };
+  }
+
+  private async cargarProductosBase(enOferta: ReadonlySet<number>, idsColorPedidos: readonly number[] = []): Promise<ProductoCrudo[]> {
+    const indice = await this.indiceDeCarta(idsColorPedidos);
     const productosDb = await prisma.producto.findMany({
       where: productoVisible(),
       include: {
@@ -148,7 +180,12 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
           select: { idSuperficie: true },
         },
         bases: {
+          where: { base: { estado: 'activo' } },
           select: { idBase: true },
+        },
+        acabados: {
+          where: { acabado: { estado: 'activo' } },
+          select: { idAcabado: true },
         },
         coloresFabrica: {
           select: {
@@ -202,6 +239,19 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
 
       const tieneColor = p.bases.length > 0 || p.coloresFabrica.length > 0;
 
+      // Lo que entrega por su carta: cada base y acabado del producto, con su marca (M02 · B7, B8).
+      const clavesCarta = new Set<string>();
+      for (const b of p.bases) {
+        for (const a of p.acabados) clavesCarta.add(`${p.idMarca}|${b.idBase}|${a.idAcabado}`);
+      }
+      for (const clave of clavesCarta) {
+        for (const familia of indice.familiasPorClave.get(clave) ?? []) familiasSet.add(familia);
+      }
+      const idsColorCarta = new Set<number>();
+      for (const [idColor, clave] of indice.claveDeColorPedido) {
+        if (clavesCarta.has(clave)) idsColorCarta.add(idColor);
+      }
+
       return {
         idProducto: p.idProducto,
         nombre: p.nombre,
@@ -230,6 +280,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
         medidas: [...medidasSet],
         familiasColor: [...familiasSet],
         colores: coloresLista,
+        idsColorCarta,
       };
     });
   }
@@ -339,7 +390,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       if (!coincide) return false;
     }
     if (omitirGrupo !== 'idColor' && f.idColor && f.idColor.length > 0) {
-      const coincide = f.idColor.some((idCol: number) => p.colores.some((c) => c.idColor === idCol));
+      const coincide = f.idColor.some((idCol: number) => p.idsColorCarta.has(idCol) || p.colores.some((c) => c.idColor === idCol));
       if (!coincide) return false;
     }
     if (omitirGrupo !== 'idMedida' && f.idMedida && f.idMedida.length > 0) {
@@ -366,7 +417,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     filtros: BuscarProductosRequest,
     _contexto: ContextoPrecio,
   ): Promise<PaginaResultado<ResultadoBusqueda>> {
-    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros));
+    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros), filtros.idColor ?? []);
     const terminoNorm = normalizarTexto(filtros.q ?? '');
 
     const evaluados: Array<{
@@ -463,7 +514,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     filtros: OpcionesFiltroRequest,
     _contexto: ContextoPrecio,
   ): Promise<OpcionesFiltro> {
-    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros));
+    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros), filtros.idColor ?? []);
     const terminoNorm = normalizarTexto(filtros.q ?? '');
 
     // 1. Filtrar los que coinciden con el término de búsqueda

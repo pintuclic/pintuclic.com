@@ -9,31 +9,37 @@ import {
  * ============================================================================
  * CONTRATO DE API REST — M01. Catálogo · ENTREGA 4: PALETA DE COLOR
  * ============================================================================
- * Scope: m01-catalogo · Entrega 4 · BORRADOR para el Tech Lead.
+ * Scope: m01-catalogo · Entrega 4 · REVISADO con las decisiones del Tech Lead (v2).
  * Base de datos: esquema 4.17 (sin cambios). Depende de las entregas 1 a 3 y de M02 (productos por color) y M06
- * (ofertas de las tarjetas, ya incluidas en las tarjetas de M01 y M02).
+ * (ofertas de las tarjetas, ya incluidas en las tarjetas de M02).
  *
  * Este contrato ES la especificación de la entrega y lo que el Tech Lead revisa antes de que se escriba el código.
- * Lo que cambie aquí cambia el módulo. NO hay una HU escrita para esta pantalla: nace de la imagen del diseño que dio el
- * Tech Lead (página «Paleta de color») y de las reglas de color ya vigentes (HU-CAT-05, HU-CAT-12, RF-CAT-05-06).
- * Si la HU existe en la v5.2 del documento de historias, hay que comparar antes de aprobar (ver Q1).
+ * Lo que cambie aquí cambia el módulo. La HU escrita es básica: manda lo que la pantalla HACE (sus funciones); el
+ * mockup sirve de guía de funciones, no de títulos ni imágenes.
  *
  * ── Qué es ──────────────────────────────────────────────────────────────────
- *  Una página pública, `/paleta-de-color`, nueva entrada del menú («Paleta de color»), donde el cliente:
- *    1. Recorre los colores de la carta por FAMILIA (Amarillos, Azules…), por MARCA o buscando por nombre o código.
- *    2. Elige un color y ve CÓMO SE VERÍA en un ambiente (sala, dormitorio, cocina, fachada) y su nombre y código.
- *    3. Ve el COMBINADOR: colores que arman con el elegido (complementario, análogos, tríadico y monocromático), cada
- *       uno enlazado al color REAL de la carta más parecido, que puede elegir con un clic.
- *    4. Ve los PRODUCTOS que se pueden entregar en ese color y, abajo, productos que podrían interesarle.
+ *  Una página pública, `/paleta-de-color`, nueva entrada del menú («Paleta de color», con un botón más llamativo que
+ *  los demás enlaces), donde el cliente:
+ *    1. Recorre la TABLA DE COLORES hecha ABANICO, filtrada por familia (Amarillos, Azules…), por marca o buscando por
+ *       nombre o código. El abanico es lo más importante de la página: grande, deslizable y que se ve en toda la altura
+ *       de la pantalla.
+ *    2. Elige un color en el abanico: aparece una ONDA llamativa abajo que lo invita a ver los productos que se
+ *       entregan en ese color.
+ *    3. Ve el COMBINADOR (complementario, análogos, tríadico y monocromático), cada muestra enlazada al color REAL de la
+ *       carta más parecido, que puede elegir con un clic. Junto a él queda la pestaña «En tu espacio», reservada para
+ *       la visualización en ambientes que construye M03 (ver P6).
+ *    4. Ve los PRODUCTOS RECOMENDADOS (los que se entregan en ese color) y los que podrían interesarle.
  *  Es una herramienta para decidir y para llevar al cliente a la ficha con el color ya elegido; no vende por sí sola.
  *
  * ── Qué NO incluye ──────────────────────────────────────────────────────────
  *  · Administrar colores, familias o bases: es de las entregas 1 y 2 (`/admin/catalogo`). Aquí solo se LEE.
  *  · Búsqueda de texto de productos: es de M02. Los productos por color se piden a M02 (`GET /busqueda/productos`
  *    con `idColor`), que ya implementa la regla de «productos que pueden entregarse en ese color» (M02 · B7).
- *  · Asesoría de color con preguntas (wizard, UI Spec 4.5) y simulador con IA: son de M03 (sin especificación).
- *  · Subir la foto del cliente para pintarla: no está pedido.
- *  · Guardar paletas, compartirlas o descargarlas: no está pedido (ver Q7).
+ *  · Visualizar el color en ambientes (habitaciones, fachadas) y la asesoría con IA: son de M03, que los construye en
+ *    otra rama. Esta entrega solo deja la pestaña y el contenedor (P6).
+ *  · La TARJETA del producto: otra rama de M01 está cambiando la tarjeta para mostrar una variante real con su color.
+ *    La página usa la tarjeta estándar del catálogo y la recibirá sin cambios cuando esa rama la entregue (P9).
+ *  · Guardar o compartir paletas: solo se comparte el enlace de la página (P5).
  *  · Los colores son REFERENCIALES: se muestran con el aviso «Los colores mostrados son referenciales y pueden variar
  *    según tu pantalla» (UI Spec 4.4). Una pantalla no reproduce la pintura real.
  *
@@ -44,58 +50,87 @@ import {
  *      `totalProductos` cuenta esos productos y siempre es 1 o más. Es el MISMO criterio de M02 · B7, no una copia
  *      distinta.
  *  P2  FAMILIAS Y MARCAS. Las pestañas de familia (y la lista de marcas) salen de los colores de P1 y cuentan cuántos hay
- *      de cada una SIN aplicar el filtro de familia (como el selector de color de la ficha), para que elegir una no vacíe
- *      las demás. Los colores sin familia solo salen en «Todas».
- *  P3  BÚSQUEDA. `q` busca en nombre y código del color (sin distinguir mayúsculas ni tildes). Con `familia` o `idMarca` se
- *      combinan con Y. Orden: por familia (según `orden` de la familia), luego por tono (de más claro a más oscuro) y
- *      luego por nombre, para que la paleta se vea ordenada como un abanico y no como una lista alfabética.
- *  P4  TOPE. Hasta LIMITE_PALETA_MAXIMO colores por página (24 por omisión). La pantalla pinta el abanico con los primeros
- *      COLORES_EN_ABANICO de la página y permite pasar de página; nunca carga «todos los colores» (miles, RF-CAT-05).
- *  P5  ELEGIR UN COLOR. El color elegido viaja en la dirección (`?color=<id>`, más `familia`, `marca` y `q`), para poder
- *      compartir el enlace y volver atrás. Un color que ya no se ofrece (404) se ignora y la página sigue sin selección.
- *  P6  AMBIENTES (AMBIENTES_PALETA). El color elegido se aplica sobre las paredes de un ambiente dibujado por Pintu Clic
- *      (sala, dormitorio, cocina, fachada); «Cambiar ambiente» pasa al siguiente. Son ilustraciones propias, sin fotos de
- *      terceros ni servicios externos. El color se tiñe sobre la pared conservando sombras y luces del dibujo (la pared
- *      oscura no queda plana). Con `prefers-reduced-motion` el cambio de color y de ambiente no se anima. Ver Q2.
+ *      de cada una SIN aplicar su propio filtro (la de familia sin el filtro de familia, la de marca sin el de marca),
+ *      para que elegir una no vacíe las demás. Los colores sin familia solo salen en «Todas».
+ *  P3  BÚSQUEDA Y ORDEN. `q` busca en nombre y código del color (sin distinguir mayúsculas ni tildes). `familia`, `idMarca`
+ *      y `q` se combinan con Y. Orden: por familia (según `orden` de la familia; sin familia al final), luego de más claro
+ *      a más oscuro (luminosidad HSL descendente) y luego por nombre, para que el abanico se vea ordenado como un
+ *      muestrario y no como una lista alfabética.
+ *  P4  PÁGINAS DEL ABANICO. El servidor entrega hasta LIMITE_PALETA_MAXIMO colores por página (24 por omisión). El abanico
+ *      (P14) pide la siguiente página cuando el cliente se acerca al final de lo cargado: nunca carga «todos los colores»
+ *      de una vez (miles, RF-CAT-05).
+ *  P5  ELEGIR UN COLOR. El color elegido y los filtros viajan en la dirección (`?color=<id>&familia=<id>&marca=<id>&q=`),
+ *      para poder compartir el enlace y volver atrás. Un color que ya no se ofrece (404) se ignora y la página sigue sin
+ *      selección.
+ *  P6  PESTAÑA «EN TU ESPACIO» (reservada para M03). Junto al combinador hay dos pestañas: «Combinador» (por omisión) y
+ *      «En tu espacio». Esta última muestra un aviso («Muy pronto podrás ver este color en tus espacios») y es un
+ *      componente propio (`AmbientesColor`) que recibe el color elegido: M03 lo reemplaza por su visualizador sin tocar
+ *      el resto de la página. M01 NO dibuja ambientes.
  *  P7  COMBINADOR (ARMONIAS). Para el color elegido se calculan cuatro armonías, en el modelo HSL de su `hexadecimal`
  *      (DEFINICION_ARMONIAS fija las reglas exactas): complementario (tono +180°), análogos (±30°), tríadico (+120° y
- *      +240°) y monocromático (el mismo tono con otras luminosidades). Los grises y blancos (saturación menor a 8 %) no
- *      tienen tono: sus armonías cromáticas parten de la luminosidad y se avisa en pantalla («Este color casi no tiene
- *      tono: las combinaciones usan luminosidad»). La armonía es una SUGERENCIA de diseño, no una garantía de gusto.
+ *      +240°) y monocromático (el mismo tono y saturación con otras luminosidades). Los grises y blancos (saturación
+ *      HSL menor a SATURACION_SIN_TONO) no tienen tono: `sinTono` es true y las armonías cromáticas parten de la
+ *      luminosidad (complementario: 100 − L; análogos: L − 15 y L + 15; tríadico: L − 30 y L + 30; siempre entre 5 y 95),
+ *      y la pantalla avisa «Este color casi no tiene tono: las combinaciones usan claridad». La armonía es una
+ *      SUGERENCIA de diseño, no una garantía de gusto.
  *  P8  COLOR REAL MÁS CERCANO. Cada muestra de una armonía se enlaza al color de la carta MÁS PARECIDO (P1), medido como
  *      distancia de color ΔE (CIE76) entre los `hexadecimal` (convertidos a CIELAB con blanco D65); no se usa el CIELAB
  *      guardado porque es opcional (RC-25). Reglas: solo colores de LA MISMA MARCA del elegido (no se puede mezclar marcas
- *      en un pedido), nunca el mismo color elegido, y solo si ΔE ≤ UMBRAL_COLOR_CERCANO; si no hay ninguno, `cercano` es
- *      null y la pantalla muestra la muestra sin enlace y con «Sin color parecido en la carta». Se informa `deltaE` (con
- *      un decimal) y la pantalla lo traduce a «muy parecido» (≤ 6), «parecido» (≤ 15) o «aproximado» (más). Ver Q3.
+ *      en un pedido), nunca el mismo color elegido, y solo si ΔE ≤ UMBRAL_COLOR_CERCANO (25, aceptado por el Tech Lead);
+ *      si no hay ninguno, `cercano` es null y la pantalla muestra la muestra sin enlace y con «Sin color parecido en la
+ *      carta». Se informa `deltaE` (con un decimal) y la pantalla lo traduce a «muy parecido» (≤ 6), «parecido» (≤ 15) o
+ *      «aproximado» (más). En empate de distancia gana el de menor id.
  *  P9  PRODUCTOS RECOMENDADOS. Los que se pueden entregar en el color elegido: `GET /busqueda/productos?idColor=…`
- *      (M02), con sus ofertas y la etiqueta «Patrocinado» como en el catálogo. Sin color elegido se muestran los del
- *      primer color de la página. Hasta 10, el título dice el color y la familia. Cada tarjeta lleva a la ficha con el
- *      color puesto (P11).
+ *      (M02), con sus ofertas y la etiqueta «Patrocinado» como en el catálogo. Hasta PRODUCTOS_RECOMENDADOS_MAXIMO. La
+ *      sección se mantiene (el Tech Lead lo confirmó). Cada tarjeta lleva a la ficha con el color puesto (P11). La
+ *      página solo CONSUME la tarjeta de M02: cuando la otra rama de M01 la cambie a «variante real con su color», este
+ *      listado la mostrará sin cambios aquí. Sin color elegido la sección pide que elija uno en el abanico.
  *  P10 PRODUCTOS QUE PODRÍAN INTERESAR. Los complementarios (HU-CAT-08, X1 a X5) del primer producto recomendado: pinturas
  *      con sus brochas, rodillos, cintas. Si no hay ninguno, la sección no se pinta.
  *  P11 COLOR PUESTO EN LA FICHA. `GET /productos/:idProducto/colores` acepta un `idColor` opcional; si el color lo ofrece
  *      ese producto, responde solo ese (si no, lista vacía, sin error). La ficha lo usa al llegar con `?color=<id>` y deja
  *      el color ya elegido. Sin el parámetro no cambia nada (compatible con la entrega 2).
  *  P12 SIN IDENTIDAD. Las rutas son públicas, sin sesión, y no guardan quién consulta. No se mide nada (M14 no entra aquí).
- *  P13 RENDIMIENTO. Calcular P1 no debe leer todos los productos por cada consulta: el servidor guarda en memoria, 60 s,
- *      el mapa «color → cuántos productos lo entregan» y lo reconstruye al vencer. Un color que se apaga o un producto que
- *      se despublica tarda como máximo ese tiempo en reflejarse (lo mismo que el catálogo cacheado). Ver Q4.
+ *  P13 RENDIMIENTO. Calcular P1 no debe leer todos los productos por cada consulta: el servidor guarda en memoria, durante
+ *      SEGUNDOS_CACHE_PALETA, el resultado de «qué colores entrega cada producto visible» y lo reconstruye al vencer. Un
+ *      color que se apaga o un producto que se despublica puede tardar hasta ese tiempo en reflejarse en esta página (la
+ *      ficha y el carrito siempre consultan en vivo y no dependen de esto).
+ *  P14 EL ABANICO. Es la pieza central y debe verse como un muestrario real de pintura abierto en abanico:
+ *      a) Cada lámina es un color de P1 (con su nombre y código a la vista y el nombre accesible completo); las láminas
+ *         salen de un mismo punto inferior y se abren en arco.
+ *      b) Muestra a la vez como máximo COLORES_EN_ABANICO láminas (menos en pantallas angostas: ABANICO_LAMINAS_MOVIL);
+ *         el resto se alcanza DESLIZANDO: arrastrar con el dedo o el cursor, flechas anterior/siguiente (zona táctil de al
+ *         menos 44×44 px), teclas ← → (también Inicio y Fin) y la rueda horizontal. El deslizado tiene inercia leve y
+ *         siempre queda una lámina centrada; con `prefers-reduced-motion` no hay inercia ni animación de transición.
+ *      c) Es GRANDE: la sección ocupa el alto visible de la pantalla (menos la cabecera) y el abanico llena ese alto; el
+ *         combinador y lo demás quedan debajo y más pequeños. Nunca desborda horizontalmente.
+ *      d) Respeta el filtro: al cambiar de familia, marca o texto el abanico vuelve a empezar con los colores del filtro.
+ *      e) Elegir una lámina (clic, toque, Enter o Espacio) la centra, la levanta y la deja marcada; la pantalla anuncia el
+ *         color elegido (nombre y código) en una región `aria-live`. Es un grupo de opciones (`radiogroup`): una sola
+ *         lámina en el orden de tabulación y las flechas recorren las demás.
+ *      f) Sin colores (filtro vacío) muestra «No hay colores con ese filtro» y un botón para limpiar el filtro.
+ *  P15 LA ONDA. Al elegir un color aparece, en la parte inferior de la sección del abanico, una onda llamativa pintada con
+ *      ese color, con su nombre, su código y un botón «Ver productos en <color>» que baja suavemente a P9 (instantáneo con
+ *      `prefers-reduced-motion`). El texto de la onda se escribe en blanco o negro según el contraste con el color (mínimo
+ *      4,5:1). La onda se anima despacio (movimiento horizontal) salvo con `prefers-reduced-motion`. Sin color elegido no
+ *      hay onda. Cambiar de color cambia la onda sin recargar.
+ *  P16 MENÚ. «Paleta de color» va justo después de «Ofertas» en el menú principal y en el menú móvil, como un botón más
+ *      llamativo que los enlaces (degradado de la marca con ícono de paleta; el de «Ofertas» sigue siendo la insignia
+ *      roja). Cambio compartido de la cabecera (`core`): ver «Cambios en piezas compartidas».
  *
- * ── Preguntas abiertas (para el Tech Lead / cliente) ────────────────────────
- *  Q1  ¿Hay HU escrita para esta página en la v5.2? Si la hay, manda sobre este borrador. La imagen del diseño ya se
- *      respetó: hero, filtro por familia con buscador, paleta, combinador (4 armonías), productos recomendados y productos
- *      que podrían interesar.
- *  Q2  AMBIENTES: se proponen 4 ilustraciones dibujadas por nosotros (sala, dormitorio, cocina, fachada). ¿Prefiere fotos
- *      reales (las pone el cliente) o estas bastan? Con fotos habría que definir dónde se guardan y quién las administra.
- *  Q3  UMBRAL DE «COLOR PARECIDO»: se propone ΔE ≤ 25 (UMBRAL_COLOR_CERCANO). Con una carta chica casi nunca habrá colores
- *      muy parecidos a una armonía; con 25 se muestra el más próximo casi siempre pero se avisa cuánto se parece.
- *  Q4  CACHÉ de 60 s en el servidor (P13): ¿basta o debe verse el cambio al instante? Lo segundo exige consultar siempre.
- *  Q5  LUGAR EN EL MENÚ: el diseño original lo pone entre «Servicios» y «Sobre nosotros». El menú de hoy es Inicio,
- *      Productos, Ofertas, Ayuda y FAQ, Sobre nosotros. Se propone «Paleta de color» justo después de «Ofertas». ¿Está bien?
- *  Q6  El abanico del diseño es una ilustración de un muestrario real. Se propone dibujarlo en SVG con los colores de la
- *      página, abierto en abanico, y que al elegir uno el abanico lo destaque. ¿Se admite, o se quiere otra imagen?
- *  Q7  ¿Se necesita compartir o guardar la paleta? Hoy solo se comparte el enlace de la página (P5).
+ * ── Cambios en piezas compartidas (decididos por el Tech Lead, van en el mismo PR) ─
+ *  · CABECERA FIJA (todas las páginas públicas): la cabecera queda siempre en la parte de arriba de la pantalla
+ *    (`position: fixed`). La franja azul con la información básica (Topbar) se ESCONDE al bajar (scroll) y VUELVE a
+ *    aparecer al subir; la cabecera principal no se mueve. El contenido no salta (se reserva su alto). Con
+ *    `prefers-reduced-motion` el cambio es inmediato. Con un menú o modal abierto la cabecera no se oculta.
+ *  · M01 (ficha): lee `?color=<id>` (P11).
+ *
+ * ── Decisiones del Tech Lead que cierran las preguntas del borrador ─────────
+ *  · HU básica: se confía más en el mockup para las FUNCIONES que para títulos e imágenes.
+ *  · Ambientes: los hace M03; aquí solo la pestaña y el espacio (P6).
+ *  · Umbral de color parecido: ΔE ≤ 25 (P8). Lugar en el menú: después de «Ofertas», con botón llamativo (P16).
+ *  · Abanico: deslizable, grande y con onda al elegir (P14, P15). Productos recomendados: se mantienen (P9).
+ *  · Caché de 60 s (P13): es solo una memoria del servidor para no recalcular en cada visita; no afecta a la compra.
  *
  * Regla de Oro #1: Cero código sin contrato previo.
  * Regla de Oro #11: Tolerancia Cero al tipo `any`.
@@ -108,9 +143,11 @@ import {
 
 export const LIMITE_PALETA_POR_DEFECTO = 24;
 export const LIMITE_PALETA_MAXIMO = 48;
-/** Cuántos colores pinta el abanico a la vez (P4). */
-export const COLORES_EN_ABANICO = 12;
-/** ΔE (CIE76) máximo para que un color de la carta cuente como «parecido» a una muestra de armonía (P8, Q3). */
+/** Láminas visibles a la vez en el abanico (P14). */
+export const COLORES_EN_ABANICO = 13;
+/** Láminas visibles a la vez en pantallas angostas (menos de 640 px). */
+export const ABANICO_LAMINAS_MOVIL = 9;
+/** ΔE (CIE76) máximo para que un color de la carta cuente como «parecido» a una muestra de armonía (P8). */
 export const UMBRAL_COLOR_CERCANO = 25;
 /** Hasta dónde se dice «muy parecido» y «parecido» en pantalla (P8). */
 export const DELTA_E_MUY_PARECIDO = 6;
@@ -120,23 +157,18 @@ export const SATURACION_SIN_TONO = 8;
 export const PRODUCTOS_RECOMENDADOS_MAXIMO = 10;
 /** Segundos que el servidor conserva el mapa «color → productos» (P13). */
 export const SEGUNDOS_CACHE_PALETA = 60;
+/** Límites de luminosidad HSL (0 a 100) de las muestras de una armonía (P7). */
+export const LUMINOSIDAD_MINIMA = 5;
+export const LUMINOSIDAD_MAXIMA = 95;
+/** Armonías de un color sin tono: cuánto se suma o resta a la luminosidad (P7). El complementario es 100 − L. */
+export const DESPLAZAMIENTOS_SIN_TONO = { analogos: [-15, 15], triadico: [-30, 30] } as const;
 
 export { idSchema, hexadecimalSchema };
 
-/** Los ambientes en que se ve el color elegido (P6). Ilustraciones propias; agregar uno es un cambio de este contrato. */
-export const AMBIENTES_PALETA = [
-  { id: 'sala', etiqueta: 'Sala' },
-  { id: 'dormitorio', etiqueta: 'Dormitorio' },
-  { id: 'cocina', etiqueta: 'Cocina' },
-  { id: 'fachada', etiqueta: 'Fachada' },
-] as const;
-export const ambientePaletaSchema = z.enum(['sala', 'dormitorio', 'cocina', 'fachada']);
-export type AmbientePaleta = z.infer<typeof ambientePaletaSchema>;
-
 /**
  * Las armonías del combinador (P7). `desplazamientos` son grados de tono HSL que se suman al del color elegido;
- * en el monocromático el tono no cambia y se usan las luminosidades de `luminosidades` (0 a 100, de oscuro a claro,
- * con la del color elegido en su lugar natural).
+ * en el monocromático el tono no cambia y se usan las luminosidades de `luminosidades` (0 a 100, de oscuro a claro).
+ * Los colores sin tono (P7) usan `DESPLAZAMIENTOS_SIN_TONO` sobre la luminosidad (el complementario es 100 − L).
  */
 export const TIPOS_ARMONIA = ['complementario', 'analogos', 'triadico', 'monocromatico'] as const;
 export const tipoArmoniaSchema = z.enum(TIPOS_ARMONIA);
@@ -190,9 +222,10 @@ export type ListarPaletaRequest = z.infer<typeof listarPaletaRequestSchema>;
 export const armoniasParamsSchema = z.object({ idColor: z.coerce.number().int().positive() });
 export type ArmoniasParams = z.infer<typeof armoniasParamsSchema>;
 
-/** GET /productos/:idProducto/colores?idColor= — el filtro nuevo de P11 (el resto de la petición no cambia). */
-export const colorDeProductoQuerySchema = z.object({ idColor: z.coerce.number().int().positive().optional() });
-export type ColorDeProductoQuery = z.infer<typeof colorDeProductoQuerySchema>;
+/**
+ * GET /productos/:idProducto/colores?idColor= — el filtro nuevo de P11 se agrega a `listarColoresProductoRequestSchema`
+ * (contrato de la entrega 2); el resto de la petición no cambia.
+ */
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 3. RESPUESTAS
