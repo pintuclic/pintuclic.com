@@ -119,8 +119,8 @@ function PanelAbierto({ aviso, onCerrar }: ContenidoProps) {
 
 /**
  * Panel lateral del carrito (contrato M05 · L1–L7, UI §4.7 Variante A). Se monta una vez en el layout público y se abre
- * con el aviso `pc:abrir-carrito`: desde el ícono del encabezado o al agregar desde una tarjeta (con su mensaje). Al
- * cambiar de página se cierra.
+ * con el aviso `pc:abrir-carrito` al agregar desde una tarjeta (con su mensaje); el ícono del encabezado lleva a /carrito.
+ * Al cambiar de página se cierra.
  */
 export function CarritoLateral() {
   const pathname = usePathname();

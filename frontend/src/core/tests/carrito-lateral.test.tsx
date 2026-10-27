@@ -28,7 +28,7 @@ describe('Aviso para abrir el panel lateral (M05 · L1)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('sin panel en la página nadie lo atiende y el encabezado sigue a /carrito', () => {
+  it('sin panel en la página nadie lo atiende y quien lo pidió sigue su camino', () => {
     vi.stubGlobal('window', new EventTarget());
     expect(abrirCarritoLateral()).toBe(false);
   });

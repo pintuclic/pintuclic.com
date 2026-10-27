@@ -39,7 +39,7 @@ import type { PreciosPort } from './m06-precios.contract';
  *  · Pantalla pública `/carrito` (la ruta la usa ya el formulario de contacto de M15) con el botón de
  *    WhatsApp de M15 (RF-ATC-03-01).
  *  · Panel lateral del carrito (L1–L7): el resumen que se despliega a la derecha, la Variante A de la
- *    especificación de UI (§4.7), desde el encabezado y al agregar desde una tarjeta.
+ *    especificación de UI (§4.7), al agregar desde una tarjeta.
  *
  * ── Qué NO hace ─────────────────────────────────────────────────────────────
  *  · No calcula precios ni descuentos: los pide a M06 (`PreciosPort.calcular`) y los muestra. No suma,
@@ -118,10 +118,10 @@ import type { PreciosPort } from './m06-precios.contract';
  *  revalidación y un aviso de que el pago aún no está disponible.
  *
  * ── Panel lateral del carrito (UI §4.7 · Variante A) ────────────────────────
- *  L1  SE ABRE desde el ícono del carrito del encabezado (en lugar de ir a /carrito) y al agregar desde
- *      el botón del carrito de una tarjeta del listado o del inicio (V3 del contrato de M02). Se cierra con
- *      la X, con "Seguir comprando", con Esc o tocando fuera; el foco vuelve a donde estaba. Sin JavaScript,
- *      el ícono del encabezado sigue siendo un enlace a /carrito.
+ *  L1  SE ABRE al agregar desde el botón del carrito de una tarjeta del listado o del inicio (V3 del
+ *      contrato de M02). El ícono del carrito del encabezado NO lo abre: lleva a la página /carrito, con el
+ *      cupón y "Continuar con la compra" (decisión del equipo, 2026-10-27). Se cierra con la X, con "Seguir
+ *      comprando", con Esc o tocando fuera; el foco vuelve a donde estaba.
  *  L2  AL AGREGAR desde una tarjeta, el panel abre con el aviso "Agregaste <producto> · <color> ·
  *      <medida>". Si M05 rechaza la línea (sin existencias, carrito lleno, línea cotizada…), abre con el
  *      mismo texto de error que muestra la ficha y no agrega nada.
@@ -167,9 +167,9 @@ import type { PreciosPort } from './m06-precios.contract';
  *  P3  M01: botón "Agregar al carrito" en la ficha del producto (variante + color + cantidad) que llama a
  *      `POST /carrito/lineas`.
  *  P4  Core Kit: el contador del Header lee `GET /carrito/resumen` en vez del valor fijo de `shell.content.ts`.
- *  P5  Core Kit (L1, L7): un panel lateral accesible (`Drawer`) que reutiliza el manejo de foco del `Modal`;
- *      el aviso `pc:abrir-carrito` junto al que ya existe `pc:carrito-actualizado`; y el ícono del carrito
- *      del Header abre el panel con ese aviso.
+ *  P5  Core Kit (L1, L7): un panel lateral accesible (`Drawer`) que reutiliza el manejo de foco del `Modal`,
+ *      y el aviso `pc:abrir-carrito` junto al que ya existe `pc:carrito-actualizado`. El Header no cambia:
+ *      su ícono sigue siendo el enlace a /carrito.
  *  P6  Layout público (fuera de los módulos): monta el panel lateral una sola vez para todas las páginas.
  *  P7  M02 e inicio: el botón del carrito de la tarjeta agrega y abre el panel (V3 del contrato de M02).
  *
