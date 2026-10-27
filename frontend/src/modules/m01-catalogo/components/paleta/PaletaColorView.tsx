@@ -122,7 +122,28 @@ export const PaletaColorView: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idEnUrl, colores, cargando]);
 
-  const elegirEnAbanico = useCallback((c: ColorPaleta): void => ir({ ...paletaDesdeUrl(params), color: c.idColor }), [ir, params]);
+  /**
+   * En pantallas bajas (celular) la onda queda debajo del borde: tras elegir, la página baja lo justo para que se vea
+   * entera con su botón. Espera a que termine la entrada de la onda; la medida real manda, no el tamaño del aparato.
+   */
+  const mostrarOnda = useCallback((): void => {
+    window.setTimeout(() => {
+      const onda = document.querySelector('[data-testid="onda-color"]');
+      if (onda === null) return;
+      const exceso = onda.getBoundingClientRect().bottom - window.innerHeight;
+      if (exceso <= 0) return;
+      const menos = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollBy({ top: exceso + 8, behavior: menos ? 'auto' : 'smooth' });
+    }, 600);
+  }, []);
+
+  const elegirEnAbanico = useCallback(
+    (c: ColorPaleta): void => {
+      ir({ ...paletaDesdeUrl(params), color: c.idColor });
+      mostrarOnda();
+    },
+    [ir, params, mostrarOnda],
+  );
 
   // P8: un color sugerido por una armonía; si no está en el abanico actual, el filtro pasa a su familia.
   const elegirDesdeCombinador = (c: ColorPaleta): void => {
@@ -152,12 +173,12 @@ export const PaletaColorView: React.FC = () => {
     <div className="bg-neutral-white">
       {/* Primera pantalla: título y filtro arriba y el abanico ocupando el resto del alto visible (P14c). */}
       <div className="flex min-h-[calc(100svh-6.5rem)] flex-col bg-gradient-to-b from-subaction/40 via-neutral-white to-neutral-lightest lg:min-h-[calc(100svh-7.75rem)]">
-        <Container className="space-y-2 pt-3">
+        <Container className="space-y-2 pt-3 [@media(max-height:500px)]:pt-2">
           <FiltroPaleta
             titulo={
               <>
-                <h1 className="font-title text-2xl font-bold text-corporate sm:text-3xl">Paleta de color</h1>
-                <p className="font-sans text-xs text-neutral-medium sm:text-sm">Desliza el abanico, elige un color y mira los productos que se entregan en él.</p>
+                <h1 className="font-title text-2xl font-bold text-corporate sm:text-3xl [@media(max-height:500px)]:sr-only">Paleta de color</h1>
+                <p className="hidden font-sans text-xs text-neutral-medium sm:block sm:text-sm [@media(max-height:500px)]:hidden">Desliza el abanico, elige un color y mira los productos que se entregan en él.</p>
               </>
             }
             familias={familias}
@@ -172,7 +193,7 @@ export const PaletaColorView: React.FC = () => {
           {error !== null && <Alert variant="error">{error}</Alert>}
         </Container>
 
-        <section aria-label="Abanico de colores" className="relative mt-1 flex-1 min-h-[440px]" data-testid="escenario-abanico">
+        <section aria-label="Abanico de colores" className="relative isolate mt-1 min-h-[340px] flex-1 sm:min-h-[440px] [@media(max-height:500px)]:min-h-[300px]" data-testid="escenario-abanico">
           <AbanicoColores
             className="absolute inset-0"
             colores={colores}

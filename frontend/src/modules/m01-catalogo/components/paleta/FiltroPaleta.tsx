@@ -25,10 +25,12 @@ export const FiltroPaleta: React.FC<FiltroPaletaProps> = ({ titulo, familias, ma
   <div className="space-y-2">
     <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
       <div className="min-w-0">{titulo}</div>
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_200px] lg:w-[540px] lg:shrink-0">
-        <Input label="Buscar color" placeholder="Nombre o código del color" value={texto} onChange={(e) => onTexto(e.target.value)} />
+      {/* Sin etiquetas visibles: el placeholder y el nombre accesible bastan y en el celular el alto es del abanico. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_170px] gap-2 sm:grid-cols-[minmax(0,1fr)_200px] lg:w-[540px] lg:shrink-0">
+        <Input aria-label="Buscar color" placeholder="Buscar color" value={texto} onChange={(e) => onTexto(e.target.value)} />
         <Select
           label="Marca"
+          hideLabel
           value={idMarca === null ? '' : String(idMarca)}
           onChange={(e) => onMarca(e.target.value === '' ? null : Number(e.target.value))}
           options={[{ value: '', label: 'Todas las marcas' }, ...marcas.map((m) => ({ value: String(m.idMarca), label: `${m.nombre} (${m.total})` }))]}
@@ -36,7 +38,7 @@ export const FiltroPaleta: React.FC<FiltroPaletaProps> = ({ titulo, familias, ma
       </div>
     </div>
     <div role="group" aria-label="Filtrar por familia de color" className="flex gap-2 overflow-x-auto pb-1">
-      <Button variant="selection" selected={familia === null} aria-pressed={familia === null} size="sm" onClick={() => onFamilia(null)} className="shrink-0">
+      <Button variant="selection" selected={familia === null} aria-pressed={familia === null} size="md" onClick={() => onFamilia(null)} className="shrink-0">
         Todas
       </Button>
       {familias.map((f) => (
@@ -45,7 +47,7 @@ export const FiltroPaleta: React.FC<FiltroPaletaProps> = ({ titulo, familias, ma
           variant="selection"
           selected={familia === f.idFamiliaColor}
           aria-pressed={familia === f.idFamiliaColor}
-          size="sm"
+          size="md"
           onClick={() => onFamilia(f.idFamiliaColor)}
           className="shrink-0"
           leftIcon={<span aria-hidden="true" className="h-3.5 w-3.5 rounded-full border border-neutral-light" style={{ background: f.hexadecimal }} />}
