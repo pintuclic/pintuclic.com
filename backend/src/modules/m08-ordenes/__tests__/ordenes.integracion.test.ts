@@ -144,14 +144,61 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     expect(await consecutivoActual()).toBe(antes + 1);
   });
 
-  it('una transacción de pago ya usada devuelve su orden aunque llegue con otra solicitud', async () => {
+  it('una transacción de pago ya usada por OTRA solicitud es un conflicto, no devuelve la orden ajena (R2)', async () => {
     const primera = solicitud();
-    const original = await creacion.crearDesdePagoConfirmado(primera);
+    await creacion.crearDesdePagoConfirmado(primera);
+    const ordenes = await prisma.orden.count();
 
-    const repetida = await creacion.crearDesdePagoConfirmado(solicitud({ transaccionPagoId: primera.transaccionPagoId }));
+    await expect(
+      creacion.crearDesdePagoConfirmado(solicitud({ transaccionPagoId: primera.transaccionPagoId })),
+    ).rejects.toMatchObject({ codigo: 'CONFLICTO_SOLICITUD' });
 
-    expect(repetida).toMatchObject({ codigo: original.codigo, creada: false });
+    expect(await prisma.orden.count()).toBe(ordenes);
   });
+
+  it('la misma solicitud con otro cliente es un conflicto y no se crea nada', async () => {
+    const primera = solicitud();
+    await creacion.crearDesdePagoConfirmado(primera);
+    const antes = await consecutivoActual();
+
+    await expect(creacion.crearDesdePagoConfirmado({ ...primera, idUsuario: ID_EMPLEADO })).rejects.toMatchObject({
+      codigo: 'CONFLICTO_SOLICITUD',
+    });
+
+    expect(await consecutivoActual()).toBe(antes);
+  });
+
+  it('si otra transacción retiene el bloqueo del consecutivo, la creación falla por tiempo y no espera sin límite', async () => {
+    await creacion.crearDesdePagoConfirmado(solicitud()); // asegura que la fila del consecutivo existe
+    const antes = await consecutivoActual();
+    let liberar: () => void = () => undefined;
+    const retenida = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+    let bloqueado: () => void = () => undefined;
+    const yaBloqueado = new Promise<void>((resolver) => {
+      bloqueado = resolver;
+    });
+
+    const retenedora = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id_consecutivo FROM consecutivo WHERE nombre = 'orden' FOR UPDATE`;
+        bloqueado();
+        await retenida;
+      },
+      { timeout: 30_000 },
+    );
+    await yaBloqueado;
+
+    const inicio = Date.now();
+    await expect(creacion.crearDesdePagoConfirmado(solicitud())).rejects.toThrow();
+    const espera = Date.now() - inicio;
+    liberar();
+    await retenedora;
+
+    expect(espera).toBeLessThan(12_000);
+    expect(await consecutivoActual()).toBe(antes);
+  }, 30_000);
 
   it('si la creación falla a la mitad, se revierte todo y el consecutivo no deja hueco (R3)', async () => {
     const antes = await consecutivoActual();

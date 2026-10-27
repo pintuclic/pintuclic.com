@@ -5,14 +5,14 @@ import {
   type SolicitudPagadaInput,
 } from '../dtos/m08-ordenes.dto';
 import type { NotificacionesOrdenPort } from '../interfaces/notificaciones-orden.port';
-import type { CreacionRepository } from '../interfaces/ordenes.interface';
+import type { CreacionRepository, OrdenExistente } from '../interfaces/ordenes.interface';
 import type { RelojPort } from '../interfaces/reloj.port';
 import { UnicidadOrdenError } from '../repositories/creacion.repository';
 
 export class CreacionOrdenError extends Error {
   constructor(
     message: string,
-    public readonly codigo: 'PAGO_NO_CONFIRMADO' | 'PAGO_INSUFICIENTE' | 'PARAMETRO_INVALIDO',
+    public readonly codigo: 'PAGO_NO_CONFIRMADO' | 'PAGO_INSUFICIENTE' | 'PARAMETRO_INVALIDO' | 'CONFLICTO_SOLICITUD',
   ) {
     super(message);
     this.name = 'CreacionOrdenError';
@@ -58,7 +58,7 @@ export class CreacionService {
         await tx.bloquearConsecutivo();
 
         const existente = await tx.buscarExistente(entrada.codigoSolicitud, entrada.transaccionPagoId);
-        if (existente) return { ...existente, creada: false };
+        if (existente) return this.confirmarMismaSolicitud(existente, entrada);
 
         const numero = await tx.avanzarConsecutivo();
         const codigo = this.formatearCodigo(numero);
@@ -73,10 +73,31 @@ export class CreacionService {
     } catch (error) {
       if (error instanceof UnicidadOrdenError) {
         const existente = await this.repo.buscarExistente(entrada.codigoSolicitud, entrada.transaccionPagoId);
-        if (existente) return { ...existente, creada: false };
+        if (existente) return this.confirmarMismaSolicitud(existente, entrada);
       }
       throw error;
     }
+  }
+
+  /**
+   * R2: una confirmación repetida recibe la orden existente SOLO si es la misma solicitud, el mismo pago
+   * y el mismo cliente. Si alguna clave coincide pero otra difiere (un pago reutilizado, un error de
+   * M07), devolver esa orden entregaría en silencio la de otro: es un conflicto y no se revela nada de ella.
+   * Un valor `null` guardado (orden anterior a la copia histórica) no cuenta como diferencia.
+   */
+  private confirmarMismaSolicitud(existente: OrdenExistente, entrada: SolicitudPagadaInput): ResultadoCreacion {
+    const difiere = (guardado: string | null, entrante: string): boolean => guardado !== null && guardado !== entrante;
+    if (
+      difiere(existente.codigoSolicitud, entrada.codigoSolicitud) ||
+      difiere(existente.transaccionPagoId, entrada.transaccionPagoId) ||
+      existente.idUsuario !== entrada.idUsuario
+    ) {
+      throw new CreacionOrdenError(
+        'La solicitud, el pago o el cliente no coinciden con los de una orden ya registrada: no se crea ni se devuelve ninguna.',
+        CODIGOS_ERROR_M08.CONFLICTO_SOLICITUD,
+      );
+    }
+    return { codigo: existente.codigo, estado: existente.estado, creada: false };
   }
 
   private validar(entradaCruda: unknown): SolicitudPagadaInput {

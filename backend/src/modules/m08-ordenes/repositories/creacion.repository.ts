@@ -1,9 +1,10 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../../core/db/client';
 import type { SolicitudPagadaInput } from '../dtos/m08-ordenes.dto';
-import type { CreacionRepository, CreacionTx, OrdenCreada } from '../interfaces/ordenes.interface';
+import type { CreacionRepository, CreacionTx, OrdenCreada, OrdenExistente } from '../interfaces/ordenes.interface';
 
 const NOMBRE_CONSECUTIVO = 'orden';
+const LIMITES_TRANSACCION = { esperaConexionMs: 5_000, duracionMs: 15_000 } as const;
 
 /** Otra transacción creó antes una orden con el mismo `codigo_solicitud` o `transaccion_pago_id`. */
 export class UnicidadOrdenError extends Error {
@@ -17,11 +18,38 @@ function aOrdenCreada(fila: { codigoVisible: string; estado: OrdenCreada['estado
   return { codigo: fila.codigoVisible, estado: fila.estado };
 }
 
+const SELECCION_EXISTENTE = {
+  codigoVisible: true,
+  estado: true,
+  codigoSolicitud: true,
+  transaccionPagoId: true,
+  idUsuario: true,
+} satisfies Prisma.OrdenSelect;
+
+function aOrdenExistente(fila: Prisma.OrdenGetPayload<{ select: typeof SELECCION_EXISTENTE }>): OrdenExistente {
+  return {
+    ...aOrdenCreada(fila),
+    codigoSolicitud: fila.codigoSolicitud,
+    transaccionPagoId: fila.transaccionPagoId,
+    idUsuario: fila.idUsuario,
+  };
+}
+
 class PrismaCreacionTx implements CreacionTx {
   constructor(private readonly tx: Prisma.TransactionClient) {}
 
   async bloquearConsecutivo(): Promise<void> {
-    // Si la fila no existe arranca después del mayor consecutivo ya usado (p. ej. órdenes del seed).
+    // Si otra creación tiene el bloqueo más de ESPERA_BLOQUEO, falla en vez de encolar ventas sin límite:
+    // la cola de M07 (ADR-03) reintenta. `SET LOCAL` vale solo para esta transacción.
+    await this.tx.$executeRaw`SET LOCAL lock_timeout = '5s'`;
+
+    // Caso normal: la fila ya existe. Se bloquea sin leer la tabla `orden`.
+    const bloqueadas = await this.tx.$queryRaw<Array<{ id_consecutivo: number }>>`
+      SELECT id_consecutivo FROM consecutivo WHERE nombre = ${NOMBRE_CONSECUTIVO} FOR UPDATE`;
+    if (bloqueadas.length > 0) return;
+
+    // Primera creación: arranca después del mayor consecutivo ya usado (p. ej. órdenes del seed). Es la
+    // única vez que se recorre `orden`; el INSERT espera a otro que lo haga a la vez y no duplica.
     await this.tx.$executeRaw`
       INSERT INTO consecutivo (nombre, ultimo_valor)
       SELECT ${NOMBRE_CONSECUTIVO}, COALESCE(MAX(CAST(split_part(codigo_visible, '-', 3) AS BIGINT)), 0)
@@ -31,12 +59,12 @@ class PrismaCreacionTx implements CreacionTx {
     await this.tx.$queryRaw`SELECT id_consecutivo FROM consecutivo WHERE nombre = ${NOMBRE_CONSECUTIVO} FOR UPDATE`;
   }
 
-  async buscarExistente(codigoSolicitud: string, transaccionPagoId: string): Promise<OrdenCreada | null> {
+  async buscarExistente(codigoSolicitud: string, transaccionPagoId: string): Promise<OrdenExistente | null> {
     const fila = await this.tx.orden.findFirst({
       where: { OR: [{ codigoSolicitud }, { transaccionPagoId }] },
-      select: { codigoVisible: true, estado: true },
+      select: SELECCION_EXISTENTE,
     });
-    return fila ? aOrdenCreada(fila) : null;
+    return fila ? aOrdenExistente(fila) : null;
   }
 
   async avanzarConsecutivo(): Promise<number> {
@@ -108,14 +136,19 @@ class PrismaCreacionTx implements CreacionTx {
 
 export class PrismaCreacionRepository implements CreacionRepository {
   async enTransaccion<T>(trabajo: (tx: CreacionTx) => Promise<T>): Promise<T> {
-    return prisma.$transaction((px) => trabajo(new PrismaCreacionTx(px)));
+    // Todas las creaciones se serializan por el bloqueo del consecutivo (numeración sin huecos): la
+    // transacción debe ser corta y tener tope, para que una colgada no detenga las ventas.
+    return prisma.$transaction((px) => trabajo(new PrismaCreacionTx(px)), {
+      maxWait: LIMITES_TRANSACCION.esperaConexionMs,
+      timeout: LIMITES_TRANSACCION.duracionMs,
+    });
   }
 
-  async buscarExistente(codigoSolicitud: string, transaccionPagoId: string): Promise<OrdenCreada | null> {
+  async buscarExistente(codigoSolicitud: string, transaccionPagoId: string): Promise<OrdenExistente | null> {
     const fila = await prisma.orden.findFirst({
       where: { OR: [{ codigoSolicitud }, { transaccionPagoId }] },
-      select: { codigoVisible: true, estado: true },
+      select: SELECCION_EXISTENTE,
     });
-    return fila ? aOrdenCreada(fila) : null;
+    return fila ? aOrdenExistente(fila) : null;
   }
 }

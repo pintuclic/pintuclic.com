@@ -25,8 +25,9 @@ import { z } from 'zod';
  * ── Reglas clave ────────────────────────────────────────────────────────────
  *  R1  La orden nace SOLO por `crearDesdePagoConfirmado` (llamada interna de M07).
  *      No existe POST público de órdenes. Sin pago confirmado no hay orden.
- *  R2  Idempotente por `codigoSolicitud` y por `transaccionPagoId` (ambos únicos):
- *      una confirmación repetida devuelve la orden existente, nunca crea otra.
+ *  R2  Idempotente por `codigoSolicitud` y por `transaccionPagoId` (ambos únicos): una confirmación
+ *      repetida devuelve la orden existente, nunca crea otra. Solo si coinciden solicitud, pago Y
+ *      cliente; si alguno difiere es un conflicto (CONFLICTO_SOLICITUD) y no se devuelve nada ajeno.
  *  R3  Atómica: orden, líneas, descuentos, historial inicial y consecutivo en una sola
  *      transacción. Si algo falla no avanza el consecutivo (sin huecos).
  *  R4  Código `PC-AAAA-NNNNN` con el año de Colombia (America/Bogota). El consecutivo
@@ -408,6 +409,7 @@ export const CODIGOS_ERROR_M08 = {
   NOTA_INMUTABLE: 'NOTA_INMUTABLE',
   PAGO_NO_CONFIRMADO: 'PAGO_NO_CONFIRMADO',
   PAGO_INSUFICIENTE: 'PAGO_INSUFICIENTE',
+  CONFLICTO_SOLICITUD: 'CONFLICTO_SOLICITUD',
   ERROR_INTERNO: 'ERROR_INTERNO',
 } as const;
 export const codigoErrorM08Schema = z.enum([
@@ -420,6 +422,7 @@ export const codigoErrorM08Schema = z.enum([
   CODIGOS_ERROR_M08.NOTA_INMUTABLE,
   CODIGOS_ERROR_M08.PAGO_NO_CONFIRMADO,
   CODIGOS_ERROR_M08.PAGO_INSUFICIENTE,
+  CODIGOS_ERROR_M08.CONFLICTO_SOLICITUD,
   CODIGOS_ERROR_M08.ERROR_INTERNO,
 ]);
 
@@ -438,7 +441,9 @@ export type ErrorResponseEnvelope = z.infer<typeof errorResponseEnvelopeSchema>;
  *  404 RECURSO_NO_DISPONIBLE (ajena, inexistente o sin permiso) · 400 PARAMETRO_INVALIDO
  *  409 TRANSICION_NO_PERMITIDA, ESTADO_CAMBIADO, OPERACION_NO_HABILITADA
  *  422 MOTIVO_REQUERIDO · 405 NOTA_INMUTABLE · 500 ERROR_INTERNO
- *  PAGO_NO_CONFIRMADO y PAGO_INSUFICIENTE solo los lanza el servicio interno (sin HTTP).
+ *  PAGO_NO_CONFIRMADO, PAGO_INSUFICIENTE y CONFLICTO_SOLICITUD solo los lanza el servicio interno (sin
+ *  HTTP). CONFLICTO_SOLICITUD: la solicitud, la transacción de pago o el cliente de una confirmación
+ *  repetida no coinciden con los de la orden ya creada (R2): no se devuelve la orden de otro.
  */
 
 /* ───────────────────────────────────────────────────────────────────────────

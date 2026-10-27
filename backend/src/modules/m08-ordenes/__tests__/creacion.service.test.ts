@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SolicitudPagadaInput } from '../dtos/m08-ordenes.dto';
-import type { CreacionRepository, CreacionTx, OrdenCreada } from '../interfaces/ordenes.interface';
+import type { CreacionRepository, CreacionTx, OrdenCreada, OrdenExistente } from '../interfaces/ordenes.interface';
 import type { NotificacionesOrdenPort } from '../interfaces/notificaciones-orden.port';
 import { UnicidadOrdenError } from '../repositories/creacion.repository';
 import { CreacionOrdenError, CreacionService } from '../services/creacion.service';
@@ -48,15 +48,23 @@ class RepoMemoria implements CreacionRepository {
     return turno;
   }
 
-  async buscarExistente(codigoSolicitud: string, transaccionPagoId: string): Promise<OrdenCreada | null> {
+  async buscarExistente(codigoSolicitud: string, transaccionPagoId: string): Promise<OrdenExistente | null> {
     return this.buscar(codigoSolicitud, transaccionPagoId);
   }
 
-  private buscar(codigoSolicitud: string, transaccionPagoId: string): OrdenCreada | null {
+  private buscar(codigoSolicitud: string, transaccionPagoId: string): OrdenExistente | null {
     const orden = [...this.ordenes.values()].find(
       (o) => o.entrada.codigoSolicitud === codigoSolicitud || o.entrada.transaccionPagoId === transaccionPagoId,
     );
-    return orden ? { codigo: orden.codigo, estado: orden.estado } : null;
+    return orden
+      ? {
+          codigo: orden.codigo,
+          estado: orden.estado,
+          codigoSolicitud: orden.entrada.codigoSolicitud,
+          transaccionPagoId: orden.entrada.transaccionPagoId,
+          idUsuario: orden.entrada.idUsuario,
+        }
+      : null;
   }
 }
 
@@ -212,13 +220,71 @@ describe('CreacionService (HU-ORD-01, HU-ORD-02, HU-ORD-06)', () => {
   });
 
   it('si otra transacción ganó por unicidad, devuelve la orden ya existente', async () => {
-    const existente: OrdenCreada = { codigo: 'PC-2026-00009', estado: 'orden_confirmada' };
+    const existente: OrdenExistente = {
+      codigo: 'PC-2026-00009',
+      estado: 'orden_confirmada',
+      codigoSolicitud: 'SOL-2026-00001',
+      transaccionPagoId: 'TX-1',
+      idUsuario: 7,
+    };
     repo.fallarAlInsertar = new UnicidadOrdenError();
     vi.spyOn(repo, 'buscarExistente').mockResolvedValue(existente);
 
     const resultado = await servicio.crearDesdePagoConfirmado(solicitud());
 
-    expect(resultado).toEqual({ ...existente, creada: false });
+    expect(resultado).toEqual({ codigo: existente.codigo, estado: existente.estado, creada: false });
+  });
+
+  it('tras perder la carrera por unicidad, no devuelve una orden que no coincide con la solicitud', async () => {
+    repo.fallarAlInsertar = new UnicidadOrdenError();
+    vi.spyOn(repo, 'buscarExistente').mockResolvedValue({
+      codigo: 'PC-2026-00009',
+      estado: 'orden_confirmada',
+      codigoSolicitud: 'SOL-2026-00555',
+      transaccionPagoId: 'TX-1',
+      idUsuario: 7,
+    });
+
+    await expect(servicio.crearDesdePagoConfirmado(solicitud())).rejects.toMatchObject({ codigo: 'CONFLICTO_SOLICITUD' });
+  });
+
+  describe('claves cruzadas (idempotencia sin devolver la orden de otro)', () => {
+    it('una transacción de pago ya usada por OTRA solicitud no devuelve esa orden: conflicto', async () => {
+      await servicio.crearDesdePagoConfirmado(solicitud());
+
+      await expect(
+        servicio.crearDesdePagoConfirmado(solicitud({ codigoSolicitud: 'SOL-2026-00002' })),
+      ).rejects.toMatchObject({ codigo: 'CONFLICTO_SOLICITUD' });
+
+      expect(repo.ordenes.size).toBe(1);
+      expect(repo.consecutivo).toBe(1);
+    });
+
+    it('una solicitud ya procesada con OTRA transacción de pago es un conflicto', async () => {
+      await servicio.crearDesdePagoConfirmado(solicitud());
+
+      await expect(
+        servicio.crearDesdePagoConfirmado(solicitud({ transaccionPagoId: 'TX-OTRA' })),
+      ).rejects.toMatchObject({ codigo: 'CONFLICTO_SOLICITUD' });
+    });
+
+    it('la misma solicitud y transacción de OTRO cliente es un conflicto, nunca la orden del primero', async () => {
+      await servicio.crearDesdePagoConfirmado(solicitud());
+
+      await expect(servicio.crearDesdePagoConfirmado(solicitud({ idUsuario: 99 }))).rejects.toMatchObject({
+        codigo: 'CONFLICTO_SOLICITUD',
+      });
+    });
+
+    it('el mensaje del conflicto no revela datos de la otra orden', async () => {
+      await servicio.crearDesdePagoConfirmado(solicitud());
+
+      const fallo = await servicio
+        .crearDesdePagoConfirmado(solicitud({ codigoSolicitud: 'SOL-2026-00002' }))
+        .catch((e: unknown) => e);
+
+      expect((fallo as Error).message).not.toMatch(/PC-2026|TX-1|SOL-2026-00001/);
+    });
   });
 
   it('un fallo del correo no revierte la orden (D5)', async () => {
