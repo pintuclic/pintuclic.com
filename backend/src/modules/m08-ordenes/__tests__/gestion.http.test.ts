@@ -163,12 +163,15 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
     lector: { idUsuario: 22, idSesion: 's22', tipoSesion: 'admin' },
     sinPermiso: { idUsuario: 23, idSesion: 's23', tipoSesion: 'admin' },
     cliente: { idUsuario: 7, idSesion: 's7', tipoSesion: 'cliente' },
+    /** Cuenta de empresa (rol empresa_vip): sesión de CLIENTE que, por su rol, tiene permisos de ventas. */
+    empresa: { idUsuario: 9, idSesion: 's9', tipoSesion: 'cliente' },
   };
   const PERMISOS: Record<number, readonly string[]> = {
     21: ['ventas.ver', 'ventas.gestionar'],
     22: ['ventas.ver'],
     23: [],
     7: [],
+    9: ['ventas.ver', 'ventas.gestionar'],
   };
 
   beforeAll(async () => {
@@ -177,6 +180,7 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
       auditoria,
     );
     const m08 = construirModuloM08(autorizacion, {
+      auditoria,
       gestion: { repo, catalogo: { variantesDisponibles: async (ids) => new Set(ids) } },
       estados: { repo, eventos, notificaciones, reloj: { ahora: () => AHORA } },
     });
@@ -308,6 +312,36 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
 
       expect(prohibido.status).toBe(404);
       expect(prohibido.texto).toBe(inexistente.texto);
+    });
+
+    it('una sesión de CLIENTE no entra a la gestión aunque su rol traiga ventas.ver y ventas.gestionar (cuenta empresa)', async () => {
+      const inexistente = await llamar('GET', '/gestion/PC-2026-99999', 'lector');
+
+      for (const [metodo, ruta, cuerpo] of [
+        ['GET', '/gestion', undefined],
+        ['GET', '/gestion?agruparPorEstado=true', undefined],
+        ['GET', '/gestion/resumen', undefined],
+        ['GET', '/gestion/PC-2026-00001', undefined],
+        ['GET', '/gestion/PC-2026-00001/historial-cliente', undefined],
+        ['PATCH', '/gestion/PC-2026-00001/estado', { estadoActual: 'orden_confirmada', estadoNuevo: 'revision_disponibilidad' }],
+        ['POST', '/gestion/PC-2026-00001/notas', { texto: 'intento' }],
+        ['POST', '/gestion/PC-2026-00001/contactos', { medio: 'correo' }],
+      ] as const) {
+        const r = await llamar(metodo, ruta, 'empresa', cuerpo);
+        expect(r.status, `${metodo} ${ruta}`).toBe(404);
+        expect(r.texto, `${metodo} ${ruta}`).toBe(inexistente.texto);
+      }
+
+      expect(repo.ordenes[0]?.estado).toBe('orden_confirmada');
+      expect(repo.ordenes[0]?.notas).toHaveLength(1);
+    });
+
+    it('el intento de una sesión de cliente deja rastro de acceso denegado (M20)', async () => {
+      await llamar('GET', '/gestion', 'empresa');
+
+      expect(auditoria.registrarAccesoDenegado).toHaveBeenCalledWith(
+        expect.objectContaining({ idUsuario: 9, operacionIntentada: expect.stringContaining('/gestion') }),
+      );
     });
 
     it('con solo «Revisar órdenes» consulta pero no puede operar (CA-ORD-05-02)', async () => {

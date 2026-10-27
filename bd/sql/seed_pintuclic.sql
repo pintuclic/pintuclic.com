@@ -67,9 +67,14 @@ INSERT INTO asignacion_permiso (id_rol, id_permiso) VALUES
     (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
     (1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
     (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
-    (1, 21),
-    (3, 4), (3, 10)
+    (1, 21)
 ON CONFLICT (id_rol, id_permiso) DO NOTHING;
+
+-- El rol de cliente empresa (3) NO tiene permisos del personal. El seed le daba `ordenes.ver` (4) y
+-- `ventas.ver` (10): como los permisos se resuelven por rol, una cuenta de empresa llegaba a la gestión
+-- de pedidos y veía los datos de todos los clientes (M08, spec §7). El cliente consulta sus propios
+-- pedidos sin permisos (titularidad). El DELETE limpia las bases creadas antes de este cambio.
+DELETE FROM asignacion_permiso WHERE id_rol = 3 AND id_permiso IN (4, 10);
 
 -- ==============================================================================
 -- 2. MÓDULO DE USUARIOS, SESIONES Y CONTROL DE ACCESO (3 Tablas)

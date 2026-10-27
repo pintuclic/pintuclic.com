@@ -71,7 +71,7 @@ export function construirAppRoutes(): Router {
 
   // M08: órdenes de venta. Cliente (`/ordenes/mis-pedidos`) y personal (`/ordenes/gestion`)
   // exigen sesión; el permiso `ventas.*` se resuelve en servidor dentro del módulo.
-  const m08 = construirModuloM08(m17.autorizacionService);
+  const m08 = construirModuloM08(m17.autorizacionService, { auditoria: m20.auditoria });
   router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
 
   // M17: la confirmación del cambio de correo del admin llega desde un enlace y es

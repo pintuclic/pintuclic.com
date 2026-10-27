@@ -1,5 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import { requirePermission } from '../../core/middlewares/autorizacion.middleware';
+import { responderRecursoNoDisponible } from '../../core/utils/apiResponse';
+import type { AuditoriaPort } from '../m20-seguridad/interfaces/auditoria.port';
 import type { AutorizacionService } from '../m20-seguridad/services/autorizacion.service';
 import { PrismaCatalogoDisponibilidadAdapter } from './adapters/catalogo-disponibilidad.adapter';
 import {
@@ -10,6 +12,7 @@ import {
 import { GestionController } from './controllers/gestion.controller';
 import { MisPedidosController } from './controllers/mis-pedidos.controller';
 import { NotasController } from './controllers/notas.controller';
+import { ipDe } from './controllers/orden-http';
 import type { CatalogoDisponibilidadPort, ConsultaClienteRepository } from './interfaces/consulta-cliente.interface';
 import type { EstadosRepository } from './interfaces/estados.interface';
 import type { EventosOrdenPort } from './interfaces/eventos-orden.port';
@@ -29,7 +32,34 @@ import { NotasService } from './services/notas.service';
 /** Permisos atómicos ya sembrados (seed_pintuclic.sql): consultar y operar pedidos. */
 export const PERMISOS_ORDENES = { ver: 'ventas.ver', gestionar: 'ventas.gestionar' } as const;
 
+/**
+ * La gestión de pedidos es del personal: una sesión de CLIENTE nunca entra, aunque su rol traiga
+ * `ventas.ver` o `ventas.gestionar` (el seed se los daba al rol `empresa_vip`, y los permisos se
+ * resuelven por rol). Responde el mismo 404 opaco que un recurso inexistente y deja rastro (M20).
+ */
+function exigirSesionDePersonal(auditoria?: AuditoriaPort): RequestHandler {
+  return async (req, res, next) => {
+    const actor = req.actor;
+    if (actor?.tipoSesion === 'admin') {
+      next();
+      return;
+    }
+    if (actor !== undefined) {
+      await auditoria?.registrarAccesoDenegado({
+        idUsuario: actor.idUsuario,
+        operacionIntentada: `${req.method} ${req.originalUrl.split('?')[0] ?? req.path}`,
+        permisoRequerido: null,
+        fecha: new Date(),
+        ipOrigen: ipDe(req),
+      });
+    }
+    responderRecursoNoDisponible(res);
+  };
+}
+
 export interface ModuloM08Config {
+  /** Puerto de auditoría de M20, para registrar los accesos denegados por tipo de sesión. */
+  auditoria?: AuditoriaPort;
   /** Dobles inyectables para pruebas; en producción se usan los de Prisma y los adaptadores por defecto. */
   consultaCliente?: {
     repo?: ConsultaClienteRepository;
@@ -85,6 +115,9 @@ export function construirModuloM08(autorizacion: AutorizacionService, config?: M
   const router = Router();
   router.get('/mis-pedidos', misPedidos.listar);
   router.get('/mis-pedidos/:codigo', misPedidos.detalle);
+
+  // Todo `/gestion` exige sesión de personal antes de comprobar el permiso atómico.
+  router.use('/gestion', exigirSesionDePersonal(config?.auditoria));
 
   // `/gestion/resumen` va antes de `/gestion/:codigo` para que no se tome «resumen» como código.
   router.get('/gestion', ver, gestion.listar);
