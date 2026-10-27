@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PaintBucket, ShoppingCart } from 'lucide-react';
 import { Button } from '../buttons/Button';
 import { ButtonLink } from '../buttons/ButtonLink';
+import { esColorMuyClaro, esHexadecimal } from '../../utils/color-muestra';
 import { formatCOP } from '../../utils/moneda';
 import { Badge } from './Badge';
 
@@ -23,6 +24,13 @@ export interface ProductCardProps {
   href?: string;
   onViewDetails?: (id: string) => void;
   onAddToCart?: (id: string) => void;
+  /** El botón del carrito se ve pero no se puede usar (por ejemplo, un combo agotado). */
+  addToCartDisabled?: boolean;
+  /**
+   * Color `#RRGGBB` del producto: la imagen va sobre un panel de ese color, como una muestra de pintura.
+   * Sin él (o si no es válido) se ve el fondo neutro de siempre.
+   */
+  swatchColor?: string;
   className?: string;
 }
 
@@ -54,11 +62,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   href,
   onViewDetails,
   onAddToCart,
+  addToCartDisabled = false,
+  swatchColor,
   className = '',
 }) => {
   // UI Spec §4.1.1: "$ 98.900 COP".
   const formatCurrency = (amount: number) => `${formatCOP(amount)} COP`;
   const imagenEfectiva = resolverImagenPorDefecto(name, imageUrl);
+  const muestra = swatchColor !== undefined && esHexadecimal(swatchColor) ? swatchColor : null;
 
   return (
     <div
@@ -71,12 +82,29 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       `}
     >
       {/* Contenedor de Imagen de Producto (UI Spec sección 4.1.1) */}
-      <div className="relative w-full h-52 bg-neutral-lightest flex items-center justify-center p-4 overflow-hidden">
+      <div
+        className={`relative w-full h-52 flex items-center justify-center p-4 overflow-hidden ${
+          muestra === null ? 'bg-neutral-lightest' : 'bg-neutral-white'
+        }`}
+      >
         {/* Badges superpuestos en esquina superior izquierda */}
-        <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1 items-start">
+        <div className="absolute top-2.5 left-2.5 z-20 flex flex-col gap-1 items-start">
           {isSponsored && <Badge variant="sponsored">Patrocinado</Badge>}
           {isOffer && <Badge variant="offer">{offerBadgeText}</Badge>}
         </div>
+
+        {/* Muestra de pintura detrás del producto. El color es un dato del catálogo, no del tema: por eso va en
+            `style`. Es decorativa: el nombre del color no aporta a quien usa lector de pantalla. */}
+        {muestra !== null && (
+          <div
+            aria-hidden="true"
+            data-muestra-color={muestra}
+            className={`absolute inset-x-4 top-14 bottom-4 rounded-card ${
+              esColorMuyClaro(muestra) ? 'border border-neutral-light' : ''
+            }`}
+            style={{ backgroundColor: muestra }}
+          />
+        )}
 
         {imagenEfectiva ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -85,12 +113,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             alt={name}
             width={400}
             height={300}
-            /* mix-blend-multiply funde el fondo blanco de las fotos de catálogo con el gris del contenedor. */
-            className="w-full h-full object-contain object-center mix-blend-multiply transition-transform duration-300 group-hover:scale-105"
+            /* mix-blend-multiply funde el fondo blanco de las fotos de catálogo con el fondo (gris o la muestra). */
+            className="relative z-10 w-full h-full object-contain object-center mix-blend-multiply transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-card bg-linear-to-br from-subaction/60 via-neutral-lightest to-subaction/30 p-4 text-center">
+          <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-2 rounded-card bg-linear-to-br from-subaction/60 via-neutral-lightest to-subaction/30 p-4 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-white shadow-sm transition-transform duration-300 group-hover:scale-105">
               <PaintBucket className="h-8 w-8 text-action" strokeWidth={1.75} aria-hidden="true" />
             </div>
@@ -192,6 +220,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               variant="primary-conversion"
               size="sm"
               aria-label={`Agregar ${name} al carrito`}
+              disabled={addToCartDisabled}
               onClick={() => onAddToCart?.(id)}
               className="px-3 shrink-0 max-sm:min-h-11 max-sm:min-w-11"
             >
