@@ -73,7 +73,7 @@ describe('ProductCard con href', () => {
 
 describe('ProductCard con color de muestra', () => {
   const panel = (html: string): string => /<div aria-hidden="true" data-muestra-color="[^"]*" class="([^"]*)"/.exec(html)?.[1] ?? '';
-  const tarjeta = (props: { swatchColor?: string; addToCartDisabled?: boolean } = {}): string =>
+  const tarjeta = (props: { swatchColor?: string; addToCartDisabled?: boolean; showViewDetails?: boolean } = {}): string =>
     renderToStaticMarkup(
       <ProductCard id="p2" name="Viniltex" price={85900} href="/productos/1" onAddToCart={() => undefined} {...props} />,
     );
@@ -82,11 +82,11 @@ describe('ProductCard con color de muestra', () => {
     const html = tarjeta({ swatchColor: '#9CC9E8' });
     expect(html).toMatch(/<div aria-hidden="true" data-muestra-color="#9CC9E8"[^>]*>/);
     expect(html).toContain('background-color:#9CC9E8');
-    expect(panel(html)).not.toContain('border');
+    expect(panel(html)).not.toContain('ring-neutral-light');
   });
 
   it('un color muy claro lleva borde para verse sobre el blanco', () => {
-    expect(panel(tarjeta({ swatchColor: '#FDFDF8' }))).toContain('border border-neutral-light');
+    expect(panel(tarjeta({ swatchColor: '#FDFDF8' }))).toContain('ring-1 ring-inset ring-neutral-light');
   });
 
   it('sin color, o con un color mal escrito, se queda el fondo neutro', () => {
@@ -99,6 +99,30 @@ describe('ProductCard con color de muestra', () => {
   it('con callback, el carrito es un botón que se puede deshabilitar', () => {
     expect(tarjeta().match(/href="\/productos\/1"/g)).toHaveLength(2);
     expect(tarjeta({ addToCartDisabled: true })).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Agregar Viniltex al carrito"|<button[^>]*aria-label="Agregar Viniltex al carrito"[^>]*disabled=""/);
+  });
+});
+
+describe('ProductCard sin "Ver producto"', () => {
+  const html = renderToStaticMarkup(
+    <ProductCard id="p3" name="Koraza" price={99900} href="/productos/2" onAddToCart={() => undefined} showViewDetails={false} />,
+  );
+
+  it('no pinta "Ver producto" y deja el carrito junto al precio', () => {
+    expect(html).not.toContain('Ver producto');
+    expect(html).toMatch(/99\.900 COP<\/span><\/div><button[^>]*aria-label="Agregar Koraza al carrito"/);
+  });
+
+  it('la imagen lleva a la ficha sin repetir el enlace para el teclado', () => {
+    expect(html).toMatch(/<a[^>]*tabindex="-1"[^>]*aria-hidden="true"[^>]*href="\/productos\/2"|<a[^>]*href="\/productos\/2"[^>]*tabindex="-1"[^>]*aria-hidden="true"/);
+    expect(html.match(/href="\/productos\/2"/g)).toHaveLength(2);
+  });
+
+  it('con muestra, la foto no se mezcla con el color', () => {
+    const conColor = renderToStaticMarkup(
+      <ProductCard id="p4" name="ICO" price={27900} imageUrl="/x.png" swatchColor="#111111" showViewDetails={false} />,
+    );
+    expect(conColor).not.toContain('mix-blend-multiply');
+    expect(conColor).toContain('drop-shadow-md');
   });
 });
 
