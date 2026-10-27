@@ -1,9 +1,6 @@
-import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { PanelCompraRapida } from '../components/publico/CompraRapidaModal';
-import { catalogoPublicoApi } from '../services/consulta-publica-api';
 import type { ProductoPublicoFicha, VariantePublica } from '../dtos/m01-catalogo-productos.dto';
-import { imagenDeCompra, presentacionInicial, requiereColor, subtituloProducto } from '../services/compra-rapida';
+import { colorDeLaDireccion, direccionConColor, presentacionInicial, requiereColor } from '../services/seleccion-ficha';
 import { datosFichaTecnica, textoAmbiente } from '../services/ficha-tecnica';
 
 const variante = (id: number, cambios: Partial<VariantePublica> = {}): VariantePublica => ({
@@ -61,71 +58,11 @@ describe('presentacionInicial (U8)', () => {
   });
 });
 
-describe('requiereColor y subtituloProducto', () => {
+describe('requiereColor', () => {
   it('pide color a los entonables y a los de colores fijos, no a las herramientas', () => {
     expect(requiereColor({ claseColor: 'entonable' })).toBe(true);
     expect(requiereColor({ claseColor: 'colores_fijos' })).toBe(true);
     expect(requiereColor({ claseColor: 'sin_color' })).toBe(false);
-  });
-
-  it('muestra la marca y la línea si la tiene', () => {
-    expect(subtituloProducto({ marca: 'Pintuco', linea: 'Viniltex' })).toBe('Pintuco · Viniltex');
-    expect(subtituloProducto({ marca: 'Goya', linea: null })).toBe('Goya');
-  });
-});
-
-describe('PanelCompraRapida', () => {
-  const pintar = (f: ProductoPublicoFicha, v: VariantePublica | null = f.variantes[0] ?? null): string =>
-    renderToStaticMarkup(
-      <PanelCompraRapida
-        ficha={f}
-        variante={v}
-        oferta={null}
-        color={null}
-        onElegirVariante={() => undefined}
-        onElegirColor={() => undefined}
-        onVerCarta={() => undefined}
-      />,
-    );
-
-  it('muestra presentaciones, color sin elegir, cantidad y el enlace a la ficha', () => {
-    const html = pintar(ficha({ imagenes: [{ idImagen: 3, idVariante: null, idColor: null }] }));
-    expect(html).toContain('Medida 1');
-    expect(html).toContain('Medida 2');
-    expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain('· Elige uno');
-    expect(html).toContain('Elige un color para agregarlo al carrito.');
-    expect(html).toContain('href="/productos/7"');
-    expect(html).toContain('Ver todos los detalles del producto');
-    expect(html).toContain(`src="${catalogoPublicoApi.urlImagen(3, 'mediana')}"`);
-  });
-
-  it('un producto sin color no muestra el selector y deja agregar', () => {
-    const html = pintar(ficha({ claseColor: 'sin_color', variantes: [variante(1)] }));
-    expect(html).not.toContain('· Elige uno');
-    expect(html).toMatch(/<button[^>]*>(?:(?!<\/button>).)*Agregar al carrito/);
-    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Agregar al carrito/);
-  });
-
-  it('un combo agotado avisa y no deja agregar', () => {
-    const html = pintar(ficha({ claseColor: 'sin_color', compraBloqueada: true }));
-    expect(html).toContain('Este combo está agotado por ahora');
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Agregar al carrito/);
-  });
-});
-
-describe('imagenDeCompra', () => {
-  const imagenes = [
-    { idImagen: 1, idVariante: null, idColor: null },
-    { idImagen: 2, idVariante: 5, idColor: null },
-    { idImagen: 3, idVariante: null, idColor: 9 },
-  ];
-
-  it('la del color, luego la de la presentación y si no, la portada', () => {
-    expect(imagenDeCompra(imagenes, { idColor: 9, idVariante: 5 })).toBe(3);
-    expect(imagenDeCompra(imagenes, { idColor: 4, idVariante: 5 })).toBe(2);
-    expect(imagenDeCompra(imagenes, { idColor: null, idVariante: null })).toBe(1);
-    expect(imagenDeCompra([], { idColor: null, idVariante: null })).toBeNull();
   });
 });
 
@@ -166,5 +103,22 @@ describe('ficha técnica', () => {
   it('una herramienta sin ficha de recubrimiento solo muestra lo que tiene', () => {
     const f = ficha({ linea: null, claseColor: 'sin_color', usoInterior: false });
     expect(datosFichaTecnica(f, null).map((d) => d.clave)).toEqual(['marca', 'categoria', 'presentaciones']);
+  });
+});
+
+describe('ficha abierta en un color (U8)', () => {
+  it('lee el ?color= solo si es un id válido', () => {
+    expect(colorDeLaDireccion('13')).toBe(13);
+    expect(colorDeLaDireccion(['7', '8'])).toBe(7);
+    for (const malo of [undefined, '', '0', '-3', 'azul', '1.5', '99999999999999999999']) {
+      expect(colorDeLaDireccion(malo)).toBeNull();
+    }
+  });
+
+  it('cambia el color de la dirección y conserva lo demás', () => {
+    expect(direccionConColor('http://x.test/productos/1', 13)).toBe('/productos/1?color=13');
+    expect(direccionConColor('http://x.test/productos/1?color=4&ref=inicio#ficha', 9)).toBe(
+      '/productos/1?color=9&ref=inicio#ficha',
+    );
   });
 });
