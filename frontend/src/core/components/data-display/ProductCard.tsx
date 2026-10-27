@@ -24,13 +24,13 @@ export interface ProductCardProps {
   href?: string;
   onViewDetails?: (id: string) => void;
   onAddToCart?: (id: string) => void;
-  /** El botón del carrito se ve pero no se puede usar (por ejemplo, un combo agotado). */
-  addToCartDisabled?: boolean;
   /**
    * Color `#RRGGBB` del producto: la imagen va sobre un panel de ese color, como una muestra de pintura.
    * Sin él (o si no es válido) se ve el fondo neutro de siempre.
    */
   swatchColor?: string;
+  /** Texto del color bajo el nombre (por ejemplo "Azul Cielo · y 45 colores más"), con un punto de ese color. */
+  swatchLabel?: string;
   /**
    * Con `false` no se pinta "Ver producto": el carrito queda junto al precio y la imagen y el nombre llevan a la
    * ficha. Por defecto se muestra, como en el resto de pantallas.
@@ -67,8 +67,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   href,
   onViewDetails,
   onAddToCart,
-  addToCartDisabled = false,
   swatchColor,
+  swatchLabel,
   showViewDetails = true,
   className = '',
 }) => {
@@ -106,7 +106,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         variant="primary-conversion"
         size="sm"
         aria-label={`Agregar ${name} al carrito`}
-        disabled={addToCartDisabled}
         onClick={() => onAddToCart?.(id)}
         className="px-3 shrink-0 max-sm:min-h-11 max-sm:min-w-11"
       >
@@ -213,6 +212,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <span className="line-clamp-2">{name}</span>
           )}
         </h3>
+
+        {muestra !== null && swatchLabel !== undefined && swatchLabel !== '' && (
+          <p className="mt-1 flex items-center gap-1.5 font-sans text-xs font-medium text-neutral-dark">
+            <span
+              aria-hidden="true"
+              className="h-3 w-3 shrink-0 rounded-full ring-1 ring-inset ring-neutral-black/10"
+              style={{ backgroundColor: muestra }}
+            />
+            <span className="truncate">{swatchLabel}</span>
+          </p>
+        )}
 
         {description && (
           <p className="font-sans text-xs text-neutral-medium line-clamp-2 mt-1 mb-2">
