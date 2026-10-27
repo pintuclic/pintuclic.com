@@ -338,6 +338,21 @@ export class CarritoMemoriaRepository implements CarritoRepositoryPort {
     return Promise.resolve();
   }
 
+  /** Fechas de corte con que se pidió borrar (para comprobar el intervalo de C13). */
+  readonly limpiezas: Date[] = [];
+
+  borrarVisitantesVencidos(antesDe: Date): Promise<number> {
+    this.limpiezas.push(antesDe);
+    const vencidos = new Set(
+      this.carritos
+        .filter((c) => c.idUsuario === null && c.hashToken !== null && c.fechaUltimaActividad < antesDe)
+        .map((c) => c.idCarrito),
+    );
+    this.carritos = this.carritos.filter((c) => !vencidos.has(c.idCarrito));
+    this.lineas = this.lineas.filter((l) => !vencidos.has(l.idCarrito));
+    return Promise.resolve(vencidos.size);
+  }
+
   unir(plan: PlanUnion): Promise<void> {
     for (const a of plan.actualizar) {
       const l = this.lineas.find((x) => x.idLinea === a.idLinea && x.idCarrito === plan.idCarritoCuenta);

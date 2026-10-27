@@ -121,6 +121,24 @@ describe.skipIf(URL_BD === undefined)('M05 · carrito (PostgreSQL + M01 + M06 re
     ]);
   });
 
+  it('C13: borra los carritos de visitante vencidos con sus líneas y no toca los de cuenta', async () => {
+    const [l1] = lineasSeed;
+    if (l1 === undefined) throw new Error('sin datos');
+    const hace40 = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+    const viejo = await prisma.carrito.create({
+      data: { tokenVisitante: `zz-${ALEATORIO}-viejo`.padEnd(64, '0'), fechaUltimaActividad: hace40 },
+    });
+    await prisma.lineaCarrito.create({ data: { idCarrito: viejo.idCarrito, ...l1, cantidad: 1 } });
+    await prisma.carrito.update({ where: { idUsuario }, data: { fechaUltimaActividad: hace40 } });
+
+    const borrados = await repo.borrarVisitantesVencidos(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+    expect(borrados).toBeGreaterThanOrEqual(1);
+    expect(await prisma.carrito.findUnique({ where: { idCarrito: viejo.idCarrito } })).toBeNull();
+    expect(await prisma.lineaCarrito.count({ where: { idCarrito: viejo.idCarrito } })).toBe(0);
+    expect(await prisma.carrito.findUnique({ where: { idUsuario } })).not.toBeNull();
+    await prisma.carrito.update({ where: { idUsuario }, data: { fechaUltimaActividad: new Date() } });
+  });
+
   it('servicio + M06 real: el carrito trae el cálculo de M06 y cumple el contrato', async () => {
     const { carritoSchema } = await import('../dtos/m05-carrito.dto.js');
     const r = await servicio.consultar({ idUsuario, tokenVisitante: null }, 'ZZNOEXISTE');

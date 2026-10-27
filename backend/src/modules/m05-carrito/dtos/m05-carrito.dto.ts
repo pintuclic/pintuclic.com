@@ -29,17 +29,22 @@ import type { PreciosPort } from '../../m06-precios/dtos/m06-precios.dto';
 export const MAXIMO_LINEAS_CARRITO = MAXIMO_LINEAS_CALCULO;
 /** C4 */
 export const CANTIDAD_MAXIMA_POR_LINEA = CANTIDAD_MAXIMA_LINEA;
-/** C13 */
+/** C13: parámetro de M17 con los días de vigencia del carrito de visitante. */
+export const CLAVE_DIAS_VIGENCIA = 'comercial.dias_vigencia_carrito_visitante';
+/** C13: valor si el parámetro no se puede leer (es también su valor inicial en el seed). */
 export const DIAS_VIGENCIA_CARRITO_VISITANTE = 30;
+/** C13: rango del parámetro (igual al de `parametro_sistema`). */
+export const diasVigenciaSchema = z.number().int().min(1).max(365);
+/** C13: cada cuánto, como máximo, se borran los carritos de visitante vencidos. */
+export const INTERVALO_LIMPIEZA_MINUTOS = 60;
 
-/** C2 / D4: cookie del carrito de visitante. */
+/** C2 / D4: cookie del carrito de visitante. Su vida (`maxAge`) son los días de C13. */
 export const atributosCookieCarritoSchema = z.object({
   nombre: z.literal('pc_cart'),
   httpOnly: z.literal(true),
   secure: z.literal(true),
   sameSite: z.literal('lax'),
   path: z.literal('/'),
-  maxAgeSegundos: z.literal(DIAS_VIGENCIA_CARRITO_VISITANTE * 24 * 60 * 60),
 });
 export type AtributosCookieCarrito = z.infer<typeof atributosCookieCarritoSchema>;
 
@@ -49,7 +54,6 @@ export const ATRIBUTOS_COOKIE_CARRITO: AtributosCookieCarrito = {
   secure: true,
   sameSite: 'lax',
   path: '/',
-  maxAgeSegundos: DIAS_VIGENCIA_CARRITO_VISITANTE * 24 * 60 * 60,
 };
 
 /** Id de una línea del carrito en la URL (`:idLinea`). */
@@ -268,6 +272,11 @@ export type PreciosCarritoPort = Pick<PreciosPort, 'calcular'>;
 
 /** Lo que M05 usa de M01 (ya implementado). */
 export type CatalogoCarritoPort = CatalogoParaCompraPort;
+
+/** Lo que M05 usa de M17 (C13): null si el parámetro no se pudo leer. */
+export interface ParametrosCarritoPort {
+  obtenerNumero(clave: typeof CLAVE_DIAS_VIGENCIA): Promise<number | null>;
+}
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 6. MAPA DE RUTAS

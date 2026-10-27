@@ -2,14 +2,18 @@ import type { LineaParaCompra } from '../../m01-catalogo/dtos/m01-catalogo-entre
 import type { Calculo } from '../../m06-precios/dtos/m06-precios.dto';
 import {
   CANTIDAD_MAXIMA_POR_LINEA,
+  CLAVE_DIAS_VIGENCIA,
   DIAS_VIGENCIA_CARRITO_VISITANTE,
+  INTERVALO_LIMPIEZA_MINUTOS,
   MAXIMO_LINEAS_CARRITO,
+  diasVigenciaSchema,
   type AgregarLineaRequest,
   type CambioRevalidacion,
   type CambiarCantidadRequest,
   type Carrito,
   type CatalogoCarritoPort,
   type LineaCarrito,
+  type ParametrosCarritoPort,
   type PreciosCarritoPort,
   type ProductoLinea,
   type ResumenCarrito,
@@ -30,7 +34,7 @@ import type {
 import { errores } from './carrito-error';
 import { esTokenVisitanteValido, generarTokenVisitante, hashTokenVisitante } from './token-visitante';
 
-const VIGENCIA_VISITANTE_MS = DIAS_VIGENCIA_CARRITO_VISITANTE * 24 * 60 * 60 * 1000;
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
 const SIN_COOKIE: AccionCookie = { tipo: 'ninguna' };
 
 export interface DependenciasCarrito {
@@ -39,6 +43,8 @@ export interface DependenciasCarrito {
   precios: PreciosCarritoPort;
   /** M01 */
   catalogo: CatalogoCarritoPort;
+  /** M17 (C13). Sin él se usan DIAS_VIGENCIA_CARRITO_VISITANTE días. */
+  parametros?: ParametrosCarritoPort;
   reloj?: () => Date;
 }
 
@@ -48,6 +54,8 @@ interface Resolucion {
   carrito: CarritoGuardado | null;
   cookie: AccionCookie;
   union: UnionCarrito | null;
+  /** C13: días de vigencia del carrito de visitante en esta petición. */
+  dias: number;
 }
 
 function mismaLinea(a: { idVariante: number; idColor: number | null }, b: LineaNueva): boolean {
@@ -78,6 +86,8 @@ function productoDeLinea(c: LineaParaCompra | undefined): ProductoLinea {
  */
 export class CarritoService {
   private readonly reloj: () => Date;
+  /** C13: momento de la última limpieza de carritos vencidos (una por intervalo y por proceso). */
+  private ultimaLimpieza = Number.NEGATIVE_INFINITY;
 
   constructor(private readonly dep: DependenciasCarrito) {
     this.reloj = dep.reloj ?? (() => new Date());
@@ -199,6 +209,8 @@ export class CarritoService {
   /* ── Dueño y unión (C1, C2, C9, C13) ─────────────────────────────────── */
 
   private async resolver(sol: Solicitante): Promise<Resolucion> {
+    const dias = await this.diasVigencia();
+    this.limpiarVencidos(dias);
     const token = esTokenVisitanteValido(sol.tokenVisitante) ? sol.tokenVisitante : null;
 
     if (sol.idUsuario !== null) {
@@ -207,30 +219,52 @@ export class CarritoService {
       if (token === null) {
         // Una cookie con otra forma se borra para no arrastrarla.
         const cookie: AccionCookie = sol.tokenVisitante === null ? SIN_COOKIE : { tipo: 'borrar' };
-        return { dueno, carrito: cuenta, cookie, union: null };
+        return { dueno, carrito: cuenta, cookie, union: null, dias };
       }
       const visitante = await this.dep.repo.buscar({ tipo: 'visitante', hashToken: hashTokenVisitante(token) });
-      if (visitante === null || this.vencido(visitante) || visitante.lineas.length === 0) {
-        return { dueno, carrito: cuenta, cookie: { tipo: 'borrar' }, union: null };
+      if (visitante === null || this.vencido(visitante, dias) || visitante.lineas.length === 0) {
+        return { dueno, carrito: cuenta, cookie: { tipo: 'borrar' }, union: null, dias };
       }
       const union = await this.unir(visitante, cuenta, sol.idUsuario);
-      return { dueno, carrito: await this.dep.repo.buscar(dueno), cookie: { tipo: 'borrar' }, union };
+      return { dueno, carrito: await this.dep.repo.buscar(dueno), cookie: { tipo: 'borrar' }, union, dias };
     }
 
     if (token === null) {
-      return { dueno: null, carrito: null, cookie: sol.tokenVisitante === null ? SIN_COOKIE : { tipo: 'borrar' }, union: null };
+      const cookie: AccionCookie = sol.tokenVisitante === null ? SIN_COOKIE : { tipo: 'borrar' };
+      return { dueno: null, carrito: null, cookie, union: null, dias };
     }
     const dueno: DuenoCarrito = { tipo: 'visitante', hashToken: hashTokenVisitante(token) };
     const carrito = await this.dep.repo.buscar(dueno);
-    if (carrito !== null && this.vencido(carrito)) {
-      // C13: el vencido se ve vacío; se vacía de verdad al volver a agregar.
-      return { dueno, carrito: { ...carrito, lineas: [] }, cookie: SIN_COOKIE, union: null };
+    if (carrito !== null && this.vencido(carrito, dias)) {
+      // C13: el vencido se ve vacío; se vacía al volver a agregar o lo borra la limpieza.
+      return { dueno, carrito: { ...carrito, lineas: [] }, cookie: SIN_COOKIE, union: null, dias };
     }
-    return { dueno, carrito, cookie: SIN_COOKIE, union: null };
+    return { dueno, carrito, cookie: SIN_COOKIE, union: null, dias };
   }
 
-  private vencido(c: CarritoGuardado): boolean {
-    return this.reloj().getTime() - c.fechaUltimaActividad.getTime() > VIGENCIA_VISITANTE_MS;
+  /** C13: días del parámetro de M17; si no se puede leer o está fuera de rango, el valor por defecto. */
+  private async diasVigencia(): Promise<number> {
+    try {
+      const valor = await this.dep.parametros?.obtenerNumero(CLAVE_DIAS_VIGENCIA);
+      const r = diasVigenciaSchema.safeParse(valor);
+      return r.success ? r.data : DIAS_VIGENCIA_CARRITO_VISITANTE;
+    } catch {
+      return DIAS_VIGENCIA_CARRITO_VISITANTE;
+    }
+  }
+
+  private vencido(c: CarritoGuardado, dias: number): boolean {
+    return this.reloj().getTime() - c.fechaUltimaActividad.getTime() > dias * MS_POR_DIA;
+  }
+
+  /** C13: borra los carritos de visitante vencidos, como máximo una vez por intervalo y sin esperar. */
+  private limpiarVencidos(dias: number): void {
+    const ahora = this.reloj().getTime();
+    if (ahora - this.ultimaLimpieza < INTERVALO_LIMPIEZA_MINUTOS * 60 * 1000) return;
+    this.ultimaLimpieza = ahora;
+    void this.dep.repo.borrarVisitantesVencidos(new Date(ahora - dias * MS_POR_DIA)).catch(() => {
+      // Si falla, se intenta en el siguiente intervalo; la petición del cliente sigue normal.
+    });
   }
 
   /** C9: une el carrito del visitante al de la cuenta (o se lo pasa si la cuenta no tenía). */
@@ -282,7 +316,7 @@ export class CarritoService {
     }
     const token = generarTokenVisitante();
     const carrito = await this.dep.repo.crear({ tipo: 'visitante', hashToken: hashTokenVisitante(token) });
-    return { carrito, cookie: { tipo: 'fijar', token } };
+    return { carrito, cookie: { tipo: 'fijar', token, diasVigencia: r.dias } };
   }
 
   private comprobarTope(enCatalogo: LineaParaCompra, cantidad: number): void {

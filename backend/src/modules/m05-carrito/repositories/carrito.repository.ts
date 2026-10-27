@@ -117,6 +117,14 @@ export class CarritoRepository implements CarritoRepositoryPort {
     });
   }
 
+  async borrarVisitantesVencidos(antesDe: Date): Promise<number> {
+    // Solo carritos de visitante: los de una cuenta no vencen. Las líneas caen en cascada.
+    const r = await prisma.carrito.deleteMany({
+      where: { idUsuario: null, tokenVisitante: { not: null }, fechaUltimaActividad: { lt: antesDe } },
+    });
+    return r.count;
+  }
+
   async unir(plan: PlanUnion): Promise<void> {
     await prisma.$transaction(async (tx) => {
       for (const l of plan.actualizar) {
