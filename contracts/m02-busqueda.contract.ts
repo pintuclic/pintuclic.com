@@ -121,11 +121,14 @@ import {
  *      mezcla con el color (un color oscuro no debe tapar el producto); los colores muy claros llevan un
  *      borde suave. Bajo el nombre, un punto con el color, su nombre y "y N colores más" (T4). Sin color, el
  *      fondo neutro de siempre y sin esa línea.
- *  V3  Sin botón "Ver producto". El nombre, la imagen y el botón del carrito (junto al precio) llevan a la
- *      ficha ABIERTA EN ESE COLOR: `/productos/:idProducto?color=:idColor` (U8 de m01-catalogo-productos);
- *      sin color, `/productos/:idProducto`. La presentación, el color y la cantidad se eligen en la ficha:
- *      no hay ventanas encima del listado.
- *  V4  Un combo agotado (`compraBloqueada`) también lleva a su ficha, que avisa que no se puede comprar.
+ *  V3  Sin botón "Ver producto". El nombre y la imagen llevan a la ficha ABIERTA EN ESE COLOR:
+ *      `/productos/:idProducto?color=:idColor` (U8 de m01-catalogo-productos); sin color,
+ *      `/productos/:idProducto`. El botón del carrito (junto al precio) AGREGA 1 unidad del producto en su
+ *      color de muestra y en la presentación del precio que muestra la tarjeta (la vendible más barata), con
+ *      el servicio del carrito de M05, y abre el panel lateral del carrito (L1–L2 del contrato de M05).
+ *  V4  Si no se puede agregar directo (combo agotado con `compraBloqueada`, ninguna presentación vendible, o
+ *      un producto que lleva color sin `colorMuestra`), el botón del carrito lleva a la ficha en su color,
+ *      que explica por qué y deja elegir.
  *  V5  INICIO: "Productos destacados" y la búsqueda de "¿Qué buscas?" usan esta misma búsqueda
  *      (GET /busqueda/productos, con su tolerancia a errores) y la misma tarjeta que /productos.
  *

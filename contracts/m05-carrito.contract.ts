@@ -38,6 +38,8 @@ import type { PreciosPort } from './m06-precios.contract';
  *    (empresa_falta_monto, sugerir_cuenta_empresa), cupón, IVA y totales.
  *  · Pantalla pública `/carrito` (la ruta la usa ya el formulario de contacto de M15) con el botón de
  *    WhatsApp de M15 (RF-ATC-03-01).
+ *  · Panel lateral del carrito (L1–L7): el resumen que se despliega a la derecha, la Variante A de la
+ *    especificación de UI (§4.7), desde el encabezado y al agregar desde una tarjeta.
  *
  * ── Qué NO hace ─────────────────────────────────────────────────────────────
  *  · No calcula precios ni descuentos: los pide a M06 (`PreciosPort.calcular`) y los muestra. No suma,
@@ -115,6 +117,27 @@ import type { PreciosPort } from './m06-precios.contract';
  *  "Tengo dudas sobre mi carrito de N productos." Mientras M07 no exista, "Continuar" termina en la
  *  revalidación y un aviso de que el pago aún no está disponible.
  *
+ * ── Panel lateral del carrito (UI §4.7 · Variante A) ────────────────────────
+ *  L1  SE ABRE desde el ícono del carrito del encabezado (en lugar de ir a /carrito) y al agregar desde
+ *      el botón del carrito de una tarjeta del listado o del inicio (V3 del contrato de M02). Se cierra con
+ *      la X, con "Seguir comprando", con Esc o tocando fuera; el foco vuelve a donde estaba. Sin JavaScript,
+ *      el ícono del encabezado sigue siendo un enlace a /carrito.
+ *  L2  AL AGREGAR desde una tarjeta, el panel abre con el aviso "Agregaste <producto> · <color> ·
+ *      <medida>". Si M05 rechaza la línea (sin existencias, carrito lleno, línea cotizada…), abre con el
+ *      mismo texto de error que muestra la ficha y no agrega nada.
+ *  L3  CONTENIDO: título "Tu carrito" con la cantidad de productos; cada línea con imagen, nombre, color
+ *      (muestra y nombre), medida, cantidad con − / + y "Quitar", con las mismas reglas de /carrito (C3–C6,
+ *      y C15: una línea de cotización no cambia de cantidad). Línea no vendible: su motivo en palabras
+ *      simples y "Quitar". Abajo, fijo: el total con IVA incluido y el ahorro total del cálculo de M06, tal
+ *      cual (M05 no suma ni redondea), y los botones "Ver carrito" (a /carrito) y "Seguir comprando". Botón
+ *      de WhatsApp de M15 con la referencia del carrito.
+ *  L4  Lo que se hace en /carrito NO va en el panel: cupón, revalidación y "Continuar con la compra".
+ *  L5  CARRITO VACÍO: mensaje y enlace a /productos.
+ *  L6  No hay rutas nuevas: usa GET /carrito, PATCH y DELETE de las líneas y POST /carrito/lineas. Cada
+ *      cambio actualiza el contador del encabezado con el aviso que ya existe (`pc:carrito-actualizado`).
+ *  L7  PANTALLA: entra deslizándose desde la derecha sobre un fondo oscuro; unos 420px en escritorio y todo
+ *      el ancho en celular. Es un diálogo accesible: nombre, foco atrapado y regreso del foco al cerrar.
+ *
  * ── Puertos ─────────────────────────────────────────────────────────────────
  *  · PreciosPort (M06, ya en main): solo `calcular`. Se inyecta el servicio de M06 (`m06.precios`).
  *    Las pruebas usan un doble con cálculos de ejemplo que respetan `calculoSchema` (evento, aviso de
@@ -144,6 +167,11 @@ import type { PreciosPort } from './m06-precios.contract';
  *  P3  M01: botón "Agregar al carrito" en la ficha del producto (variante + color + cantidad) que llama a
  *      `POST /carrito/lineas`.
  *  P4  Core Kit: el contador del Header lee `GET /carrito/resumen` en vez del valor fijo de `shell.content.ts`.
+ *  P5  Core Kit (L1, L7): un panel lateral accesible (`Drawer`) que reutiliza el manejo de foco del `Modal`;
+ *      el aviso `pc:abrir-carrito` junto al que ya existe `pc:carrito-actualizado`; y el ícono del carrito
+ *      del Header abre el panel con ese aviso.
+ *  P6  Layout público (fuera de los módulos): monta el panel lateral una sola vez para todas las páginas.
+ *  P7  M02 e inicio: el botón del carrito de la tarjeta agrega y abre el panel (V3 del contrato de M02).
  *
  * ── Preguntas al Tech Lead (respondidas) ────────────────────────────────────
  *  Q1  Unir los carritos al iniciar sesión (D2): confirmado.
@@ -151,6 +179,9 @@ import type { PreciosPort } from './m06-precios.contract';
  *  Q3  No se paga con líneas no vendibles en el carrito; hay que quitarlas antes (C11): confirmado.
  *  Q4  Los carritos de visitante vencidos se borran según un parámetro de días editable en Configuración
  *      (M17): C13.
+ *  Q5  La Variante A de §4.7 también trae el paso a paso Carrito → Pago → Orden y "Complementa tu
+ *      proyecto": quedan fuera por ahora (Pago y Orden son de M07 y M08, que no existen, y no hay regla para
+ *      elegir complementos del carrito). Decisión del equipo, 2026-10-27.
  *
  * Regla de Oro #1: Cero código sin contrato previo.
  * Regla de Oro #11: Tolerancia Cero al tipo `any`.
