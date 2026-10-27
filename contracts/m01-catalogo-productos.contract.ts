@@ -125,20 +125,17 @@ import {
  *      del tipo de medida (D6), siempre marcado como aproximado; null sin equivalencia.
  *  U7  No se exponen existencias exactas, códigos de proveedor ni ids internos de BD
  *      más allá de lo que la vista necesita (HU-SEG-06).
- *  U8  COMPRA RÁPIDA (pantalla; la abre la tarjeta del listado de M02, V4 de su contrato): ventana
- *      que carga la ficha pública del producto (GET /productos/:idProducto) y muestra su imagen,
- *      marca, nombre y precio con la oferta de la presentación elegida, las presentaciones, el
- *      selector de color de la ficha (solo si el producto lleva color) y la cantidad, con el mismo
- *      "Agregar al carrito" de la ficha (M05 · P3: variante + color + cantidad, de 1 a 9 999).
- *        · Empieza con la primera presentación vendible elegida; el color NO viene elegido: el
- *          cliente lo escoge, igual que en la ficha.
- *        · Si el producto tiene una sola presentación y no lleva color, la ventana igual se abre
- *          para confirmar la cantidad (nunca se agrega sin que el cliente lo vea).
- *        · Al agregar muestra el mismo aviso de la ficha ("Agregaste… · Ver carrito") y se puede
- *          seguir comprando; los errores son los de M05, con el mismo texto de la ficha.
- *        · Tiene un enlace "Ver ficha completa". Con `compraBloqueada` no se agrega.
- *        · No hay rutas nuevas: usa la ficha pública, la carta de colores y el servicio del carrito
- *          que ya existen.
+ *  U8  FICHA EN UN COLOR (la abren las tarjetas del listado y del inicio, V3 del contrato de M02):
+ *        · `/productos/:idProducto?color=:idColor` abre la ficha con ese color ya elegido, si el producto
+ *          lo ofrece (P5); si no, o sin `?color=`, la ficha abre sin color, como siempre. Para traerlo,
+ *          GET /productos/:idProducto/colores acepta `idColor`.
+ *        · Al elegir otro color en la ficha, la dirección cambia a ese color (se puede compartir) sin
+ *          recargar la página.
+ *        · Presentación: la primera disponible que se pueda comprar.
+ *        · Pantalla: a la izquierda la imagen sobre una "pared" pintada del color elegido, con su nombre y
+ *          código, y debajo la descripción y la ficha técnica; se desplazan con la página. A la derecha el
+ *          panel de compra (nombre, colores como muestras con la carta completa a un toque, presentación,
+ *          precio, cantidad y "Agregar al carrito"), que se queda a la vista al bajar en pantallas grandes.
  *
  * ── Autorización (administración) ───────────────────────────────────────────
  *  Igual que la entrega 1 (D1): GET → catalogo.ver · POST → catalogo.crear ·
