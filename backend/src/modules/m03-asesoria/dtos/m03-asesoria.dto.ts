@@ -4,8 +4,8 @@ import { idSchema, respuestaPaginada, respuestaUno } from '../../m01-catalogo/dt
 /**
  * DTOs de M03 — Asesoría y asistencia.
  * Espejo de `contracts/m03-asesoria.contract.ts`, que es la especificación del módulo.
- * Esta entrega cubre la CALCULADORA (HU-ASE-02); el cuestionario y el asistente llegan
- * en las etapas E3 y E4 del contrato.
+ * Cubre la CALCULADORA (HU-ASE-02) y el CUESTIONARIO GUIADO en modo `fijo` (HU-ASE-01).
+ * El modo `asistido` y el asistente llegan en la etapa E4 del contrato.
  */
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -18,7 +18,20 @@ export const ADVERTENCIA_CALCULO =
 export const CODIGOS_ERROR_M03 = {
   PARAMETRO_INVALIDO: 'PARAMETRO_INVALIDO',
   RECURSO_NO_DISPONIBLE: 'RECURSO_NO_DISPONIBLE',
+  MODO_CUESTIONARIO_DISTINTO: 'MODO_CUESTIONARIO_DISTINTO',
 } as const;
+
+/** Permisos del panel de M03 (sembrados en el PR general). */
+export const PERMISO_ASESORIA_VER = 'asesoria.ver';
+export const PERMISO_ASESORIA_EDITAR = 'asesoria.editar';
+
+/** Ruta del catálogo público de M02 a la que lleva el botón del cuestionario (R5). */
+export const RUTA_CATALOGO = '/productos';
+
+/** R7: cuántas tarjetas se muestran antes de salir del flujo. */
+export const VISTA_PREVIA_PRODUCTOS = 6;
+/** R8: cuántos preparatorios se muestran por grupo. */
+export const MAX_COMPLEMENTOS = 6;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * VALIDACIÓN DE ENTRADA (M03 · K8)

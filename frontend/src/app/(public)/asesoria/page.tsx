@@ -2,18 +2,20 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Container } from '@/core/components';
-import { CalculadoraGeneralView } from '@/modules/m03-asesoria/components/publico/CalculadoraGeneralView';
+import { AsesoriaView } from '@/modules/m03-asesoria/components/publico/AsesoriaView';
 
 export const metadata: Metadata = {
-  title: 'Calculadora de pintura — Pintu Clic',
+  title: 'Asesoría: qué pintura necesitas y cuánta — Pintu Clic',
   description:
-    'Calcula cuánta pintura necesitas para tu proyecto según los metros cuadrados y las manos que vas a dar, o averigua cuánto rinde la pintura que ya tienes.',
+    'Responde unas pocas preguntas y te mostramos las pinturas adecuadas para tu proyecto, o calcula cuánta pintura necesitas según los metros cuadrados y las manos que vas a dar.',
 };
 
 /**
- * Calculadora general de M03 (HU-ASE-02). Según el contrato (Q7) también se monta en la
- * landing y, la de producto, en la ficha de M01; esta página existe para poder usarla y
- * compartirla por su propio enlace mientras eso se acuerda con los dueños de esas pantallas.
+ * Asesoría de M03: la búsqueda asistida (HU-ASE-01) y la calculadora general (HU-ASE-02).
+ *
+ * Según el contrato (Q7) la calculadora también se monta en la ficha de M01 y en la landing;
+ * esta página existe para poder usarlas y compartirlas por su propio enlace mientras eso se
+ * acuerda con los dueños de esas pantallas.
  */
 export default function AsesoriaPage() {
   return (
@@ -30,11 +32,11 @@ export default function AsesoriaPage() {
             Inicio
           </Link>
           <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="font-medium text-neutral-dark">Calculadora de pintura</span>
+          <span className="font-medium text-neutral-dark">Asesoría</span>
         </nav>
       </Container>
 
-      <CalculadoraGeneralView />
+      <AsesoriaView />
     </div>
   );
 }

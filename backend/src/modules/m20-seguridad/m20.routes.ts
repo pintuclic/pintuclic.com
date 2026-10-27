@@ -5,7 +5,8 @@ import { SesionController } from './controllers/sesion.controller';
 import { PrivacidadRepository } from './repositories/privacidad.repository';
 import { SesionRepository } from './repositories/sesion.repository';
 import { UsuarioRepository } from './repositories/usuario.repository';
-import { AuditoriaRegistroTecnico } from './services/auditoria.service';
+import type { AuditoriaPort } from './interfaces/auditoria.port';
+import { AuditoriaPersistente } from './services/auditoria.service';
 import { ParametrosSeguridadEnv } from './services/parametros-seguridad.service';
 import { PrivacidadService } from './services/privacidad.service';
 import { SesionService } from './services/sesion.service';
@@ -14,14 +15,19 @@ import { SesionService } from './services/sesion.service';
 export function construirModuloM20(): {
   router: Router;
   sesionService: SesionService;
-  auditoria: AuditoriaRegistroTecnico;
+  auditoria: AuditoriaPort;
 } {
   const sesionRepo = new SesionRepository();
   const usuarioRepo = new UsuarioRepository();
   const privacidadRepo = new PrivacidadRepository();
 
   const parametros = new ParametrosSeguridadEnv();
-  const auditoria = new AuditoriaRegistroTecnico();
+  /**
+   * HU-SEG-04: `registrarAccion` se persiste en `registro_auditoria`, que es inmutable.
+   * Los accesos denegados siguen yendo al registro técnico, porque la lista de acciones que
+   * se guardan la define el Product Owner (RF-SEG-04-01) y aún no los incluye.
+   */
+  const auditoria: AuditoriaPort = new AuditoriaPersistente();
   const sesionService = new SesionService(sesionRepo, usuarioRepo, parametros);
   const privacidadService = new PrivacidadService(privacidadRepo);
 

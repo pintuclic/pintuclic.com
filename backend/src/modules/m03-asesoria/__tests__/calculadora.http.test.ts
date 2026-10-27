@@ -1,13 +1,20 @@
 import express, { type Express } from 'express';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { AuditoriaPort } from '../../m20-seguridad/interfaces/auditoria.port';
+import {
+  AutorizacionService,
+  type ResolutorPermisos,
+} from '../../m20-seguridad/services/autorizacion.service';
+import type { ConfiguracionAsesoria } from '../dtos/cuestionario.dto';
 import type {
   CalculadoraRepositoryPort,
   ConfiguracionCalculadoraPort,
   PaginaProductosCalculables,
   ProductoConRendimiento,
 } from '../interfaces/calculadora.interface';
+import type { ConfiguracionRepositoryPort } from '../interfaces/cuestionario.interface';
 import { construirModuloM03 } from '../m03.routes';
 
 /**
@@ -53,8 +60,23 @@ const repo: CalculadoraRepositoryPort = {
     CATALOGO.find((p) => p.idProducto === id) ?? null,
 };
 
-const configuracion: ConfiguracionCalculadoraPort = {
+const CONFIGURACION_BASE: ConfiguracionAsesoria = {
+  modoCuestionario: 'fijo',
+  manosPorDefecto: null,
+  guionCuestionario: '',
+  guionAsistente: '',
+  iaTiempoEsperaMs: 8000,
+  iaReintentos: 2,
+  iaSuspensionCuotaMinutos: 60,
+  iaRetencionIncidentesDias: 90,
+  iaFallosConsecutivosAlerta: 5,
+  fechaActualizacion: new Date(0).toISOString(),
+};
+
+const configuracion: ConfiguracionCalculadoraPort & ConfiguracionRepositoryPort = {
   obtenerManosPorDefecto: async (): Promise<number | null> => null,
+  obtener: async (): Promise<ConfiguracionAsesoria> => CONFIGURACION_BASE,
+  editar: async (): Promise<ConfiguracionAsesoria> => CONFIGURACION_BASE,
 };
 
 let servidor: Server;
@@ -63,7 +85,14 @@ let base: string;
 beforeAll(async () => {
   const app: Express = express();
   app.use(express.json());
-  const m03 = construirModuloM03({ calculadoraRepo: repo, configuracionRepo: configuracion });
+  // La calculadora es pública: la autorización no interviene, pero el módulo la pide para
+  // montar su panel, así que se le pasa una que nunca concede permisos.
+  const resolutor: ResolutorPermisos = { tienePermiso: () => Promise.resolve(false) };
+  const auditoria = { registrarAccesoDenegado: vi.fn() } satisfies AuditoriaPort;
+  const m03 = construirModuloM03(new AutorizacionService(resolutor, auditoria), {
+    calculadoraRepo: repo,
+    configuracionRepo: configuracion,
+  });
   app.use('/asesoria', m03.publicRouter);
 
   await new Promise<void>((listo) => {

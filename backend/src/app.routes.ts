@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import { construirRutasLandingBanners } from './core/landing/banners.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
+import { BusquedaM02Adapter } from './modules/m03-asesoria/adapters/busqueda-m02.adapter';
 import { construirModuloM03 } from './modules/m03-asesoria/m03.routes';
 import { construirModuloM14 } from './modules/m14-patrocinios/m14.routes';
 import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
@@ -186,9 +187,15 @@ export function construirAppRoutes(): Router {
     m15.publicRouter,
   );
 
-  // M03: asesoría y asistencia. La calculadora de pintura es pública y no usa inteligencia
-  // artificial, así que responde aunque el servicio de IA esté caído (M03 · K11, I6).
-  const m03 = construirModuloM03();
+  // M03: asesoría y asistencia. La calculadora y el cuestionario guiado son públicos y no
+  // usan inteligencia artificial, así que responden aunque el servicio de IA esté caído
+  // (M03 · K11, I6). La vista previa del cuestionario la resuelve la búsqueda de M02, para
+  // que el número que anuncia y lo que muestra el catálogo al pulsar sean lo mismo (M03 · R7).
+  const m03 = construirModuloM03(m17.autorizacionService, {
+    catalogo: new BusquedaM02Adapter(m02.busquedaService),
+    auditoria: m20.auditoria,
+  });
+  router.use('/admin/asesoria', exigirSesionSalvo(auth, []), m03.adminRouter);
   router.use('/asesoria', m03.publicRouter);
 
   // M17: la confirmación del cambio de correo del admin llega desde un enlace y es
