@@ -13,7 +13,7 @@ describe.skipIf(URL_BD === undefined)('M02 · búsqueda (PostgreSQL real)', () =
   let repo: BusquedaRepository;
   let primerColorDeLaFicha: (idProducto: number, idFamiliaColor?: number) => Promise<{ nombre: string; hexadecimal: string } | null>;
 
-  const buscar = async (cambios: Partial<BuscarProductosRequest> = {}): Promise<ResultadoBusqueda[]> =>
+  const buscar = async (cambios: Partial<BuscarProductosRequest> = {}): Promise<readonly ResultadoBusqueda[]> =>
     (await repo.buscarProductos({ ordenar: 'relevancia', pagina: 1, limite: 48, ...cambios }, { idUsuario: null })).items;
   const nombres = (lista: readonly ResultadoBusqueda[]): string[] => lista.map((p) => p.nombre);
 
