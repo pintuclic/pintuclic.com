@@ -64,12 +64,33 @@ export class AuditoriaPersistente implements AuditoriaPort {
     return this.tecnico.registrarAccesoDenegado(evento);
   }
 
+  /**
+   * Si quien emite el evento no supo el nombre del actor, se busca aquí.
+   *
+   * La columna `actor` existe para que el registro siga siendo legible cuando la cuenta se
+   * elimine (la clave foránea es `ON DELETE SET NULL`), así que dejarla vacía anularía esa
+   * garantía. Es una consulta extra, pero solo en los cambios del panel, que son contados.
+   */
+  private async nombreDe(evento: EventoAccionAuditada): Promise<string | null> {
+    if (evento.actor !== null || evento.idUsuario === null) return evento.actor;
+    try {
+      const usuario = await prisma.usuario.findUnique({
+        where: { idUsuario: evento.idUsuario },
+        select: { nombre: true },
+      });
+      return usuario?.nombre ?? null;
+    } catch {
+      // Un fallo al resolver el nombre no puede impedir que la acción quede registrada.
+      return null;
+    }
+  }
+
   async registrarAccion(evento: EventoAccionAuditada): Promise<void> {
     await prisma.registroAuditoria.create({
       data: {
         fecha: evento.fecha,
         idUsuario: evento.idUsuario,
-        actor: evento.actor,
+        actor: await this.nombreDe(evento),
         accion: evento.accion,
         entidad: evento.entidad,
         idEntidad: evento.idEntidad,
