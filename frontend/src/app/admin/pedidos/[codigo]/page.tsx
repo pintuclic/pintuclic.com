@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { DetallePedidoView } from '@/modules/m08-ordenes/components/admin/DetallePedidoView';
+import { DetallePedidoAdmin } from './DetallePedidoAdmin';
 
 export const metadata: Metadata = {
   title: 'Detalle del pedido — Panel Administrativo — Pintu Clic',
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 /** HU-ORD-09 · Detalle para atender un pedido. */
 export default async function DetallePedidoAdminPage({ params }: { params: Promise<{ codigo: string }> }) {
   const { codigo } = await params;
-  return <DetallePedidoView codigo={codigo} />;
+  return <DetallePedidoAdmin codigo={codigo} />;
 }
