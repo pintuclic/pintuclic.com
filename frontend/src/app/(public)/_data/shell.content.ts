@@ -105,6 +105,7 @@ export const header: HeaderProps = {
     { label: 'Productos', href: '/productos' },
     { label: 'Ofertas', href: '/productos?enOferta=true', variant: 'pill' },
     { label: 'Paleta de color', href: '/paleta-de-color', variant: 'destacado' },
+    { label: 'Asesoría', href: '/asesoria' },
     { label: 'Ayuda y FAQ', href: '/centro-de-ayuda' },
     { label: 'Sobre Nosotros', href: '/sobre-nosotros' },
   ],
@@ -141,9 +142,11 @@ export const header: HeaderProps = {
       },
     ],
     assistant: {
-      text: '¿No sabes qué pintura necesitas? Consulta nuestras guías o explora por superficie y ambiente',
-      ctaLabel: 'Ir al centro de ayuda',
-      href: '/centro-de-ayuda',
+      // Es justo lo que hace la búsqueda asistida de M03: unas pocas preguntas y el
+      // catálogo ya filtrado. Antes llevaba al centro de ayuda, que no responde eso.
+      text: '¿No sabes qué pintura necesitas? Responde unas pocas preguntas y te mostramos las que sirven para tu proyecto',
+      ctaLabel: 'Empezar la asesoría',
+      href: '/asesoria',
     },
   },
   account: { label: 'Mi cuenta', sublabel: 'Iniciar sesión', href: '/login' },
@@ -179,6 +182,8 @@ export const footer: FooterProps = {
       title: 'Servicios y Ayuda',
       links: [
         { label: 'Catálogo completo', href: '/productos' },
+        { label: 'Qué pintura necesito', href: '/asesoria' },
+        { label: 'Calculadora de pintura', href: '/asesoria' },
         { label: 'Centro de ayuda', href: '/centro-de-ayuda' },
         { label: 'Preguntas frecuentes', href: '/centro-de-ayuda#preguntas-frecuentes' },
         { label: 'Sobre nosotros', href: '/sobre-nosotros' },

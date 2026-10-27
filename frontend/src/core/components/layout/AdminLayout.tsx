@@ -22,6 +22,7 @@ import {
   Settings,
   Shield,
   ShieldAlert,
+  Sparkles,
   Store,
   UserCheck,
   Users,
@@ -128,6 +129,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Atención al cliente',
     href: '/admin/atencion',
     icon: <Headset className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Asesoría',
+    href: '/admin/asesoria',
+    icon: <Sparkles className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
