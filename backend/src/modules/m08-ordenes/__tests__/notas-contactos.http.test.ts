@@ -87,6 +87,7 @@ describe('Notas internas y contactos · HTTP (HU-ORD-10, HU-ORD-09-02)', () => {
   let servidor: Server;
   let baseUrl: string;
   const repo = new RepoMemoria();
+  const erroresNoControlados: unknown[] = [];
   const auditoria = { registrarAccesoDenegado: vi.fn().mockResolvedValue(undefined) };
 
   const ACTORES: Record<string, Actor> = {
@@ -120,6 +121,11 @@ describe('Notas internas y contactos · HTTP (HU-ORD-10, HU-ORD-09-02)', () => {
       next();
     });
     app.use('/ordenes', m08.router);
+    // Lo que llegue aquí es un error no controlado: en producción lo registra el manejador global.
+    app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      erroresNoControlados.push(error);
+      if (!res.headersSent) res.status(500).end();
+    });
     servidor = await new Promise<Server>((resolver) => {
       const s = app.listen(0, '127.0.0.1', () => resolver(s));
     });
@@ -132,6 +138,7 @@ describe('Notas internas y contactos · HTTP (HU-ORD-10, HU-ORD-09-02)', () => {
 
   beforeEach(() => {
     auditoria.registrarAccesoDenegado.mockClear();
+    erroresNoControlados.length = 0;
     repo.ordenes = [orden('PC-2026-00001', 7)];
     repo.siguiente = 1;
   });
@@ -185,6 +192,17 @@ describe('Notas internas y contactos · HTTP (HU-ORD-10, HU-ORD-09-02)', () => {
     it('una orden inexistente responde 404 opaco', async () => {
       const r = await llamar('POST', '/gestion/PC-2026-99999/notas', 'gestor', { texto: 'hola' });
       expect(r.status).toBe(404);
+    });
+
+    it('con el código y el cuerpo inválidos a la vez responde un único 400 y no llega ningún error al manejador global', async () => {
+      const codigoLargo = 'X'.repeat(51);
+
+      const nota = await llamar('POST', `/gestion/${codigoLargo}/notas`, 'gestor', { texto: '' });
+      const contacto = await llamar('POST', `/gestion/${codigoLargo}/contactos`, 'gestor', { medio: 'whatsapp' });
+
+      expect(nota.status).toBe(400);
+      expect(contacto.status).toBe(400);
+      expect(erroresNoControlados).toEqual([]);
     });
 
     it.each(['PUT', 'PATCH', 'DELETE'])('%s sobre una nota responde 405 NOTA_INMUTABLE y no la toca (CA-ORD-10-03)', async (metodo) => {

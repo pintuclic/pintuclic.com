@@ -40,9 +40,11 @@ export class GestionController {
   });
 
   historialCliente = manejarOrden(async (req: Request, res: Response): Promise<void> => {
+    // En cascada: `validar` responde 400 al fallar, y una segunda respuesta lanzaría ERR_HTTP_HEADERS_SENT.
     const parametros = validar(res, codigoOrdenParamsSchema, req.params);
+    if (parametros === null) return;
     const paginacion = validar(res, paginacionQuerySchema, req.query);
-    if (parametros === null || paginacion === null) return;
+    if (paginacion === null) return;
 
     const { filas, paginacion: meta } = await this.servicio.historialCliente(
       parametros.codigo,
@@ -59,8 +61,9 @@ export class GestionController {
       return;
     }
     const parametros = validar(res, codigoOrdenParamsSchema, req.params);
+    if (parametros === null) return;
     const cambio = validar(res, cambiarEstadoRequestSchema, req.body);
-    if (parametros === null || cambio === null) return;
+    if (cambio === null) return;
 
     res.json({ success: true, data: await this.servicio.cambiarEstado(parametros.codigo, cambio, actor) });
   });

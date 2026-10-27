@@ -15,16 +15,19 @@ import { NotasController } from './controllers/notas.controller';
 import { ipDe } from './controllers/orden-http';
 import type { CatalogoDisponibilidadPort, ConsultaClienteRepository } from './interfaces/consulta-cliente.interface';
 import type { EstadosRepository } from './interfaces/estados.interface';
+import type { CreacionRepository } from './interfaces/ordenes.interface';
 import type { EventosOrdenPort } from './interfaces/eventos-orden.port';
 import type { GestionRepository } from './interfaces/gestion.interface';
 import type { NotasRepository } from './interfaces/notas.interface';
 import type { NotificacionesOrdenPort } from './interfaces/notificaciones-orden.port';
 import type { RelojPort } from './interfaces/reloj.port';
 import { PrismaConsultaClienteRepository } from './repositories/consulta-cliente.repository';
+import { PrismaCreacionRepository } from './repositories/creacion.repository';
 import { PrismaEstadosRepository } from './repositories/estados.repository';
 import { PrismaGestionRepository } from './repositories/gestion.repository';
 import { PrismaNotasRepository } from './repositories/notas.repository';
 import { ConsultaClienteService } from './services/consulta-cliente.service';
+import { CreacionService } from './services/creacion.service';
 import { EstadosService } from './services/estados.service';
 import { GestionService } from './services/gestion.service';
 import { NotasService } from './services/notas.service';
@@ -72,6 +75,9 @@ export interface ModuloM08Config {
   notas?: {
     repo?: NotasRepository;
   };
+  creacion?: {
+    repo?: CreacionRepository;
+  };
   estados?: {
     repo?: EstadosRepository;
     eventos?: EventosOrdenPort;
@@ -84,8 +90,12 @@ export interface ModuloM08Config {
  * M08 · Orden de venta (contracts/m08-ordenes.contract.ts). Se monta bajo `/ordenes`, detrás de
  * la sesión: el cliente titular usa `/mis-pedidos`; el personal usa `/gestion`.
  */
-export function construirModuloM08(autorizacion: AutorizacionService, config?: ModuloM08Config): { router: Router } {
+export function construirModuloM08(
+  autorizacion: AutorizacionService,
+  config?: ModuloM08Config,
+): { router: Router; creacion: CreacionService } {
   const reloj = config?.estados?.reloj ?? new RelojSistemaAdapter();
+  const notificaciones = config?.estados?.notificaciones ?? new SinNotificacionesOrdenAdapter();
   const catalogoPorDefecto = new PrismaCatalogoDisponibilidadAdapter();
 
   const consultaCliente = new ConsultaClienteService(
@@ -96,9 +106,11 @@ export function construirModuloM08(autorizacion: AutorizacionService, config?: M
   const estados = new EstadosService(
     config?.estados?.repo ?? new PrismaEstadosRepository(),
     config?.estados?.eventos ?? new SinEventosOrdenAdapter(),
-    config?.estados?.notificaciones ?? new SinNotificacionesOrdenAdapter(),
+    notificaciones,
     reloj,
   );
+  /** Punto de entrada de M07: se llama al confirmarse el pago (HU-ORD-01). Sin ruta HTTP (R1). */
+  const creacion = new CreacionService(config?.creacion?.repo ?? new PrismaCreacionRepository(), notificaciones, reloj);
   const gestionService = new GestionService(
     config?.gestion?.repo ?? new PrismaGestionRepository(),
     estados,
@@ -140,5 +152,5 @@ export function construirModuloM08(autorizacion: AutorizacionService, config?: M
     router.patch(ruta, gestionar, notas.inmutable);
     router.delete(ruta, gestionar, notas.inmutable);
   }
-  return { router };
+  return { router, creacion };
 }

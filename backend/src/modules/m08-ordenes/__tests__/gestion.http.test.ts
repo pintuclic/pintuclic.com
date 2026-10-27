@@ -151,6 +151,7 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
   let servidor: Server;
   let baseUrl: string;
   const repo = new RepoMemoria();
+  const erroresNoControlados: unknown[] = [];
   const auditoria = { registrarAccesoDenegado: vi.fn().mockResolvedValue(undefined) };
   const eventos = { emitirCambioEstado: vi.fn().mockResolvedValue(undefined) };
   const notificaciones = {
@@ -193,6 +194,11 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
       next();
     });
     app.use('/ordenes', m08.router);
+    // Lo que llegue aquí es un error no controlado: en producción lo registra el manejador global.
+    app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      erroresNoControlados.push(error);
+      if (!res.headersSent) res.status(500).end();
+    });
     servidor = await new Promise<Server>((resolver) => {
       const s = app.listen(0, '127.0.0.1', () => resolver(s));
     });
@@ -206,6 +212,7 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
   beforeEach(() => {
     auditoria.registrarAccesoDenegado.mockClear();
     eventos.emitirCambioEstado.mockClear();
+    erroresNoControlados.length = 0;
     repo.ordenes = [
       detalle('PC-2026-00001', 'orden_confirmada'),
       detalle('PC-2026-00002', 'orden_confirmada', { fecha: new Date('2026-10-10T00:00:00Z') }),
@@ -463,6 +470,18 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
 
       expect(r.status).toBe(409);
       expect(json(r)).toMatchObject({ error: { code: 'TRANSICION_NO_PERMITIDA' } });
+    });
+
+    it('con el código y el cuerpo inválidos a la vez responde un único 400 y no llega ningún error al manejador global', async () => {
+      const codigoLargo = 'X'.repeat(51);
+
+      const estado = await llamar('PATCH', `/gestion/${codigoLargo}/estado`, 'gestor', { estadoNuevo: 'no-existe' });
+      const historial = await llamar('GET', `/gestion/${codigoLargo}/historial-cliente?pagina=0`, 'lector');
+
+      expect(estado.status).toBe(400);
+      expect(json(estado)).toMatchObject({ success: false, error: { code: 'PARAMETRO_INVALIDO' } });
+      expect(historial.status).toBe(400);
+      expect(erroresNoControlados).toEqual([]);
     });
 
     it('volver de preparada a preparación sin motivo responde 400 por el esquema del contrato', async () => {

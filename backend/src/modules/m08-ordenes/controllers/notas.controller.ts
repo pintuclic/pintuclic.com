@@ -14,9 +14,11 @@ export class NotasController {
       responderRecursoNoDisponible(res);
       return;
     }
+    // En cascada: `validar` responde 400 al fallar, y una segunda respuesta lanzaría ERR_HTTP_HEADERS_SENT.
     const parametros = validar(res, codigoOrdenParamsSchema, req.params);
+    if (parametros === null) return;
     const nota = validar(res, crearNotaRequestSchema, req.body);
-    if (parametros === null || nota === null) return;
+    if (nota === null) return;
 
     res.status(201).json({ success: true, data: await this.servicio.crearNota(parametros.codigo, nota, actor) });
   });
@@ -28,8 +30,9 @@ export class NotasController {
       return;
     }
     const parametros = validar(res, codigoOrdenParamsSchema, req.params);
+    if (parametros === null) return;
     const contacto = validar(res, crearContactoRequestSchema, req.body);
-    if (parametros === null || contacto === null) return;
+    if (contacto === null) return;
 
     res.status(201).json({ success: true, data: await this.servicio.crearContacto(parametros.codigo, contacto, actor) });
   });
