@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { PanelCompraRapida } from '../components/publico/CompraRapidaModal';
+import { catalogoPublicoApi } from '../services/consulta-publica-api';
 import type { ProductoPublicoFicha, VariantePublica } from '../dtos/m01-catalogo-productos.dto';
 import { imagenDeCompra, presentacionInicial, requiereColor, subtituloProducto } from '../services/compra-rapida';
 import { datosFichaTecnica, textoAmbiente } from '../services/ficha-tecnica';
@@ -96,7 +97,7 @@ describe('PanelCompraRapida', () => {
     expect(html).toContain('Elige un color para agregarlo al carrito.');
     expect(html).toContain('href="/productos/7"');
     expect(html).toContain('Ver todos los detalles del producto');
-    expect(html).toMatch(/<img[^>]*src="[^"]*imagenes\/3[^"]*"/);
+    expect(html).toContain(`src="${catalogoPublicoApi.urlImagen(3, 'mediana')}"`);
   });
 
   it('un producto sin color no muestra el selector y deja agregar', () => {
