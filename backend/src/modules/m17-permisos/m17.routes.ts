@@ -8,6 +8,7 @@ import { ClientesAdminController } from './controllers/clientes-admin.controller
 import { ConfiguracionController } from './controllers/configuracion.controller';
 import { EmpleadosController } from './controllers/empleados.controller';
 import { GobernanzaAdminController } from './controllers/gobernanza-admin.controller';
+import { PanelController } from './controllers/panel.controller';
 import { PermisosController } from './controllers/permisos.controller';
 import type { ActivacionEmpleadoPort } from './interfaces/empleados.interface';
 import type { GobernanzaAdminRepositoryPort } from './interfaces/gobernanza.interface';
@@ -15,11 +16,13 @@ import { ClientesAdminRepository } from './repositories/clientes-admin.repositor
 import { PrismaConfiguracionRepository } from './repositories/configuracion.repository';
 import { EmpleadosRepository } from './repositories/empleados.repository';
 import { GobernanzaAdminRepository } from './repositories/gobernanza-admin.repository';
+import { PanelRepository } from './repositories/panel.repository';
 import { PermisosRepository } from './repositories/permisos.repository';
 import { ClientesAdminService } from './services/clientes-admin.service';
 import { ConfiguracionService } from './services/configuracion.service';
 import { EmpleadosService } from './services/empleados.service';
 import { GobernanzaAdminService } from './services/gobernanza-admin.service';
+import { PanelService } from './services/panel.service';
 import { PermisosService } from './services/permisos.service';
 import { ResolutorPermisosDatabaseAdapter } from './services/resolutor-permisos.adapter';
 
@@ -83,6 +86,7 @@ export function construirModuloM17(
   const clientesService = new ClientesAdminService(clientesRepo, gobernanzaRepo, sesionService);
   const configService = new ConfiguracionService(configRepo);
   const gobernanzaService = new GobernanzaAdminService(gobernanzaRepo, empleadosRepo, sesionService);
+  const panelService = new PanelService(new PanelRepository(), resolutorPermisos);
 
   // 3. Controladores
   const empleadosController = new EmpleadosController(empleadosService);
@@ -90,10 +94,14 @@ export function construirModuloM17(
   const clientesController = new ClientesAdminController(clientesService);
   const configController = new ConfiguracionController(configService);
   const gobernanzaController = new GobernanzaAdminController(gobernanzaService);
+  const panelController = new PanelController(panelService);
 
   // 4. Router
   const router = Router();
   const soloAdmin = requireAdmin(gobernanzaRepo) as RequestHandler;
+
+  // Resumen del panel: sesión obligatoria (la monta el router padre); cada bloque se filtra por permiso en el servicio.
+  router.get('/resumen', panelController.resumen as RequestHandler);
 
   // HU-ADM-01: Gestión de Colaboradores / Empleados
   router.get(

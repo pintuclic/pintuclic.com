@@ -1,12 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  ArrowRight,
-  Bell,
   Boxes,
   Percent,
   Building2,
@@ -22,7 +19,6 @@ import {
   Megaphone,
   Menu,
   Package,
-  Search,
   Settings,
   Shield,
   ShieldAlert,
@@ -35,7 +31,6 @@ import { apiClient } from '../../api/apiClient';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../buttons/Button';
 import { IconButton } from '../buttons/IconButton';
-import { Input } from '../forms/Input';
 import { Logo } from './Logo';
 
 export interface AdminNavItem {
@@ -179,15 +174,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     };
   }, [usuario, establecerUsuario]);
 
-  const nombreVisible = usuario?.nombre || 'Carlos Álvarez';
-  const correoVisible = usuario?.correo || 'admin@pintuclic.co';
+  const nombreVisible = usuario?.nombre || 'Mi cuenta';
+  const correoVisible = usuario?.correo ?? '';
   const iniciales =
     nombreVisible
       .trim()
       .split(/\s+/)
       .slice(0, 2)
       .map((p) => p[0]?.toUpperCase() ?? '')
-      .join('') || 'CA';
+      .join('') || 'PC';
 
   const [esEscritorio, setEsEscritorio] = useState(true);
 
@@ -233,16 +228,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     return pathname?.startsWith(item.href) ?? false;
   };
 
+  /** El título de la sección actual sale de la propia navegación: el ítem cuya ruta mejor coincide con la dirección. */
   const getBreadcrumbTitle = () => {
-    if (pathname === '/admin') return 'Dashboard';
-    if (pathname?.startsWith('/admin/empleados')) return 'Colaboradores';
-    if (pathname?.startsWith('/admin/clientes')) return 'Clientes';
-    if (pathname?.startsWith('/admin/empresas')) return 'Empresas';
-    if (pathname?.startsWith('/admin/banners')) return 'Banners de Inicio';
-    if (pathname?.startsWith('/admin/contenido')) return 'Contenido';
-    if (pathname?.startsWith('/admin/configuracion')) return 'Configuración';
-    if (pathname?.startsWith('/admin/gobernanza')) return 'Gobernanza';
-    return 'Dashboard';
+    const coincidencias = navItems.filter((item) => isNavActive(item));
+    const mejor = coincidencias.sort((x, y) => y.href.length - x.href.length)[0];
+    return mejor?.label ?? 'Dashboard';
   };
 
   return (
@@ -327,37 +317,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           })}
         </nav>
 
-        {/* Tarjeta Inferior Oficial ("Hacemos crecer tu negocio") */}
-        <div className="p-4">
-          <div className="p-3.5 bg-subaction/55 border border-subaction rounded-card flex items-center gap-2.5">
-            <Image
-              src="/images/landing/producto-pintura-acrilica.png"
-              alt=""
-              width={56}
-              height={64}
-              className="h-16 w-14 object-contain shrink-0"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="font-title font-bold text-xs text-corporate leading-snug">
-                Hacemos crecer tu negocio
-              </p>
-              <p className="font-sans text-[11px] text-neutral-medium leading-tight mt-1">
-                Más colores.
-                <br />
-                Más proyectos.
-                <br />
-                Más Colombia.
-              </p>
-            </div>
-            <Link
-              href="/"
-              aria-label="Ir a la tienda Pintu Clic"
-              className="w-7 h-7 rounded-full bg-action text-neutral-white hover:bg-action-hover flex items-center justify-center shrink-0 self-end shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
-            >
-              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
       </aside>
 
       {/* ==================================================================== */}
@@ -403,36 +362,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             </nav>
           </div>
 
-          {/* Centro: Buscador global */}
-          <div className="hidden md:flex items-center flex-1 max-w-md mx-4">
-            <Input
-              id="buscar-admin-global"
-              type="search"
-              placeholder="Buscar productos, marcas, categorías o pedidos..."
-              aria-label="Buscar en el panel administrativo"
-              leftIcon={<Search className="w-4 h-4 text-neutral-medium" />}
-              className="h-10 min-h-[40px] py-1.5 text-xs bg-neutral-lightest border-neutral-light/80 rounded-btn"
-            />
-          </div>
-
-          {/* Lado derecho: Notificaciones + Perfil de Administrador en fila horizontal */}
+          {/* Lado derecho: Perfil de la persona que entró */}
           <div className="flex items-center gap-3 sm:gap-5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label="Notificaciones, 3 sin leer"
-              className="relative p-2 text-corporate hover:bg-neutral-lightest rounded-btn min-h-[40px]"
-            >
-              <Bell className="w-5 h-5" />
-              <span
-                aria-hidden="true"
-                className="absolute top-1 right-1 w-4 h-4 bg-danger text-neutral-white font-title font-bold text-[10px] rounded-full flex items-center justify-center ring-2 ring-neutral-white"
-              >
-                3
-              </span>
-            </Button>
-
             {/* Perfil Administrador */}
             <div className="relative" ref={perfilRef}>
               <Button

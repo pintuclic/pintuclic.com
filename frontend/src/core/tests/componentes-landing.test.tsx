@@ -256,11 +256,11 @@ describe('Footer', () => {
 });
 
 describe('Admin Core Kit (AdminLayout, AdminPageHeader, AdminStatCard)', () => {
-  it('AdminLayout renderiza el sidebar full-height, el logo oficial, el menú sin jerga interna y el widget inferior', () => {
+  it('AdminLayout renderiza el sidebar full-height, el logo oficial y el menú, sin adornos que no hacen nada', () => {
     const html = renderToStaticMarkup(
       <AdminLayout>
         <AdminPageHeader
-          title="¡Hola, Carlos!"
+          title="¡Hola, equipo!"
           subtitle="Resumen del panel"
           metaPrimary="Viernes, 23 de octubre de 2026"
           metaSecondary="Pintu Clic Admin"
@@ -269,10 +269,14 @@ describe('Admin Core Kit (AdminLayout, AdminPageHeader, AdminStatCard)', () => {
     );
 
     expect(html).toContain('aria-label="Navegación administrativa"');
-    expect(html).toContain('Hacemos crecer tu negocio');
     expect(html).not.toContain('Módulos M17');
-    expect(html).toContain('Buscar productos, marcas, categorías o pedidos...');
-    expect(html).toContain('¡Hola, Carlos!');
+    // Nada de maqueta: ni tarjeta publicitaria abajo, ni buscador que no busca, ni campana de notificaciones sin función.
+    expect(html).not.toContain('Hacemos crecer tu negocio');
+    expect(html).not.toContain('Buscar productos, marcas, categorías o pedidos');
+        expect(html).not.toMatch(/aria-label="Notificaciones/);
+    // Sin sesión no se inventa una persona.
+    expect(html).not.toContain('Carlos');
+    expect(html).toContain('¡Hola, equipo!');
     expect(html).toContain('Pintu Clic Admin');
   });
 
