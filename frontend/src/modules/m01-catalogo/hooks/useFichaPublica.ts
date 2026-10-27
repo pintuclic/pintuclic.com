@@ -10,6 +10,7 @@ import type {
 import { catalogoPublicoApi } from '../services/consulta-publica-api';
 import { leerErrorCatalogo } from '../services/mensaje-error';
 import { ofertaDePresentacion } from '../services/ofertas-visuales';
+import { presentacionInicial, requiereColor } from '../services/seleccion-ficha';
 
 export type EstadoFicha =
   | { tipo: 'cargando' }
@@ -28,16 +29,12 @@ export interface FichaPublica {
   oferta: OfertaPublica | null;
 }
 
-const primera = (variantes: readonly VariantePublica[]): VariantePublica | null => variantes[0] ?? null;
-
 /**
- * Lo que comparten la ficha y la compra rápida (U8): carga la ficha pública, recuerda la presentación y el color
- * elegidos y pide las ofertas con ese color (los eventos pueden excluir colores).
+ * La ficha pública (HU-CAT-06, U8): carga el producto, empieza con la primera presentación que se puede comprar y,
+ * si llega `idColorInicial` (la tarjeta del listado, `?color=`), con ese color ya elegido cuando el producto lo
+ * ofrece. Pide las ofertas con el color elegido, porque los eventos pueden excluir colores.
  */
-export function useFichaPublica(
-  idProducto: number,
-  varianteInicial: (variantes: readonly VariantePublica[]) => VariantePublica | null = primera,
-): FichaPublica {
+export function useFichaPublica(idProducto: number, idColorInicial: number | null = null): FichaPublica {
   const [estado, setEstado] = useState<EstadoFicha>({ tipo: 'cargando' });
   const [idVariante, setIdVariante] = useState<number | null>(null);
   const [color, setColor] = useState<ColorOfrecido | null>(null);
@@ -51,9 +48,19 @@ export function useFichaPublica(
     setOfertasConColor(null);
     catalogoPublicoApi
       .ficha(idProducto)
-      .then((ficha) => {
+      .then(async (ficha) => {
+        // El color de la tarjeta se pide antes de mostrar la ficha, para que no "salte" de sin color a color.
+        const inicial =
+          idColorInicial === null || !requiereColor(ficha)
+            ? null
+            : await catalogoPublicoApi
+                .colores(idProducto, { idColor: idColorInicial, pagina: 1, limite: 1 })
+                .then((pagina) => pagina.items[0] ?? null)
+                // Si no se puede traer, la ficha abre sin color, como siempre.
+                .catch(() => null);
         if (!vigente) return;
-        setIdVariante(varianteInicial(ficha.variantes)?.idVariante ?? null);
+        setIdVariante(presentacionInicial(ficha.variantes)?.idVariante ?? null);
+        setColor(inicial);
         setEstado({ tipo: 'lista', ficha });
       })
       .catch((err: unknown) => {
@@ -65,7 +72,7 @@ export function useFichaPublica(
     return () => {
       vigente = false;
     };
-    // `varianteInicial` solo decide al cargar: cambiarla no vuelve a pedir la ficha.
+    // El color inicial solo cuenta al abrir: elegir otro en la ficha cambia la dirección, no vuelve a cargar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idProducto]);
 

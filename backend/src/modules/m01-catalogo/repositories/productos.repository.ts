@@ -275,6 +275,7 @@ export async function consultarColoresOfrecidos(
     });
   }
   if (query.idAcabado !== undefined) filtros.push({ idAcabado: query.idAcabado });
+  if (query.idColor !== undefined) filtros.push({ idColor: query.idColor });
   // Las familias se calculan sin el filtro de familia para que el selector no se vacíe al elegir una.
   const sinFamilia: Prisma.ColorWhereInput = { AND: filtros };
   const conFamilia: Prisma.ColorWhereInput =

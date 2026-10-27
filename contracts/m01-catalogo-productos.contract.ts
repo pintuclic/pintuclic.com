@@ -613,6 +613,8 @@ export const listarColoresProductoRequestSchema = paginacionQuerySchema.extend({
   busqueda: z.string().trim().max(100).optional(),
   idFamiliaColor: z.coerce.number().int().positive().optional(),
   idAcabado: z.coerce.number().int().positive().optional(),
+  /** U8: trae ese color si el producto lo ofrece (la ficha abierta en un color, `?color=`). */
+  idColor: z.coerce.number().int().positive().optional(),
 });
 export type ListarColoresProductoRequest = z.infer<typeof listarColoresProductoRequestSchema>;
 

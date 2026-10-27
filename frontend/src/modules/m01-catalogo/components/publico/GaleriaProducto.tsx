@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { esColorMuyClaro } from '@/core/utils/color-muestra';
 
 export interface ImagenGaleria {
   idImagen: number;
@@ -19,6 +20,8 @@ export interface GaleriaProductoProps {
   /** Imagen de la medida elegida (por ejemplo la silueta del envase): se muestra en una esquina. */
   imagenMedidaUrl: string | null;
   nombreMedida: string | null;
+  /** Color elegido: la imagen se ve sobre una pared pintada de ese color, con su nombre y código (U8). */
+  color?: { nombre: string; codigo: string | null; hexadecimal: string } | null;
 }
 
 /** Carrusel de imágenes del producto con miniaturas; la primera es la portada. */
@@ -28,6 +31,7 @@ export const GaleriaProducto: React.FC<GaleriaProductoProps> = ({
   idImagenEnfocada = null,
   imagenMedidaUrl,
   nombreMedida,
+  color = null,
 }) => {
   const [indice, setIndice] = useState(0);
   const total = imagenes.length;
@@ -47,15 +51,38 @@ export const GaleriaProducto: React.FC<GaleriaProductoProps> = ({
 
   return (
     <section aria-label={`Imágenes de ${nombre}`} aria-roledescription="carrusel" className="space-y-3">
-      <div className="relative flex min-h-72 items-center justify-center overflow-hidden rounded-card bg-neutral-lightest p-4 sm:min-h-96">
+      <div
+        className="relative flex min-h-80 items-end justify-center overflow-hidden rounded-card bg-neutral-lightest p-6 transition-colors duration-500 sm:min-h-[28rem]"
+        // El color es un dato del catálogo, no del tema: por eso va en `style`.
+        style={color === null ? undefined : { backgroundColor: color.hexadecimal }}
+        data-color-pared={color?.hexadecimal}
+      >
+        {color !== null && (
+          <>
+            {/* Piso claro bajo la pared pintada: el envase queda "parado" frente al color. */}
+            <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/5 bg-neutral-white/75" />
+            <p
+              className={`absolute left-4 top-4 z-10 rounded-input bg-neutral-white/90 px-3 py-1.5 font-title text-sm font-semibold text-neutral-black shadow-card ${
+                esColorMuyClaro(color.hexadecimal) ? 'ring-1 ring-neutral-light' : ''
+              }`}
+            >
+              {color.nombre}
+              {color.codigo !== null && (
+                <span className="block font-sans text-xs font-normal text-neutral-medium">{color.codigo}</span>
+              )}
+            </p>
+          </>
+        )}
         {actual === undefined ? (
-          <p className="font-sans text-sm text-neutral-medium">Este producto aún no tiene imágenes.</p>
+          <p className="relative self-center font-sans text-sm text-neutral-medium">Este producto aún no tiene imágenes.</p>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={actual.url}
             alt={`${nombre}, imagen ${indice + 1} de ${total}`}
-            className="max-h-96 w-full object-contain mix-blend-multiply"
+            className={`relative max-h-96 w-full object-contain ${
+              color === null ? 'self-center mix-blend-multiply' : 'drop-shadow-xl'
+            }`}
           />
         )}
         {total > 1 && (

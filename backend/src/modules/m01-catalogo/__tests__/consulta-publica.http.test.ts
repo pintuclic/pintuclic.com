@@ -559,6 +559,11 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: consulta pública (HTTP
         `/productos/${id}/colores?busqueda=${encodeURIComponent('-r2-')}&idFamiliaColor=${fx.familiaRojos}`,
       );
       expect(lista(buscado).map((c) => c.idColor)).toEqual([rojo2.idColor]);
+      // U8: la ficha abierta en un color lo pide por id; uno que el producto no ofrece no se devuelve.
+      const porId = await servidor.publica(`/productos/${id}/colores?idColor=${String(rojo1.idColor)}`);
+      expect(lista(porId).map((c) => c.idColor)).toEqual([rojo1.idColor]);
+      const ajenoPorId = await servidor.publica(`/productos/${id}/colores?idColor=${String(ajeno.idColor)}`);
+      expect(lista(ajenoPorId)).toEqual([]);
       // U7: sin datos de proveedor ni CIELAB internos.
       expect(JSON.stringify(r.cuerpo)).not.toContain('cielab');
     });
