@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { Alert, Button, Container, ProductCard, Select, Skeleton } from '@/core/components';
+import { CompraRapidaModal } from '@/modules/m01-catalogo/components/publico/CompraRapidaModal';
 import { precioVisible } from '@/modules/m01-catalogo/services/ofertas-visuales';
 import { EventosEnCurso } from '@/modules/m06-precios/components/publico/EventosEnCurso';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
@@ -39,6 +40,8 @@ export const BusquedaCatalogoView: React.FC = () => {
   );
 
   const [panelMovilAbierto, setPanelMovilAbierto] = useState(false);
+  /** Producto abierto en la compra rápida (V4); null = cerrada. */
+  const [compraRapida, setCompraRapida] = useState<number | null>(null);
   const [textoBusqueda, setTextoBusqueda] = useState(filtros.q);
 
   const [cargando, setCargando] = useState(true);
@@ -464,6 +467,9 @@ export const BusquedaCatalogoView: React.FC = () => {
                       {...precioVisible(p.precioDesde, p.oferta)}
                       isSponsored={p.patrocinado}
                       href={`/productos/${p.idProducto}`}
+                      onAddToCart={() => setCompraRapida(p.idProducto)}
+                      addToCartDisabled={p.compraBloqueada}
+                      {...(p.colorMuestra === null ? {} : { swatchColor: p.colorMuestra.hexadecimal })}
                       {...(p.idImagenPrincipal === null
                         ? {}
                         : { imageUrl: busquedaApi.urlImagen(p.idImagenPrincipal, 'miniatura') })}
@@ -500,6 +506,9 @@ export const BusquedaCatalogoView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* V4: el carrito de la tarjeta abre la compra rápida de M01 sin salir del listado. */}
+      <CompraRapidaModal idProducto={compraRapida} onClose={() => setCompraRapida(null)} />
     </Container>
   );
 };

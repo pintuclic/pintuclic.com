@@ -40,6 +40,12 @@ export interface OfertaListado {
   precioConOferta: number;
 }
 
+/** Color con el que se pinta el fondo de la imagen de la tarjeta (T1, T2). */
+export interface ColorMuestra {
+  nombre: string;
+  hexadecimal: string;
+}
+
 export interface ResultadoBusqueda {
   idProducto: number;
   nombre: string;
@@ -58,6 +64,8 @@ export interface ResultadoBusqueda {
   patrocinado: boolean;
   /** La campaña que lo adelantó, para medir; null si `patrocinado` es false. */
   idCampania: number | null;
+  /** Fondo de la imagen; null si el producto no se vende con color. */
+  colorMuestra: ColorMuestra | null;
   coincidenciaColor: string | null;
 }
 
