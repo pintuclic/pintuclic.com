@@ -43,10 +43,15 @@ const resultado = (cambios: Partial<ResultadoBusqueda> = {}): ResultadoBusqueda 
 
 describe('Botón del carrito de la tarjeta (M02 · V3, V4)', () => {
   it('agrega la presentación del precio que muestra: la más barata que se puede comprar', () => {
-    const lista = [variante(1, 85900), variante(2, 28900), variante(3, 19900, { disponibilidad: 'agotado' })];
+    const lista = [variante(1, 85900), variante(2, 28900), variante(3, 99000, { compraBloqueada: true })];
     expect(presentacionDeTarjeta(lista)?.idVariante).toBe(2);
     expect(presentacionDeTarjeta([variante(4, 10000, { compraBloqueada: true })])).toBeNull();
     expect(presentacionDeTarjeta([])).toBeNull();
+  });
+
+  it('"agotado por ahora" no impide agregar: la existencia es solo informativa (M13, V4 de M01)', () => {
+    const lista = [variante(1, 34500, { disponibilidad: 'agotado' })];
+    expect(presentacionDeTarjeta(lista)?.idVariante).toBe(1);
   });
 
   it('lleva a la ficha cuando no puede agregar directo', () => {

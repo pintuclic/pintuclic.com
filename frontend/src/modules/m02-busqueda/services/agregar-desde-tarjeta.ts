@@ -3,10 +3,11 @@ import type { ResultadoBusqueda } from '../dtos/busqueda.dto';
 
 /**
  * V3: la presentación que agrega el botón del carrito de la tarjeta, la del precio que muestra ("desde"): la más barata
- * entre las que se pueden comprar y están disponibles. Si ninguna, null (el botón lleva a la ficha, V4).
+ * entre las que se pueden comprar. "Agotado por ahora" NO impide comprar: la existencia es solo informativa (M13, V4 de
+ * M01); solo un combo agotado se bloquea (`compraBloqueada`, K5). Si ninguna se puede comprar, null (V4: va a la ficha).
  */
 export function presentacionDeTarjeta(variantes: readonly VariantePublica[]): VariantePublica | null {
-  const vendibles = variantes.filter((v) => !v.compraBloqueada && v.disponibilidad === 'disponible');
+  const vendibles = variantes.filter((v) => !v.compraBloqueada);
   return vendibles.reduce<VariantePublica | null>(
     (mejor, v) => (mejor === null || v.precio < mejor.precio ? v : mejor),
     null,
