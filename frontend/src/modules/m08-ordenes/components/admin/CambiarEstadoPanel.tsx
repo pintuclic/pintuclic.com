@@ -38,9 +38,8 @@ export function CambiarEstadoPanel({ orden, operando, onCambiar }: CambiarEstado
     reset({ estadoNuevo: orden.transicionesPermitidas[0] ?? orden.estado, motivo: '' });
   }, [orden.estado, orden.transicionesPermitidas, reset]);
 
-  if (orden.transicionesPermitidas.length === 0) {
-    return <p className="text-sm text-neutral-medium">Esta orden no tiene más pasos disponibles.</p>;
-  }
+  // Sin pasos posibles no hay nada que ofrecer: quien lo monta oculta la tarjeta entera.
+  if (orden.transicionesPermitidas.length === 0) return null;
 
   const requiereMotivo = orden.estado === 'preparada' && watch('estadoNuevo') === 'en_preparacion';
 

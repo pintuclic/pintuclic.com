@@ -127,9 +127,11 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
               </ul>
             </Tarjeta>
 
-            <Tarjeta id="estado" titulo="Cambiar estado">
-              <CambiarEstadoPanel orden={detalle} operando={operando} onCambiar={cambiarEstado} />
-            </Tarjeta>
+            {detalle.transicionesPermitidas.length > 0 && (
+              <Tarjeta id="estado" titulo="Cambiar estado">
+                <CambiarEstadoPanel orden={detalle} operando={operando} onCambiar={cambiarEstado} />
+              </Tarjeta>
+            )}
 
             <Tarjeta id="contactos" titulo="Contactos con el cliente">
               <ContactosPanel contactos={detalle.contactos} operando={operando} onRegistrar={agregarContacto} />
