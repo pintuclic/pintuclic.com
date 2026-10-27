@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 4.11 (alineado con schema_pintuclic.sql v4.11 - atención al cliente M15)
+-- VERSIÓN: 4.18 (alineado con schema_pintuclic.sql v4.18 - asesoría M03 y auditoría M20)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -68,7 +68,10 @@ INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     (26, 'atencion.atender_clientes',      'Atender las consultas escaladas a un asesor humano',               'activo'),
     -- Patrocinios y publicidad (M14 HU-PAT-01, HU-PAT-02)
     (27, 'patrocinios.ver',                'Consultar campañas de patrocinio, anuncios y su medición',         'activo'),
-    (28, 'patrocinios.editar',             'Crear y editar campañas de patrocinio y anuncios publicitarios',   'activo')
+    (28, 'patrocinios.editar',             'Crear y editar campañas de patrocinio y anuncios publicitarios',   'activo'),
+    -- Asesoría y asistencia (M03 HU-ASE-01, HU-ASE-05, HU-ASE-06)
+    (29, 'asesoria.ver',                   'Consultar el cuestionario guiado, los guiones y los incidentes del servicio de IA', 'activo'),
+    (30, 'asesoria.editar',                'Editar el cuestionario guiado, los guiones y los parámetros del servicio de IA',    'activo')
 ON CONFLICT (id_permiso) DO NOTHING;
 
 -- 1.5 Asignación de Permisos a Roles
@@ -78,7 +81,7 @@ INSERT INTO asignacion_permiso (id_rol, id_permiso) VALUES
     (1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
     (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
     (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26),
-    (1, 27), (1, 28),
+    (1, 27), (1, 28), (1, 29), (1, 30),
     (3, 4), (3, 10)
 ON CONFLICT (id_rol, id_permiso) DO NOTHING;
 
@@ -596,6 +599,11 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
     'dictamen_empresa',
     'Resultado de tu solicitud de cuenta empresarial · Pintu Clic',
     'Gracias por tu solicitud de cuenta empresarial en Pintu Clic. A continuación encontrarás el resultado de la revisión.'
+),
+(
+    'alerta_servicio_ia',
+    'El asistente de la tienda no está respondiendo · Pintu Clic',
+    'El servicio de inteligencia artificial que atiende el asistente y la búsqueda asistida acumuló varios fallos seguidos y dejó de responder. El resto del sitio sigue funcionando con normalidad. Revisa el detalle en el panel, en Asesoría.'
 )
 ON CONFLICT (tipo) DO NOTHING;
 
@@ -806,6 +814,79 @@ INSERT INTO cupon (id_cupon, codigo, nombre, descripcion, tipo_valor, valor, mon
     (1, 'BIENVENIDA10', 'Bienvenida', '10 % en la primera compra', 'porcentaje', 10.00, 50000.00, 100, 1, 'todos', '2026-11-01T05:00:00Z', NULL, 'inactivo')
 ON CONFLICT (id_cupon) DO NOTHING;
 
+-- ==============================================================================
+-- 9F. ASESORÍA Y ASISTENCIA (5 Tablas - M03)
+-- ==============================================================================
+
+-- 9F.1 Configuración (fila única, M03 · D8). Arranca en modo `fijo` a propósito: no necesita
+-- la clave de Gemini, así que el cuestionario se puede probar sin servicio externo (M03 · Q3).
+-- `manos_por_defecto` queda en NULL porque RF-ASE-02-06 prohíbe suponer las manos (M03 · K9).
+-- Los valores de IA son los supuestos del contrato mientras no llegue el anexo B (M03 · Q1).
+INSERT INTO configuracion_asesoria (
+    id_configuracion, modo_cuestionario, manos_por_defecto,
+    guion_cuestionario, guion_asistente,
+    ia_tiempo_espera_ms, ia_reintentos, ia_suspension_cuota_minutos,
+    ia_retencion_incidentes_dias, ia_fallos_consecutivos_alerta
+) VALUES (
+    1, 'fijo', NULL,
+    'Ayuda a quien no sabe qué pintura necesita. Haz una pregunta por turno, siempre con opciones cerradas, y usa como máximo seis. Pregunta primero por la superficie, luego por el ambiente, el color deseado, el estado de la superficie y con qué se va a aplicar. Cuando ya tengas con qué filtrar, termina. No prometas resultados ni hables de precios.',
+    'Eres el asesor de pintura de Pintu Clic. Responde en español, breve y claro, como alguien que atiende en el mostrador. Hablas de pintura, preparación de superficies, aplicación y de los productos de la tienda. No das precios, descuentos, existencias ni plazos de entrega: para eso remites al catálogo o al carrito. Para calcular cuánta pintura se necesita, remites a la calculadora. No inventas productos ni rendimientos. Si te preguntan algo ajeno a la pintura, lo dices con amabilidad y ofreces hablar con un asesor.',
+    8000, 2, 60, 90, 5
+) ON CONFLICT (id_configuracion) DO NOTHING;
+
+-- 9F.2 Cuestionario de partida (M03 · F6, V3). Es el de la spec CONTRASTADO con lo que M01
+-- tiene de verdad: se omiten la opción «Zona húmeda» y la pregunta «¿Qué uso tendrá el
+-- espacio?», porque no existe el dato ni el filtro que las exprese (M03 · D11, Q4b).
+INSERT INTO pregunta_asesoria (id_pregunta, texto, orden, origen_opciones, estado) VALUES
+    (1, '¿Qué superficie va a pintar?',               1, 'manual',         'activo'),
+    (2, '¿El espacio es abierto o cerrado?',          2, 'manual',         'activo'),
+    (3, '¿Qué color desea?',                          3, 'familias_color', 'activo'),
+    (4, '¿En qué condiciones está la superficie?',    4, 'manual',         'activo'),
+    (5, '¿Con qué se va a aplicar o diluir?',         5, 'manual',         'activo')
+ON CONFLICT (id_pregunta) DO NOTHING;
+
+-- La pregunta 3 no lleva opciones: son las familias cromáticas activas del catálogo (M03 · F3).
+INSERT INTO opcion_asesoria (id_opcion, id_pregunta, texto, orden, estado) VALUES
+    (1,  1, 'Pared o techo interior',   1, 'activo'),
+    (2,  1, 'Fachada o muro exterior',  2, 'activo'),
+    (3,  1, 'Madera',                   3, 'activo'),
+    (4,  1, 'Metal',                    4, 'activo'),
+    (5,  1, 'Piso',                     5, 'activo'),
+    (6,  2, 'Interior cerrado',         1, 'activo'),
+    (7,  2, 'Exterior a la intemperie', 2, 'activo'),
+    (8,  4, 'Nueva sin tratar',         1, 'activo'),
+    (9,  4, 'Pintada en buen estado',   2, 'activo'),
+    (10, 4, 'Deteriorada',              3, 'activo'),
+    (11, 5, 'Agua',                     1, 'activo'),
+    (12, 5, 'Solvente',                 2, 'activo'),
+    (13, 5, 'Indiferente',              3, 'activo')
+ON CONFLICT (id_opcion) DO NOTHING;
+
+-- Correspondencia opción → filtro (M03 · F2). Todos los objetivos existen en el catálogo:
+-- superficies 1-4 (Paredes y techos, Madera, Metal, Pisos), subcategoría 2 (Pinturas para
+-- fachadas), 4 (Anticorrosivos) y 8 (Selladores e imprimantes), categoría 2 (Preparación de
+-- superficies) y 4 (Impermeabilizantes), tipos de resina 1 (Base agua) y 2 (Base aceite).
+-- «Pintada en buen estado» (9) e «Indiferente» (13) no llevan efecto a propósito: no filtran.
+INSERT INTO efecto_opcion_asesoria (id_efecto, id_opcion, tipo, dimension, id_objetivo, ambiente, requiere_opciones) VALUES
+    (1,  1,  'filtrar',          'superficie',   1,    NULL,       '{}'),
+    (2,  2,  'filtrar',          'subcategoria', 2,    NULL,       '{}'),
+    (3,  3,  'filtrar',          'superficie',   2,    NULL,       '{}'),
+    (4,  4,  'filtrar',          'superficie',   3,    NULL,       '{}'),
+    (5,  5,  'filtrar',          'superficie',   4,    NULL,       '{}'),
+    (6,  6,  'filtrar_ambiente', NULL,           NULL, 'interior', '{}'),
+    (7,  7,  'filtrar_ambiente', NULL,           NULL, 'exterior', '{}'),
+    -- CA-ASE-01-03: a la intemperie, el resultado incluye impermeabilizantes
+    (8,  7,  'incluir',          'categoria',    4,    NULL,       '{}'),
+    -- Superficie nueva: se proponen selladores e imprimantes
+    (9,  8,  'incluir',          'subcategoria', 8,    NULL,       '{}'),
+    -- Superficie deteriorada: se propone la preparación de superficies
+    (10, 10, 'incluir',          'categoria',    2,    NULL,       '{}'),
+    -- CA-ASE-01-02: metal (opción 4) deteriorado, el resultado incluye anticorrosivos
+    (11, 10, 'incluir',          'subcategoria', 4,    NULL,       '{4}'),
+    (12, 11, 'filtrar',          'tipo_resina',  1,    NULL,       '{}'),
+    (13, 12, 'filtrar',          'tipo_resina',  2,    NULL,       '{}')
+ON CONFLICT (id_efecto) DO NOTHING;
+
 
 -- ==============================================================================
 -- 10. ACTUALIZACIÓN AUTOMÁTICA DE SECUENCIAS (EVITA COLISIONES DE IDs)
@@ -863,5 +944,12 @@ SELECT setval('evento_descuento_id_evento_seq',       COALESCE((SELECT MAX(id_ev
 SELECT setval('evento_regla_id_regla_seq',            COALESCE((SELECT MAX(id_regla) FROM evento_regla), 1));
 SELECT setval('evento_exclusion_id_exclusion_seq',    COALESCE((SELECT MAX(id_exclusion) FROM evento_exclusion), 1));
 SELECT setval('cupon_id_cupon_seq',                   COALESCE((SELECT MAX(id_cupon) FROM cupon), 1));
+
+-- M03 y M20 (v4.18)
+SELECT setval('pregunta_asesoria_id_pregunta_seq',       COALESCE((SELECT MAX(id_pregunta) FROM pregunta_asesoria), 1));
+SELECT setval('opcion_asesoria_id_opcion_seq',           COALESCE((SELECT MAX(id_opcion) FROM opcion_asesoria), 1));
+SELECT setval('efecto_opcion_asesoria_id_efecto_seq',    COALESCE((SELECT MAX(id_efecto) FROM efecto_opcion_asesoria), 1));
+SELECT setval('incidente_ia_id_incidente_seq',           COALESCE((SELECT MAX(id_incidente) FROM incidente_ia), 1));
+SELECT setval('registro_auditoria_id_registro_seq',      COALESCE((SELECT MAX(id_registro) FROM registro_auditoria), 1));
 
 COMMIT;

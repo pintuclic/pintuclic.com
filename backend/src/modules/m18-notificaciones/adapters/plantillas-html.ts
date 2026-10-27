@@ -124,6 +124,30 @@ export function htmlCambioCorreoConfirmado(intro: string, nuevoCorreo: string): 
   `.trim();
 }
 
+/**
+ * M03 · I9: aviso interno al administrador cuando el servicio de IA acumula fallos.
+ * No lleva datos de ninguna persona ni el contenido de las consultas (M03 · I7).
+ */
+export function textoAlertaServicioIa(intro: string, servicio: string, fallosConsecutivos: number): string {
+  return [
+    intro,
+    '',
+    `Servicio: ${servicio}`,
+    `Fallos seguidos: ${fallosConsecutivos}`,
+  ].join('\n');
+}
+
+export function htmlAlertaServicioIa(intro: string, servicio: string, fallosConsecutivos: number): string {
+  return `
+    <div style="${CAJA_ESTILO}">
+      <h2 style="color: #0B2D6B; margin-top: 0;">El asistente no está respondiendo</h2>
+      ${introAHtml(intro)}
+      <p style="font-size: 13px; color: #4B5563;">Servicio: <strong>${escaparHtml(servicio)}</strong></p>
+      <p style="font-size: 13px; color: #4B5563;">Fallos seguidos: <strong>${fallosConsecutivos}</strong></p>
+    </div>
+  `.trim();
+}
+
 export function textoDictamenEmpresa(intro: string, aprobada: boolean, motivo?: string): string {
   const motivoLimpio = motivo?.trim();
   return [

@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.11 (v4.10 + M15: contacto, horario y canal de atención)
+-- VERSIÓN: 4.19 (v4.18 + M03: cuestionario guiado e incidentes de IA; M20: registro de auditoría)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 67
+-- TOTAL TABLAS: 85
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -203,6 +203,61 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_evento_medicion') THEN
         CREATE TYPE enum_evento_medicion AS ENUM ('impresion', 'clic');
     END IF;
+
+    -- M03: cuál de los dos cuestionarios está vigente (contrato M03 · D3)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_modo_cuestionario') THEN
+        CREATE TYPE enum_modo_cuestionario AS ENUM ('fijo', 'asistido');
+    END IF;
+
+    -- M03: de dónde salen las opciones de una pregunta del modo fijo (M03 · F3)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_origen_opciones_asesoria') THEN
+        CREATE TYPE enum_origen_opciones_asesoria AS ENUM ('manual', 'familias_color');
+    END IF;
+
+    -- M03: qué hace elegir una opción (M03 · F2)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_efecto_asesoria') THEN
+        CREATE TYPE enum_tipo_efecto_asesoria AS ENUM ('filtrar', 'filtrar_ambiente', 'incluir');
+    END IF;
+
+    -- M03: dimensiones que M02 sabe filtrar y que por tanto viajan en la URL del catálogo (M03 · V1, V2)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_dimension_filtro_asesoria') THEN
+        CREATE TYPE enum_dimension_filtro_asesoria AS ENUM (
+            'categoria', 'subcategoria', 'superficie', 'familia_color', 'tipo_resina', 'linea'
+        );
+    END IF;
+
+    -- M03: ambiente del producto (producto.uso_interior / uso_exterior de M01, sin ENUM propio hasta ahora)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ambiente_asesoria') THEN
+        CREATE TYPE enum_ambiente_asesoria AS ENUM ('interior', 'exterior');
+    END IF;
+
+    -- M03: servicio de inteligencia artificial del incidente (M03 · I7)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_servicio_ia') THEN
+        CREATE TYPE enum_servicio_ia AS ENUM ('gemini');
+    END IF;
+
+    -- M03: qué función pedía el servicio cuando falló (M03 · I7)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_funcion_ia') THEN
+        CREATE TYPE enum_funcion_ia AS ENUM ('chat', 'cuestionario');
+    END IF;
+
+    -- M03: tipo de fallo del servicio de IA (M03 · I7)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_incidente_ia') THEN
+        CREATE TYPE enum_tipo_incidente_ia AS ENUM (
+            'tiempo_agotado', 'no_disponible', 'cuota_agotada',
+            'respuesta_no_procesable', 'error_configuracion'
+        );
+    END IF;
+
+    -- M03: cómo terminó el intento (M03 · I7, I9)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_resultado_incidente_ia') THEN
+        CREATE TYPE enum_resultado_incidente_ia AS ENUM ('recuperado', 'fallido', 'suspendido');
+    END IF;
+
+    -- M20 (HU-SEG-04): resultado de la acción auditada (RF-SEG-04-02)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_resultado_auditoria') THEN
+        CREATE TYPE enum_resultado_auditoria AS ENUM ('exito', 'fallo');
+    END IF;
 END $$;
 
 -- ------------------------------------------------------------------------------
@@ -252,6 +307,9 @@ BEGIN
 END $$;
 
 ALTER TYPE enum_estado_solicitud_contacto ADD VALUE IF NOT EXISTS 'rechazada' AFTER 'atendida';
+
+-- M18 (v4.18): aviso al administrador cuando el servicio de IA acumula fallos (M03 · I9, M18 HU-NOT-01)
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'alerta_servicio_ia';
 
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS
@@ -2266,6 +2324,210 @@ CREATE TABLE IF NOT EXISTS medicion_patrocinio (
 COMMENT ON TABLE medicion_patrocinio IS 'Totales diarios de impresiones y clics de campañas y anuncios; sin datos personales (M14 · M1)';
 
 -- ==============================================================================
+-- 9.y ASESORÍA Y ASISTENCIA (M03 · contracts/m03-asesoria.contract.ts)
+-- ==============================================================================
+
+-- Tabla: pregunta_asesoria
+-- Pregunta del cuestionario del modo `fijo` (M03 · F1). Las preguntas no se borran, se
+-- desactivan (F5), para no romper un flujo a medias. `origen_opciones = familias_color`
+-- significa que las opciones son las familias cromáticas activas del catálogo y la tabla
+-- `opcion_asesoria` queda vacía para esa pregunta (F3).
+CREATE TABLE IF NOT EXISTS pregunta_asesoria (
+    id_pregunta SERIAL PRIMARY KEY,
+    texto VARCHAR(200) NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    origen_opciones enum_origen_opciones_asesoria NOT NULL DEFAULT 'manual',
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_pregunta_asesoria_texto CHECK (btrim(texto) <> ''),
+    CONSTRAINT ck_pregunta_asesoria_orden CHECK (orden >= 0)
+);
+
+COMMENT ON TABLE pregunta_asesoria IS 'Pregunta del cuestionario guiado administrable (M03 · HU-ASE-01, modo fijo)';
+COMMENT ON COLUMN pregunta_asesoria.origen_opciones IS 'manual = opciones en opcion_asesoria; familias_color = las familias cromáticas activas del catálogo (M03 · F3)';
+
+-- Tabla: opcion_asesoria
+-- Opción cerrada de una pregunta del modo `fijo`. Se desactiva, nunca se borra (F5).
+CREATE TABLE IF NOT EXISTS opcion_asesoria (
+    id_opcion SERIAL PRIMARY KEY,
+    id_pregunta INT NOT NULL,
+    texto VARCHAR(100) NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    CONSTRAINT fk_opcion_asesoria_pregunta FOREIGN KEY (id_pregunta)
+        REFERENCES pregunta_asesoria (id_pregunta) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_opcion_asesoria_texto CHECK (btrim(texto) <> ''),
+    CONSTRAINT ck_opcion_asesoria_orden CHECK (orden >= 0)
+);
+
+COMMENT ON TABLE opcion_asesoria IS 'Opción cerrada de una pregunta del cuestionario fijo (M03 · HU-ASE-01)';
+
+-- Tabla: efecto_opcion_asesoria
+-- Qué hace elegir una opción (M03 · F2). Sin clave foránea hacia el catálogo porque
+-- `id_objetivo` apunta a una tabla distinta según `dimension` (categoría, subcategoría,
+-- superficie, familia_color, tipo_resina o línea); el servicio comprueba que el objetivo
+-- exista y esté activo y, si no, ignora el efecto sin error (M03 · F4).
+--   · filtrar          → `dimension` + `id_objetivo` obligatorios, `ambiente` nulo.
+--   · filtrar_ambiente → `ambiente` obligatorio, `dimension` e `id_objetivo` nulos.
+--   · incluir          → `dimension` limitada a categoria/subcategoria (complementos, M03 · R8).
+CREATE TABLE IF NOT EXISTS efecto_opcion_asesoria (
+    id_efecto SERIAL PRIMARY KEY,
+    id_opcion INT NOT NULL,
+    tipo enum_tipo_efecto_asesoria NOT NULL,
+    dimension enum_dimension_filtro_asesoria,
+    id_objetivo INT,
+    ambiente enum_ambiente_asesoria,
+    -- M03 · F2: opciones que también deben estar elegidas para que el efecto aplique
+    requiere_opciones INT[] NOT NULL DEFAULT '{}',
+    CONSTRAINT fk_efecto_asesoria_opcion FOREIGN KEY (id_opcion)
+        REFERENCES opcion_asesoria (id_opcion) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_efecto_asesoria_forma CHECK (
+        (tipo = 'filtrar'          AND dimension IS NOT NULL AND id_objetivo IS NOT NULL AND ambiente IS NULL)
+     OR (tipo = 'filtrar_ambiente' AND dimension IS NULL     AND id_objetivo IS NULL     AND ambiente IS NOT NULL)
+     OR (tipo = 'incluir'          AND dimension IN ('categoria', 'subcategoria') AND id_objetivo IS NOT NULL AND ambiente IS NULL)
+    ),
+    CONSTRAINT ck_efecto_asesoria_objetivo CHECK (id_objetivo IS NULL OR id_objetivo > 0),
+    CONSTRAINT ck_efecto_asesoria_requiere CHECK (array_length(requiere_opciones, 1) IS NULL OR array_length(requiere_opciones, 1) <= 5)
+);
+
+COMMENT ON TABLE efecto_opcion_asesoria IS 'Correspondencia entre una opción y el filtro que aplica, editable por el administrador (M03 · RF-ASE-01-02, F2)';
+COMMENT ON COLUMN efecto_opcion_asesoria.id_objetivo IS 'Id del valor del catálogo según `dimension`; sin FK porque apunta a seis tablas. El servicio valida que exista y esté activo (M03 · F4)';
+COMMENT ON COLUMN efecto_opcion_asesoria.requiere_opciones IS 'Otras opciones que deben estar elegidas para que el efecto aplique, p. ej. Metal + Deteriorada (M03 · F2)';
+
+-- Tabla: configuracion_asesoria
+-- Fila única con el modo vigente, los guiones de la IA y los parámetros de resiliencia
+-- (M03 · D8, Q1). Los guiones orientan al modelo pero NUNCA levantan las reglas duras del
+-- código: vocabulario cerrado, lista cerrada de productos y esquema de salida (M03 · R12).
+CREATE TABLE IF NOT EXISTS configuracion_asesoria (
+    id_configuracion SMALLINT PRIMARY KEY DEFAULT 1,
+    modo_cuestionario enum_modo_cuestionario NOT NULL DEFAULT 'fijo',
+    -- M03 · K9: sugerencia de manos; NULL = no se sugiere ninguna y el campo nace vacío
+    manos_por_defecto SMALLINT,
+    guion_cuestionario TEXT NOT NULL DEFAULT '',
+    guion_asistente TEXT NOT NULL DEFAULT '',
+    ia_tiempo_espera_ms INT NOT NULL DEFAULT 8000,
+    ia_reintentos SMALLINT NOT NULL DEFAULT 2,
+    ia_suspension_cuota_minutos INT NOT NULL DEFAULT 60,
+    ia_retencion_incidentes_dias INT NOT NULL DEFAULT 90,
+    ia_fallos_consecutivos_alerta SMALLINT NOT NULL DEFAULT 5,
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_config_asesoria_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_config_asesoria_fila_unica CHECK (id_configuracion = 1),
+    CONSTRAINT ck_config_asesoria_manos CHECK (manos_por_defecto IS NULL OR manos_por_defecto BETWEEN 1 AND 10),
+    CONSTRAINT ck_config_asesoria_espera CHECK (ia_tiempo_espera_ms BETWEEN 1000 AND 60000),
+    CONSTRAINT ck_config_asesoria_reintentos CHECK (ia_reintentos BETWEEN 0 AND 5),
+    CONSTRAINT ck_config_asesoria_suspension CHECK (ia_suspension_cuota_minutos BETWEEN 1 AND 1440),
+    CONSTRAINT ck_config_asesoria_retencion CHECK (ia_retencion_incidentes_dias BETWEEN 1 AND 3650),
+    CONSTRAINT ck_config_asesoria_fallos CHECK (ia_fallos_consecutivos_alerta BETWEEN 1 AND 100),
+    CONSTRAINT ck_config_asesoria_guiones CHECK (length(guion_cuestionario) <= 4000 AND length(guion_asistente) <= 4000)
+);
+
+COMMENT ON TABLE configuracion_asesoria IS 'Modo de cuestionario, guiones de la IA y parámetros de resiliencia; fila única (M03 · D3, D8)';
+COMMENT ON COLUMN configuracion_asesoria.modo_cuestionario IS 'fijo = preguntas administrables; asistido = las propone Gemini. Se cambia desde el panel, sin despliegue (M03 · D3)';
+
+-- Tabla: incidente_ia
+-- Registro técnico de fallos del servicio de IA (M03 · RF-ASE-06-06, I7). NUNCA guarda el
+-- texto de la persona, la respuesta del modelo, la dirección IP ni la clave del servicio.
+-- Se PURGA por retención (M03 · I8), y por eso no vive en `registro_auditoria`, que es
+-- inmutable (M03 · D10).
+CREATE TABLE IF NOT EXISTS incidente_ia (
+    id_incidente SERIAL PRIMARY KEY,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    servicio enum_servicio_ia NOT NULL DEFAULT 'gemini',
+    funcion enum_funcion_ia NOT NULL,
+    tipo enum_tipo_incidente_ia NOT NULL,
+    intentos SMALLINT NOT NULL,
+    resultado enum_resultado_incidente_ia NOT NULL,
+    CONSTRAINT ck_incidente_ia_intentos CHECK (intentos >= 1)
+);
+
+COMMENT ON TABLE incidente_ia IS 'Incidentes del servicio de IA, sin datos de la persona ni del contenido; se purgan por retención (M03 · I7, I8)';
+COMMENT ON COLUMN incidente_ia.resultado IS 'recuperado = un reintento lo salvó; fallido = se agotaron los intentos; suspendido = se rechazó por cuota agotada (M03 · I9)';
+
+-- ==============================================================================
+-- 9.z REGISTRO DE AUDITORÍA (M20 · HU-SEG-04, parte de escritura)
+-- ==============================================================================
+
+-- Tabla: registro_auditoria
+-- Quién hizo cada cambio importante y cuándo (RF-SEG-04-02), con el valor anterior y el
+-- nuevo cuando la acción modifica un dato (RF-SEG-04-03). M03 es su primer cliente: escribe
+-- aquí cada cambio del administrador a la configuración y los guiones (M03 · A1).
+--
+-- INMUTABLE (RF-SEG-04-04): más abajo se revocan UPDATE y DELETE sobre la tabla, de modo que
+-- ni el administrador de la aplicación pueda alterar o borrar un registro. La prohibición vive
+-- en la base de datos, no solo en el código.
+--
+-- `id_usuario` queda en NULL cuando la acción la hizo el sistema, y la FK es ON DELETE SET
+-- NULL: si la cuenta desaparece, el registro se conserva con el nombre que se guardó.
+CREATE TABLE IF NOT EXISTS registro_auditoria (
+    id_registro BIGSERIAL PRIMARY KEY,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario INT,
+    -- Copia del nombre del actor: el registro debe seguir siendo legible si la cuenta se borra
+    actor VARCHAR(150),
+    -- Acción en punto, como el código de un permiso: `asesoria.configuracion.editar`
+    accion VARCHAR(100) NOT NULL,
+    entidad VARCHAR(60) NOT NULL,
+    id_entidad VARCHAR(60),
+    valor_anterior TEXT,
+    valor_nuevo TEXT,
+    resultado enum_resultado_auditoria NOT NULL DEFAULT 'exito',
+    ip_origen VARCHAR(45),
+    CONSTRAINT fk_auditoria_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_auditoria_accion CHECK (accion ~ '^[a-z]+(\.[a-z_]+)+$'),
+    CONSTRAINT ck_auditoria_entidad CHECK (btrim(entidad) <> ''),
+    CONSTRAINT ck_auditoria_valores CHECK (
+        (valor_anterior IS NULL OR length(valor_anterior) <= 2000)
+    AND (valor_nuevo    IS NULL OR length(valor_nuevo)    <= 2000)
+    )
+);
+
+COMMENT ON TABLE registro_auditoria IS 'Bitácora inmutable de acciones relevantes: actor, acción, entidad, valor anterior y nuevo (M20 · HU-SEG-04, RF-SEG-04-02, RF-SEG-04-03)';
+COMMENT ON COLUMN registro_auditoria.actor IS 'Copia del nombre de quien actuó, para que el registro siga siendo legible si la cuenta se elimina';
+COMMENT ON COLUMN registro_auditoria.valor_anterior IS 'Valor previo, ya recortado por el emisor; los textos largos se registran por longitud y huella, no completos (M03 · A2)';
+
+-- RF-SEG-04-04, primera barrera: se revoca el permiso a PUBLIC y al rol conectado.
+-- INSERT y SELECT se conservan. Idempotente.
+DO $$
+BEGIN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON TABLE registro_auditoria FROM PUBLIC';
+    EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON TABLE registro_auditoria FROM %I', current_user);
+EXCEPTION
+    WHEN insufficient_privilege THEN
+        RAISE NOTICE 'No se pudo revocar UPDATE/DELETE sobre registro_auditoria: hágalo el administrador de la base (RF-SEG-04-04)';
+END $$;
+
+-- RF-SEG-04-04, segunda barrera: el disparador.
+-- La revocación de arriba NO basta: PostgreSQL deja pasar a un SUPERUSUARIO y al dueño de la
+-- tabla por encima de cualquier permiso (comprobado el 2026-10-26: conectados como `postgres`,
+-- un UPDATE y un DELETE alteraron y borraron registros aunque el permiso estuviera revocado).
+-- El requisito dice «incluso por parte del administrador», así que el disparador rechaza el
+-- cambio sea quien sea quien lo intente. Un superusuario todavía podría desactivarlo a mano,
+-- pero eso ya es un acto deliberado y no un descuido ni un error de la aplicación.
+CREATE OR REPLACE FUNCTION fn_registro_auditoria_inmutable() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'El registro de auditoría es inmutable: no se permite % (RF-SEG-04-04)', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END $$;
+
+COMMENT ON FUNCTION fn_registro_auditoria_inmutable() IS 'Rechaza UPDATE, DELETE y TRUNCATE sobre registro_auditoria, sin importar el rol (M20 · RF-SEG-04-04)';
+
+DROP TRIGGER IF EXISTS trg_registro_auditoria_sin_cambios ON registro_auditoria;
+CREATE TRIGGER trg_registro_auditoria_sin_cambios
+    BEFORE UPDATE OR DELETE ON registro_auditoria
+    FOR EACH ROW EXECUTE FUNCTION fn_registro_auditoria_inmutable();
+
+DROP TRIGGER IF EXISTS trg_registro_auditoria_sin_truncate ON registro_auditoria;
+CREATE TRIGGER trg_registro_auditoria_sin_truncate
+    BEFORE TRUNCATE ON registro_auditoria
+    FOR EACH STATEMENT EXECUTE FUNCTION fn_registro_auditoria_inmutable();
+
+-- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
 -- ==============================================================================
 
@@ -2429,6 +2691,18 @@ CREATE INDEX IF NOT EXISTS idx_cupon_estado_fechas ON cupon(estado, fecha_inicio
 CREATE INDEX IF NOT EXISTS idx_cupon_uso_cupon_usuario ON cupon_uso(id_cupon, id_usuario) WHERE liberado_en IS NULL;
 CREATE INDEX IF NOT EXISTS idx_cuenta_empresa_sub_rol ON cuenta_empresa(id_sub_rol_empresa);
 
+-- M03: cuestionario guiado, incidentes de IA
+CREATE INDEX IF NOT EXISTS idx_pregunta_asesoria_orden ON pregunta_asesoria(estado, orden);
+CREATE INDEX IF NOT EXISTS idx_opcion_asesoria_pregunta ON opcion_asesoria(id_pregunta, orden);
+CREATE INDEX IF NOT EXISTS idx_efecto_asesoria_opcion ON efecto_opcion_asesoria(id_opcion);
+CREATE INDEX IF NOT EXISTS idx_incidente_ia_fecha ON incidente_ia(fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_incidente_ia_tipo_fecha ON incidente_ia(tipo, fecha DESC);
+
+-- M20: registro de auditoría (consulta por fecha y por entidad afectada, RF-SEG-04-05)
+CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON registro_auditoria(fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_auditoria_entidad ON registro_auditoria(entidad, id_entidad);
+CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON registro_auditoria(id_usuario);
+
 -- M14: campañas, anuncios y medición
 CREATE INDEX IF NOT EXISTS idx_campania_estado_fechas ON campania_patrocinio(estado, fecha_inicio, fecha_fin);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_campania_nombre ON campania_patrocinio (lower(btrim(nombre)));
@@ -2443,5 +2717,5 @@ CREATE INDEX IF NOT EXISTS idx_lineacotizacion_cotizacion ON linea_cotizacion(id
 CREATE INDEX IF NOT EXISTS idx_lineacarrito_cotizacion ON linea_carrito(id_cotizacion) WHERE id_cotizacion IS NOT NULL;
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (79 TABLAS - v4.18)
+-- FIN DEL SCRIPT DDL (85 TABLAS - v4.19)
 -- ==============================================================================

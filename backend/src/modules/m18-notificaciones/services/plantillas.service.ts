@@ -47,6 +47,12 @@ function renderizarMuestra(
         contenidoHtml: plantillasHtml.htmlDictamenEmpresa(intro, true),
         contenidoTexto: plantillasHtml.textoDictamenEmpresa(intro, true),
       };
+    case 'alerta_servicio_ia':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlAlertaServicioIa(intro, 'Gemini', 5),
+        contenidoTexto: plantillasHtml.textoAlertaServicioIa(intro, 'Gemini', 5),
+      };
   }
 }
 

@@ -25,6 +25,7 @@ export const DEPENDENCIA_DE_CONSULTA: Partial<Record<CodigoPermiso, CodigoPermis
   'atencion.editar': 'atencion.ver',
   'atencion.atender_clientes': 'atencion.ver',
   'patrocinios.editar': 'patrocinios.ver',
+  'asesoria.editar': 'asesoria.ver',
 };
 
 /**

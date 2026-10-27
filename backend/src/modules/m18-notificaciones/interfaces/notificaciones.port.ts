@@ -14,7 +14,8 @@ export interface EventoNotificacion {
     | 'activacion_empleado'
     | 'cambio_correo_otp'
     | 'cambio_correo_confirmado'
-    | 'dictamen_empresa';
+    | 'dictamen_empresa'
+    | 'alerta_servicio_ia';
   destinatario: string;
   timestamp: Date;
   metadatos: Record<string, string | number | boolean>;
@@ -32,6 +33,16 @@ export interface NotificacionesPort {
     motivoRechazo?: string
   ): Promise<void>;
   notificarCambioCorreoConfirmado?(correoAnterior: string, nuevoCorreo: string): Promise<void>;
+  /**
+   * M03 · I9: el servicio de IA acumuló los fallos consecutivos configurados. Opcional
+   * para no romper los adaptadores existentes; M03 comprueba que esté antes de llamar y,
+   * si el aviso falla, el resto del módulo sigue funcionando (M03 · A4).
+   */
+  notificarAlertaServicioIa?(
+    correo: string,
+    servicio: string,
+    fallosConsecutivos: number,
+  ): Promise<void>;
 }
 
 /**
