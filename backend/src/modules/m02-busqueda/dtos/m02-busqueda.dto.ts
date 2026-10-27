@@ -84,10 +84,17 @@ export const PESOS_RELEVANCIA = {
   nombre: 5,
   marca: 4,
   linea: 3,
+  categoria: 2,
   color: 2,
   descripcion: 1,
 } as const;
 export const FACTOR_COINCIDENCIA_EXACTA = 2;
+export const FACTOR_COINCIDENCIA_APROXIMADA = 0.5;
+export const LARGO_MINIMO_PALABRA = 3;
+export const ERRORES_TOLERADOS = [
+  { desdeLetras: 8, errores: 2 },
+  { desdeLetras: 4, errores: 1 },
+] as const;
 /** Cuántos productos patrocinados pueden pasar por delante en el listado (M14 · A8; mismo valor que allí). */
 export const CUPO_PATROCINADOS_LISTADO = 8;
 
@@ -174,7 +181,14 @@ export type ListarSinResultadoRequest = z.infer<typeof listarSinResultadoRequest
  * 4. RESPUESTAS
  * ─────────────────────────────────────────────────────────────────────────── */
 
+export const colorMuestraSchema = z.object({
+  nombre: z.string(),
+  hexadecimal: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+});
+export type ColorMuestra = z.infer<typeof colorMuestraSchema>;
+
 export const resultadoBusquedaSchema = productoPublicoTarjetaSchema.extend({
+  colorMuestra: colorMuestraSchema.nullable(),
   coincidenciaColor: z.string().nullable(),
   patrocinado: z.boolean(),
   idCampania: idSchema.nullable(),

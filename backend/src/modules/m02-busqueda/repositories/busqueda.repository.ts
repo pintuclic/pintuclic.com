@@ -5,6 +5,7 @@ import type {
   BuscarProductosRequest,
   BusquedaSinResultado,
   ColorBuscado,
+  ColorMuestra,
   ContextoPrecio,
   ListarSinResultadoRequest,
   OpcionesFiltro,
@@ -20,21 +21,40 @@ import type {
   PrecioFinalPort,
   ResultadoBusqueda,
 } from '../dtos/m02-busqueda.dto';
-import {
-  FACTOR_COINCIDENCIA_EXACTA,
-  PESOS_RELEVANCIA,
-} from '../dtos/m02-busqueda.dto';
+import { FACTOR_COINCIDENCIA_EXACTA, PESOS_RELEVANCIA } from '../dtos/m02-busqueda.dto';
 import type { BusquedaRepositoryPort, PaginaResultado } from '../interfaces/busqueda.interface';
+import {
+  FACTOR_POR_FUERZA,
+  fuerzaCoincidencia,
+  normalizarTexto,
+  palabrasDeBusqueda,
+} from '../services/coincidencia-texto';
 import { PrecioFinalBaseAdapter } from '../services/precio-final.adapter';
 import { compararPorRelevancia, elegirPatrocinados } from '../services/patrocinio-listado';
+import { CartaColoresRepository, type ColorCoincidente } from './carta-colores.repository';
 
-export function normalizarTexto(texto: string): string {
-  return texto
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .replace(/\s+/g, ' ');
+export { normalizarTexto };
+
+/** Textos ya normalizados (B3) de cada campo que se busca (B4), para no repetir la normalización por palabra. */
+interface TextosBuscables {
+  nombre: string;
+  marca: string;
+  linea: string;
+  categoria: string;
+  subcategoria: string;
+  descripcion: string;
+}
+
+/** Colores de la carta que coinciden con cada palabra del término (B7): palabra → producto → color. */
+type CartaPorPalabra = ReadonlyMap<string, ReadonlyMap<number, ColorCoincidente>>;
+
+type FamiliaBuscable = { id: number; nombre: string; normalizado: string };
+
+interface Coincidencia {
+  puntaje: number;
+  coincidenciaColor: string | null;
+  /** El color que coincidió con el término, para el color de muestra (T2). */
+  idColorCoincidente: number | null;
 }
 
 interface ProductoCrudo {
@@ -63,8 +83,13 @@ interface ProductoCrudo {
   compraBloqueada: boolean;
   superficies: readonly number[];
   medidas: readonly number[];
+  /** Familias que puede entregar: de fábrica y de su carta (B8). */
   familiasColor: readonly number[];
-  colores: ReadonlyArray<{ idColor: number; nombre: string; familia: string | null }>;
+  /** Colores de fábrica, con el nombre normalizado para buscar. */
+  colores: ReadonlyArray<{ idColor: number; nombre: string; nombreNormalizado: string }>;
+  /** Colores del filtro `idColor` que ofrece, de fábrica o de su carta (B7). */
+  coloresDelFiltro: readonly number[];
+  textos: TextosBuscables;
 }
 
 export class BusquedaRepository implements BusquedaRepositoryPort {
@@ -72,6 +97,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     private readonly precioFinalPort: PrecioFinalPort = new PrecioFinalBaseAdapter(),
     private readonly ofertasPort: OfertasListadoPort | null = null,
     private readonly patrocinioPort: PatrocinioListadoPort | null = null,
+    private readonly carta: CartaColoresRepository = new CartaColoresRepository(),
   ) {}
 
   /**
@@ -119,7 +145,10 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     }
   }
 
-  private async cargarProductosBase(enOferta: ReadonlySet<number>): Promise<ProductoCrudo[]> {
+  private async cargarProductosBase(
+    enOferta: ReadonlySet<number>,
+    idsColorFiltro: readonly number[] = [],
+  ): Promise<ProductoCrudo[]> {
     const productosDb = await prisma.producto.findMany({
       where: productoVisible(),
       include: {
@@ -157,7 +186,6 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
                 idColor: true,
                 nombre: true,
                 idFamiliaColor: true,
-                familia: { select: { nombre: true } },
               },
             },
           },
@@ -171,6 +199,12 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     const mapaPrecios = await this.precioFinalPort
       .preciosFinales(todosIdsVariante, { idUsuario: null })
       .catch((): ReadonlyMap<number, number> => new Map());
+    // B7/B8: lo que ofrece la carta de cada producto entonable, resuelto en la base.
+    const idsProducto = productosDb.map((p) => p.idProducto);
+    const [familiasCarta, coloresFiltro] = await Promise.all([
+      this.carta.familiasPorProducto(idsProducto),
+      this.carta.coloresDelFiltroPorProducto(idsProducto, idsColorFiltro),
+    ]);
 
     return productosDb.map((p) => {
       const preciosVariantes = p.variantes.map(
@@ -183,10 +217,10 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       const coloresLista = p.coloresFabrica.map((c) => ({
         idColor: c.color.idColor,
         nombre: c.color.nombre,
-        familia: c.color.familia?.nombre ?? null,
+        nombreNormalizado: normalizarTexto(c.color.nombre),
       }));
 
-      const familiasSet = new Set<number>();
+      const familiasSet = new Set<number>(familiasCarta.get(p.idProducto) ?? []);
       for (const c of p.coloresFabrica) {
         if (c.color.idFamiliaColor) {
           familiasSet.add(c.color.idFamiliaColor);
@@ -230,92 +264,124 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
         medidas: [...medidasSet],
         familiasColor: [...familiasSet],
         colores: coloresLista,
+        coloresDelFiltro: coloresFiltro.get(p.idProducto) ?? [],
+        textos: {
+          nombre: normalizarTexto(p.nombre),
+          marca: normalizarTexto(p.marca.nombre),
+          linea: normalizarTexto(p.linea?.nombre ?? ''),
+          categoria: normalizarTexto(p.subcategoria.categoria.nombre),
+          subcategoria: normalizarTexto(p.subcategoria.nombre),
+          descripcion: normalizarTexto(p.descripcion ?? ''),
+        },
       };
     });
   }
 
+  /** Nombre de cada familia cromática, normalizado para buscarlo (B8). Son pocas. */
+  private async familiasBuscables(): Promise<FamiliaBuscable[]> {
+    const familias = await prisma.familiaColor.findMany({ select: { idFamiliaColor: true, nombre: true } });
+    return familias.map((f) => ({ id: f.idFamiliaColor, nombre: f.nombre, normalizado: normalizarTexto(f.nombre) }));
+  }
+
+  /** B7: por cada palabra, el color de la carta que la contiene en cada producto (una consulta por palabra). */
+  private async cartaPorPalabra(
+    palabras: readonly string[],
+    productos: readonly ProductoCrudo[],
+  ): Promise<CartaPorPalabra> {
+    const conColor = productos.filter((p) => p.tieneColor).map((p) => p.idProducto);
+    const mapas = await Promise.all(palabras.map((palabra) => this.carta.colorQueContiene(conColor, palabra)));
+    return new Map(palabras.map((palabra, i) => [palabra, mapas[i] ?? new Map<number, ColorCoincidente>()]));
+  }
+
+  /** Lo que la coincidencia necesita además del producto; sin término no hace falta consultar nada. */
+  private async contextoDeBusqueda(
+    palabras: readonly string[],
+    productos: readonly ProductoCrudo[],
+  ): Promise<{ carta: CartaPorPalabra; familias: FamiliaBuscable[] }> {
+    if (palabras.length === 0) return { carta: new Map(), familias: [] };
+    const [carta, familias] = await Promise.all([
+      this.cartaPorPalabra(palabras, productos),
+      this.familiasBuscables(),
+    ]);
+    return { carta, familias };
+  }
+
+  /**
+   * B11–B13 y O2: cada palabra del término debe coincidir con al menos un campo; el puntaje suma el peso de cada campo
+   * por la fuerza de la coincidencia. Sin término, todos valen 1.
+   */
   private evaluarCoincidencia(
     producto: ProductoCrudo,
     terminoNormalizado: string,
-  ): { puntaje: number; coincidenciaColor: string | null } {
-    if (terminoNormalizado === '') {
-      return { puntaje: 1, coincidenciaColor: null };
+    palabras: readonly string[],
+    contexto: { carta: CartaPorPalabra; familias: readonly FamiliaBuscable[] },
+  ): Coincidencia {
+    if (palabras.length === 0) {
+      return { puntaje: 1, coincidenciaColor: null, idColorCoincidente: null };
     }
+
+    const t = producto.textos;
+    const campos: ReadonlyArray<{ peso: number; texto: string }> = [
+      { peso: PESOS_RELEVANCIA.nombre, texto: t.nombre },
+      { peso: PESOS_RELEVANCIA.marca, texto: t.marca },
+      { peso: PESOS_RELEVANCIA.linea, texto: t.linea },
+      { peso: PESOS_RELEVANCIA.categoria, texto: t.categoria },
+      { peso: PESOS_RELEVANCIA.categoria, texto: t.subcategoria },
+      { peso: PESOS_RELEVANCIA.descripcion, texto: t.descripcion },
+    ];
+    const familiasDelProducto = contexto.familias.filter((f) => producto.familiasColor.includes(f.id));
 
     let puntaje = 0;
     let coincidenciaColor: string | null = null;
+    let idColorCoincidente: number | null = null;
 
-    const nombreNorm = normalizarTexto(producto.nombre);
-    const marcaNorm = normalizarTexto(producto.marcaNombre);
-    const lineaNorm = normalizarTexto(producto.lineaNombre ?? '');
-    const descNorm = normalizarTexto(producto.descripcion);
-
-    // Nombre (peso 5)
-    if (nombreNorm === terminoNormalizado) {
-      puntaje += PESOS_RELEVANCIA.nombre * FACTOR_COINCIDENCIA_EXACTA;
-    } else if (nombreNorm.includes(terminoNormalizado)) {
-      puntaje += PESOS_RELEVANCIA.nombre;
-    }
-
-    // Marca (peso 4)
-    if (marcaNorm === terminoNormalizado) {
-      puntaje += PESOS_RELEVANCIA.marca * FACTOR_COINCIDENCIA_EXACTA;
-    } else if (marcaNorm.includes(terminoNormalizado)) {
-      puntaje += PESOS_RELEVANCIA.marca;
-    }
-
-    // Línea (peso 3)
-    if (lineaNorm !== '') {
-      if (lineaNorm === terminoNormalizado) {
-        puntaje += PESOS_RELEVANCIA.linea * FACTOR_COINCIDENCIA_EXACTA;
-      } else if (lineaNorm.includes(terminoNormalizado)) {
-        puntaje += PESOS_RELEVANCIA.linea;
-      }
-    }
-
-    // Color y familia cromática (peso 2)
-    for (const c of producto.colores) {
-      const colNorm = normalizarTexto(c.nombre);
-      const famNorm = normalizarTexto(c.familia ?? '');
-
-      if (colNorm === terminoNormalizado) {
-        puntaje += PESOS_RELEVANCIA.color * FACTOR_COINCIDENCIA_EXACTA;
-        if (!coincidenciaColor) coincidenciaColor = c.nombre;
-      } else if (colNorm.includes(terminoNormalizado)) {
-        puntaje += PESOS_RELEVANCIA.color;
-        if (!coincidenciaColor) coincidenciaColor = c.nombre;
-      } else if (famNorm !== '' && (famNorm === terminoNormalizado || famNorm.includes(terminoNormalizado))) {
-        puntaje += PESOS_RELEVANCIA.color;
-        if (!coincidenciaColor && c.familia) coincidenciaColor = `Familia ${c.familia}`;
-      }
-    }
-
-    // Descripción (peso 1)
-    if (descNorm.includes(terminoNormalizado)) {
-      puntaje += PESOS_RELEVANCIA.descripcion;
-    }
-
-    // Búsqueda flexible por palabras si el término tiene varios términos
-    const palabras = terminoNormalizado.split(' ').filter((p) => p.length > 2);
-    if (palabras.length > 1) {
-      let palabrasEncontradas = 0;
-      for (const palabra of palabras) {
-        if (
-          nombreNorm.includes(palabra) ||
-          marcaNorm.includes(palabra) ||
-          lineaNorm.includes(palabra) ||
-          descNorm.includes(palabra) ||
-          producto.colores.some((c) => normalizarTexto(c.nombre).includes(palabra))
-        ) {
-          palabrasEncontradas += 1;
+    for (const palabra of palabras) {
+      let encontrada = false;
+      for (const campo of campos) {
+        const fuerza = fuerzaCoincidencia(palabra, campo.texto);
+        if (fuerza !== null) {
+          puntaje += campo.peso * FACTOR_POR_FUERZA[fuerza];
+          encontrada = true;
         }
       }
-      if (palabrasEncontradas === palabras.length) {
-        puntaje += 3;
+
+      // Color: primero los de fábrica (con tolerancia), luego la carta (B7) y por último la familia (B8).
+      const deFabrica = producto.colores
+        .map((c) => ({ color: c, fuerza: fuerzaCoincidencia(palabra, c.nombreNormalizado) }))
+        .find((x) => x.fuerza !== null);
+      const deCarta = contexto.carta.get(palabra)?.get(producto.idProducto);
+      const familia = familiasDelProducto
+        .map((f) => ({ familia: f, fuerza: fuerzaCoincidencia(palabra, f.normalizado) }))
+        .find((x) => x.fuerza !== null);
+
+      if (deFabrica !== undefined && deFabrica.fuerza !== null) {
+        puntaje += PESOS_RELEVANCIA.color * FACTOR_POR_FUERZA[deFabrica.fuerza];
+        encontrada = true;
+        if (coincidenciaColor === null) {
+          coincidenciaColor = deFabrica.color.nombre;
+          idColorCoincidente = deFabrica.color.idColor;
+        }
+      } else if (deCarta !== undefined) {
+        puntaje += PESOS_RELEVANCIA.color;
+        encontrada = true;
+        if (coincidenciaColor === null) {
+          coincidenciaColor = deCarta.nombre;
+          idColorCoincidente = deCarta.idColor;
+        }
+      } else if (familia !== undefined && familia.fuerza !== null) {
+        puntaje += PESOS_RELEVANCIA.color * FACTOR_POR_FUERZA[familia.fuerza];
+        encontrada = true;
+        if (coincidenciaColor === null) coincidenciaColor = `Familia ${familia.familia.nombre}`;
       }
+
+      // B12: si una palabra no coincide con nada, el producto no aparece.
+      if (!encontrada) return { puntaje: 0, coincidenciaColor: null, idColorCoincidente: null };
     }
 
-    return { puntaje, coincidenciaColor };
+    // Escribir el nombre completo tal cual pesa más que cualquier coincidencia parcial.
+    if (t.nombre === terminoNormalizado) puntaje += PESOS_RELEVANCIA.nombre * FACTOR_COINCIDENCIA_EXACTA;
+
+    return { puntaje, coincidenciaColor, idColorCoincidente };
   }
 
   private cumpleFiltrosBase(p: ProductoCrudo, f: OpcionesFiltroRequest, omitirGrupo?: string): boolean {
@@ -339,8 +405,8 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       if (!coincide) return false;
     }
     if (omitirGrupo !== 'idColor' && f.idColor && f.idColor.length > 0) {
-      const coincide = f.idColor.some((idCol: number) => p.colores.some((c) => c.idColor === idCol));
-      if (!coincide) return false;
+      // B7: de fábrica o de su carta; `coloresDelFiltro` ya viene calculado para estos colores.
+      if (p.coloresDelFiltro.length === 0) return false;
     }
     if (omitirGrupo !== 'idMedida' && f.idMedida && f.idMedida.length > 0) {
       const coincide = f.idMedida.some((idMed: number) => p.medidas.includes(idMed));
@@ -362,30 +428,47 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     return true;
   }
 
+  /** T1–T3: el color de muestra de los productos de la página. Si la consulta falla, salen sin color. */
+  private async coloresDeMuestra(
+    pagina: ReadonlyArray<{ producto: ProductoCrudo; idColorCoincidente: number | null }>,
+    filtros: BuscarProductosRequest,
+  ): Promise<ReadonlyMap<number, ColorMuestra>> {
+    const conColor = pagina.filter(({ producto }) => producto.tieneColor);
+    try {
+      return await this.carta.coloresDeMuestra(
+        conColor.map(({ producto }) => producto.idProducto),
+        {
+          idsColorFiltro: filtros.idColor ?? [],
+          colorDelTermino: new Map(
+            conColor.flatMap(({ producto, idColorCoincidente }) =>
+              idColorCoincidente === null ? [] : [[producto.idProducto, idColorCoincidente] as const],
+            ),
+          ),
+          idsFamiliaFiltro: filtros.idFamiliaColor ?? [],
+        },
+      );
+    } catch {
+      return new Map();
+    }
+  }
+
   async buscarProductos(
     filtros: BuscarProductosRequest,
     _contexto: ContextoPrecio,
   ): Promise<PaginaResultado<ResultadoBusqueda>> {
-    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros));
+    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros), filtros.idColor ?? []);
     const terminoNorm = normalizarTexto(filtros.q ?? '');
+    const palabras = palabrasDeBusqueda(terminoNorm);
+    const candidatos = productosBase.filter((p) => this.cumpleFiltrosBase(p, filtros));
+    const contexto = await this.contextoDeBusqueda(palabras, candidatos);
 
-    const evaluados: Array<{
-      producto: ProductoCrudo;
-      puntaje: number;
-      coincidenciaColor: string | null;
-    }> = [];
-
-    for (const p of productosBase) {
-      if (!this.cumpleFiltrosBase(p, filtros)) {
+    const evaluados: Array<{ producto: ProductoCrudo } & Coincidencia> = [];
+    for (const p of candidatos) {
+      const coincidencia = this.evaluarCoincidencia(p, terminoNorm, palabras, contexto);
+      if (palabras.length > 0 && coincidencia.puntaje === 0) {
         continue;
       }
-
-      const { puntaje, coincidenciaColor } = this.evaluarCoincidencia(p, terminoNorm);
-      if (terminoNorm !== '' && puntaje === 0) {
-        continue;
-      }
-
-      evaluados.push({ producto: p, puntaje, coincidenciaColor });
+      evaluados.push({ producto: p, ...coincidencia });
     }
 
     // Patrocinio (O7): solo con el orden por relevancia, con cupo, y sin cambiar quién aparece ni cuántos.
@@ -430,7 +513,10 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     const inicio = (pagina - 1) * limite;
     const paginados = evaluados.slice(inicio, inicio + limite);
 
-    const ofertas = await this.ofertasDeLaPagina(paginados.map(({ producto }) => producto.idProducto));
+    const [ofertas, muestras] = await Promise.all([
+      this.ofertasDeLaPagina(paginados.map(({ producto }) => producto.idProducto)),
+      this.coloresDeMuestra(paginados, filtros),
+    ]);
     const items: ResultadoBusqueda[] = paginados.map(({ producto, coincidenciaColor }) => ({
       idProducto: producto.idProducto,
       nombre: producto.nombre,
@@ -447,6 +533,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       oferta: ofertas.get(producto.idProducto) ?? null,
       patrocinado: patrocinados.has(producto.idProducto),
       idCampania: patrocinados.get(producto.idProducto)?.idCampania ?? null,
+      colorMuestra: muestras.get(producto.idProducto) ?? null,
       coincidenciaColor,
     }));
 
@@ -463,14 +550,15 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     filtros: OpcionesFiltroRequest,
     _contexto: ContextoPrecio,
   ): Promise<OpcionesFiltro> {
-    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros));
+    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros), filtros.idColor ?? []);
     const terminoNorm = normalizarTexto(filtros.q ?? '');
+    const palabras = palabrasDeBusqueda(terminoNorm);
+    const contexto = await this.contextoDeBusqueda(palabras, productosBase);
 
     // 1. Filtrar los que coinciden con el término de búsqueda
-    const productosCoincidentes = productosBase.filter((p) => {
-      const { puntaje } = this.evaluarCoincidencia(p, terminoNorm);
-      return terminoNorm === '' || puntaje > 0;
-    });
+    const productosCoincidentes = productosBase.filter(
+      (p) => palabras.length === 0 || this.evaluarCoincidencia(p, terminoNorm, palabras, contexto).puntaje > 0,
+    );
 
     // 2. F3: Para cada grupo de filtro, filtrar omitiendo ese grupo
     const paraCat = productosCoincidentes.filter((p) => this.cumpleFiltrosBase(p, filtros, 'idCategoria'));
