@@ -125,6 +125,17 @@ import {
  *      del tipo de medida (D6), siempre marcado como aproximado; null sin equivalencia.
  *  U7  No se exponen existencias exactas, códigos de proveedor ni ids internos de BD
  *      más allá de lo que la vista necesita (HU-SEG-06).
+ *  U8  FICHA EN UN COLOR (la abren las tarjetas del listado y del inicio, V3 del contrato de M02):
+ *        · `/productos/:idProducto?color=:idColor` abre la ficha con ese color ya elegido, si el producto
+ *          lo ofrece (P5); si no, o sin `?color=`, la ficha abre sin color, como siempre. Para traerlo,
+ *          GET /productos/:idProducto/colores acepta `idColor`.
+ *        · Al elegir otro color en la ficha, la dirección cambia a ese color (se puede compartir) sin
+ *          recargar la página.
+ *        · Presentación: la primera disponible que se pueda comprar.
+ *        · Pantalla: a la izquierda la imagen sobre una "pared" pintada del color elegido, con su nombre y
+ *          código, y debajo la descripción y la ficha técnica; se desplazan con la página. A la derecha el
+ *          panel de compra (nombre, colores como muestras con la carta completa a un toque, presentación,
+ *          precio, cantidad y "Agregar al carrito"), que se queda a la vista al bajar en pantallas grandes.
  *
  * ── Autorización (administración) ───────────────────────────────────────────
  *  Igual que la entrega 1 (D1): GET → catalogo.ver · POST → catalogo.crear ·
@@ -602,7 +613,7 @@ export const listarColoresProductoRequestSchema = paginacionQuerySchema.extend({
   busqueda: z.string().trim().max(100).optional(),
   idFamiliaColor: z.coerce.number().int().positive().optional(),
   idAcabado: z.coerce.number().int().positive().optional(),
-  /** Solo ese color, si el producto lo ofrece (paleta de color · P11). */
+  /** Solo ese color, si el producto lo ofrece: la ficha abierta en un color (`?color=`, U8) y la paleta de color (P11). */
   idColor: z.coerce.number().int().positive().optional(),
 });
 export type ListarColoresProductoRequest = z.infer<typeof listarColoresProductoRequestSchema>;

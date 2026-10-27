@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ProductoFichaView } from '@/modules/m01-catalogo/components/publico/ProductoFichaView';
+import { colorDeLaDireccion } from '@/modules/m01-catalogo/services/seleccion-ficha';
 
 export const metadata: Metadata = {
   title: 'Producto — Pintu Clic',
@@ -11,12 +12,11 @@ export default async function ProductoPage({
   searchParams,
 }: {
   params: Promise<{ idProducto: string }>;
-  searchParams: Promise<{ color?: string }>;
+  searchParams: Promise<{ color?: string | string[] }>;
 }) {
   const { idProducto } = await params;
-  const { color } = await searchParams;
   if (!/^\d+$/.test(idProducto) || Number(idProducto) < 1) notFound();
-  // Paleta de color (M01 · P11): llegar con `?color=<id>` deja ese color ya elegido, si el producto lo ofrece.
-  const idColorInicial = color !== undefined && /^\d+$/.test(color) && Number(color) > 0 ? Number(color) : null;
-  return <ProductoFichaView idProducto={Number(idProducto)} idColorInicial={idColorInicial} />;
+  // U8 y paleta de color (P11): la ficha abre en el color de `?color=` si el producto lo ofrece; uno inválido se ignora.
+  const { color } = await searchParams;
+  return <ProductoFichaView idProducto={Number(idProducto)} idColorInicial={colorDeLaDireccion(color)} />;
 }
