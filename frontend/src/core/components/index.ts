@@ -16,6 +16,7 @@ export * from './navigation/Stepper';
 export * from './navigation/SegmentedTabs';
 export * from './navigation/SectionNav';
 export * from './overlays/Modal';
+export * from './overlays/Drawer';
 export * from './data-display/Badge';
 export * from './data-display/ProductCard';
 export * from './data-display/CategoryCard';

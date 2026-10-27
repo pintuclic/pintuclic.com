@@ -89,8 +89,10 @@ Para el contenido general de lectura y la estructura de datos (fuente por defect
 
 * **Sistema base:** Todos los márgenes, paddings y gaps deben ser múltiplos de 8px (8px, 16px, 24px, 32px, 40px, 48px, etc.).
 * **Contenedor de Página:**
-  * **Escritorio (> 1024px):** `max-w-7xl mx-auto px-6` (márgenes laterales de 24px).
+  * **Escritorio (> 1024px):** hasta 1536px de ancho (`max-w-[96rem] mx-auto px-6`, márgenes laterales de 24px). Antes era `max-w-7xl` (1280px); se amplió para aprovechar las pantallas anchas: el catálogo, con su columna de filtros, dejaba tarjetas muy angostas.
+  * **Pantallas muy anchas (≥ 1536px):** `px-10` (márgenes laterales de 40px).
   * **Móvil (< 768px):** `px-4` (márgenes laterales de 16px).
+  * El componente `Container` del Core Kit aplica estos valores; el encabezado, el pie y las páginas lo comparten para quedar alineados.
 * **Gutter (separación entre columnas):** 24px (`gap-6`).
 * **Espaciado entre tarjetas de catálogo:**
   * Separación vertical: 32px (`gap-y-8`).

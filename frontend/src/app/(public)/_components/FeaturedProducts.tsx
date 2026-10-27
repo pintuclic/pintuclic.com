@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 import { Button, ProductCard, type ProductCardProps } from '@/core/components';
 import { busquedaApi } from '@/modules/m02-busqueda/services/busqueda-api';
+import { useAgregarDesdeTarjeta } from '@/modules/m02-busqueda/hooks/useAgregarDesdeTarjeta';
 import { tarjetaDeResultado } from '@/modules/m02-busqueda/services/tarjeta-resultado';
 import { featuredLink, featuredProducts, type FeaturedProduct } from '../_data/home.content';
 import {
@@ -58,6 +59,8 @@ function tarjetaDestacada(p: FeaturedProduct): ProductCardProps {
  * tiempo real cuando el usuario escribe o elige una categoría en la barra de búsqueda superior.
  */
 export function FeaturedProducts() {
+  // M02 · V3: el carrito de la tarjeta agrega y abre el panel lateral, igual que en /productos.
+  const agregarDesdeTarjeta = useAgregarDesdeTarjeta();
   const [productos, setProductos] = useState<ReadonlyArray<ProductCardProps>>(featuredProducts.map(tarjetaDestacada));
   const [filtro, setFiltro] = useState<DetalleFiltroLanding>({ busqueda: '', idCategoria: '' });
   const [cargando, setCargando] = useState(false);
@@ -89,7 +92,7 @@ export function FeaturedProducts() {
           if (!activo) return;
           setProductos(
             pagina.items.map((item) => ({
-              ...tarjetaDeResultado(item),
+              ...tarjetaDeResultado(item, agregarDesdeTarjeta),
               // Sin foto propia, la ilustración del inicio que corresponde al producto.
               ...(item.idImagenPrincipal === null
                 ? { imageUrl: resolverImagenRespaldo(item.idProducto, item.categoria, item.subcategoria) }
@@ -126,7 +129,7 @@ export function FeaturedProducts() {
       activo = false;
       clearTimeout(temporizador);
     };
-  }, [filtro.busqueda, filtro.idCategoria]);
+  }, [filtro.busqueda, filtro.idCategoria, agregarDesdeTarjeta]);
 
   const hayFiltroActivo = filtro.busqueda.trim() !== '' || filtro.idCategoria !== '';
 
@@ -189,7 +192,7 @@ export function FeaturedProducts() {
       ) : (
         <div
           aria-busy={cargando}
-          className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+          className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5"
         >
           {productos.map((producto) => (
             <ProductCard key={producto.id} {...producto} className="h-full" />

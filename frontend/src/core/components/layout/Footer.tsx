@@ -5,6 +5,14 @@ import { IconoFacebook, IconoInstagram, IconoYoutube, type IconoMarcaProps } fro
 import { Container } from './Container';
 import { Logo, type LogoProps } from './Logo';
 
+/**
+ * Clave de un enlace del pie. Dos enlaces pueden llevar a la misma página (por ejemplo, dos herramientas de la asesoría),
+ * así que la dirección sola se repite: el texto junto con la dirección sí es único en cada lista.
+ */
+export function claveDeEnlace(enlace: { label: string; href: string }): string {
+  return `${enlace.label}|${enlace.href}`;
+}
+
 export type FooterSocialIcon = 'facebook' | 'instagram' | 'youtube';
 export type FooterContactIcon = 'ubicacion' | 'telefono' | 'correo';
 
@@ -92,7 +100,7 @@ export function Footer({
             <h2 className="mb-4 font-title text-lg font-semibold">{columna.title}</h2>
             <ul className="flex flex-col gap-1 font-sans text-sm">
               {columna.links.map((enlace) => (
-                <li key={enlace.href}>
+                <li key={claveDeEnlace(enlace)}>
                   <Link href={enlace.href} className={`inline-flex min-h-11 items-center md:min-h-8 ${ENLACE}`}>
                     {enlace.label}
                   </Link>
@@ -137,7 +145,7 @@ export function Footer({
           <nav aria-label="Legal">
             <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
               {legalLinks.map((enlace) => (
-                <li key={enlace.href}>
+                <li key={claveDeEnlace(enlace)}>
                   <Link href={enlace.href} className={`inline-flex min-h-11 items-center md:min-h-8 ${ENLACE}`}>
                     {enlace.label}
                   </Link>

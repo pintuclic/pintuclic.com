@@ -64,7 +64,7 @@ export const ProductosDelColor: React.FC<ProductosDelColorProps> = ({ color, id 
 
         {productos.error !== null && <Alert variant="error">{productos.error}</Alert>}
         {color !== null && productos.cargando && productos.datos === null && (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4" aria-hidden="true">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5" aria-hidden="true">
             {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-72 w-full" />
             ))}
@@ -76,7 +76,7 @@ export const ProductosDelColor: React.FC<ProductosDelColorProps> = ({ color, id 
           </p>
         )}
         {items.length > 0 && (
-          <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {items.map((p) => (
               <li key={p.idProducto} className="flex">
                 <MedidorPatrocinio idCampania={p.patrocinado ? p.idCampania : null} ubicacion="listado" className="flex w-full">
