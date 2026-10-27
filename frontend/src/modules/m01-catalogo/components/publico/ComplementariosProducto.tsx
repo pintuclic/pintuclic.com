@@ -49,6 +49,7 @@ export const ComplementariosProducto: React.FC<ComplementariosProductoProps> = (
               description={`${p.esCombo ? 'Combo · ' : ''}${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}`}
               {...precioVisible(p.precioDesde, p.oferta)}
               isSponsored={p.patrocinado}
+              showViewDetails={false}
               href={`/productos/${p.idProducto}`}
               {...(p.idImagenPrincipal === null
                 ? {}
