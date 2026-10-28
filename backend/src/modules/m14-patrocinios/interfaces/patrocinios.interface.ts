@@ -1,4 +1,5 @@
 import type {
+  Foco,
   CampaniaRequest,
   EntidadMedicion,
   EspacioPublicitario,
@@ -96,6 +97,8 @@ export interface FilaAnuncio {
   fechaInicio: string;
   fechaFin: string;
   orden: number;
+  focoEscritorio: Foco;
+  focoMovil: Foco;
   tieneImagenMovil: boolean;
   fechaCreacion: Date;
   fechaActualizacion: Date;
@@ -112,6 +115,8 @@ export interface DatosAnuncio {
   fechaInicio: string;
   fechaFin: string;
   orden: number;
+  focoEscritorio: Foco;
+  focoMovil: Foco;
 }
 
 export interface MedidaImagen {

@@ -12,7 +12,7 @@ import {
   srcSetDe,
 } from '../services/anuncios-publico';
 import { aCuerpoActualizarAnuncio, aCuerpoCrearAnuncio, borradorAnuncioVacio, parsearOrden, type BorradorAnuncio } from '../services/anuncios-form';
-import { ayudaDeMedida, problemaDeImagen, type ImagenElegida } from '../services/imagenes';
+import { ayudaDeImagen, problemaDeImagen, proporcionDeVista, type ImagenElegida } from '../services/imagenes';
 import { avisarMedicion, claveImpresion, reiniciarMedicionCliente } from '../services/medicion-cliente';
 import { medicionApi } from '../services/patrocinios-api';
 import { formatearCtr, porcentajeDeBarra } from '../components/MedicionView';
@@ -24,6 +24,8 @@ const anuncio = (sobre: Partial<Parameters<typeof hayImagenMovil>[0][number]> = 
   abrirEnNuevaPestana: true,
   urlImagen: '/api/v1/patrocinios/anuncios/imagenes/1?variante=escritorio&v=5',
   urlImagenMovil: null,
+  focoEscritorio: { x: 50, y: 50 },
+  focoMovil: { x: 50, y: 50 },
   ...sobre,
 });
 
@@ -68,33 +70,30 @@ describe('ayudas del slider público', () => {
   });
 });
 
-describe('imágenes del anuncio: las mismas reglas que el servidor (B8, B13)', () => {
-  it('acepta la medida recomendada de cada espacio y el doble', () => {
-    expect(problemaDeImagen('escritorio', 'inicio', 1232, 280)).toBeNull();
-    expect(problemaDeImagen('escritorio', 'inicio', 2464, 560)).toBeNull();
-    expect(problemaDeImagen('escritorio', 'catalogo', 1232, 200)).toBeNull();
-    expect(problemaDeImagen('movil', 'inicio', 800, 600)).toBeNull();
-    expect(problemaDeImagen('movil', 'ficha', 640, 480)).toBeNull();
+describe('imágenes del anuncio: sin forma ni tamaño obligatorios, con punto de enfoque (B8, B13)', () => {
+  it('ya no se rechaza por proporción ni por tamaño mínimo: cuadradas, verticales y pequeñas sirven', () => {
+    for (const [ancho] of [[1232], [2464], [1500], [800], [320], [100]] as const) {
+      expect(problemaDeImagen('escritorio', ancho)).toBeNull();
+      expect(problemaDeImagen('movil', ancho)).toBeNull();
+    }
   });
 
-  it('la forma equivocada explica cuál es la medida recomendada', () => {
-    const mensaje = problemaDeImagen('escritorio', 'inicio', 1232, 200);
-    expect(mensaje).toContain('1232×200');
-    expect(mensaje).toContain('1232×280');
-    expect(problemaDeImagen('movil', 'inicio', 1232, 280)).toContain('800×600');
+  it('solo se avisa cuando pasa del tope de ancho de seguridad (8000 px)', () => {
+    expect(problemaDeImagen('escritorio', 8000)).toBeNull();
+    expect(problemaDeImagen('escritorio', 8001)).toContain('máximo es 8000');
+    expect(problemaDeImagen('movil', 9000)).toContain('imagen móvil');
   });
 
-  it('respeta la tolerancia del 10 % en el borde y el ancho mínimo y máximo', () => {
-    expect(problemaDeImagen('escritorio', 'inicio', 1232, 255)).toBeNull();
-    expect(problemaDeImagen('escritorio', 'inicio', 1232, 250)).toContain('forma');
-    expect(problemaDeImagen('escritorio', 'inicio', 616, 140)).toContain('entre 1232 y 4000');
-    expect(problemaDeImagen('escritorio', 'inicio', 4400, 1000)).toContain('entre 1232 y 4000');
-    expect(problemaDeImagen('movil', 'inicio', 600, 450)).toContain('entre 640 y 4000');
+  it('la vista previa usa la proporción real del espacio y 4:3 en el celular', () => {
+    expect(proporcionDeVista('escritorio', 'inicio')).toBeCloseTo(1232 / 280);
+    expect(proporcionDeVista('escritorio', 'catalogo')).toBeCloseTo(1232 / 200);
+    expect(proporcionDeVista('movil', 'ficha')).toBeCloseTo(4 / 3);
   });
 
-  it('la ayuda dice la medida, el doble y el mínimo', () => {
-    expect(ayudaDeMedida('escritorio', 'inicio')).toBe('Recomendada 1232 × 280 px, o el doble (2464 × 560 px) para pantallas muy nítidas. Mínimo 1232 px de ancho.');
-    expect(ayudaDeMedida('movil', 'inicio')).toContain('Forma 4:3. Recomendada 800 × 600 px');
+  it('la ayuda ya no pide una medida, solo tipo y peso', () => {
+    expect(ayudaDeImagen('escritorio')).toContain('cualquier forma');
+    expect(ayudaDeImagen('escritorio')).not.toMatch(/Recomendada|Mínimo/);
+    expect(ayudaDeImagen('movil')).toContain('celular');
   });
 });
 
@@ -153,6 +152,20 @@ describe('formulario de anuncios', () => {
     expect(quita.ok && quita.valor.quitarImagenMovil).toBe(true);
     const con = aCuerpoActualizarAnuncio(borrador({ imagenMovil: imagenElegida() }));
     expect(con.ok && con.valor.imagenMovil).toEqual({ imagenBase64: 'AAAA', imagenMimeType: 'image/jpeg' });
+  });
+
+  it('el punto de enfoque empieza en el centro y viaja en el cuerpo de crear y de editar (B8)', () => {
+    expect(borradorAnuncioVacio('2026-10-26')).toMatchObject({ focoEscritorio: { x: 50, y: 50 }, focoMovil: { x: 50, y: 50 } });
+    const conFoco = { focoEscritorio: { x: 20, y: 80 }, focoMovil: { x: 0, y: 100 } };
+    const crear = aCuerpoCrearAnuncio(borrador(conFoco));
+    expect(crear.ok && crear.valor).toMatchObject(conFoco);
+    const editar = aCuerpoActualizarAnuncio(borrador({ imagen: null, ...conFoco }));
+    expect(editar.ok && editar.valor).toMatchObject(conFoco);
+  });
+
+  it('un enfoque fuera de 0 a 100 no pasa el esquema del contrato', () => {
+    const r = aCuerpoCrearAnuncio(borrador({ focoEscritorio: { x: 120, y: 50 } }));
+    expect(r.ok).toBe(false);
   });
 
   it('el orden es un entero de 0 a 999', () => {

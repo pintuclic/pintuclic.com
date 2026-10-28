@@ -5,6 +5,7 @@ import { FileInput } from '@/core/components/forms/FileInput';
 import { SectionNav } from '@/core/components/navigation/SectionNav';
 import { cuentaDeEncabezado, Header, type HeaderProps } from '@/core/components/layout/Header';
 import { DictamenPanel } from '../components/admin/DictamenPanel';
+import { EmpresasAdminView } from '../components/admin/EmpresasAdminView';
 import { EstadoBadge } from '../components/admin/ElementosAdmin';
 import { AuthPanel } from '../components/auth/AuthPanel';
 import { LoginForm } from '../components/auth/LoginForm';
@@ -162,7 +163,7 @@ describe('Panel de empresas (HU-CUE-09)', () => {
       );
       const vacio = html(<DictamenPanel motivoObligatorio onDictaminar={async () => undefined} tiposCliente={[]} />);
       expect(vacio).toContain('No hay tipos de cliente empresa activos');
-      expect(vacio).toContain('Promociones');
+      expect(vacio).toContain('Tipos de cliente');
     });
   });
 
@@ -271,5 +272,14 @@ describe('Seguridad del perfil (HU-CUE-06)', () => {
     expect(salida).not.toContain('autoComplete="email"');
     expect(salida).toContain('id="correo-nuevo"');
     expect(salida).toContain('id="correo-contrasena"');
+  });
+});
+
+describe('Panel de empresas · tipos de cliente en la misma vista', () => {
+  it('ofrece la pestaña «Tipos de cliente» junto a las cuentas y su descuento', () => {
+    const salida = html(<EmpresasAdminView />);
+    expect(salida).toContain('Solicitudes de empresa');
+    expect(salida).toContain('Cuentas y descuentos');
+    expect(salida).toContain('Tipos de cliente');
   });
 });

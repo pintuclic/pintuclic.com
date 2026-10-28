@@ -1,4 +1,6 @@
 import type {
+  ContactoAdminEntity,
+  EditarContactoRequest,
   CrearFaqRequest,
   CrearPaginaRequest,
   EditarFaqRequest,
@@ -66,4 +68,10 @@ export interface FaqRepositoryPort {
     orden: number,
     idAutor: number | null,
   ): Promise<FaqAdminEntity>;
+}
+
+export interface ContactoRepositoryPort {
+  /** La ficha única de contacto; si nunca se editó, todos sus campos vienen en `null`. */
+  obtener(): Promise<ContactoAdminEntity>;
+  guardar(datos: EditarContactoRequest, idAutor: number | null): Promise<ContactoAdminEntity>;
 }

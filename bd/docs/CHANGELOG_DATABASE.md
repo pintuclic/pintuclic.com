@@ -10,14 +10,33 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
-## [v3.22] - 2026-10-27
-### Esquema 4.21 (91 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
+## [v3.24] - 2026-10-28
+### Esquema 4.23 (93 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
 - **Alcance General:** pedido por el contrato `contracts/m11-postventa.contract.ts`. Cambio aditivo: tres tablas y cuatro ENUMs nuevos; no altera tablas existentes.
   - **`solicitud_postventa`**: cabecera del trámite con código `DEV-AAAA-NNNNN`, orden asociada, cliente titular, tipo (`cancelacion`, `devolucion`, `garantia`), estado (`solicitada`, `en_revision`, `aprobada`, `rechazada`, `reembolsada`), motivo general, observaciones de resolución, motivo de rechazo tipificado, empleado que resuelve, total a reembolsar, método de reembolso, referencia/comprobante, datos bancarios (JSONB) y evidencia (JSONB).
   - **`linea_solicitud_postventa`**: desglose por línea de orden de los productos devueltos con cantidad, precio unitario congelado y motivo específico (soporta devoluciones parciales y totales; excluye entonados para retracto).
   - **`historial_estado_postventa`**: trazabilidad inmutable de cada transición de estado con autor, motivo y fecha.
   - **ENUMs nuevos (4):** `enum_tipo_postventa`, `enum_estado_postventa`, `enum_metodo_reembolso` y `enum_motivo_rechazo_postventa`.
   - **Prisma:** modelos `SolicitudPostventa`, `LineaSolicitudPostventa` e `HistorialEstadoPostventa` con sus relaciones en `Orden`, `LineaOrden` y `Usuario`.
+
+---
+
+## [v3.23] - 2026-10-28
+### Esquema 4.22 (90 Tablas) - FP-01: imagen editable de las tarjetas de categorías del inicio
+- **Alcance General:** cambio aditivo pedido por la remasterización del inicio. No se toca ni se borra nada de lo que existía.
+  - **`imagen_categoria_inicio`**: una fila por categoría (`id_categoria` PK y FK con borrado en cascada) con la imagen (`contenido` BYTEA, `mime_type` jpeg/png/webp) y su punto de enfoque `foco_x/y` (SMALLINT 0 a 100, 50 = centro). Sin fila, la tarjeta del inicio usa su ilustración de respaldo. Sin datos sembrados.
+  - **Prisma:** modelo `ImagenCategoriaInicio` y su relación con `Categoria` y `Usuario`.
+  - **Bases existentes en 4.21:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente).
+
+---
+
+## [v3.22] - 2026-10-28
+### Esquema 4.21 (89 Tablas) - M14: punto de enfoque de las imágenes de anuncios · M16: contacto del sitio
+- **Alcance General:** cambio aditivo pedido por la remasterización del inicio. No se toca ni se borra nada de lo que existía.
+  - **`anuncio_publicitario`**: cuatro columnas `foco_escritorio_x/y` y `foco_movil_x/y` (SMALLINT, 0 a 100, por defecto 50 = centro) con `ck_anuncio_foco`. Reemplazan la regla de subir la imagen con proporción y tamaño exactos: el personal sube cualquier imagen y marca qué parte debe verse cuando el espacio la recorta (M14 · B8). Va también como `ALTER TABLE … ADD COLUMN IF NOT EXISTS` para las bases que ya tenían la tabla.
+  - **`contacto_institucional`**: fila única (`id_contacto = 1`) con dirección, teléfono, correo y cuatro redes (https:// o vacío) que edita el personal y lee el pie de página (M16). Todo es opcional: el sitio no muestra lo que esté vacío. Sin datos sembrados a propósito: los reales los carga el cliente.
+  - **Prisma:** campos nuevos en `AnuncioPublicitario` y modelo `ContactoInstitucional`.
+  - **Bases existentes en 4.20:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente).
 
 ---
 

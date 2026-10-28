@@ -9,12 +9,15 @@ import {
   cambiarEstadoBannerInicioRequestSchema,
   crearBannerInicioRequestSchema,
   editarBannerInicioRequestSchema,
+  guardarImagenCategoriaInicioRequestSchema,
 } from './fp01-landing.dto';
 import {
   PrismaBannersInicioRepository,
   type BannersInicioRepositoryPort,
 } from './banners.repository';
 import { BannersInicioService, LandingBannerError } from './banners.service';
+import { PrismaCategoriasInicioRepository, type CategoriasInicioRepositoryPort } from './categorias-inicio.repository';
+import { CategoriasInicioService } from './categorias-inicio.service';
 
 function parsearId(req: Request, nombre: string): number {
   const raw = req.params[nombre];
@@ -80,8 +83,10 @@ export interface RutasLandingBanners {
 export function construirRutasLandingBanners(
   autorizacionService: Pick<AutorizacionService, 'exigirPermiso'>,
   repositorio: BannersInicioRepositoryPort = new PrismaBannersInicioRepository(),
+  repositorioCategorias: CategoriasInicioRepositoryPort = new PrismaCategoriasInicioRepository(),
 ): RutasLandingBanners {
   const service = new BannersInicioService(repositorio);
+  const categorias = new CategoriasInicioService(repositorioCategorias);
   const exigirVer = requirePermission(
     autorizacionService as AutorizacionService,
     PERMISOS_LANDING_BANNERS.ver,
@@ -108,6 +113,27 @@ export function construirRutasLandingBanners(
       const img = await service.obtenerImagen(id);
       res.setHeader('Content-Type', img.mimeType);
       res.setHeader('Cache-Control', 'no-cache');
+      res.status(200).send(img.bytes);
+    } catch (error) {
+      manejarError(res, error);
+    }
+  });
+
+  // Imágenes de las tarjetas de categorías del inicio (FP-01 · C5).
+  publicRouter.get('/categorias', async (_req: Request, res: Response) => {
+    try {
+      responderExito(res, await categorias.listarPublicas());
+    } catch (error) {
+      manejarError(res, error);
+    }
+  });
+
+  publicRouter.get('/categorias/:id/imagen', async (req: Request, res: Response) => {
+    try {
+      const img = await categorias.obtenerImagen(parsearId(req, 'id'));
+      res.setHeader('Content-Type', img.mimeType);
+      // El enlace lleva `?v=<version>`: cambia con cada edición, así que puede guardarse mucho tiempo.
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       res.status(200).send(img.bytes);
     } catch (error) {
       manejarError(res, error);
@@ -164,6 +190,34 @@ export function construirRutasLandingBanners(
     try {
       const id = parsearId(req, 'id');
       await service.eliminar(id);
+      responderExito(res, { eliminado: true });
+    } catch (error) {
+      manejarError(res, error);
+    }
+  });
+
+  // FP-01 · C2–C4: lista, guarda (imagen y/o enfoque) y quita la imagen de una tarjeta de categoría.
+  adminRouter.get('/categorias', exigirVer, async (_req: Request, res: Response) => {
+    try {
+      responderExito(res, await categorias.listarAdmin());
+    } catch (error) {
+      manejarError(res, error);
+    }
+  });
+
+  adminRouter.put('/categorias/:id/imagen', exigirEditar, async (req: Request, res: Response) => {
+    try {
+      const id = parsearId(req, 'id');
+      const body = guardarImagenCategoriaInicioRequestSchema.parse(req.body);
+      responderExito(res, await categorias.guardar(id, body, req.actor?.idUsuario ?? null));
+    } catch (error) {
+      manejarError(res, error);
+    }
+  });
+
+  adminRouter.delete('/categorias/:id/imagen', exigirEditar, async (req: Request, res: Response) => {
+    try {
+      await categorias.quitar(parsearId(req, 'id'));
       responderExito(res, { eliminado: true });
     } catch (error) {
       manejarError(res, error);

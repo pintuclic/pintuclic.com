@@ -1,8 +1,8 @@
-import { BadgeCheck, CircleHelp, Headset, MapPin, Phone, type LucideIcon } from 'lucide-react';
+import { BadgeCheck, CircleHelp, Clock, Headset, Mail, MapPin, MessageCircle, Phone, type LucideIcon } from 'lucide-react';
 import { Container } from './Container';
 
 /** Claves serializables: el contenido no importa componentes de íconos. */
-export type TopbarIcon = 'envio' | 'calidad' | 'asesoria' | 'ayuda' | 'telefono';
+export type TopbarIcon = 'envio' | 'calidad' | 'asesoria' | 'ayuda' | 'telefono' | 'horario' | 'whatsapp' | 'correo';
 
 const ICONOS: Record<TopbarIcon, LucideIcon> = {
   envio: MapPin,
@@ -10,6 +10,9 @@ const ICONOS: Record<TopbarIcon, LucideIcon> = {
   asesoria: Headset,
   ayuda: CircleHelp,
   telefono: Phone,
+  horario: Clock,
+  whatsapp: MessageCircle,
+  correo: Mail,
 };
 
 export interface TopbarItem {
@@ -25,7 +28,7 @@ export interface TopbarProps {
 
 /**
  * Franja superior (UI Spec §3.1): fondo corporativo, texto pequeño blanco.
- * En móvil solo se conserva el primer mensaje y el teléfono.
+ * En móvil solo se conserva el primer mensaje y el teléfono; si no hay teléfono, solo el primer mensaje.
  */
 export function Topbar({ items }: TopbarProps) {
   return (

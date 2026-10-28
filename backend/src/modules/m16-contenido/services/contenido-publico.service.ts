@@ -1,11 +1,13 @@
 import {
   normalizarSlugPagina,
+  type ContactoPublico,
   type FaqPublicaItem,
   type PaginaPublicaDetalle,
   type PaginaPublicaResumen,
 } from '../dtos/m16-contenido.dto';
 import type { ContenidoFaqPort } from '../interfaces/contenido-faq.port';
 import type {
+  ContactoRepositoryPort,
   FaqRepositoryPort,
   PaginasRepositoryPort,
 } from '../interfaces/contenido.interface';
@@ -19,7 +21,22 @@ export class ContenidoPublicoService implements ContenidoFaqPort {
   constructor(
     private readonly paginasRepo: PaginasRepositoryPort,
     private readonly faqRepo: FaqRepositoryPort,
+    private readonly contactoRepo: ContactoRepositoryPort | null = null,
   ) {}
+
+  /** HU-CON-05 · R9: la ficha de contacto del pie de página, sin los datos de quién la editó (R4). */
+  async obtenerContactoPublico(): Promise<ContactoPublico> {
+    const c = await (this.contactoRepo?.obtener() ?? Promise.resolve(null));
+    return {
+      direccion: c?.direccion ?? null,
+      telefono: c?.telefono ?? null,
+      correo: c?.correo ?? null,
+      facebook: c?.facebook ?? null,
+      instagram: c?.instagram ?? null,
+      youtube: c?.youtube ?? null,
+      tiktok: c?.tiktok ?? null,
+    };
+  }
 
   async listarPaginasPublicas(): Promise<PaginaPublicaResumen[]> {
     return this.paginasRepo.listarPublicadas();

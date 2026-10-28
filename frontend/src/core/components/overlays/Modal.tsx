@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useEffect, useId, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { SELECTOR_FOCALIZABLES, siguienteIndiceDeFoco } from './foco';
 
@@ -37,6 +38,9 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const elementoPrevioRef = useRef<HTMLElement | null>(null);
+  // El portal necesita `document`, que no existe al renderizar en el servidor.
+  const [enElNavegador, setEnElNavegador] = useState(false);
+  useEffect(() => setEnElNavegador(true), []);
 
   const idBase = useId();
   const idTitulo = `${idBase}-titulo`;
@@ -130,7 +134,7 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, onClose, closeOnOutsideClick, obtenerFocalizables]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !enElNavegador) return null;
 
   const sizeStyles: Record<ModalSize, string> = {
     sm: 'max-w-md',
@@ -139,7 +143,16 @@ export const Modal: React.FC<ModalProps> = ({
     xl: 'max-w-4xl',
   };
 
-  return (
+  /*
+   * Se dibuja colgado de <body> y no donde está escrito.
+   *
+   * `position: fixed` NO basta: si un ancestro crea un contexto de apilamiento —y basta con
+   * un `position: sticky`, como el panel de compra de la ficha de producto— el modal queda
+   * encerrado dentro de ese contexto, por debajo de la cabecera fija. Se veía: el velo gris
+   * se cortaba bajo la cabecera, que quedaba sin oscurecer, y el modal aparecía recortado.
+   * Subirle el z-index no sirve de nada estando encerrado; sacarlo del árbol sí.
+   */
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-neutral-black/60 backdrop-blur-xs transition-opacity duration-200 animate-in fade-in">
       <div
         ref={panelRef}
@@ -208,7 +221,8 @@ export const Modal: React.FC<ModalProps> = ({
         {/* Contenido scrolleable */}
         <div className="p-5 sm:p-6 overflow-y-auto flex-1">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

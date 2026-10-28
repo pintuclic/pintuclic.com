@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { IconButton } from '@/core/components';
+import { posicionDeFoco } from '@/core/utils/foco-imagen';
 import {
   SEGUNDOS_ROTACION_ANUNCIO,
   type AnuncioPublico,
@@ -53,7 +54,11 @@ const Diapositiva: React.FC<{
         loading={prioritaria ? 'eager' : 'lazy'}
         decoding="async"
         draggable={false}
-        className={`h-full w-full select-none ${conMovil && !tieneMovil ? 'object-contain sm:object-cover' : 'object-cover'}`}
+        className={`h-full w-full select-none ${conMovil && !tieneMovil ? 'object-contain sm:object-cover' : 'object-cover'} ${
+          // B8: en celular, con imagen móvil, manda su enfoque; en el resto, el de escritorio.
+          tieneMovil ? '[object-position:var(--foco-movil)] sm:[object-position:var(--foco-escritorio)]' : '[object-position:var(--foco-escritorio)]'
+        }`}
+        style={{ '--foco-escritorio': posicionDeFoco(anuncio.focoEscritorio), '--foco-movil': posicionDeFoco(anuncio.focoMovil) } as React.CSSProperties}
       />
     </picture>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { BannersAdminView } from '@/core/landing/BannersAdminView';
+import { CategoriasInicioAdmin } from '@/core/landing/CategoriasInicioAdmin';
 
 export const metadata: Metadata = {
   title: 'Banners de Inicio | Pintu Clic Admin',
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function AdminBannersPage() {
-  return <BannersAdminView />;
+  return (
+    <>
+      <BannersAdminView />
+      <CategoriasInicioAdmin />
+    </>
+  );
 }

@@ -13,16 +13,7 @@ import type {
   FooterProps,
   HeaderProps,
   MegaMenuTab,
-  TopbarItem,
 } from '@/core/components';
-
-export const topbarItems: ReadonlyArray<TopbarItem> = [
-  { icon: 'envio', label: 'Envíos a toda Colombia', href: '/politicas-de-envio' },
-  { icon: 'calidad', label: 'Productos de calidad', href: '/productos' },
-  { icon: 'asesoria', label: 'Asesoría experta', href: '/centro-de-ayuda' },
-  { icon: 'ayuda', label: '¿Necesitas ayuda?', href: '/centro-de-ayuda' },
-  { icon: 'telefono', label: '322 123 4567', href: 'tel:+573221234567' },
-];
 
 export const megaMenuTabs: ReadonlyArray<MegaMenuTab> = [
   {
@@ -153,7 +144,8 @@ export const header: HeaderProps = {
   cart: { count: 0, total: 0, href: '/carrito' },
 };
 
-export const footer: FooterProps = {
+/** Las redes y el contacto no van aquí: los edita el administrador (M16 · HU-CON-05) y los pone `PieDePagina`. */
+export const footer: Omit<FooterProps, 'contact' | 'socials'> = {
   brandName: 'Pintu Clic',
   logo: {
     src: '/images/landing/logo-footer.png',
@@ -163,11 +155,6 @@ export const footer: FooterProps = {
     className: 'h-14 w-auto',
   },
   description: 'Todo para tu proyecto en un solo lugar. Calidad, asesoría y envío rápido a toda Colombia.',
-  socials: [
-    { label: 'Facebook', href: 'https://www.facebook.com', icon: 'facebook' },
-    { label: 'Instagram', href: 'https://www.instagram.com', icon: 'instagram' },
-    { label: 'YouTube', href: 'https://www.youtube.com', icon: 'youtube' },
-  ],
   columns: [
     {
       title: 'Categorías',
@@ -191,11 +178,12 @@ export const footer: FooterProps = {
     },
   ],
   contactTitle: 'Contacto',
-  contact: [
-    { icon: 'ubicacion', label: 'Bogotá, Colombia' },
-    { icon: 'telefono', label: '322 123 4567', href: 'tel:+573221234567' },
-    { icon: 'correo', label: 'contacto@pintuclic.com', href: 'mailto:contacto@pintuclic.com' },
-  ],
+  // M07: Wompi es la única pasarela y Nequi el único medio de pago habilitado. Si se habilitan tarjetas, se suman aquí.
+  payments: {
+    title: 'Pagos seguros',
+    gateway: 'Procesados por Wompi',
+    methods: ['Nequi'],
+  },
   legalLinks: [
     { label: 'Términos y condiciones', href: '/terminos-y-condiciones' },
     { label: 'Política de privacidad', href: '/politica-de-privacidad' },

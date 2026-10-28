@@ -1,6 +1,9 @@
 import { apiClient } from '@/core/api/apiClient';
 import type { RespuestaExitosa } from '@/core/types/respuesta-api.type';
 import type {
+  ContactoAdminEntity,
+  ContactoPublico,
+  EditarContactoRequest,
   FaqFormValues,
   PaginaFormValues,
 } from '../dtos/m16-contenido.dto';
@@ -37,6 +40,12 @@ export async function obtenerPaginaPublicaPorSlug(
 export async function listarFaqPublicas(): Promise<FaqPublicaItem[]> {
   const { data } =
     await apiClient.get<RespuestaExitosa<FaqPublicaItem[]>>('/contenido/faq');
+  return data.data;
+}
+
+/** HU-CON-05: los datos de contacto del pie de página (lo vacío viene en `null`). */
+export async function obtenerContactoPublico(): Promise<ContactoPublico> {
+  const { data } = await apiClient.get<RespuestaExitosa<ContactoPublico>>('/contenido/contacto');
   return data.data;
 }
 
@@ -155,5 +164,17 @@ export async function cambiarOrdenFaqAdmin(
     `/admin/contenido/faq/${idFaq}/orden`,
     { orden },
   );
+  return data.data;
+}
+
+/* ─── Contacto del sitio (HU-CON-05) ──────────────────────────────────────── */
+
+export async function obtenerContactoAdmin(): Promise<ContactoAdminEntity> {
+  const { data } = await apiClient.get<RespuestaExitosa<ContactoAdminEntity>>('/admin/contenido/contacto');
+  return data.data;
+}
+
+export async function guardarContactoAdmin(valores: EditarContactoRequest): Promise<ContactoAdminEntity> {
+  const { data } = await apiClient.put<RespuestaExitosa<ContactoAdminEntity>>('/admin/contenido/contacto', valores);
   return data.data;
 }

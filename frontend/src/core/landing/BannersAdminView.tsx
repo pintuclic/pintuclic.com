@@ -22,6 +22,7 @@ import {
   Button,
   Input,
   Modal,
+  PuntoEnfoque,
   Select,
   Skeleton,
   Textarea,
@@ -34,6 +35,7 @@ import {
   type EstadoBannerInicio,
   type TipoMimeBannerInicio,
 } from './landing-banners-api';
+import { FOCO_CENTRO, posicionDeFoco, type FocoImagen } from '../utils/foco-imagen';
 import heroStorefront from '../../../assets/hero-storefront-D9L_fhlS.png';
 
 const IMAGENES_RESPALDO_ADMIN: ReadonlyArray<string> = [
@@ -64,6 +66,8 @@ interface FormularioBannerEstado {
   imagenMimeType?: TipoMimeBannerInicio;
   vistaPreviaUrl?: string;
   nombreArchivo?: string;
+  /** Qué parte de la imagen se conserva al recortarla. */
+  foco: FocoImagen;
 }
 
 const ESTADO_INICIAL_FORM: FormularioBannerEstado = {
@@ -76,6 +80,7 @@ const ESTADO_INICIAL_FORM: FormularioBannerEstado = {
   enlaceBotonSecundario: '/centro-de-ayuda',
   orden: 1,
   estado: 'activo',
+  foco: FOCO_CENTRO,
 };
 
 const TIPOS_PERMITIDOS: ReadonlySet<string> = new Set([
@@ -138,6 +143,7 @@ export function BannersAdminView() {
       orden: banner.orden,
       estado: banner.estado,
       vistaPreviaUrl: obtenerImagenEfectivaBanner(banner),
+      foco: { x: banner.focoX, y: banner.focoY },
     });
     setModalAbierto(true);
   };
@@ -201,6 +207,8 @@ export function BannersAdminView() {
         enlaceBotonSecundario: form.enlaceBotonSecundario.trim() || null,
         orden: Number(form.orden) || 0,
         estado: form.estado,
+        focoX: form.foco.x,
+        focoY: form.foco.y,
         ...(form.imagenBase64 && form.imagenMimeType
           ? {
               imagenBase64: form.imagenBase64,
@@ -365,7 +373,12 @@ export function BannersAdminView() {
                   {/* Vista previa visual en miniatura del slide */}
                   <div className="relative flex min-h-48 flex-col justify-center overflow-hidden bg-corporate p-6 text-neutral-white">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={urlImg} alt={banner.tituloLinea1} className="absolute inset-0 h-full w-full object-cover object-right" />
+                    <img
+                      src={urlImg}
+                      alt={banner.tituloLinea1}
+                      className="absolute inset-0 h-full w-full object-cover"
+                      style={{ objectPosition: banner.tieneImagenPersonalizada ? posicionDeFoco({ x: banner.focoX, y: banner.focoY }) : 'right' }}
+                    />
                     <div
                       aria-hidden="true"
                       className="absolute inset-0 bg-linear-to-r from-corporate/85 via-corporate/55 to-transparent"
@@ -516,7 +529,7 @@ export function BannersAdminView() {
                   Imagen de fondo del slider
                 </p>
                 <p className="font-sans text-xs text-neutral-medium">
-                  Formatos PNG, JPG o WEBP (máximo 5 MB). Recomendado: 1280 × 420 px.
+                  Formatos PNG, JPG o WEBP (máximo 5 MB), de cualquier forma y tamaño: marque abajo qué parte debe verse.
                 </p>
               </div>
               <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-btn bg-action px-4 py-2 font-title text-sm font-medium text-neutral-white transition-colors hover:bg-action-hover">
@@ -538,6 +551,20 @@ export function BannersAdminView() {
               </p>
             )}
 
+            {/* Punto de enfoque: la imagen puede ser de cualquier forma; aquí se marca qué parte debe quedar a la vista. */}
+            {form.vistaPreviaUrl && (
+              <div className="mt-3">
+                <PuntoEnfoque
+                  src={form.vistaPreviaUrl}
+                  proporcion={2.2}
+                  foco={form.foco}
+                  onChange={(foco) => setForm((prev) => ({ ...prev, foco }))}
+                  nombre="del slider"
+                  sinVista
+                />
+              </div>
+            )}
+
             {/* Previsualización en tiempo real */}
             <div className="relative mt-3 flex h-44 flex-col justify-center overflow-hidden rounded-card bg-corporate p-5 text-neutral-white">
               {form.vistaPreviaUrl ? (
@@ -546,6 +573,7 @@ export function BannersAdminView() {
                   src={form.vistaPreviaUrl}
                   alt="Vista previa del slider"
                   className="absolute inset-0 h-full w-full object-cover"
+                  style={{ objectPosition: posicionDeFoco(form.foco) }}
                 />
               ) : (
                 <div

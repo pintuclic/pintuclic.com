@@ -1,12 +1,7 @@
 import {
   ANCHO_MAXIMO_IMAGEN,
-  ANCHO_MINIMO_ESCRITORIO,
-  ANCHO_MINIMO_MOVIL,
   DEFINICION_ESPACIOS,
   IMAGEN_MAXIMO_BYTES,
-  PROPORCION_MOVIL,
-  TAMANO_MOVIL_RECOMENDADO,
-  TOLERANCIA_PROPORCION,
   type EspacioPublicitario,
   type ImagenSubida,
 } from '../dtos/m14-patrocinios.dto';
@@ -25,48 +20,26 @@ export interface ImagenElegida extends ImagenSubida {
 export const TIPOS_ACEPTADOS = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const ACEPTAR_IMAGENES = TIPOS_ACEPTADOS.join(',');
 
-/** Lo que se pide de cada imagen: proporción, medida recomendada y ancho mínimo (B8, B13). */
-export function requisitosDeImagen(variante: VarianteImagen, espacio: EspacioPublicitario) {
-  if (variante === 'movil') {
-    return {
-      proporcion: PROPORCION_MOVIL.ancho / PROPORCION_MOVIL.alto,
-      recomendado: TAMANO_MOVIL_RECOMENDADO,
-      anchoMinimo: ANCHO_MINIMO_MOVIL,
-      rotulo: 'La imagen móvil',
-    };
-  }
+/** La proporción (ancho ÷ alto) con la que se muestra una imagen: la del espacio en escritorio y 4:3 en el celular (B5, B10). */
+export function proporcionDeVista(variante: VarianteImagen, espacio: EspacioPublicitario): number {
+  if (variante === 'movil') return 4 / 3;
   const { ancho, alto } = DEFINICION_ESPACIOS[espacio];
-  return { proporcion: ancho / alto, recomendado: { ancho, alto }, anchoMinimo: ANCHO_MINIMO_ESCRITORIO, rotulo: 'La imagen de escritorio' };
+  return ancho / alto;
 }
 
-/** El texto de ayuda con la medida a subir, p. ej. «1232 × 280 px (o el doble, 2464 × 560, para pantallas nítidas)». */
-export function ayudaDeMedida(variante: VarianteImagen, espacio: EspacioPublicitario): string {
-  const { recomendado } = requisitosDeImagen(variante, espacio);
-  const doble = `${recomendado.ancho * 2} × ${recomendado.alto * 2}`;
+/** El texto de ayuda de cada campo de imagen: ya no hay medida obligatoria (B8), solo el tipo y el peso. */
+export function ayudaDeImagen(variante: VarianteImagen): string {
   return variante === 'movil'
-    ? `Forma 4:3. Recomendada ${recomendado.ancho} × ${recomendado.alto} px (mínimo ${ANCHO_MINIMO_MOVIL} px de ancho).`
-    : `Recomendada ${recomendado.ancho} × ${recomendado.alto} px, o el doble (${doble} px) para pantallas muy nítidas. Mínimo ${ANCHO_MINIMO_ESCRITORIO} px de ancho.`;
+    ? 'JPG, PNG o WEBP de hasta 5 MB, de cualquier forma: marque abajo qué parte debe verse en el celular.'
+    : 'JPG, PNG o WEBP de hasta 5 MB, de cualquier forma y tamaño: marque abajo qué parte debe verse.';
 }
 
-/**
- * Las mismas comprobaciones que hace el servidor (B8, B13), para avisar antes de subir 5 MB. Primero la proporción y
- * después el tamaño. Devuelve null si la imagen sirve; el servidor sigue siendo quien decide.
- */
-export function problemaDeImagen(
-  variante: VarianteImagen,
-  espacio: EspacioPublicitario,
-  ancho: number,
-  alto: number,
-): string | null {
-  const req = requisitosDeImagen(variante, espacio);
-  const recomendada = `${req.recomendado.ancho}×${req.recomendado.alto} px`;
-  if (Math.abs(ancho / alto - req.proporcion) / req.proporcion > TOLERANCIA_PROPORCION) {
-    return `${req.rotulo} mide ${ancho}×${alto} px y no tiene la forma del espacio. Debe medir ${recomendada} (o tener esa misma proporción, con un margen del ${Math.round(TOLERANCIA_PROPORCION * 100)} %).`;
-  }
-  if (ancho < req.anchoMinimo || ancho > ANCHO_MAXIMO_IMAGEN) {
-    return `${req.rotulo} mide ${ancho} px de ancho: debe estar entre ${req.anchoMinimo} y ${ANCHO_MAXIMO_IMAGEN} px. Lo recomendado es ${recomendada}.`;
-  }
-  return null;
+/** La única medida que se revisa antes de subir 5 MB: el tope de ancho de seguridad (B13). Devuelve null si la imagen sirve. */
+export function problemaDeImagen(variante: VarianteImagen, ancho: number): string | null {
+  const rotulo = variante === 'movil' ? 'La imagen móvil' : 'La imagen de escritorio';
+  return ancho > ANCHO_MAXIMO_IMAGEN
+    ? `${rotulo} mide ${ancho} px de ancho y el máximo es ${ANCHO_MAXIMO_IMAGEN} px. Redúzcala e inténtelo de nuevo.`
+    : null;
 }
 
 function leerComoDataUrl(archivo: File): Promise<string> {
@@ -91,13 +64,9 @@ export type ResultadoLectura = { ok: true; imagen: ImagenElegida } | { ok: false
 
 /**
  * Lee el archivo que eligió la persona: comprueba tipo y peso, lo pasa a base64 (así viaja en el JSON, B7), mide sus
- * píxeles y le aplica las reglas de forma y tamaño del espacio.
+ * píxeles y comprueba el tope de ancho de seguridad.
  */
-export async function leerImagen(
-  archivo: File,
-  variante: VarianteImagen,
-  espacio: EspacioPublicitario,
-): Promise<ResultadoLectura> {
+export async function leerImagen(archivo: File, variante: VarianteImagen): Promise<ResultadoLectura> {
   if (!(TIPOS_ACEPTADOS as readonly string[]).includes(archivo.type)) {
     return { ok: false, mensaje: 'Solo se aceptan imágenes JPG, PNG o WEBP (no SVG).' };
   }
@@ -107,7 +76,7 @@ export async function leerImagen(
   try {
     const vistaPrevia = await leerComoDataUrl(archivo);
     const { ancho, alto } = await medirImagen(vistaPrevia);
-    const problema = problemaDeImagen(variante, espacio, ancho, alto);
+    const problema = problemaDeImagen(variante, ancho);
     if (problema !== null) return { ok: false, mensaje: problema };
     const base64 = vistaPrevia.slice(vistaPrevia.indexOf(',') + 1);
     return {

@@ -3,38 +3,17 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, RotateCcw } from 'lucide-react';
-import { Button, ProductCard, type ProductCardProps } from '@/core/components';
+import { Button, type ProductCardProps } from '@/core/components';
 import { busquedaApi } from '@/modules/m02-busqueda/services/busqueda-api';
 import { useAgregarDesdeTarjeta } from '@/modules/m02-busqueda/hooks/useAgregarDesdeTarjeta';
 import { tarjetaDeResultado } from '@/modules/m02-busqueda/services/tarjeta-resultado';
+import { FilaProductos, FilaProductosCargando } from './FilaProductos';
 import { featuredLink, featuredProducts, type FeaturedProduct } from '../_data/home.content';
 import {
   emitirFiltroLanding,
   EVENTO_FILTRO_LANDING,
   type DetalleFiltroLanding,
 } from './ToolsBar';
-
-const IMAGEN_POR_PRODUCTO: Readonly<Record<number, string>> = {
-  1: '/images/landing/catalogo-viniltex.png',
-  2: '/images/landing/catalogo-koraza.png',
-  3: '/images/landing/catalogo-pintulux.png',
-  4: '/images/landing/catalogo-esmalte-ico.png',
-  5: '/images/landing/catalogo-barniz.png',
-  6: '/images/landing/producto-brocha.png',
-};
-
-function resolverImagenRespaldo(idProducto: number, categoria: string, subcategoria: string): string {
-  const directa = IMAGEN_POR_PRODUCTO[idProducto];
-  if (directa) return directa;
-  const texto = `${categoria} ${subcategoria}`.toLowerCase();
-  if (texto.includes('brocha')) return '/images/landing/producto-brocha.png';
-  if (texto.includes('rodillo')) return '/images/landing/producto-rodillo.png';
-  if (texto.includes('cinta')) return '/images/landing/producto-cinta.png';
-  if (texto.includes('madera') || texto.includes('barniz')) return '/images/landing/catalogo-barniz.png';
-  if (texto.includes('fachada') || texto.includes('exterior')) return '/images/landing/catalogo-koraza.png';
-  if (texto.includes('esmalte')) return '/images/landing/catalogo-pintulux.png';
-  return '/images/landing/catalogo-viniltex.png';
-}
 
 /** La colección fija del inicio, con la misma tarjeta del catálogo (sin "Ver producto", carrito junto al precio). */
 function tarjetaDestacada(p: FeaturedProduct): ProductCardProps {
@@ -61,7 +40,7 @@ function tarjetaDestacada(p: FeaturedProduct): ProductCardProps {
 export function FeaturedProducts() {
   // M02 · V3: el carrito de la tarjeta agrega y abre el panel lateral, igual que en /productos.
   const agregarDesdeTarjeta = useAgregarDesdeTarjeta();
-  const [productos, setProductos] = useState<ReadonlyArray<ProductCardProps>>(featuredProducts.map(tarjetaDestacada));
+  const [productos, setProductos] = useState<ReadonlyArray<ProductCardProps> | null>(null);
   const [filtro, setFiltro] = useState<DetalleFiltroLanding>({ busqueda: '', idCategoria: '' });
   const [cargando, setCargando] = useState(false);
 
@@ -91,13 +70,7 @@ export function FeaturedProducts() {
         .then((pagina) => {
           if (!activo) return;
           setProductos(
-            pagina.items.map((item) => ({
-              ...tarjetaDeResultado(item, agregarDesdeTarjeta),
-              // Sin foto propia, la ilustración del inicio que corresponde al producto.
-              ...(item.idImagenPrincipal === null
-                ? { imageUrl: resolverImagenRespaldo(item.idProducto, item.categoria, item.subcategoria) }
-                : {}),
-            })),
+            pagina.items.map((item) => tarjetaDeResultado(item, agregarDesdeTarjeta)),
           );
         })
         .catch(() => {
@@ -141,14 +114,14 @@ export function FeaturedProducts() {
 
   return (
     <section aria-labelledby="titulo-destacados">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 id="titulo-destacados" className="font-title text-xl font-semibold text-neutral-black">
             {hayFiltroActivo ? 'Resultados en el catálogo' : 'Productos destacados'}
           </h2>
           <p className="font-sans text-sm text-neutral-medium">
             {hayFiltroActivo
-              ? `Mostrando ${productos.length} ${productos.length === 1 ? 'producto encontrado' : 'productos encontrados'}`
+              ? `Mostrando ${productos?.length ?? 0} ${productos?.length === 1 ? 'producto encontrado' : 'productos encontrados'}`
               : 'Selección directa de nuestro catálogo disponible con precios reales por presentación'}
           </p>
         </div>
@@ -175,7 +148,9 @@ export function FeaturedProducts() {
         </div>
       </div>
 
-      {productos.length === 0 && !cargando ? (
+      {productos === null ? (
+        <FilaProductosCargando />
+      ) : productos.length === 0 && !cargando ? (
         <div className="rounded-card border border-dashed border-neutral-light bg-neutral-white p-10 text-center">
           <p className="font-title text-base font-semibold text-neutral-black">
             No encontramos productos con ese filtro
@@ -190,13 +165,8 @@ export function FeaturedProducts() {
           </div>
         </div>
       ) : (
-        <div
-          aria-busy={cargando}
-          className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5"
-        >
-          {productos.map((producto) => (
-            <ProductCard key={producto.id} {...producto} className="h-full" />
-          ))}
+        <div aria-busy={cargando}>
+          <FilaProductos ariaLabel="Productos destacados" productos={productos} />
         </div>
       )}
     </section>
