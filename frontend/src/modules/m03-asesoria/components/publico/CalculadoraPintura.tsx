@@ -18,28 +18,17 @@ import {
   Button,
   ButtonLink,
   Input,
-  SegmentedTabs,
   Select,
   Skeleton,
   Stepper,
 } from '@/core/components';
 import {
   areaDeMedidas,
-  formularioCoberturaSchema,
   formularioMedidasSchema,
-  type FormularioCobertura,
   type FormularioMedidas,
 } from '../../dtos/m03-asesoria.dto';
-import type {
-  CalculadoraProducto,
-  ResultadoCalculo,
-  SentidoCalculo,
-} from '../../interfaces/asesoria.interface';
-import {
-  calcularCantidad,
-  calcularCobertura,
-  obtenerCalculadoraDeProducto,
-} from '../../services/asesoria-api';
+import type { CalculadoraProducto, ResultadoCalculo } from '../../interfaces/asesoria.interface';
+import { calcularCantidad, obtenerCalculadoraDeProducto } from '../../services/asesoria-api';
 import {
   esSinCalculadora,
   formatearIntervalo,
@@ -54,11 +43,6 @@ import {
   type Superficie,
   type TipoSuperficie,
 } from '../../services/superficies';
-
-const SENTIDOS: ReadonlyArray<{ value: SentidoCalculo; label: string }> = [
-  { value: 'cantidad', label: 'Cuánto comprar' },
-  { value: 'cobertura', label: 'Cuánto rinde' },
-];
 
 const PASOS = ['Superficie', 'Medidas', 'Resultado'] as const;
 
@@ -101,7 +85,12 @@ export interface CalculadoraPinturaProps {
  *
  * Un solo componente para las dos entradas del contrato (D5): la ficha de un producto le
  * pasa su `idProducto` y la calculadora general le pasa el que la persona eligió en el
- * selector. Y los dos sentidos: cuánto comprar y cuánta área cubre una cantidad.
+ * selector.
+ *
+ * Solo ofrece el sentido «cuánto comprar». El sentido «cuánto rinde» (K4) sigue vivo en el
+ * servidor y en `calcularCobertura`, pero no se expone: no está en el mockup y el Product
+ * Owner decidió retirarlo de la pantalla (28/10/2026). Devolverlo es volver a pintar la
+ * pestaña, no reconstruir el cálculo.
  *
  * «Cuánto comprar» NO pide el área: pide las medidas de la superficie y la calcula. Quien
  * llega aquí sabe que su pared mide 5 × 2,5, no que son 25 m²; pedirle el área le obligaba
@@ -124,7 +113,6 @@ export function CalculadoraPintura({
   const [cargando, setCargando] = useState(datosIniciales === undefined);
   const [sinCalculadora, setSinCalculadora] = useState(false);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
-  const [sentido, setSentido] = useState<SentidoCalculo>('cantidad');
 
   useEffect(() => {
     if (datosIniciales !== undefined) {
@@ -208,32 +196,13 @@ export function CalculadoraPintura({
         </header>
       )}
 
-      <div className={incrustada ? 'pb-4' : 'border-b border-neutral-light p-4 sm:px-6'}>
-        <SegmentedTabs
-          options={SENTIDOS}
-          value={sentido}
-          onChange={setSentido}
-          ariaLabel="Qué quieres calcular"
-          panelId={`${idPanel}-panel`}
-          idPrefix={`${idPanel}-sentido`}
+      <div className={incrustada ? '' : 'p-4 sm:p-6'}>
+        <CalculoPorMedidas
+          datos={datos}
+          idProducto={idProducto}
+          enlaceAlProducto={enlaceAlProducto}
+          idVarianteInicial={idVarianteInicial}
         />
-      </div>
-
-      <div id={`${idPanel}-panel`} role="tabpanel" className={incrustada ? '' : 'p-4 sm:p-6'}>
-        {sentido === 'cantidad' ? (
-          <CalculoPorMedidas
-            datos={datos}
-            idProducto={idProducto}
-            enlaceAlProducto={enlaceAlProducto}
-            idVarianteInicial={idVarianteInicial}
-          />
-        ) : (
-          <CalculoPorUnidades
-            datos={datos}
-            idProducto={idProducto}
-            idVarianteInicial={idVarianteInicial}
-          />
-        )}
       </div>
 
       <p
@@ -445,7 +414,6 @@ function CalculoPorMedidas({
           ) : (
             <ResultadoCantidad
               resultado={resultado}
-              manos={datos.manosAplicadas}
               idProducto={idProducto}
               nombreProducto={datos.nombre}
               enlaceAlProducto={enlaceAlProducto}
@@ -580,13 +548,11 @@ function AreaTotal({ area }: { area: number }) {
 
 function ResultadoCantidad({
   resultado,
-  manos,
   idProducto,
   nombreProducto,
   enlaceAlProducto,
 }: {
   resultado: ResultadoCalculo;
-  manos: number;
   idProducto: number;
   nombreProducto: string;
   enlaceAlProducto: boolean;
@@ -599,9 +565,6 @@ function ResultadoCantidad({
       <p className="mt-3 font-sans text-sm text-neutral-medium">Necesitas aproximadamente</p>
       <p className="font-sans text-2xl font-semibold text-action">
         {formatearIntervalo(minimo, maximo, unidadesDe(minimo, maximo))} de {presentacion}
-      </p>
-      <p className="font-sans text-sm text-neutral-medium">
-        (Para {manos} {manos === 1 ? 'mano' : 'manos'})
       </p>
 
       {resultado.equivalencias.length > 0 && (
@@ -625,105 +588,5 @@ function ResultadoCantidad({
         </div>
       )}
     </div>
-  );
-}
-
-/* ───────────────────────────────────────────────────────────────────────────
- * CUÁNTO RINDE — ya tienes la pintura y quieres saber hasta dónde llega.
- * ─────────────────────────────────────────────────────────────────────────── */
-
-function CalculoPorUnidades({
-  datos,
-  idProducto,
-  idVarianteInicial,
-}: {
-  datos: CalculadoraProducto;
-  idProducto: number;
-  idVarianteInicial: number | null;
-}) {
-  const [resultado, setResultado] = useState<ResultadoCalculo | null>(null);
-  const [errorApi, setErrorApi] = useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<FormularioCobertura>({
-    resolver: zodResolver(formularioCoberturaSchema),
-    defaultValues: {
-      idVariante: presentacionDeArranque(datos, idVarianteInicial),
-      unidades: '',
-    },
-  });
-
-  const enviar = handleSubmit(async (valores) => {
-    setErrorApi(null);
-    try {
-      const calculado = await calcularCobertura({
-        idProducto,
-        idVariante: Number(valores.idVariante),
-        unidades: Number(valores.unidades),
-        manos: datos.manosAplicadas,
-      });
-      setResultado(calculado);
-    } catch (err: unknown) {
-      setResultado(null);
-      setErrorApi(mensajeDeError(err, 'No pudimos calcular el rendimiento. Inténtalo de nuevo.'));
-    }
-  });
-
-  return (
-    <form onSubmit={enviar} noValidate className="space-y-4">
-      <p className="font-sans text-sm text-neutral-medium">
-        Rinde {formatearIntervalo(datos.rendimientoMin, datos.rendimientoMax, 'm² por galón')}, por
-        cada mano.
-      </p>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Select
-          label="Presentación"
-          options={datos.presentaciones.map((p) => ({
-            value: String(p.idVariante),
-            label: p.presentacion,
-          }))}
-          error={errors.idVariante?.message}
-          {...register('idVariante')}
-        />
-        <Input
-          label="Cuántas unidades tienes"
-          inputMode="numeric"
-          placeholder="Por ejemplo, 2"
-          error={errors.unidades?.message}
-          {...register('unidades')}
-        />
-      </div>
-
-      <p className="font-sans text-xs text-neutral-medium">
-        El cálculo supone {datos.manosAplicadas}{' '}
-        {datos.manosAplicadas === 1 ? 'mano' : 'manos'}.
-      </p>
-
-      <Button type="submit" isLoading={isSubmitting}>
-        Calcular cuánto rinde
-      </Button>
-
-      {errorApi !== null && <Alert variant="error">{errorApi}</Alert>}
-
-      {resultado !== null && (
-        <div role="status" className="rounded-lg border border-action/30 bg-action/5 p-4">
-          <p className="font-sans text-sm text-neutral-medium">Con eso alcanzas a cubrir</p>
-          <p className="font-sans text-2xl font-semibold text-action">
-            {formatearIntervalo(
-              resultado.seleccionada.minimo,
-              resultado.seleccionada.maximo,
-              'm²',
-            )}{' '}
-            <span className="text-base font-normal text-neutral-medium">
-              con {resultado.seleccionada.presentacion}
-            </span>
-          </p>
-        </div>
-      )}
-    </form>
   );
 }

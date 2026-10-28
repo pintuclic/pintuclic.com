@@ -22,8 +22,7 @@ export function CalculadoraGeneralView() {
     <div className="space-y-6">
       <p className="font-sans text-sm text-neutral-medium">
         Elige la pintura, dinos qué vas a pintar y cuánto mide, y te decimos cuánto comprar. No
-        hace falta que saques los metros cuadrados: los calculamos nosotros. También funciona al
-        revés: si ya tienes la pintura, te decimos cuánto alcanza a cubrir.
+        hace falta que saques los metros cuadrados: los calculamos nosotros.
       </p>
 
       <div className="rounded-lg border border-neutral-light bg-white p-4 sm:p-6">
