@@ -310,8 +310,11 @@ export class CarritoService {
     });
   }
 
-  /** C9: une el carrito del visitante al de la cuenta (o se lo pasa si la cuenta no tenía). */
-  private async unir(visitante: CarritoGuardado, cuenta: CarritoGuardado | null, idUsuario: number): Promise<UnionCarrito> {
+  /**
+   * C9: une el carrito del visitante al de la cuenta (o se lo pasa si la cuenta no tenía). Null si otra petición
+   * simultánea ya lo unió: esta solo lee el resultado.
+   */
+  private async unir(visitante: CarritoGuardado, cuenta: CarritoGuardado | null, idUsuario: number): Promise<UnionCarrito | null> {
     if (cuenta === null) {
       await this.dep.repo.pasarACuenta(visitante.idCarrito, idUsuario);
       return { lineasAgregadas: visitante.lineas.length, lineasSumadas: 0, lineasDescartadas: 0, cantidadesAjustadas: 0 };
@@ -336,12 +339,13 @@ export class CarritoService {
         lineasDescartadas += 1;
       }
     }
-    await this.dep.repo.unir({
+    const unido = await this.dep.repo.unir({
       idCarritoVisitante: visitante.idCarrito,
       idCarritoCuenta: cuenta.idCarrito,
       actualizar,
       agregar,
     });
+    if (!unido) return null;
     return { lineasAgregadas: agregar.length, lineasSumadas: actualizar.length, lineasDescartadas, cantidadesAjustadas };
   }
 

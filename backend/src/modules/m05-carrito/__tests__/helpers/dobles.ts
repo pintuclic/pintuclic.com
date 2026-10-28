@@ -390,7 +390,8 @@ export class CarritoMemoriaRepository implements CarritoRepositoryPort {
     return Promise.resolve(vencidos.size);
   }
 
-  unir(plan: PlanUnion): Promise<void> {
+  unir(plan: PlanUnion): Promise<boolean> {
+    if (!this.carritos.some((x) => x.idCarrito === plan.idCarritoVisitante)) return Promise.resolve(false);
     for (const a of plan.actualizar) {
       const l = this.lineas.find((x) => x.idLinea === a.idLinea && x.idCarrito === plan.idCarritoCuenta);
       if (l !== undefined) l.cantidad = a.cantidad;
@@ -400,6 +401,6 @@ export class CarritoMemoriaRepository implements CarritoRepositoryPort {
     }
     this.lineas = this.lineas.filter((x) => x.idCarrito !== plan.idCarritoVisitante);
     this.carritos = this.carritos.filter((x) => x.idCarrito !== plan.idCarritoVisitante);
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
 }

@@ -107,12 +107,15 @@ describe.skipIf(URL_BD === undefined)('M05 · carrito (PostgreSQL + M01 + M06 re
     await repo.guardarLinea(cuenta.idCarrito, { ...l1, cantidad: 1 });
     const conLinea = (await repo.buscar({ tipo: 'cuenta', idUsuario })) as CarritoGuardado;
     const vis = (await repo.buscar(visitante(1))) as CarritoGuardado;
-    await repo.unir({
+    const plan = {
       idCarritoVisitante: vis.idCarrito,
       idCarritoCuenta: cuenta.idCarrito,
       actualizar: [{ idLinea: conLinea.lineas[0]?.idLinea ?? 0, cantidad: 8 }],
       agregar: [{ ...l2, cantidad: 3 }],
-    });
+    };
+    // La página y la cabecera lo piden a la vez al iniciar sesión: solo una une, la otra no duplica ni falla.
+    const resultados = await Promise.all([repo.unir(plan), repo.unir(plan)]);
+    expect(resultados.filter(Boolean)).toHaveLength(1);
     expect(await repo.buscar(visitante(1))).toBeNull();
     const final = (await repo.buscar({ tipo: 'cuenta', idUsuario })) as CarritoGuardado;
     expect(final.lineas.map((l) => [l.idVariante, l.idColor, l.cantidad])).toEqual([
