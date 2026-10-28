@@ -55,11 +55,6 @@ export function CarritoView() {
             <p className="mt-2">{textoSiguientePaso(c.cambios)}</p>
           </Alert>
         )}
-        {c.listoParaPagar && (
-          <Alert variant="success" title="Tu carrito está listo">
-            Revisamos precios y disponibilidad y todo sigue igual. El pago en línea estará disponible muy pronto.
-          </Alert>
-        )}
       </div>
 
       {c.cargando && carrito === null ? (
