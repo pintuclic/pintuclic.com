@@ -6,6 +6,18 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-27
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 📐 **La calculadora deja de pedir los metros cuadrados.** Ahora se eligen la superficie y sus medidas, y el área se calcula sola. Entra como la rama `feature/m03-calculadora-medidas`.
+
+### Módulo M03 — Calculadora (HU-ASE-02)
+- **El área ya no se escribe (K12).** Quien llega a la calculadora sabe que su pared mide 5 × 2,5, no que son 25 m²: pedirle el área le obligaba a hacer a mano justo la multiplicación que venía a buscar. La pantalla sigue el mockup de `VISTAS.pdf` (pág. 10) y reparte el trabajo en tres bloques: qué vas a pintar, las medidas, y el resultado. El área total se actualiza mientras se escribe.
+- **Cuatro superficies: paredes, techos, puertas y muebles (K13).** Solo cambian el vocabulario, nunca el cálculo: un techo se mide de ancho y **largo**, una pared de ancho y **alto**, y el contador se nombra según la pieza («Cantidad de techos iguales»). **No se inventaron coeficientes** por superficie —ni «la puerta se pinta por las dos caras», ni mermas por textura—: el catálogo no registra ese dato.
+- **El área se calcula con enteros escalados**, igual que el backend (K5): multiplicar en coma flotante hacía que 1,1 × 2,2 diera 2,4200000000000004, que el servidor habría rechazado por tener más de dos decimales. Un solo redondeo al final.
+- **El resultado se retira si cambian los datos (K14).** Antes, al cambiar una medida después de calcular, la cifra de al lado se quedaba en pantalla sin corresponder a lo escrito. Una cifra que ya no corresponde engaña más que no mostrar ninguna.
+- **Las manos se siguen pidiendo (K9, RF-ASE-02-06).** El mockup las da por supuestas en 2; el contrato prohíbe suponerlas, así que el campo se mantiene y el resultado dice «(Para N manos)», como en el mockup. Pendiente de confirmar con el Product Owner.
+- La API **no cambia**: sigue recibiendo `area` en m².
+
 ## [No publicado] - 2026-10-26
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🧩 **PR general de M03 (Asesoría y asistencia).** Los archivos compartidos que el módulo necesita, antes de construirlo: base de datos, permisos, el aviso de M18 y el registro de auditoría de M20. Sin código de módulo todavía. Entra como la rama `chore/m03-asesoria-bd`.
