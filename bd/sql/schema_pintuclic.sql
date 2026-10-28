@@ -1412,6 +1412,8 @@ CREATE TABLE IF NOT EXISTS solicitud_compra (
     costo_entrega NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     sub_total NUMERIC(12, 2) NOT NULL,
     descuento NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    descuento_eventos NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    descuento_empresa NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     total_mercancia NUMERIC(12, 2) NOT NULL,
     total NUMERIC(12, 2) NOT NULL,
     base_sin_impuesto NUMERIC(12, 2) NOT NULL,
@@ -1438,7 +1440,8 @@ CREATE TABLE IF NOT EXISTS solicitud_compra (
     CONSTRAINT chk_solicitud_compra_origen CHECK (origen <> 'cotizacion' OR id_cotizacion IS NOT NULL),
     CONSTRAINT chk_solicitud_compra_direccion CHECK (modo_entrega <> 'domicilio' OR direccion IS NOT NULL),
     CONSTRAINT chk_solicitud_compra_importes CHECK (
-        costo_entrega >= 0 AND sub_total >= 0 AND descuento >= 0 AND total_mercancia >= 0 AND total >= 0
+        costo_entrega >= 0 AND sub_total >= 0 AND descuento >= 0 AND descuento_eventos >= 0
+        AND descuento_empresa >= 0 AND total_mercancia >= 0 AND total >= 0
         AND base_sin_impuesto >= 0 AND importe_iva >= 0 AND importe_cupon >= 0
         AND tasa_iva >= 0 AND tasa_iva <= 100
         AND (monto_pagado IS NULL OR monto_pagado >= 0)
@@ -1447,6 +1450,7 @@ CREATE TABLE IF NOT EXISTS solicitud_compra (
 );
 
 COMMENT ON TABLE solicitud_compra IS 'Solicitud de compra SOL-AAAA-NNNNN de M07: la compra congelada al pagar; también la cola de creación de la orden';
+COMMENT ON COLUMN solicitud_compra.descuento IS 'Suma de descuento_eventos, descuento_empresa e importe_cupon (resumen de M06)';
 COMMENT ON COLUMN solicitud_compra.total_mercancia IS 'Total de M06 (mercancía con IVA, sin envío)';
 COMMENT ON COLUMN solicitud_compra.total IS 'Lo que se cobra: total_mercancia + costo_entrega (M07 · R10)';
 COMMENT ON COLUMN solicitud_compra.id_cupon IS 'Cupón aplicado (referencia a cupon, sin FK: esa tabla se crea más adelante en este script)';
