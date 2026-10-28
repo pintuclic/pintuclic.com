@@ -10,6 +10,17 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.24] - 2026-10-28
+### Esquema 4.23 (93 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
+- **Alcance General:** pedido por el contrato `contracts/m11-postventa.contract.ts`. Cambio aditivo: tres tablas y cuatro ENUMs nuevos; no altera tablas existentes.
+  - **`solicitud_postventa`**: cabecera del trámite con código `DEV-AAAA-NNNNN`, orden asociada, cliente titular, tipo (`cancelacion`, `devolucion`, `garantia`), estado (`solicitada`, `en_revision`, `aprobada`, `rechazada`, `reembolsada`), motivo general, observaciones de resolución, motivo de rechazo tipificado, empleado que resuelve, total a reembolsar, método de reembolso, referencia/comprobante, datos bancarios (JSONB) y evidencia (JSONB).
+  - **`linea_solicitud_postventa`**: desglose por línea de orden de los productos devueltos con cantidad, precio unitario congelado y motivo específico (soporta devoluciones parciales y totales; excluye entonados para retracto).
+  - **`historial_estado_postventa`**: trazabilidad inmutable de cada transición de estado con autor, motivo y fecha.
+  - **ENUMs nuevos (4):** `enum_tipo_postventa`, `enum_estado_postventa`, `enum_metodo_reembolso` y `enum_motivo_rechazo_postventa`.
+  - **Prisma:** modelos `SolicitudPostventa`, `LineaSolicitudPostventa` e `HistorialEstadoPostventa` con sus relaciones en `Orden`, `LineaOrden` y `Usuario`.
+
+---
+
 ## [v3.23] - 2026-10-28
 ### Esquema 4.22 (90 Tablas) - FP-01: imagen editable de las tarjetas de categorías del inicio
 - **Alcance General:** cambio aditivo pedido por la remasterización del inicio. No se toca ni se borra nada de lo que existía.

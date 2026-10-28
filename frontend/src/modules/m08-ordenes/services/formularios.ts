@@ -9,8 +9,9 @@ import type { FiltrosBandeja } from '../interfaces/ordenes.interface';
 
 /** Convierte el formulario de búsqueda en parámetros del contrato, omitiendo los campos vacíos. */
 export function aFiltrosBandeja(valores: FiltrosBandejaForm): FiltrosBandeja {
+  const codigoLimpio = valores.codigo.replace(/^#/, '').trim();
   return {
-    ...(valores.codigo === '' ? {} : { codigo: valores.codigo }),
+    ...(codigoLimpio === '' ? {} : { codigo: codigoLimpio }),
     ...(valores.nombre === '' ? {} : { nombre: valores.nombre }),
     ...(valores.correo === '' ? {} : { correo: valores.correo }),
     ...(valores.telefono === '' ? {} : { telefono: valores.telefono }),

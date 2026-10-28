@@ -258,6 +258,23 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_resultado_auditoria') THEN
         CREATE TYPE enum_resultado_auditoria AS ENUM ('exito', 'fallo');
     END IF;
+
+    -- M11: postventa (cancelaciones, devoluciones y garantías)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_postventa') THEN
+        CREATE TYPE enum_tipo_postventa AS ENUM ('cancelacion', 'devolucion', 'garantia');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_postventa') THEN
+        CREATE TYPE enum_estado_postventa AS ENUM ('solicitada', 'en_revision', 'aprobada', 'rechazada', 'reembolsada');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_metodo_reembolso') THEN
+        CREATE TYPE enum_metodo_reembolso AS ENUM ('transferencia_bancaria', 'reverso_pasarela', 'saldo_tienda', 'efectivo');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_motivo_rechazo_postventa') THEN
+        CREATE TYPE enum_motivo_rechazo_postventa AS ENUM (
+            'fuera_de_plazo', 'producto_entonado', 'producto_abierto_o_danado',
+            'evidencia_insuficiente', 'politica_no_cumplida', 'otro'
+        );
+    END IF;
 END $$;
 
 -- ------------------------------------------------------------------------------
@@ -1568,6 +1585,89 @@ CREATE TABLE IF NOT EXISTS factura (
 );
 
 COMMENT ON TABLE factura IS 'Factura electrónica o física vinculada a una orden';
+
+-- ==============================================================================
+-- 6.x MÓDULO M11 — POSTVENTA (DEVOLUCIONES, REEMBOLSOS Y CANCELACIONES)
+-- ==============================================================================
+
+-- Tabla: solicitud_postventa
+-- Cabecera del trámite de postventa: cancelaciones, devoluciones y garantías (M11 · HU-POS-01 a HU-POS-06).
+CREATE TABLE IF NOT EXISTS solicitud_postventa (
+    id_solicitud_postventa SERIAL PRIMARY KEY,
+    codigo_visible VARCHAR(50) NOT NULL UNIQUE,
+    id_orden INT NOT NULL,
+    id_usuario INT NOT NULL,
+    tipo enum_tipo_postventa NOT NULL,
+    estado enum_estado_postventa NOT NULL DEFAULT 'solicitada',
+    motivo_general TEXT NOT NULL,
+    observaciones_resolucion TEXT,
+    motivo_rechazo enum_motivo_rechazo_postventa,
+    id_empleado_resuelve INT,
+    total_reembolso NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    metodo_reembolso enum_metodo_reembolso,
+    referencia_reembolso VARCHAR(100),
+    comprobante_url VARCHAR(255),
+    datos_bancarios JSONB,
+    evidencia_urls JSONB,
+    fecha_solicitud TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_resolucion TIMESTAMPTZ,
+    fecha_reembolso TIMESTAMPTZ,
+    CONSTRAINT fk_postventa_orden FOREIGN KEY (id_orden)
+        REFERENCES orden (id_orden) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_postventa_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_postventa_empleado FOREIGN KEY (id_empleado_resuelve)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_postventa_total_reembolso CHECK (total_reembolso >= 0)
+);
+
+COMMENT ON TABLE solicitud_postventa IS 'Cabecera de trámites de postventa: cancelaciones, devoluciones y garantías (M11)';
+COMMENT ON COLUMN solicitud_postventa.codigo_visible IS 'DEV-AAAA-NNNNN: código público generado con consecutivo corrido (M11)';
+COMMENT ON COLUMN solicitud_postventa.total_reembolso IS 'Monto económico total a restituir por la cancelación o devolución';
+
+-- Tabla: linea_solicitud_postventa
+-- Desglose de variantes y cantidades devueltas por el cliente (M11 · HU-POS-02).
+CREATE TABLE IF NOT EXISTS linea_solicitud_postventa (
+    id_linea_solicitud_postventa SERIAL PRIMARY KEY,
+    id_solicitud_postventa INT NOT NULL,
+    id_linea_orden INT NOT NULL,
+    cantidad INT NOT NULL DEFAULT 1,
+    precio_unitario NUMERIC(12, 2) NOT NULL,
+    subtotal NUMERIC(12, 2) NOT NULL,
+    motivo_especifico VARCHAR(300),
+    CONSTRAINT fk_lsp_solicitud FOREIGN KEY (id_solicitud_postventa)
+        REFERENCES solicitud_postventa (id_solicitud_postventa) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_lsp_linea_orden FOREIGN KEY (id_linea_orden)
+        REFERENCES linea_orden (id_linea_orden) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT ck_lsp_cantidad CHECK (cantidad > 0)
+);
+
+COMMENT ON TABLE linea_solicitud_postventa IS 'Desglose de líneas afectadas en la solicitud de postventa (M11)';
+
+-- Tabla: historial_estado_postventa
+-- Trazabilidad inmutable de los cambios de estado del trámite postventa (M11 · HU-POS-05).
+CREATE TABLE IF NOT EXISTS historial_estado_postventa (
+    id_historial_estado_postventa SERIAL PRIMARY KEY,
+    id_solicitud_postventa INT NOT NULL,
+    estado_anterior enum_estado_postventa,
+    estado_nuevo enum_estado_postventa NOT NULL,
+    id_usuario_autor INT,
+    motivo TEXT,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_hep_solicitud FOREIGN KEY (id_solicitud_postventa)
+        REFERENCES solicitud_postventa (id_solicitud_postventa) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_hep_autor FOREIGN KEY (id_usuario_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+COMMENT ON TABLE historial_estado_postventa IS 'Trazabilidad inmutable de cambios de estado en solicitudes de postventa (M11)';
+
+CREATE INDEX IF NOT EXISTS idx_postventa_orden ON solicitud_postventa (id_orden);
+CREATE INDEX IF NOT EXISTS idx_postventa_usuario ON solicitud_postventa (id_usuario, fecha_solicitud DESC);
+CREATE INDEX IF NOT EXISTS idx_postventa_estado ON solicitud_postventa (estado, fecha_solicitud DESC);
+CREATE INDEX IF NOT EXISTS idx_postventa_tipo ON solicitud_postventa (tipo);
+CREATE INDEX IF NOT EXISTS idx_linea_postventa_solicitud ON linea_solicitud_postventa (id_solicitud_postventa);
+CREATE INDEX IF NOT EXISTS idx_historial_postventa_solicitud ON historial_estado_postventa (id_solicitud_postventa, fecha ASC);
 
 -- ==============================================================================
 -- 7. MÓDULO DE SERVICIOS Y RESERVACIONES
