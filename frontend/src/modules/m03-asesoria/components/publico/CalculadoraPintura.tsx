@@ -83,6 +83,16 @@ export interface CalculadoraPinturaProps {
    * la de la ficha no, porque enlazaría a la página en la que ya se está.
    */
   enlaceAlProducto?: boolean;
+  /**
+   * Dentro de un contenedor que ya aporta marco y encabezado, como el modal de la ficha de
+   * producto: se omiten los suyos para no dibujar dos cajas y dos títulos encajados.
+   */
+  incrustada?: boolean;
+  /**
+   * Presentación con la que abrir. La ficha de producto pasa la que la persona ya eligió
+   * allí, para que la calculadora no la haga elegir dos veces lo mismo.
+   */
+  idVarianteInicial?: number | null;
 }
 
 /**
@@ -105,6 +115,8 @@ export function CalculadoraPintura({
   datosIniciales,
   mostrarNombre = true,
   enlaceAlProducto = false,
+  incrustada = false,
+  idVarianteInicial = null,
 }: CalculadoraPinturaProps) {
   const idPanel = useId();
   const [datos, setDatos] = useState<CalculadoraProducto | null>(datosIniciales ?? null);
@@ -168,27 +180,34 @@ export function CalculadoraPintura({
 
   return (
     <section
-      aria-labelledby={`${idPanel}-titulo`}
-      className="overflow-hidden rounded-lg border border-neutral-light bg-white"
+      aria-labelledby={incrustada ? undefined : `${idPanel}-titulo`}
+      className={
+        incrustada ? '' : 'overflow-hidden rounded-lg border border-neutral-light bg-white'
+      }
     >
-      <header className="flex items-start gap-3 border-b border-neutral-light p-4 sm:p-6">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-subaction">
-          <Calculator className="h-5 w-5 text-action" aria-hidden="true" />
-        </span>
-        <div>
-          <h2 id={`${idPanel}-titulo`} className="font-sans text-lg font-semibold text-neutral-dark">
-            Calculadora de pintura
-          </h2>
-          <p className="font-sans text-sm text-neutral-medium">
-            Te ayudamos a calcular la cantidad de pintura que necesitas para tu proyecto.
-          </p>
-          {mostrarNombre && (
-            <p className="mt-1 font-sans text-sm font-medium text-neutral-dark">{datos.nombre}</p>
-          )}
-        </div>
-      </header>
+      {!incrustada && (
+        <header className="flex items-start gap-3 border-b border-neutral-light p-4 sm:p-6">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-subaction">
+            <Calculator className="h-5 w-5 text-action" aria-hidden="true" />
+          </span>
+          <div>
+            <h2
+              id={`${idPanel}-titulo`}
+              className="font-sans text-lg font-semibold text-neutral-dark"
+            >
+              Calculadora de pintura
+            </h2>
+            <p className="font-sans text-sm text-neutral-medium">
+              Te ayudamos a calcular la cantidad de pintura que necesitas para tu proyecto.
+            </p>
+            {mostrarNombre && (
+              <p className="mt-1 font-sans text-sm font-medium text-neutral-dark">{datos.nombre}</p>
+            )}
+          </div>
+        </header>
+      )}
 
-      <div className="border-b border-neutral-light p-4 sm:px-6">
+      <div className={incrustada ? 'pb-4' : 'border-b border-neutral-light p-4 sm:px-6'}>
         <SegmentedTabs
           options={SENTIDOS}
           value={sentido}
@@ -199,19 +218,28 @@ export function CalculadoraPintura({
         />
       </div>
 
-      <div id={`${idPanel}-panel`} role="tabpanel" className="p-4 sm:p-6">
+      <div id={`${idPanel}-panel`} role="tabpanel" className={incrustada ? '' : 'p-4 sm:p-6'}>
         {sentido === 'cantidad' ? (
           <CalculoPorMedidas
             datos={datos}
             idProducto={idProducto}
             enlaceAlProducto={enlaceAlProducto}
+            idVarianteInicial={idVarianteInicial}
           />
         ) : (
-          <CalculoPorUnidades datos={datos} idProducto={idProducto} />
+          <CalculoPorUnidades
+            datos={datos}
+            idProducto={idProducto}
+            idVarianteInicial={idVarianteInicial}
+          />
         )}
       </div>
 
-      <p className="flex items-start gap-2 border-t border-neutral-light bg-neutral-light/30 p-4 font-sans text-xs text-neutral-medium sm:px-6">
+      <p
+        className={`mt-6 flex items-start gap-2 border-t border-neutral-light font-sans text-xs text-neutral-medium ${
+          incrustada ? 'pt-4' : 'bg-neutral-light/30 p-4 sm:px-6'
+        }`}
+      >
         <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         {datos.advertencia}
       </p>
@@ -223,13 +251,34 @@ export function CalculadoraPintura({
  * CUÁNTO COMPRAR — tres columnas: superficie, medidas y resultado.
  * ─────────────────────────────────────────────────────────────────────────── */
 
+/**
+ * Con qué presentación abrir: la que venga de fuera si el producto la tiene, y si no, la
+ * primera. `idVarianteInicial` puede apuntar a una variante que este producto no ofrece
+ * (una dirección vieja, por ejemplo), así que se comprueba antes de usarla.
+ */
+function presentacionDeArranque(
+  datos: CalculadoraProducto,
+  idVarianteInicial: number | null,
+): string {
+  const pedida = datos.presentaciones.find((p) => p.idVariante === idVarianteInicial);
+  if (pedida !== undefined) return String(pedida.idVariante);
+  const primera = datos.presentaciones[0];
+  return primera === undefined ? '' : String(primera.idVariante);
+}
+
 interface PropsMedidas {
   datos: CalculadoraProducto;
   idProducto: number;
   enlaceAlProducto: boolean;
+  idVarianteInicial: number | null;
 }
 
-function CalculoPorMedidas({ datos, idProducto, enlaceAlProducto }: PropsMedidas) {
+function CalculoPorMedidas({
+  datos,
+  idProducto,
+  enlaceAlProducto,
+  idVarianteInicial,
+}: PropsMedidas) {
   const idGrupo = useId();
   const [tipo, setTipo] = useState<TipoSuperficie>(SUPERFICIE_POR_DEFECTO);
   const [resultado, setResultado] = useState<ResultadoCalculo | null>(null);
@@ -242,7 +291,6 @@ function CalculoPorMedidas({ datos, idProducto, enlaceAlProducto }: PropsMedidas
   const [datosDelResultado, setDatosDelResultado] = useState<string | null>(null);
 
   const superficie = superficiePorId(tipo);
-  const primera = datos.presentaciones[0];
 
   // El esquema cambia con la superficie para que el error nombre «el alto» o «el largo».
   // react-hook-form relee `resolver` en cada render, así que basta con recalcularlo.
@@ -261,7 +309,7 @@ function CalculoPorMedidas({ datos, idProducto, enlaceAlProducto }: PropsMedidas
   } = useForm<FormularioMedidas>({
     resolver: zodResolver(schema),
     defaultValues: {
-      idVariante: primera === undefined ? '' : String(primera.idVariante),
+      idVariante: presentacionDeArranque(datos, idVarianteInicial),
       ancho: '',
       ladoMayor: '',
       repeticiones: '1',
@@ -601,13 +649,14 @@ function ResultadoCantidad({
 function CalculoPorUnidades({
   datos,
   idProducto,
+  idVarianteInicial,
 }: {
   datos: CalculadoraProducto;
   idProducto: number;
+  idVarianteInicial: number | null;
 }) {
   const [resultado, setResultado] = useState<ResultadoCalculo | null>(null);
   const [errorApi, setErrorApi] = useState<string | null>(null);
-  const primera = datos.presentaciones[0];
 
   const {
     register,
@@ -616,7 +665,7 @@ function CalculoPorUnidades({
   } = useForm<FormularioCobertura>({
     resolver: zodResolver(formularioCoberturaSchema),
     defaultValues: {
-      idVariante: primera === undefined ? '' : String(primera.idVariante),
+      idVariante: presentacionDeArranque(datos, idVarianteInicial),
       unidades: '',
     },
   });

@@ -1,0 +1,62 @@
+{
+  "fecha": "2026-10-21T07:37:47.987Z",
+  "objetivo": "http://localhost:3000",
+  "resumen": {
+    "total": 7,
+    "pass": 2,
+    "warn": 2,
+    "fail": 3,
+    "estado_general": "RECHAZADO_CON_VULNERABILIDADES"
+  },
+  "hallazgos": [
+    {
+      "category": "Headers",
+      "name": "Content-Security-Policy",
+      "status": "FAIL",
+      "details": "Cabecera ausente.",
+      "recommendation": "Agregar helmet({ contentSecurityPolicy: true })"
+    },
+    {
+      "category": "Headers",
+      "name": "X-Content-Type-Options",
+      "status": "FAIL",
+      "details": "Ausente o valor incorrecto.",
+      "recommendation": "Enviar X-Content-Type-Options: nosniff"
+    },
+    {
+      "category": "Headers",
+      "name": "X-Frame-Options",
+      "status": "WARN",
+      "details": "Ausente (riesgo de Clickjacking si se embebe en iframe).",
+      "recommendation": "Enviar X-Frame-Options: DENY"
+    },
+    {
+      "category": "Headers",
+      "name": "Infrastructure Fingerprint Leak",
+      "status": "WARN",
+      "details": "Divulgación detectada (Next.js).",
+      "recommendation": "Deshabilitar X-Powered-By"
+    },
+    {
+      "category": "Cookies",
+      "name": "Session Cookies",
+      "status": "PASS",
+      "details": "No se emiten cookies en la ruta base.",
+      "recommendation": null
+    },
+    {
+      "category": "CORS",
+      "name": "Origin Policy",
+      "status": "PASS",
+      "details": "CORS seguro (Allow-Origin: No reflejado).",
+      "recommendation": null
+    },
+    {
+      "category": "Error Handling",
+      "name": "Stack Trace Leak",
+      "status": "FAIL",
+      "details": "La respuesta HTTP expone trazas internas del código fuente.",
+      "recommendation": "Capturar excepciones con middleware global de error genérico en producción."
+    }
+  ]
+}

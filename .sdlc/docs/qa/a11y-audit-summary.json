@@ -1,0 +1,11 @@
+{
+  "fecha": "2026-10-21T07:37:33.070Z",
+  "archivos_auditados": 1,
+  "resumen": {
+    "pass": 1,
+    "warn": 0,
+    "fail": 0,
+    "estado_accesibilidad": "CONFORME_WCAG_2.1_AA"
+  },
+  "hallazgos": []
+}
