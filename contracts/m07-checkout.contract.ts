@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { idSchema, paginacionQuerySchema, respuestaPaginada, respuestaUno } from './m01-catalogo.contract';
-import type { CatalogoParaCompraPort } from './m01-catalogo-entrega3.contract';
 import { nombreSchema, telefonoSchema } from './m04-cuentas.contract';
 import type { Carrito, Revalidacion, RevalidarRequest } from './m05-carrito.contract';
 import { carritoSchema, revalidacionSchema, revalidarRequestSchema } from './m05-carrito.contract';
 import type { PreciosPort } from './m06-precios.contract';
 import { cantidadSchema, codigoCuponEntradaSchema, dineroSchema, fechaHoraSchema, resumenCalculoSchema } from './m06-precios.contract';
+import type { SolicitudPagadaInput } from './m08-ordenes.contract';
 
 /**
  * ============================================================================
@@ -74,10 +74,10 @@ import { cantidadSchema, codigoCuponEntradaSchema, dineroSchema, fechaHoraSchema
  *      máximo MAXIMO_INTENTOS_PAGO intentos por solicitud; después → 409 LIMITE_INTENTOS y el cliente
  *      empieza otra desde el carrito. El precio no se recalcula: se cobra lo congelado.
  *  R5  CONFIRMACIÓN. Wompi avisa por POST /checkout/wompi/eventos (evento `transaction.updated`):
- *      a) La firma se valida ANTES de leer el cuerpo con Zod: se concatenan, en orden, los valores de
- *         `signature.properties` leídos de `data`, luego `timestamp` y el secreto de eventos; SHA-256; se
- *         compara con `signature.checksum` (o la cabecera X-Event-Checksum). Firma inválida → 401
- *         FIRMA_INVALIDA, se audita (M20) y no se toca nada.
+ *      a) La firma se valida sobre el cuerpo recibido ANTES de validarlo con Zod (Wompi puede cambiar la lista
+ *         de propiedades firmadas): se concatenan, en orden, los valores de `signature.properties` leídos de
+ *         `data`, luego `timestamp` y el secreto de eventos; SHA-256; se compara con `signature.checksum` (o la
+ *         cabecera X-Event-Checksum). Firma inválida → 401 FIRMA_INVALIDA, se audita (M20) y no se toca nada.
  *      b) Nunca se confía solo en el evento: se consulta la transacción en Wompi (GET /transactions/:id) y
  *         se usa ese resultado.
  *      c) Se responde 200 siempre que la firma sea válida, aunque la referencia no exista o el evento sea
@@ -85,8 +85,9 @@ import { cantidadSchema, codigoCuponEntradaSchema, dineroSchema, fechaHoraSchema
  *      De respaldo, GET /checkout/solicitudes/:codigo consulta a Wompi si el intento sigue PENDING y la
  *      última consulta fue hace más de INTERVALO_CONSULTA_WOMPI_SEGUNDOS: la pantalla no depende del evento.
  *  R6  APROBADO: el pago se acepta solo si coinciden referencia, moneda COP y `amount_in_cents` con el total
- *      congelado (D06 de M08). Si coinciden → `pagada` y se encola la creación de la orden (tabla de cola,
- *      misma transacción). Si no → `en_revision` y no se crea nada. La cola llama a M08 con
+ *      congelado (D06 de M08). Si coinciden → `pagada` y queda en cola para crear la orden: la propia
+ *      solicitud es la cola (estado `pagada` + próximo intento), escrita en la misma transacción que el pago.
+ *      Si no → `en_revision` y no se crea nada. La cola llama a M08 con
  *      `SolicitudPagadaInput` (sección 6) y reintenta con espera creciente (REINTENTOS_ORDEN_MINUTOS).
  *      M08 es idempotente por `codigoSolicitud` (R2 de M08). Un error que no se arregla reintentando
  *      (CONFLICTO_SOLICITUD, PAGO_INSUFICIENTE, entrada inválida) o agotar los reintentos → `en_revision`.
@@ -106,13 +107,14 @@ import { cantidadSchema, codigoCuponEntradaSchema, dineroSchema, fechaHoraSchema
  *  R11 NEQUI EN WOMPI. Cada intento es POST /transactions con `payment_method.type = NEQUI`, el celular,
  *      `amount_in_cents`, `currency = COP`, el correo del cliente, `reference` = `<SOL>-<n.º de intento>`
  *      (Wompi exige referencias únicas), la firma de integridad (SHA-256 de reference + amount_in_cents +
- *      currency + secreto de integridad) y los dos tokens de aceptación de R13. El resultado nunca es
- *      inmediato: el intento nace PENDING y el cliente lo acepta o rechaza en su app.
+ *      currency + secreto de integridad) y los dos tokens de aceptación de R13 (`acceptance_token` y
+ *      `accept_personal_auth`), con la llave privada. El resultado nunca es inmediato: el intento nace PENDING
+ *      y el cliente lo acepta o rechaza en su app.
  *  R12 CELULAR NEQUI: 10 dígitos, empieza por 3 (`celularNequiSchema`). Se precarga del perfil o de la
  *      dirección si cumple el formato. Solo viaja a Wompi: en la base y en las respuestas queda
  *      enmascarado (`*** *** 1111`, HU-SEG-06) y no se escribe en registros.
  *  R13 TÉRMINOS DE WOMPI: GET /checkout/preparar trae los enlaces y tokens de aceptación de Wompi
- *      (reglamento y autorización de datos personales). El cliente marca las dos casillas; sin ellas el
+ *      (reglamento y autorización de datos personales, de GET /merchants/info con la llave pública). El cliente marca las dos casillas; sin ellas el
  *      esquema rechaza la petición (400 PARAMETRO_INVALIDO). Los tokens no son secretos.
  *  R14 ENTREGA: `domicilio` exige la dirección. Se precarga la única dirección de M04 (HU-CUE-07) y el
  *      cliente puede cambiarla solo para este pedido; no se guarda en su perfil. En la solicitud y en la
@@ -151,13 +153,15 @@ import { cantidadSchema, codigoCuponEntradaSchema, dineroSchema, fechaHoraSchema
  *  D8  `esEntonado` y `baseConsumida` van false y null a M08 hasta que M01 los exponga (P5).
  *
  * ── Piezas en otros módulos (cada una en su PR pequeño) ────────────────────
- *  P1  BD / Prisma (PR general): tablas `solicitud_compra`, `linea_solicitud`, `linea_solicitud_descuento`,
- *      `intento_pago` y `cola_orden`; fila `solicitud` en `consecutivo`. La tabla `pagos` no se toca.
+ *  P1  BD / Prisma (PR general): tablas `solicitud_compra` (también hace de cola, R6), `linea_solicitud` (con
+ *      sus descuentos congelados) e `intento_pago`; fila `solicitud` en `consecutivo`. La tabla `pagos` no se
+ *      toca.
  *  P2  `app.routes.ts`: montar /api/v1/checkout y /api/v1/admin/pagos.
  *  P3  M05: "Continuar con la compra" lleva a /checkout en vez del aviso de pago no disponible, y un puerto
  *      para M07 (CarritoCheckoutPort, sección 6).
- *  P4  M08 en main con `crearDesdePagoConfirmado` (BLOQUEANTE para cerrar el flujo).
- *  P5  M01: exponer en CatalogoParaCompraPort si la línea es entonada y la base que consume.
+ *  P4  M08 con `crearDesdePagoConfirmado`. Su rama (feature/m08-ordenes) se unió a esta: si M08 llega antes a
+ *      main, este PR solo trae M07.
+ *  P5  M01 (más adelante): exponer en CatalogoParaCompraPort si la línea es entonada y la base que consume.
  *  P6  Core Kit: entrada "Pagos" en el menú del panel.
  *  P7  M17: nada nuevo; se leen los parámetros de envío que ya existen.
  *  P8  DevOps: WOMPI_API_URL, WOMPI_PUBLIC_KEY, WOMPI_PRIVATE_KEY, WOMPI_EVENTS_SECRET y
@@ -302,8 +306,8 @@ export const listarSolicitudesAdminRequestSchema = paginacionQuerySchema.extend(
 export type ListarSolicitudesAdminRequest = z.infer<typeof listarSolicitudesAdminRequestSchema>;
 
 /**
- * POST /checkout/wompi/eventos — lo que M07 lee del evento DESPUÉS de validar la firma sobre el cuerpo
- * crudo (R5 a). Los campos que no se usan se ignoran.
+ * POST /checkout/wompi/eventos — lo que M07 lee del evento DESPUÉS de validar su firma (R5 a). Los campos
+ * que no se usan se ignoran.
  */
 export const eventoWompiInputSchema = z.object({
   event: z.string(),
@@ -478,11 +482,11 @@ export interface CarritoCheckoutPort {
   quitarComprado(idUsuario: number, lineas: readonly { idVariante: number; idColor: number | null }[]): Promise<void>;
 }
 
-/** Lo que M07 usa de M06 (guía §7): recalcular y registrar o liberar el cupón. */
-export type PreciosCheckoutPort = Pick<PreciosPort, 'calcular' | 'registrarUsoCupon' | 'liberarUsoCupon'>;
-
-/** Lo que M07 usa de M01 para copiar las líneas (P5 lo amplía). */
-export type CatalogoCheckoutPort = CatalogoParaCompraPort;
+/**
+ * Lo que M07 usa de M06 (guía §7). El recálculo llega dentro de la revalidación de M05, que ya trae el
+ * cálculo nuevo y los datos de M01 de cada línea; aquí solo se registra o libera el cupón.
+ */
+export type PreciosCheckoutPort = Pick<PreciosPort, 'registrarUsoCupon' | 'liberarUsoCupon'>;
 
 /** Lo que M07 usa de M17 (R10): null si el parámetro no se pudo leer. */
 export interface ParametrosCheckoutPort {
@@ -499,18 +503,16 @@ export interface PerfilCheckoutPort {
 }
 
 /**
- * Lo que M07 usa de M08 (P4). La entrada es `SolicitudPagadaInput` del contrato de M08 (§2, rama
- * feature/m08-ordenes): cuando M08 llegue a main, este puerto la importa de allí en lugar de repetirla.
- * Mapeo desde la solicitud: codigoSolicitud ← código SOL · transaccionPagoId ← id de Wompi aprobado ·
- * origen e idCotizacion ← R9 · modoEntrega, direccion ← R14 · costoEntrega ← R10 · subTotal ←
- * resumen.subtotalInicial · descuento ← resumen.descuentoTotal · total ← totalACobrar · baseSinImpuesto,
- * importeIva, tasaIva ← resumen · montoPagado ← amount_in_cents / 100 · por línea: nombreProducto,
- * varianteCopia (medida), colorSolicitado, skuVendido ← M01; precioInicial, precioAplicado
- * (precioUnitarioFinal) y descuentos (ordenAplicacion, origen, porcentaje, importe) ← M06;
- * idVarianteRef ← idVariante; esEntonado y baseConsumida ← D8.
+ * Lo que M07 usa de M08 (P4). Mapeo desde la solicitud: codigoSolicitud ← código SOL · transaccionPagoId ← id
+ * de Wompi aprobado · origen e idCotizacion ← R9 · modoEntrega, direccion ← R14 · costoEntrega ← R10 ·
+ * subTotal ← resumen.subtotalInicial · descuento ← resumen.descuentoTotal · total ← totalACobrar ·
+ * baseSinImpuesto, importeIva, tasaIva ← resumen · montoPagado ← amount_in_cents / 100 · por línea:
+ * nombreProducto, varianteCopia (medida), colorSolicitado, skuVendido ← M01 (vía M05); precioInicial,
+ * precioAplicado (precioUnitarioFinal) y descuentos ← M06; idVarianteRef ← idVariante; esEntonado y
+ * baseConsumida ← D8.
  */
 export interface OrdenesCheckoutPort {
-  crearDesdePagoConfirmado(entrada: unknown): Promise<{ codigo: string; creada: boolean }>;
+  crearDesdePagoConfirmado(entrada: SolicitudPagadaInput): Promise<{ codigo: string; creada: boolean }>;
 }
 
 /** Cliente de Wompi (adaptador del módulo; en pruebas, uno en memoria). */
@@ -532,8 +534,8 @@ export interface PasarelaPagoPort {
     moneda: string;
     mensaje: string | null;
   }>;
-  /** R5 a: valida el checksum de un evento sobre su cuerpo crudo. */
-  firmaValida(cuerpoCrudo: string, checksumCabecera: string | null): boolean;
+  /** R5 a: valida el checksum del evento sobre el cuerpo recibido, antes de Zod. */
+  firmaValida(cuerpo: unknown, checksumCabecera: string | null): boolean;
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
