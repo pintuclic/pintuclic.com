@@ -52,8 +52,9 @@ export interface AdminLayoutProps {
   children: React.ReactNode;
   navItems?: ReadonlyArray<AdminNavItem>;
   /**
-   * Conteos que se dibujan bajo un ítem del menú, por su `href` (p. ej. pedidos esperando en cada estado).
-   * Los aporta quien monta el layout: el núcleo no conoce ningún módulo.
+   * Conteos de un ítem del menú, por su `href` (p. ej. pedidos esperando en cada estado). El menú muestra solo
+   * su suma junto al ítem; el desglose se ve dentro del módulo. Los aporta quien monta el layout: el núcleo no
+   * conoce ningún módulo.
    */
   navConteos?: Readonly<Record<string, ReadonlyArray<AdminNavConteo>>>;
 }
@@ -355,16 +356,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     </span>
                   )}
                 </Link>
-                {total > 0 && (
-                  <ul aria-label={`${item.label} esperando por estado`} className="mb-1 mt-0.5 space-y-0.5 pl-12 pr-4">
-                    {conteos.map((c) => (
-                      <li key={c.etiqueta} className="flex justify-between font-sans text-xs text-neutral-medium">
-                        <span>{c.etiqueta}</span>
-                        <span className="font-semibold text-corporate">{c.cantidad}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             );
           })}
