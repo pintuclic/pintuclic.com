@@ -10,6 +10,20 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.21] - 2026-10-27
+### Esquema 4.20 (88 Tablas) - M07: solicitudes de compra e intentos de pago
+- **Alcance General:** pedido por el contrato `contracts/m07-checkout.contract.ts` (P1). Cambio aditivo: tres tablas y dos ENUMs nuevos; no se toca nada de lo que existía. La tabla `pagos` (que exige una orden) no se usa: en M07 el pago ocurre antes de que exista la orden.
+  - **`solicitud_compra`**: la compra congelada al pagar con su código `SOL-AAAA-NNNNN` (RF-CHK-04-13): origen y cotización, modo de entrega y dirección, subtotal, descuentos, total de la mercancía, envío, total a cobrar, IVA, cupón y si su uso está registrado en M06, la transacción aprobada, el monto pagado y el código de la orden. Sigue existiendo aunque el cobro o la orden fallen (RF-CHK-04-06). Es también la **cola** de creación de la orden (M07 · R6): estado `pagada` + `proximo_intento_orden`, escrito en la misma transacción que el pago.
+  - **`linea_solicitud`**: copia de cada línea con su precio de M06 y sus descuentos en JSONB (pasan tal cual a `linea_orden_descuento`). Sin FK al catálogo, como `linea_orden`.
+  - **`intento_pago`**: cada cobro con Nequi enviado a Wompi, con su referencia única `<SOL>-<n>`, el id de la transacción, su estado, el monto en centavos y el celular **enmascarado** (nunca el número completo, HU-SEG-06).
+  - **ENUMs nuevos:** `enum_estado_solicitud_compra` y `enum_estado_intento_pago`.
+  - **Consecutivo:** las solicitudes usan la fila `solicitud` de `consecutivo`, que M07 crea la primera vez (como hace M08 con `orden`).
+  - **Prisma:** modelos `SolicitudCompra`, `LineaSolicitud` e `IntentoPago` y sus dos enums. `prisma migrate diff` contra una base creada con este DDL no reporta diferencias en estas tablas.
+  - **Verificado el 2026-10-27** en PostgreSQL 18 sobre una base nueva: DDL y seed corren limpios dos veces seguidas y dejan 88 tablas.
+  - **Bases existentes en 4.19:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente).
+
+---
+
 ## [v3.20] - 2026-10-27
 ### Esquema 4.19 (85 Tablas) - M03: asesoría y asistencia · M20: registro de auditoría (HU-SEG-04, escritura)
 - **Alcance General:** seis tablas nuevas pedidas por el contrato `contracts/m03-asesoria.contract.ts` (sección «Fuera del módulo»). Cambio puramente aditivo: no se toca ni se borra nada de lo que ya existía. Es el PR general de M03; el módulo llega después.
