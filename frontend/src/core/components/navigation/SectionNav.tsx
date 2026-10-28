@@ -55,14 +55,14 @@ export function SectionNav<T extends string>({
                 aria-current={activa ? 'true' : undefined}
                 aria-controls={controlsId}
                 onClick={() => onChange(id)}
-                className={`flex min-h-11 w-full items-center gap-3 rounded-btn px-3 py-2 text-left font-sans text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
+                className={`flex min-h-11 w-full min-w-0 items-center gap-3 rounded-btn px-3 py-2 text-left font-sans text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
                   activa
                     ? 'bg-action/10 font-semibold text-action'
                     : 'text-neutral-dark hover:bg-neutral-light/40 hover:text-neutral-black'
                 }`}
               >
                 {Icono && <Icono className="h-5 w-5 shrink-0" aria-hidden="true" />}
-                <span className="whitespace-nowrap">{label}</span>
+                <span className="truncate whitespace-nowrap">{label}</span>
               </button>
             </li>
           );
