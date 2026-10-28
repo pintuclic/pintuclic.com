@@ -216,6 +216,7 @@ export function aSolicitud(s: SolicitudGuardada): Solicitud {
     intentos: s.intentos.map(aIntentoPago),
     venceEn: s.venceEn.toISOString(),
     codigoOrden: s.codigoOrden,
+    compraDirecta: s.compraDirecta,
     creadaEn: s.fechaCreacion.toISOString(),
   };
 }

@@ -9,7 +9,7 @@ import { avisarCarritoActualizado } from '@/core/utils/eventos-carrito';
 import { INTERVALO_CONSULTA_PANTALLA_SEGUNDOS, MAXIMO_INTENTOS_PAGO, type Solicitud, type TerminosWompi } from '../dtos/m07-checkout.dto';
 import { reintentoFormSchema, type ReintentoFormData, type ReintentoFormEntrada } from '../dtos/formularios.dto';
 import { checkoutApi, mensajeDeError } from '../services/checkout-api';
-import { PASOS_COMPRA, pasoDe, sigueEnCurso } from '../services/textos-checkout';
+import { PASOS_COMPRA, PASOS_COMPRA_DIRECTA, pasoDe, sigueEnCurso } from '../services/textos-checkout';
 import { EstadoSolicitudBadge, ResumenCompra, type LineaResumen } from './comunes';
 
 function lineasDe(s: Solicitud): LineaResumen[] {
@@ -191,7 +191,7 @@ export function PagoEstadoView({ codigo }: { codigo: string }) {
         <EstadoSolicitudBadge estado={s.estado} />
       </div>
       <div className="mt-4 max-w-xl">
-        <Stepper steps={PASOS_COMPRA} current={pasoDe(s.estado)} ariaLabel="Pasos de la compra" />
+        <Stepper steps={s.compraDirecta ? PASOS_COMPRA_DIRECTA : PASOS_COMPRA} current={pasoDe(s.estado)} ariaLabel="Pasos de la compra" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_24rem] lg:items-start">
@@ -251,8 +251,8 @@ export function PagoEstadoView({ codigo }: { codigo: string }) {
                 <p className="text-sm text-neutral-dark">Llegaste al máximo de intentos. Vuelve al carrito para empezar de nuevo.</p>
               )}
               <div className="flex flex-wrap gap-3">
-                <ButtonLink href="/carrito" variant="outline">
-                  Volver al carrito
+                <ButtonLink href={s.compraDirecta ? '/productos' : '/carrito'} variant="outline">
+                  {s.compraDirecta ? 'Ver productos' : 'Volver al carrito'}
                 </ButtonLink>
                 <Button variant="ghost" isLoading={cancelando} onClick={() => void cancelar()}>
                   Cancelar compra
@@ -264,9 +264,11 @@ export function PagoEstadoView({ codigo }: { codigo: string }) {
           {(s.estado === 'vencida' || s.estado === 'cancelada') && (
             <div className="space-y-4">
               <Alert variant="info" title={s.estado === 'vencida' ? 'Esta compra venció' : 'Cancelaste esta compra'}>
-                No se hizo ningún cobro. Tus productos siguen en el carrito.
+                No se hizo ningún cobro.{s.compraDirecta ? '' : ' Tus productos siguen en el carrito.'}
               </Alert>
-              <ButtonLink href="/carrito">Volver al carrito</ButtonLink>
+              <ButtonLink href={s.compraDirecta ? '/productos' : '/carrito'}>
+                {s.compraDirecta ? 'Ver productos' : 'Volver al carrito'}
+              </ButtonLink>
             </div>
           )}
         </section>

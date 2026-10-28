@@ -1,8 +1,25 @@
 import type { BadgeVariant } from '@/core/components';
-import type { EstadoSolicitud, Solicitud } from '../dtos/m07-checkout.dto';
+import { CANTIDAD_MAXIMA_LINEA } from '@/modules/m06-precios/dtos/m06-precios.dto';
+import type { CompraDirecta, EstadoSolicitud, Solicitud } from '../dtos/m07-checkout.dto';
 
-/** Pasos de la compra (UI §4.7): Carrito → Pago → Orden. */
+/** Pasos de la compra (UI §4.7): Carrito → Pago → Orden. En la compra directa (R17) el primero es el producto. */
 export const PASOS_COMPRA = ['Carrito', 'Pago', 'Orden'] as const;
+export const PASOS_COMPRA_DIRECTA = ['Producto', 'Pago', 'Orden'] as const;
+
+/** R17: la compra directa que viene en la dirección (`?idVariante=…&idColor=…&cantidad=…`); null si no la hay. */
+export function compraDirectaDeUrl(params: { get(nombre: string): string | null }): CompraDirecta | null {
+  const entero = (v: string | null): number | null => {
+    const n = Number(v);
+    return v !== null && Number.isInteger(n) && n > 0 ? n : null;
+  };
+  const idVariante = entero(params.get('idVariante'));
+  if (idVariante === null) return null;
+  return {
+    idVariante,
+    idColor: entero(params.get('idColor')),
+    cantidad: Math.min(entero(params.get('cantidad')) ?? 1, CANTIDAD_MAXIMA_LINEA),
+  };
+}
 
 export const ETIQUETA_ESTADO: Record<EstadoSolicitud, string> = {
   en_pago: 'Esperando el pago',

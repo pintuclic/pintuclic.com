@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { celularNequiSchema, crearSolicitudRequestSchema } from '../dtos/m07-checkout.dto';
+import { celularNequiSchema, crearSolicitudRequestSchema, prepararCheckoutRequestSchema } from '../dtos/m07-checkout.dto';
 import { checksumEsperado, firmaEventoValida, firmaIntegridad } from '../services/firmas-wompi';
 import {
   aCentavos,
@@ -106,6 +106,22 @@ describe('M07 · reglas', () => {
         aceptaciones: { ...base.aceptaciones, aceptaTerminos: false },
       }).success,
     ).toBe(false);
+  });
+
+  it('R17, D9: la compra directa no lleva cupón; preparar exige la presentación', () => {
+    const base = {
+      pantalla: { lineas: [{ idLinea: 1, subtotal: 10 }], total: 10, codigoCupon: 'PINTA10' },
+      directa: { idVariante: 3, idColor: null, cantidad: 1 },
+      modoEntrega: 'recogida',
+      direccion: null,
+      celularNequi: '3991111111',
+      aceptaciones: { tokenAceptacion: 'a', tokenDatosPersonales: 'b', aceptaTerminos: true },
+    };
+    expect(crearSolicitudRequestSchema.safeParse(base).success).toBe(false);
+    expect(crearSolicitudRequestSchema.safeParse({ ...base, pantalla: { lineas: [{ idLinea: 1, subtotal: 10 }], total: 10 } }).success).toBe(true);
+    expect(prepararCheckoutRequestSchema.parse({ idVariante: '3', cantidad: '2' })).toEqual({ idVariante: 3, cantidad: 2 });
+    expect(prepararCheckoutRequestSchema.safeParse({ cantidad: '2' }).success).toBe(false);
+    expect(prepararCheckoutRequestSchema.safeParse({ idVariante: '3', codigoCupon: 'X' }).success).toBe(false);
   });
 
   it('R3: vence pasado el plazo, salvo con un pago en curso', () => {

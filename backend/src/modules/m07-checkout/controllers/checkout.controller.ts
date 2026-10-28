@@ -71,7 +71,9 @@ export class CheckoutController {
   preparar = manejar(async (req, res) => {
     const q = validar(res, prepararCheckoutRequestSchema, req.query);
     if (q === null) return;
-    exito(res, await this.servicio.preparar(actor(req), q.codigoCupon));
+    const directa =
+      q.idVariante === undefined ? undefined : { idVariante: q.idVariante, idColor: q.idColor ?? null, cantidad: q.cantidad ?? 1 };
+    exito(res, await this.servicio.preparar(actor(req), q.codigoCupon, directa));
   });
 
   crear = manejar(async (req, res) => {

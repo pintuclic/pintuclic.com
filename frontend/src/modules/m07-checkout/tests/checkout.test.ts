@@ -2,7 +2,7 @@ import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 import { pagoFormSchema, reintentoFormSchema } from '../dtos/formularios.dto';
 import { codigoDeError, mensajeDeError, pagoEnCursoDeError, revalidacionDeError } from '../services/checkout-api';
-import { estadoDeUrl, pasoDe, sigueEnCurso, textoEnvio } from '../services/textos-checkout';
+import { compraDirectaDeUrl, estadoDeUrl, pasoDe, sigueEnCurso, textoEnvio } from '../services/textos-checkout';
 
 function errorApi(status: number, code: string, details: unknown): AxiosError {
   const response = {
@@ -97,5 +97,15 @@ describe('M07 · textos', () => {
     expect(estadoDeUrl('inventado')).toBeNull();
     expect(textoEnvio(0, String)).toBe('Gratis');
     expect(textoEnvio(15000, String)).toBe('15000');
+  });
+});
+
+describe('M07 · compra directa desde la ficha (R17)', () => {
+  it('lee la presentación, el color y la cantidad de la dirección', () => {
+    expect(compraDirectaDeUrl(new URLSearchParams('idVariante=9&cantidad=3'))).toEqual({ idVariante: 9, idColor: null, cantidad: 3 });
+    expect(compraDirectaDeUrl(new URLSearchParams('idVariante=4&idColor=12'))).toEqual({ idVariante: 4, idColor: 12, cantidad: 1 });
+    expect(compraDirectaDeUrl(new URLSearchParams('idVariante=4&cantidad=99999'))?.cantidad).toBe(9_999);
+    expect(compraDirectaDeUrl(new URLSearchParams('cupon=PINTA10'))).toBeNull();
+    expect(compraDirectaDeUrl(new URLSearchParams('idVariante=abc'))).toBeNull();
   });
 });

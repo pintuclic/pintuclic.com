@@ -10,6 +10,7 @@ import {
   eventoWompiInputSchema,
   type AceptacionesWompi,
   type CarritoCheckoutPort,
+  type CompraDirecta,
   type CrearSolicitudRequest,
   type ListarSolicitudesAdminRequest,
   type OrdenesCheckoutPort,
@@ -72,9 +73,12 @@ export class CheckoutService {
 
   /* ── Cliente ──────────────────────────────────────────────────────────── */
 
-  async preparar(idUsuario: number, codigoCupon?: string): Promise<PrepararCheckout> {
+  /** Con `directa`, la pantalla prepara solo esa línea (R17); sin ella, el carrito de la cuenta. */
+  async preparar(idUsuario: number, codigoCupon?: string, directa?: CompraDirecta): Promise<PrepararCheckout> {
     const [carrito, envio, perfil, terminos, abierta] = await Promise.all([
-      this.dep.carrito.carritoDeCuenta(idUsuario, codigoCupon),
+      directa === undefined
+        ? this.dep.carrito.carritoDeCuenta(idUsuario, codigoCupon)
+        : this.dep.carrito.carritoDirecto(idUsuario, directa),
       this.parametrosEnvio(),
       this.dep.perfil.datosDeEntrega(idUsuario),
       this.terminos(),
@@ -98,10 +102,18 @@ export class CheckoutService {
 
   /** R2, en su orden. */
   async crear(idUsuario: number, req: CrearSolicitudRequest): Promise<Solicitud> {
-    // a) Revalidación con lo que el cliente tenía en pantalla (C11 de M05).
-    const revalidacion = await this.dep.carrito.revalidar(idUsuario, req.pantalla);
+    // a) Revalidación con lo que el cliente tenía en pantalla (C11 de M05); R17: solo la línea de la ficha.
+    const directa = req.directa;
+    const revalidacion =
+      directa === undefined
+        ? await this.dep.carrito.revalidar(idUsuario, req.pantalla)
+        : await this.dep.carrito.revalidarDirecta(idUsuario, directa, req.pantalla);
     const carrito = revalidacion.carrito;
     if (carrito.lineas.length === 0) throw errores.carritoVacio();
+    const producto = carrito.lineas[0]?.producto;
+    if (directa !== undefined && producto?.esCombo === true && producto.topeUnidades !== null && directa.cantidad > producto.topeUnidades) {
+      throw errores.productoNoDisponible(producto.topeUnidades);
+    }
     if (!revalidacion.puedeContinuar || carrito.calculo === null) throw errores.carritoCambio(revalidacion);
 
     // b) R9
@@ -143,6 +155,7 @@ export class CheckoutService {
         idCupon: cuponAplicado?.idCupon ?? null,
         importeCupon: resumen.descuentoCupon,
         venceEn: new Date(ahora.getTime() + VIGENCIA_SOLICITUD_MINUTOS * MS_POR_MINUTO),
+        compraDirecta: directa !== undefined,
         lineas: congelarLineas(carrito),
       },
       anioColombia(ahora),
@@ -474,6 +487,8 @@ export class CheckoutService {
       });
       return;
     }
+    // R17: la compra directa no pasó por el carrito.
+    if (s.compraDirecta) return;
     try {
       await this.dep.carrito.quitarComprado(
         s.idUsuario,

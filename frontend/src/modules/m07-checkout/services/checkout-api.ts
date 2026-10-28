@@ -2,6 +2,7 @@ import { isAxiosError } from 'axios';
 import { apiClient, esRespuestaError } from '@/core/api/apiClient';
 import { revalidacionSchema, type Revalidacion } from '@/modules/m05-carrito/dtos/m05-carrito.dto';
 import type {
+  CompraDirecta,
   CrearSolicitudRequest,
   EstadoSolicitud,
   PrepararCheckout,
@@ -36,10 +37,20 @@ export interface FiltroPagos {
 
 /** Rutas del cliente (`/checkout`) y del panel (`/admin/pagos`). La sesión viaja en cookie HttpOnly. */
 export const checkoutApi = {
-  preparar: async (codigoCupon: string | null): Promise<PrepararCheckout> =>
+  /** Con `directa`, solo esa línea de la ficha (R17); si no, el carrito con su cupón. */
+  preparar: async (codigoCupon: string | null, directa: CompraDirecta | null = null): Promise<PrepararCheckout> =>
     (
       await apiClient.get<SobreUno<PrepararCheckout>>('/checkout/preparar', {
-        params: codigoCupon === null ? {} : { codigoCupon },
+        params:
+          directa !== null
+            ? {
+                idVariante: directa.idVariante,
+                cantidad: directa.cantidad,
+                ...(directa.idColor === null ? {} : { idColor: directa.idColor }),
+              }
+            : codigoCupon === null
+              ? {}
+              : { codigoCupon },
       })
     ).data.data,
 

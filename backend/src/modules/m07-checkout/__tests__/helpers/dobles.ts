@@ -101,6 +101,14 @@ export function carrito(lineas: LineaCarrito[] = [lineaCarrito()], cupon: { idCu
 
 export class CarritoFalso implements CarritoCheckoutPort {
   revalidacion: Revalidacion = { carrito: carrito(), cambios: [], puedeContinuar: true };
+  /** R17: lo que devuelve la compra directa (por defecto, una línea de la ficha). */
+  directa: Revalidacion = { carrito: carrito([lineaCarrito({ idLinea: 1, idVariante: 30, cantidad: 1, subtotal: 50_000 })]), cambios: [], puedeContinuar: true };
+  async carritoDirecto(): Promise<Carrito> {
+    return this.directa.carrito;
+  }
+  async revalidarDirecta(): Promise<Revalidacion> {
+    return this.directa;
+  }
   quitados: { idVariante: number; idColor: number | null }[] = [];
   async carritoDeCuenta(): Promise<Carrito> {
     return this.revalidacion.carrito;

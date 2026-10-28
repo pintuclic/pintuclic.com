@@ -15,6 +15,7 @@ describe.skipIf(URL_BD === undefined)('M07 · checkout (PostgreSQL + M05, M06 y 
   let servicio: CheckoutService;
   let pasarela: PasarelaFalsa;
   let carritoDeCuenta: (id: number) => Promise<import('../../m05-carrito/dtos/m05-carrito.dto').Carrito>;
+  let carritoAgregar: (l: { idVariante: number; idColor: number | null }) => Promise<unknown>;
   let cliente = 0;
   let ahora = new Date();
   const lineasSeed: Array<{ idVariante: number; idColor: number | null }> = [];
@@ -49,6 +50,7 @@ describe.skipIf(URL_BD === undefined)('M07 · checkout (PostgreSQL + M05, M06 y 
     );
     const carrito = new CarritoService({ repo: new CarritoRepository(), precios: m06.precios, catalogo });
     carritoDeCuenta = (id) => carrito.carritoDeCuenta(id);
+    carritoAgregar = (l) => carrito.agregar({ idUsuario: cliente, tokenVisitante: null }, { ...l, cantidad: 1 });
     pasarela = new dobles.PasarelaFalsa(`tx-${ALEATORIO}`);
     servicio = new Servicio({
       repo: new CheckoutRepository(),
@@ -56,6 +58,8 @@ describe.skipIf(URL_BD === undefined)('M07 · checkout (PostgreSQL + M05, M06 y 
         carritoDeCuenta: (id, cupon) => carrito.carritoDeCuenta(id, cupon),
         revalidar: (id, pantalla) => carrito.revalidarCuenta(id, pantalla),
         quitarComprado: (id, lineas) => carrito.quitarComprado(id, lineas),
+        carritoDirecto: (id, linea) => carrito.carritoDirecto(id, linea),
+        revalidarDirecta: (id, linea, pantalla) => carrito.revalidarDirecta(id, linea, pantalla),
       },
       precios: m06.precios,
       ordenes: new OrdenesM08Adapter(
@@ -118,5 +122,28 @@ describe.skipIf(URL_BD === undefined)('M07 · checkout (PostgreSQL + M05, M06 y 
     expect(orden.total.toNumber()).toBeCloseTo(s.totalACobrar, 2);
     expect(await prisma.lineaOrden.count({ where: { idOrden: orden.idOrden } })).toBe(2);
     expect((await carritoDeCuenta(cliente)).lineas).toHaveLength(0);
+  });
+
+  it('R17: la compra directa paga solo esa línea y el carrito queda igual', async () => {
+    const [l1, l2] = lineasSeed;
+    if (l1 === undefined || l2 === undefined) throw new Error('sin datos');
+    await carritoAgregar(l1);
+    const directa = { ...l2, cantidad: 2 };
+    const p = await servicio.preparar(cliente, undefined, directa);
+    const linea = p.carrito.lineas[0];
+    const s = await servicio.crear(cliente, {
+      pantalla: { lineas: [{ idLinea: 1, subtotal: linea?.precio?.subtotal ?? null }], total: p.carrito.calculo?.resumen.total ?? 0 },
+      directa,
+      modoEntrega: 'recogida',
+      direccion: null,
+      celularNequi: '3991111111',
+      aceptaciones: { tokenAceptacion: 'acc', tokenDatosPersonales: 'pd', aceptaTerminos: true },
+    });
+    expect(s).toMatchObject({ compraDirecta: true, lineas: [{ cantidad: 2 }] });
+    pasarela.resolver(`tx-${ALEATORIO}-2`, 'APPROVED');
+    ahora = new Date(ahora.getTime() + 10_000);
+    expect((await servicio.obtenerMia(cliente, s.codigo)).estado).toBe('completada');
+    const enCarrito = (await carritoDeCuenta(cliente)).lineas.map((l) => [l.idVariante, l.idColor, l.cantidad]);
+    expect(enCarrito).toEqual([[l1.idVariante, l1.idColor, 1]]);
   });
 });

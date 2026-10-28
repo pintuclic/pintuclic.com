@@ -238,6 +238,36 @@ describe('M07 · CheckoutService', () => {
     expect(await codigoDeError(servicio.obtenerMia(CLIENTE, 'SOL-2026-99999'))).toBe('RECURSO_NO_DISPONIBLE');
   });
 
+  it('R17: la compra directa paga solo esa línea, queda marcada y no toca el carrito', async () => {
+    const p = await servicio.preparar(CLIENTE, undefined, { idVariante: 30, idColor: null, cantidad: 1 });
+    expect(p.carrito.lineas.map((l) => l.idVariante)).toEqual([30]);
+    const s = await servicio.crear(CLIENTE, {
+      ...peticion,
+      pantalla: { lineas: [{ idLinea: 1, subtotal: 50_000 }], total: 50_000 },
+      directa: { idVariante: 30, idColor: null, cantidad: 1 },
+    });
+    expect(s.compraDirecta).toBe(true);
+    expect(s.totalACobrar).toBe(50_000);
+    pasarela.resolver('tx-1', 'APPROVED');
+    ahora = new Date(ahora.getTime() + 10_000);
+    expect((await servicio.obtenerMia(CLIENTE, s.codigo)).estado).toBe('completada');
+    expect(ordenes.recibidas[0]?.origen).toBe('carrito');
+    expect(carritoF.quitados).toEqual([]);
+  });
+
+  it('R17: un combo pedido por encima de su tope responde 409', async () => {
+    carritoF.directa = {
+      carrito: carrito([
+        lineaCarrito({ idLinea: 1, cantidad: 5, producto: { ...lineaCarrito().producto, esCombo: true, topeUnidades: 2 } }),
+      ]),
+      cambios: [],
+      puedeContinuar: true,
+    };
+    const r = servicio.crear(CLIENTE, { ...peticion, directa: { idVariante: 11, idColor: 8, cantidad: 5 } });
+    expect(await codigoDeError(r)).toBe('PRODUCTO_NO_DISPONIBLE');
+    expect(repo.solicitudes).toHaveLength(0);
+  });
+
   it('R3: el cliente cancela solo sin pago en curso', async () => {
     const s = await servicio.crear(CLIENTE, peticion);
     expect(await codigoDeError(servicio.cancelar(CLIENTE, s.codigo))).toBe('ESTADO_NO_PERMITE');

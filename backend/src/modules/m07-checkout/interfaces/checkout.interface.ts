@@ -65,6 +65,8 @@ export interface SolicitudNueva {
   idCupon: number | null;
   importeCupon: number;
   venceEn: Date;
+  /** R17: comprada desde la ficha, sin el carrito. */
+  compraDirecta: boolean;
   lineas: LineaCongelada[];
 }
 

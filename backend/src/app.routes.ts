@@ -240,6 +240,8 @@ export function construirAppRoutes(): Router {
       carritoDeCuenta: (idUsuario, codigoCupon) => m05.carrito.carritoDeCuenta(idUsuario, codigoCupon),
       revalidar: (idUsuario, pantalla) => m05.carrito.revalidarCuenta(idUsuario, pantalla),
       quitarComprado: (idUsuario, lineas) => m05.carrito.quitarComprado(idUsuario, lineas),
+      carritoDirecto: (idUsuario, linea) => m05.carrito.carritoDirecto(idUsuario, linea),
+      revalidarDirecta: (idUsuario, linea, pantalla) => m05.carrito.revalidarDirecta(idUsuario, linea, pantalla),
     },
     precios: m06.precios,
     ordenes: new OrdenesM08Adapter(m08.creacion),

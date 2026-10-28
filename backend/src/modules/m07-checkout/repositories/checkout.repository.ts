@@ -93,6 +93,7 @@ function aSolicitud(f: Fila): SolicitudGuardada {
     transaccionPagoId: f.transaccionPagoId,
     montoPagado: f.montoPagado === null ? null : n(f.montoPagado),
     codigoOrden: f.codigoOrden,
+    compraDirecta: f.compraDirecta,
     reintentosOrden: f.reintentosOrden,
     proximoIntentoOrden: f.proximoIntentoOrden,
     ultimoError: f.ultimoError,
@@ -162,6 +163,7 @@ export class CheckoutRepository implements CheckoutRepositoryPort {
           idCupon: nueva.idCupon,
           importeCupon: nueva.importeCupon,
           venceEn: nueva.venceEn,
+          compraDirecta: nueva.compraDirecta,
           lineas: {
             create: nueva.lineas.map((l) => ({
               posicion: l.posicion,

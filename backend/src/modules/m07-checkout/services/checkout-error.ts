@@ -77,6 +77,13 @@ export const errores = {
       'Llegaste al máximo de intentos para esta compra. Vuelve al carrito para empezar de nuevo.',
       409,
     ),
+  productoNoDisponible: (tope: number): CheckoutError =>
+    new CheckoutError(
+      'PRODUCTO_NO_DISPONIBLE',
+      `De este combo quedan ${tope} ${tope === 1 ? 'unidad' : 'unidades'}. Baja la cantidad e inténtalo de nuevo.`,
+      409,
+      { motivo: 'tope_combo' },
+    ),
   pasarela: (): CheckoutError =>
     new CheckoutError(
       'PASARELA_NO_DISPONIBLE',

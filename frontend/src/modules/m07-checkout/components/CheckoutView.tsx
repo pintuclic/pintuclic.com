@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -20,7 +20,7 @@ import {
   requiereSesion,
   revalidacionDeError,
 } from '../services/checkout-api';
-import { PASOS_COMPRA } from '../services/textos-checkout';
+import { compraDirectaDeUrl, PASOS_COMPRA, PASOS_COMPRA_DIRECTA } from '../services/textos-checkout';
 import { ResumenCompra, type LineaResumen } from './comunes';
 
 const VACIO: PagoFormEntrada = {
@@ -46,11 +46,17 @@ function lineasDe(p: PrepararCheckout): LineaResumen[] {
   }));
 }
 
-/** /checkout: entrega, celular de Nequi, términos de Wompi y resumen con el botón de pagar (contrato M07 · R2). */
+/**
+ * /checkout: entrega, celular de Nequi, términos de Wompi y resumen con el botón de pagar (contrato M07 · R2). Con
+ * `?idVariante=…` paga solo ese producto desde la ficha, sin el carrito (R17).
+ */
 export function CheckoutView() {
   const router = useRouter();
   const params = useSearchParams();
-  const cupon = params.get('cupon');
+  const directa = useMemo(() => compraDirectaDeUrl(params), [params]);
+  // D9: la compra directa no lleva cupón.
+  const cupon = directa === null ? params.get('cupon') : null;
+  const consulta = params.toString();
   const [datos, setDatos] = useState<PrepararCheckout | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cambios, setCambios] = useState<readonly CambioRevalidacion[]>([]);
@@ -69,7 +75,7 @@ export function CheckoutView() {
 
   const cargar = useCallback(async (): Promise<void> => {
     try {
-      const p = await checkoutApi.preparar(cupon);
+      const p = await checkoutApi.preparar(cupon, directa);
       setDatos(p);
       const d = p.direccionPerfil;
       reset({
@@ -83,12 +89,14 @@ export function CheckoutView() {
       });
     } catch (err: unknown) {
       if (requiereSesion(err)) {
-        router.replace(`/login?destino=${encodeURIComponent('/carrito')}`);
+        // Sin sesión: se inicia y se vuelve a esta misma compra (RF-CAR-01-02).
+        const destino = directa === null ? '/carrito' : `/checkout?${consulta}`;
+        router.replace(`/login?destino=${encodeURIComponent(destino)}`);
         return;
       }
-      setError(mensajeDeError(err, 'No fue posible preparar el pago. Vuelve al carrito e inténtalo de nuevo.'));
+      setError(mensajeDeError(err, 'No fue posible preparar el pago. Inténtalo de nuevo.'));
     }
-  }, [cupon, reset, router]);
+  }, [cupon, directa, consulta, reset, router]);
 
   useEffect(() => {
     void cargar();
@@ -101,6 +109,7 @@ export function CheckoutView() {
     try {
       const s = await checkoutApi.crear({
         pantalla: pantallaDe(datos.carrito, cupon),
+        ...(directa === null ? {} : { directa }),
         modoEntrega: f.modoEntrega,
         direccion:
           f.modoEntrega === 'domicilio'
@@ -147,8 +156,8 @@ export function CheckoutView() {
         {error !== null ? (
           <div className="space-y-4">
             <Alert variant="error">{error}</Alert>
-            <ButtonLink href="/carrito" variant="outline">
-              Volver al carrito
+            <ButtonLink href={directa === null ? '/carrito' : '/productos'} variant="outline">
+              {directa === null ? 'Volver al carrito' : 'Ver productos'}
             </ButtonLink>
           </div>
         ) : (
@@ -176,16 +185,24 @@ export function CheckoutView() {
 
   const envio = modo === 'recogida' ? datos.envio.recogida : datos.envio.domicilio;
   const sinPasarela = datos.terminos === null;
+  // R17: en la compra directa M05 no filtró antes; una línea que no se vende no se paga.
+  const noVendible = datos.carrito.lineas.some((l) => l.precio?.vendible !== true);
 
   return (
     <Container className="min-h-[60vh] py-8">
-      <Link href="/carrito" className="inline-flex items-center gap-1 font-title text-sm font-medium text-action hover:text-action-hover">
-        <ArrowLeft aria-hidden className="h-4 w-4" />
-        Volver al carrito
-      </Link>
+      {directa === null ? (
+        <Link href="/carrito" className="inline-flex items-center gap-1 font-title text-sm font-medium text-action hover:text-action-hover">
+          <ArrowLeft aria-hidden className="h-4 w-4" />
+          Volver al carrito
+        </Link>
+      ) : (
+        <Button variant="ghost" size="sm" leftIcon={<ArrowLeft aria-hidden className="h-4 w-4" />} onClick={() => router.back()}>
+          Volver al producto
+        </Button>
+      )}
       <h1 className="mt-3 font-title text-2xl font-bold text-corporate md:text-3xl">Finaliza tu compra</h1>
       <div className="mt-4 max-w-xl">
-        <Stepper steps={PASOS_COMPRA} current={1} ariaLabel="Pasos de la compra" />
+        <Stepper steps={directa === null ? PASOS_COMPRA : PASOS_COMPRA_DIRECTA} current={1} ariaLabel="Pasos de la compra" />
       </div>
 
       <div className="mt-6 space-y-3" aria-live="polite">
@@ -195,6 +212,11 @@ export function CheckoutView() {
             <Link href={`/checkout/${datos.solicitudEnCurso}`} className="font-semibold underline">
               Ver ese pago
             </Link>
+          </Alert>
+        )}
+        {noVendible && (
+          <Alert variant="error" title="Este producto no está disponible">
+            Ya no se puede comprar en esta presentación o color. Vuelve a la ficha y elige otra opción.
           </Alert>
         )}
         {sinPasarela && (
@@ -324,7 +346,7 @@ export function CheckoutView() {
             envio={envio}
             total={resumen.total + envio}
           >
-            <Button type="submit" variant="primary-conversion" size="lg" fullWidth isLoading={isSubmitting} disabled={sinPasarela || datos.solicitudEnCurso !== null}>
+            <Button type="submit" variant="primary-conversion" size="lg" fullWidth isLoading={isSubmitting} disabled={sinPasarela || noVendible || datos.solicitudEnCurso !== null}>
               Pagar con Nequi
             </Button>
           </ResumenCompra>
