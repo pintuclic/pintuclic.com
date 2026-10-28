@@ -4,7 +4,14 @@ import { nombreSchema, telefonoSchema } from '../../m04-cuentas/dtos/m04-cuentas
 import type { Carrito, Revalidacion, RevalidarRequest } from '../../m05-carrito/dtos/m05-carrito.dto';
 import { carritoSchema, revalidacionSchema, revalidarRequestSchema } from '../../m05-carrito/dtos/m05-carrito.dto';
 import type { PreciosPort } from '../../m06-precios/dtos/m06-precios.dto';
-import { cantidadSchema, codigoCuponEntradaSchema, dineroSchema, fechaHoraSchema, resumenCalculoSchema } from '../../m06-precios/dtos/m06-precios.dto';
+import {
+  CANTIDAD_MAXIMA_LINEA,
+  cantidadSchema,
+  codigoCuponEntradaSchema,
+  dineroSchema,
+  fechaHoraSchema,
+  resumenCalculoSchema,
+} from '../../m06-precios/dtos/m06-precios.dto';
 import type { SolicitudPagadaInput } from '../../m08-ordenes/dtos/m08-ordenes.dto';
 
 /**
@@ -101,16 +108,40 @@ export type AceptacionesWompi = z.infer<typeof aceptacionesWompiSchema>;
  * 2. PETICIONES
  * ─────────────────────────────────────────────────────────────────────────── */
 
-/** GET /checkout/preparar */
-export const prepararCheckoutRequestSchema = z.object({
-  codigoCupon: codigoCuponEntradaSchema.optional(),
+/** R17: la presentación, color y cantidad de una compra directa desde la ficha. */
+export const compraDirectaSchema = z.object({
+  idVariante: idSchema,
+  idColor: idSchema.nullable(),
+  cantidad: cantidadSchema,
 });
+export type CompraDirecta = z.infer<typeof compraDirectaSchema>;
+
+/** GET /checkout/preparar — con `idVariante` (y `idColor`, `cantidad`) prepara una compra directa (R17). */
+export const prepararCheckoutRequestSchema = z
+  .object({
+    codigoCupon: codigoCuponEntradaSchema.optional(),
+    idVariante: z.coerce.number().int().positive().optional(),
+    idColor: z.coerce.number().int().positive().optional(),
+    cantidad: z.coerce.number().int().min(1).max(CANTIDAD_MAXIMA_LINEA).optional(),
+  })
+  .refine((v) => v.idVariante !== undefined || (v.idColor === undefined && v.cantidad === undefined), {
+    message: 'Falta la presentación del producto',
+    path: ['idVariante'],
+  })
+  .refine((v) => v.idVariante === undefined || v.codigoCupon === undefined, {
+    message: 'La compra directa no lleva cupón',
+    path: ['codigoCupon'],
+  });
 export type PrepararCheckoutRequest = z.infer<typeof prepararCheckoutRequestSchema>;
 
-/** POST /checkout/solicitudes (R2). `pantalla` es lo mismo que recibe POST /carrito/revalidar (C11). */
+/**
+ * POST /checkout/solicitudes (R2). `pantalla` es lo mismo que recibe POST /carrito/revalidar (C11). Con
+ * `directa` se paga solo esa línea (R17) y `pantalla` describe esa línea (idLinea 1).
+ */
 export const crearSolicitudRequestSchema = z
   .object({
     pantalla: revalidarRequestSchema,
+    directa: compraDirectaSchema.optional(),
     modoEntrega: modoEntregaSchema,
     /** Obligatoria con `domicilio`; null con `recogida`. */
     direccion: direccionEntregaSchema.nullable(),
@@ -120,6 +151,10 @@ export const crearSolicitudRequestSchema = z
   .refine((v) => v.modoEntrega !== 'domicilio' || v.direccion !== null, {
     message: 'Escribe la dirección de entrega',
     path: ['direccion'],
+  })
+  .refine((v) => v.directa === undefined || v.pantalla.codigoCupon === undefined, {
+    message: 'La compra directa no lleva cupón',
+    path: ['pantalla', 'codigoCupon'],
   });
 export type CrearSolicitudRequest = z.infer<typeof crearSolicitudRequestSchema>;
 
@@ -237,6 +272,8 @@ export const solicitudSchema = z.object({
   venceEn: fechaHoraSchema,
   /** R7: el código PC-… cuando la orden existe; null antes. */
   codigoOrden: z.string().nullable(),
+  /** R17: se pagó desde la ficha, sin el carrito. */
+  compraDirecta: z.boolean(),
   creadaEn: fechaHoraSchema,
 });
 export type Solicitud = z.infer<typeof solicitudSchema>;
@@ -268,7 +305,8 @@ export type ListarSolicitudesResponseEnvelope = z.infer<typeof listarSolicitudes
  * 404 RECURSO_NO_DISPONIBLE (ajena, inexistente o sin permiso) · 409 CARRITO_CAMBIO (R2 a, con la
  * revalidación) · 409 VARIAS_COTIZACIONES (R2 b) · 409 PAGO_EN_CURSO (R2 c, con el código) ·
  * 409 CUPON_NO_DISPONIBLE (R2 e, con el motivo) · 409 ESTADO_NO_PERMITE · 409 SOLICITUD_VENCIDA (R3) ·
- * 409 LIMITE_INTENTOS (R4) · 503 PASARELA_NO_DISPONIBLE (R2 f) · 500 ERROR_INTERNO.
+ * 409 LIMITE_INTENTOS (R4) · 409 PRODUCTO_NO_DISPONIBLE (R17, con el motivo) · 503 PASARELA_NO_DISPONIBLE
+ * (R2 f) · 500 ERROR_INTERNO.
  */
 export const CODIGOS_ERROR_CHECKOUT = [
   'PARAMETRO_INVALIDO',
@@ -282,6 +320,7 @@ export const CODIGOS_ERROR_CHECKOUT = [
   'ESTADO_NO_PERMITE',
   'SOLICITUD_VENCIDA',
   'LIMITE_INTENTOS',
+  'PRODUCTO_NO_DISPONIBLE',
   'PASARELA_NO_DISPONIBLE',
   'ERROR_INTERNO',
 ] as const;
@@ -311,6 +350,10 @@ export interface CarritoCheckoutPort {
   carritoDeCuenta(idUsuario: number, codigoCupon?: string): Promise<Carrito>;
   /** C11 con el dueño ya resuelto. */
   revalidar(idUsuario: number, pantalla: RevalidarRequest): Promise<Revalidacion>;
+  /** R17: una sola línea calculada como un carrito (idLinea 1), sin guardarla ni tocar el carrito. */
+  carritoDirecto(idUsuario: number, linea: CompraDirecta): Promise<Carrito>;
+  /** R17: C11 sobre esa línea. */
+  revalidarDirecta(idUsuario: number, linea: CompraDirecta, pantalla: RevalidarRequest): Promise<Revalidacion>;
   /** R7: quita las líneas con esa variante y color; las que ya no estén se ignoran. */
   quitarComprado(idUsuario: number, lineas: readonly { idVariante: number; idColor: number | null }[]): Promise<void>;
 }

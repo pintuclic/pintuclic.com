@@ -4,7 +4,14 @@ import { nombreSchema, telefonoSchema } from './m04-cuentas.contract';
 import type { Carrito, Revalidacion, RevalidarRequest } from './m05-carrito.contract';
 import { carritoSchema, revalidacionSchema, revalidarRequestSchema } from './m05-carrito.contract';
 import type { PreciosPort } from './m06-precios.contract';
-import { cantidadSchema, codigoCuponEntradaSchema, dineroSchema, fechaHoraSchema, resumenCalculoSchema } from './m06-precios.contract';
+import {
+  CANTIDAD_MAXIMA_LINEA,
+  cantidadSchema,
+  codigoCuponEntradaSchema,
+  dineroSchema,
+  fechaHoraSchema,
+  resumenCalculoSchema,
+} from './m06-precios.contract';
 import type { SolicitudPagadaInput } from './m08-ordenes.contract';
 
 /**
@@ -93,7 +100,8 @@ import type { SolicitudPagadaInput } from './m08-ordenes.contract';
  *      (CONFLICTO_SOLICITUD, PAGO_INSUFICIENTE, entrada inválida) o agotar los reintentos → `en_revision`.
  *  R7  ORDEN CREADA: la solicitud pasa a `completada` con el código de la orden `PC-…`. Luego se quitan del
  *      carrito de la cuenta las líneas compradas (misma variante y color); lo que el cliente agregó después
- *      se queda. Si quitar falla, no se revierte nada: la orden ya existe.
+ *      se queda. Si quitar falla, no se revierte nada: la orden ya existe. Una compra directa (R17) no toca
+ *      el carrito.
  *  R8  PAGO TARDÍO (P3 de M08): un APPROVED que llega a una solicitud vencida o cancelada se respeta: el
  *      cliente ya pagó. Pasa a `pagada` y sigue R6 con los precios congelados. El cupón se vuelve a
  *      registrar; si M06 ya no lo permite, la orden se crea igual y lo dice en `observaciones`.
@@ -124,9 +132,17 @@ import type { SolicitudPagadaInput } from './m08-ordenes.contract';
  *  R16 PANEL (D6): GET con `ventas.ver`; consultar Wompi y reintentar la orden con `ventas.gestionar`.
  *      Toda denegación responde 404 RECURSO_NO_DISPONIBLE. Cada acción del panel se audita (M20). El
  *      personal NO puede marcar un pago como aprobado a mano: solo se acepta un APPROVED de Wompi (D3).
+ *  R17 COMPRA DIRECTA (UI §4.4, "compra inmediata" desde la ficha): "Comprar ahora" paga SOLO esa
+ *      presentación, color y cantidad, sin pasar por el carrito ni cambiarlo. M05 calcula esa única línea con
+ *      M06 como si fuera un carrito (sin guardarlo) y la revalida igual que C11: `pantalla` lleva la línea 1
+ *      con el subtotal y el total que el cliente vio. Mismas reglas R1–R16, con estas diferencias: sin cupón
+ *      (D9), origen `carrito` (RF-ORD-01-03 solo distingue carrito o cotización), y un combo pedido por encima
+ *      de su tope responde 409 PRODUCTO_NO_DISPONIBLE. La solicitud queda marcada `compraDirecta`.
  *
  * ── Pantallas ───────────────────────────────────────────────────────────────
  *  /carrito (M05): "Continuar con la compra" revalida y, si se puede, lleva a /checkout (P3).
+ *  Ficha del producto (M01): junto a "Agregar al carrito", "Comprar ahora" lleva a
+ *   /checkout?idVariante=…&idColor=…&cantidad=… (R17); sin sesión, pide iniciarla y vuelve allí (P9).
  *  /checkout: pasos Carrito → Pago → Orden (Stepper del Core Kit). Columna principal: "¿Cómo quieres
  *   recibirlo?" (Envío a domicilio con la dirección precargada y editable / Recoger en el almacén),
  *   "Paga con Nequi" (celular y el aviso "Necesitas la app de Nequi en este celular") y las dos casillas
@@ -151,6 +167,7 @@ import type { SolicitudPagadaInput } from './m08-ordenes.contract';
  *  D6  Permisos existentes `ventas.ver` y `ventas.gestionar`: no hay permisos nuevos.
  *  D7  Envío con los parámetros que ya existen en M17 (en el seed: $15.000, gratis desde $200.000).
  *  D8  `esEntonado` y `baseConsumida` van false y null a M08 hasta que M01 los exponga (P5).
+ *  D9  La compra directa no lleva cupón: el campo vive en /carrito. Quien tenga uno compra desde el carrito.
  *
  * ── Piezas en otros módulos (cada una en su PR pequeño) ────────────────────
  *  P1  BD / Prisma (PR general): tablas `solicitud_compra` (también hace de cola, R6), `linea_solicitud` (con
@@ -167,6 +184,7 @@ import type { SolicitudPagadaInput } from './m08-ordenes.contract';
  *  P8  DevOps: WOMPI_API_URL, WOMPI_PUBLIC_KEY, WOMPI_PRIVATE_KEY, WOMPI_EVENTS_SECRET y
  *      WOMPI_INTEGRITY_SECRET en el backend (y sin valores en .env.example); la URL de eventos en el panel
  *      de Wompi: https://<dominio>/api/v1/checkout/wompi/eventos (una para pruebas y otra para producción).
+ *  P9  M01: botón "Comprar ahora" en la ficha (R17). M05: calcular y revalidar una línea sin guardarla.
  *
  * ── Preguntas abiertas (no bloquean) ────────────────────────────────────────
  *  Q1  Documento HU-CHK del analista: mapear sus HU y criterios a estas reglas.
@@ -268,16 +286,40 @@ export type AceptacionesWompi = z.infer<typeof aceptacionesWompiSchema>;
  * 2. PETICIONES
  * ─────────────────────────────────────────────────────────────────────────── */
 
-/** GET /checkout/preparar */
-export const prepararCheckoutRequestSchema = z.object({
-  codigoCupon: codigoCuponEntradaSchema.optional(),
+/** R17: la presentación, color y cantidad de una compra directa desde la ficha. */
+export const compraDirectaSchema = z.object({
+  idVariante: idSchema,
+  idColor: idSchema.nullable(),
+  cantidad: cantidadSchema,
 });
+export type CompraDirecta = z.infer<typeof compraDirectaSchema>;
+
+/** GET /checkout/preparar — con `idVariante` (y `idColor`, `cantidad`) prepara una compra directa (R17). */
+export const prepararCheckoutRequestSchema = z
+  .object({
+    codigoCupon: codigoCuponEntradaSchema.optional(),
+    idVariante: z.coerce.number().int().positive().optional(),
+    idColor: z.coerce.number().int().positive().optional(),
+    cantidad: z.coerce.number().int().min(1).max(CANTIDAD_MAXIMA_LINEA).optional(),
+  })
+  .refine((v) => v.idVariante !== undefined || (v.idColor === undefined && v.cantidad === undefined), {
+    message: 'Falta la presentación del producto',
+    path: ['idVariante'],
+  })
+  .refine((v) => v.idVariante === undefined || v.codigoCupon === undefined, {
+    message: 'La compra directa no lleva cupón',
+    path: ['codigoCupon'],
+  });
 export type PrepararCheckoutRequest = z.infer<typeof prepararCheckoutRequestSchema>;
 
-/** POST /checkout/solicitudes (R2). `pantalla` es lo mismo que recibe POST /carrito/revalidar (C11). */
+/**
+ * POST /checkout/solicitudes (R2). `pantalla` es lo mismo que recibe POST /carrito/revalidar (C11). Con
+ * `directa` se paga solo esa línea (R17) y `pantalla` describe esa línea (idLinea 1).
+ */
 export const crearSolicitudRequestSchema = z
   .object({
     pantalla: revalidarRequestSchema,
+    directa: compraDirectaSchema.optional(),
     modoEntrega: modoEntregaSchema,
     /** Obligatoria con `domicilio`; null con `recogida`. */
     direccion: direccionEntregaSchema.nullable(),
@@ -287,6 +329,10 @@ export const crearSolicitudRequestSchema = z
   .refine((v) => v.modoEntrega !== 'domicilio' || v.direccion !== null, {
     message: 'Escribe la dirección de entrega',
     path: ['direccion'],
+  })
+  .refine((v) => v.directa === undefined || v.pantalla.codigoCupon === undefined, {
+    message: 'La compra directa no lleva cupón',
+    path: ['pantalla', 'codigoCupon'],
   });
 export type CrearSolicitudRequest = z.infer<typeof crearSolicitudRequestSchema>;
 
@@ -404,6 +450,8 @@ export const solicitudSchema = z.object({
   venceEn: fechaHoraSchema,
   /** R7: el código PC-… cuando la orden existe; null antes. */
   codigoOrden: z.string().nullable(),
+  /** R17: se pagó desde la ficha, sin el carrito. */
+  compraDirecta: z.boolean(),
   creadaEn: fechaHoraSchema,
 });
 export type Solicitud = z.infer<typeof solicitudSchema>;
@@ -435,7 +483,8 @@ export type ListarSolicitudesResponseEnvelope = z.infer<typeof listarSolicitudes
  * 404 RECURSO_NO_DISPONIBLE (ajena, inexistente o sin permiso) · 409 CARRITO_CAMBIO (R2 a, con la
  * revalidación) · 409 VARIAS_COTIZACIONES (R2 b) · 409 PAGO_EN_CURSO (R2 c, con el código) ·
  * 409 CUPON_NO_DISPONIBLE (R2 e, con el motivo) · 409 ESTADO_NO_PERMITE · 409 SOLICITUD_VENCIDA (R3) ·
- * 409 LIMITE_INTENTOS (R4) · 503 PASARELA_NO_DISPONIBLE (R2 f) · 500 ERROR_INTERNO.
+ * 409 LIMITE_INTENTOS (R4) · 409 PRODUCTO_NO_DISPONIBLE (R17, con el motivo) · 503 PASARELA_NO_DISPONIBLE
+ * (R2 f) · 500 ERROR_INTERNO.
  */
 export const CODIGOS_ERROR_CHECKOUT = [
   'PARAMETRO_INVALIDO',
@@ -449,6 +498,7 @@ export const CODIGOS_ERROR_CHECKOUT = [
   'ESTADO_NO_PERMITE',
   'SOLICITUD_VENCIDA',
   'LIMITE_INTENTOS',
+  'PRODUCTO_NO_DISPONIBLE',
   'PASARELA_NO_DISPONIBLE',
   'ERROR_INTERNO',
 ] as const;
@@ -478,6 +528,10 @@ export interface CarritoCheckoutPort {
   carritoDeCuenta(idUsuario: number, codigoCupon?: string): Promise<Carrito>;
   /** C11 con el dueño ya resuelto. */
   revalidar(idUsuario: number, pantalla: RevalidarRequest): Promise<Revalidacion>;
+  /** R17: una sola línea calculada como un carrito (idLinea 1), sin guardarla ni tocar el carrito. */
+  carritoDirecto(idUsuario: number, linea: CompraDirecta): Promise<Carrito>;
+  /** R17: C11 sobre esa línea. */
+  revalidarDirecta(idUsuario: number, linea: CompraDirecta, pantalla: RevalidarRequest): Promise<Revalidacion>;
   /** R7: quita las líneas con esa variante y color; las que ya no estén se ignoran. */
   quitarComprado(idUsuario: number, lineas: readonly { idVariante: number; idColor: number | null }[]): Promise<void>;
 }
