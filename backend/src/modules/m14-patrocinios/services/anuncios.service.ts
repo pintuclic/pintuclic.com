@@ -67,8 +67,8 @@ export class AnunciosService {
   async crear(datos: CrearAnuncioRequest, idUsuario: number): Promise<Anuncio> {
     const enlace = this.enlaceGuardado(datos.enlace);
     const imagenes = await Promise.all([
-      prepararImagen(datos.imagen, 'escritorio', datos.espacio),
-      ...(datos.imagenMovil === null ? [] : [prepararImagen(datos.imagenMovil, 'movil', datos.espacio)]),
+      prepararImagen(datos.imagen, 'escritorio'),
+      ...(datos.imagenMovil === null ? [] : [prepararImagen(datos.imagenMovil, 'movil')]),
     ]);
     const id = await this.anuncios.crear(
       {
@@ -80,6 +80,8 @@ export class AnunciosService {
         fechaInicio: datos.fechaInicio,
         fechaFin: datos.fechaFin,
         orden: datos.orden,
+        focoEscritorio: datos.focoEscritorio,
+        focoMovil: datos.focoMovil,
       },
       imagenes,
       idUsuario,
@@ -92,8 +94,8 @@ export class AnunciosService {
     if (actual === null) throw errores.noDisponible();
     const enlace = this.enlaceGuardado(datos.enlace);
     const nuevas: Promise<ImagenPreparada>[] = [];
-    if (datos.imagen !== undefined) nuevas.push(prepararImagen(datos.imagen, 'escritorio', actual.espacio));
-    if (datos.imagenMovil !== undefined) nuevas.push(prepararImagen(datos.imagenMovil, 'movil', actual.espacio));
+    if (datos.imagen !== undefined) nuevas.push(prepararImagen(datos.imagen, 'escritorio'));
+    if (datos.imagenMovil !== undefined) nuevas.push(prepararImagen(datos.imagenMovil, 'movil'));
     const imagenes = await Promise.all(nuevas);
     const ok = await this.anuncios.reemplazar(
       idAnuncio,
@@ -105,6 +107,8 @@ export class AnunciosService {
         fechaInicio: datos.fechaInicio,
         fechaFin: datos.fechaFin,
         orden: datos.orden,
+        focoEscritorio: datos.focoEscritorio,
+        focoMovil: datos.focoMovil,
       },
       imagenes,
       datos.quitarImagenMovil,
@@ -136,6 +140,8 @@ export class AnunciosService {
       abrirEnNuevaPestana: f.enlace !== null && esEnlaceExterno(f.enlace),
       urlImagen: this.urlPublica(f, 'escritorio'),
       urlImagenMovil: f.tieneImagenMovil ? this.urlPublica(f, 'movil') : null,
+      focoEscritorio: f.focoEscritorio,
+      focoMovil: f.focoMovil,
     }));
   }
 
@@ -200,6 +206,8 @@ export class AnunciosService {
       estado: f.estado,
       situacion: situacionAnuncio(f, ahora),
       tieneImagenMovil: f.tieneImagenMovil,
+      focoEscritorio: f.focoEscritorio,
+      focoMovil: f.focoMovil,
       urlImagen: `${RUTA_ADMIN}/${f.idAnuncio}/imagen?variante=escritorio&v=${version(f)}`,
       urlImagenMovil: f.tieneImagenMovil ? `${RUTA_ADMIN}/${f.idAnuncio}/imagen?variante=movil&v=${version(f)}` : null,
       fechaCreacion: f.fechaCreacion.toISOString(),

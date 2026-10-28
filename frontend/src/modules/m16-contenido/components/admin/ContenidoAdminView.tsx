@@ -50,14 +50,16 @@ import {
   listarPaginasAdmin,
 } from '../../services/contenido-api';
 import { MarkdownContenido } from '../publico/MarkdownContenido';
+import { ContactoSitioForm } from './ContactoSitioForm';
 import { FaqFormModal } from './FaqFormModal';
 import { PaginaFormModal } from './PaginaFormModal';
 
-type PestanaContenido = 'paginas' | 'faq';
+type PestanaContenido = 'paginas' | 'faq' | 'contacto';
 
 const OPCIONES_PESTANA: ReadonlyArray<SegmentedOption<PestanaContenido>> = [
   { value: 'paginas', label: 'Páginas Institucionales' },
   { value: 'faq', label: 'Preguntas Frecuentes (FAQ)' },
+  { value: 'contacto', label: 'Contacto del sitio' },
 ];
 
 const FILTROS_ESTADO_PAGINA: ReadonlyArray<SelectOption> = [
@@ -342,7 +344,7 @@ export const ContenidoAdminView: React.FC = () => {
                 >
                   Nueva página
                 </Button>
-              ) : (
+              ) : pestana === 'faq' ? (
                 <Button
                   type="button"
                   variant="primary-action"
@@ -351,7 +353,7 @@ export const ContenidoAdminView: React.FC = () => {
                 >
                   Nueva pregunta FAQ
                 </Button>
-              )}
+              ) : null}
             </div>
           }
         />
@@ -394,7 +396,7 @@ export const ContenidoAdminView: React.FC = () => {
         )}
 
         {/* Selector de pestaña (Páginas Institucionales | FAQ) */}
-        <div className="max-w-md">
+        <div className="max-w-xl">
           <SegmentedTabs
             options={OPCIONES_PESTANA}
             value={pestana}
@@ -411,7 +413,9 @@ export const ContenidoAdminView: React.FC = () => {
           role="tabpanel"
           className="bg-neutral-white rounded-card border border-neutral-light p-5 sm:p-6 shadow-card space-y-5"
         >
-          {pestana === 'paginas' ? (
+          {pestana === 'contacto' ? (
+            <ContactoSitioForm />
+          ) : pestana === 'paginas' ? (
             <>
               {/* Filtros de Páginas */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

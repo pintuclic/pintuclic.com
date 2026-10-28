@@ -24,7 +24,25 @@ const publico = (sobre: Partial<AnuncioPublico> = {}): AnuncioPublico => ({
   abrirEnNuevaPestana: true,
   urlImagen: '/api/v1/patrocinios/anuncios/imagenes/1?variante=escritorio&v=5',
   urlImagenMovil: null,
+  focoEscritorio: { x: 50, y: 50 },
+  focoMovil: { x: 50, y: 50 },
   ...sobre,
+});
+
+describe('EspacioPublicitario · punto de enfoque (B8)', () => {
+  it('la imagen se recorta alrededor del punto de enfoque del anuncio', () => {
+    const salida = html(<EspacioPublicitario espacio="inicio" anuncios={[publico({ focoEscritorio: { x: 20, y: 80 } })]} />);
+    expect(salida).toContain('--foco-escritorio:20% 80%');
+    expect(salida).toContain('[object-position:var(--foco-escritorio)]');
+  });
+
+  it('con imagen móvil, en celular manda el enfoque móvil y desde tablet el de escritorio', () => {
+    const salida = html(
+      <EspacioPublicitario espacio="inicio" anuncios={[publico({ urlImagenMovil: '/m', focoEscritorio: { x: 10, y: 10 }, focoMovil: { x: 90, y: 30 } })]} />,
+    );
+    expect(salida).toContain('--foco-movil:90% 30%');
+    expect(salida).toContain('[object-position:var(--foco-movil)] sm:[object-position:var(--foco-escritorio)]');
+  });
 });
 
 describe('EspacioPublicitario (B4–B6, B10–B12)', () => {
@@ -120,6 +138,8 @@ const anuncioAdmin: Anuncio = {
   estado: 'activo',
   situacion: 'vigente',
   tieneImagenMovil: false,
+  focoEscritorio: { x: 50, y: 50 },
+  focoMovil: { x: 50, y: 50 },
   urlImagen: '/api/v1/admin/patrocinios/anuncios/7/imagen?variante=escritorio&v=5',
   urlImagenMovil: null,
   fechaCreacion: '2026-10-01T00:00:00.000Z',
@@ -140,10 +160,18 @@ describe('Editor de anuncios', () => {
     }
   });
 
-  it('dice qué medida subir y avisa que sin imagen móvil se verá muy pequeña en celulares', () => {
-    expect(nuevo).toContain('Recomendada 1232 × 280 px');
-    expect(nuevo).toContain('Forma 4:3');
+  it('ya no pide una medida exacta (B8) y avisa que sin imagen móvil se verá muy pequeña en celulares', () => {
+    expect(nuevo).toContain('cualquier forma');
+    expect(nuevo).not.toMatch(/Recomendada \d+ × \d+ px|Forma 4:3|Mínimo \d+ px/);
     expect(nuevo).toContain(AVISO_SIN_MOVIL);
+  });
+
+  it('al editar con imagen actual ofrece marcar el punto de enfoque, con porcentajes escribibles', () => {
+    const salida = html(<AnuncioEditor anuncio={anuncioAdmin} onCancelar={nada} onGuardado={nada} />);
+    expect(salida).toContain('data-testid="punto-enfoque"');
+    expect(salida).toContain('Horizontal (%)');
+    expect(salida).toContain('Vertical (%)');
+    expect(salida).toContain('Así se verá');
   });
 
   it('no ofrece el carrito ni el pago como espacio', () => {

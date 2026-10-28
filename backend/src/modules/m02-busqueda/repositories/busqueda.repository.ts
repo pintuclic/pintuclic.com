@@ -20,7 +20,7 @@ import type {
   PrecioFinalPort,
   ResultadoBusqueda,
 } from '../dtos/m02-busqueda.dto';
-import { FACTOR_COINCIDENCIA_EXACTA, PESOS_RELEVANCIA } from '../dtos/m02-busqueda.dto';
+import { DIAS_MAS_VENDIDOS, FACTOR_COINCIDENCIA_EXACTA, PESOS_RELEVANCIA } from '../dtos/m02-busqueda.dto';
 import type { BusquedaRepositoryPort, PaginaResultado } from '../interfaces/busqueda.interface';
 import {
   FACTOR_POR_FUERZA,
@@ -76,6 +76,8 @@ interface ProductoCrudo {
   idImagenPrincipal: number | null;
   precioDesde: number;
   enOferta: boolean;
+  /** Unidades vendidas en la ventana de «más vendidos» (O8); 0 si no se pidió ese orden ni el filtro. */
+  unidadesVendidas: number;
   disponibilidad: 'disponible' | 'agotado';
   tieneColor: boolean;
   esCombo: boolean;
@@ -120,6 +122,36 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     return new Set(await this.ofertasPort.idsProductosEnOferta());
   }
 
+  /**
+   * Unidades vendidas por producto en los últimos DIAS_MAS_VENDIDOS días (O8): las líneas de las órdenes de M08 que no
+   * están canceladas ni devueltas, asignadas al producto de la variante vendida. Solo se lee si hace falta (orden o
+   * filtro); si falla, queda vacío: el catálogo no se cae por esto.
+   */
+  private async ventasRecientes(filtros: { ordenar?: string | undefined; conVentas?: boolean | undefined }): Promise<ReadonlyMap<number, number>> {
+    if (filtros.ordenar !== 'mas_vendidos' && filtros.conVentas !== true) return new Map();
+    try {
+      const desde = new Date(Date.now() - DIAS_MAS_VENDIDOS * 24 * 60 * 60 * 1000);
+      const lineas = await prisma.lineaOrden.groupBy({
+        by: ['idVarianteRef'],
+        where: { idVarianteRef: { not: null }, orden: { fecha: { gte: desde }, estado: { notIn: ['cancelado', 'devuelto'] } } },
+        _sum: { cantidad: true },
+      });
+      const ids = lineas.flatMap((l) => (l.idVarianteRef === null ? [] : [l.idVarianteRef]));
+      if (ids.length === 0) return new Map();
+      const variantes = await prisma.variante.findMany({ where: { idVariante: { in: ids } }, select: { idVariante: true, idProducto: true } });
+      const productoDe = new Map(variantes.map((v) => [v.idVariante, v.idProducto]));
+      const porProducto = new Map<number, number>();
+      for (const l of lineas) {
+        const idProducto = l.idVarianteRef === null ? undefined : productoDe.get(l.idVarianteRef);
+        if (idProducto === undefined) continue;
+        porProducto.set(idProducto, (porProducto.get(idProducto) ?? 0) + (l._sum.cantidad ?? 0));
+      }
+      return porProducto;
+    } catch {
+      return new Map();
+    }
+  }
+
   /** La oferta de cada tarjeta de la página. Si M06 falla, las tarjetas salen sin etiqueta. */
   private async ofertasDeLaPagina(ids: readonly number[]): Promise<ReadonlyMap<number, OfertaListado | null>> {
     if (this.ofertasPort === null || ids.length === 0) return new Map();
@@ -147,6 +179,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
   private async cargarProductosBase(
     enOferta: ReadonlySet<number>,
     idsColorFiltro: readonly number[] = [],
+    ventas: ReadonlyMap<number, number> = new Map(),
   ): Promise<ProductoCrudo[]> {
     const productosDb = await prisma.producto.findMany({
       where: productoVisible(),
@@ -256,6 +289,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
         idImagenPrincipal: portada,
         precioDesde: precioMin,
         enOferta: enOferta.has(p.idProducto),
+        unidadesVendidas: ventas.get(p.idProducto) ?? 0,
         disponibilidad: tieneStock ? 'disponible' : 'agotado',
         tieneColor,
         esCombo: p.esCombo,
@@ -385,6 +419,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
   }
 
   private cumpleFiltrosBase(p: ProductoCrudo, f: OpcionesFiltroRequest, omitirGrupo?: string): boolean {
+    if (omitirGrupo !== 'ids' && f.ids && f.ids.length > 0 && !f.ids.includes(p.idProducto)) return false;
     if (omitirGrupo !== 'idCategoria' && f.idCategoria && f.idCategoria.length > 0) {
       if (!f.idCategoria.includes(p.idCategoria)) return false;
     }
@@ -421,6 +456,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
       if (f.ambiente === 'exterior' && !p.usoExterior) return false;
     }
     if (omitirGrupo !== 'enOferta' && f.enOferta === true && !p.enOferta) return false;
+    if (omitirGrupo !== 'conVentas' && f.conVentas === true && p.unidadesVendidas === 0) return false;
     if (omitirGrupo !== 'precio') {
       if (f.precioMin !== undefined && p.precioDesde < f.precioMin) return false;
       if (f.precioMax !== undefined && p.precioDesde > f.precioMax) return false;
@@ -456,7 +492,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     filtros: BuscarProductosRequest,
     _contexto: ContextoPrecio,
   ): Promise<PaginaResultado<ResultadoBusqueda>> {
-    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros), filtros.idColor ?? []);
+    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros), filtros.idColor ?? [], await this.ventasRecientes(filtros));
     const terminoNorm = normalizarTexto(filtros.q ?? '');
     const palabras = palabrasDeBusqueda(terminoNorm);
     const candidatos = productosBase.filter((p) => this.cumpleFiltrosBase(p, filtros));
@@ -495,6 +531,9 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
         if (a.producto.precioDesde !== b.producto.precioDesde) {
           return b.producto.precioDesde - a.producto.precioDesde;
         }
+      } else if (filtros.ordenar === 'mas_vendidos') {
+        const porVentas = b.producto.unidadesVendidas - a.producto.unidadesVendidas;
+        if (porVentas !== 0) return porVentas;
       } else if (filtros.ordenar === 'novedad') {
         const diffTiempo = b.producto.fechaCreacion.getTime() - a.producto.fechaCreacion.getTime();
         if (diffTiempo !== 0) return diffTiempo;
@@ -551,7 +590,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
     filtros: OpcionesFiltroRequest,
     _contexto: ContextoPrecio,
   ): Promise<OpcionesFiltro> {
-    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros), filtros.idColor ?? []);
+    const productosBase = await this.cargarProductosBase(await this.idsEnOferta(filtros), filtros.idColor ?? [], await this.ventasRecientes(filtros));
     const terminoNorm = normalizarTexto(filtros.q ?? '');
     const palabras = palabrasDeBusqueda(terminoNorm);
     const contexto = await this.contextoDeBusqueda(palabras, productosBase);

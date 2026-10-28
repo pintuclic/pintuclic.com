@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ShoppingCart } from 'lucide-react';
 import { Alert, Button, ButtonLink, Drawer, Skeleton } from '@/core/components';
@@ -14,6 +14,7 @@ import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/
 import { useCarrito } from '../hooks/useCarrito';
 import { referenciaWhatsapp } from '../services/textos-carrito';
 import { LineaCarritoCompacta } from './LineaCarritoCompacta';
+import { PestanaCarrito } from './PestanaCarrito';
 
 interface ContenidoProps {
   aviso: AvisoCarritoLateral | null;
@@ -120,27 +121,41 @@ function PanelAbierto({ aviso, onCerrar }: ContenidoProps) {
 /**
  * Panel lateral del carrito (contrato M05 · L1–L7, UI §4.7 Variante A). Se monta una vez en el layout público y se abre
  * con el aviso `pc:abrir-carrito` al agregar desde una tarjeta (con su mensaje); el ícono del encabezado lleva a /carrito.
- * Al cambiar de página se cierra.
+ * Al cambiar de página se cierra. Una vez que se abrió, al cerrarlo queda una pestaña en el borde para desplegarlo de
+ * nuevo (salvo en el carrito y el pago, donde ya se ve el resumen completo).
  */
 export function CarritoLateral() {
   const pathname = usePathname();
   const [apertura, setApertura] = useState<{ vez: number; aviso: AvisoCarritoLateral | null } | null>(null);
+  const [yaSeAbrio, setYaSeAbrio] = useState(false);
+  const aperturas = useRef(0);
+
+  // Cada apertura lleva un número nuevo: así el panel se vuelve a montar y lee el carrito recién cambiado.
+  const abrir = useCallback((aviso: AvisoCarritoLateral | null) => {
+    aperturas.current += 1;
+    setApertura({ vez: aperturas.current, aviso });
+    setYaSeAbrio(true);
+  }, []);
 
   useEffect(() => {
     const alPedirApertura = (evento: Event): void => {
       // Reclama el aviso: quien lo envió sabe que hay panel y no navega a /carrito.
       evento.preventDefault();
       const aviso = avisoDeApertura(evento);
-      setApertura((previa) => ({ vez: (previa?.vez ?? 0) + 1, aviso }));
+      abrir(aviso);
     };
     window.addEventListener(EVENTO_ABRIR_CARRITO, alPedirApertura);
     return () => window.removeEventListener(EVENTO_ABRIR_CARRITO, alPedirApertura);
-  }, []);
+  }, [abrir]);
 
   useEffect(() => {
     setApertura(null);
   }, [pathname]);
 
-  if (apertura === null) return null;
+  if (apertura === null) {
+    const enPaginaConResumen = pathname === '/carrito' || pathname?.startsWith('/checkout') === true;
+    if (!yaSeAbrio || enPaginaConResumen) return null;
+    return <PestanaCarrito onAbrir={() => abrir(null)} />;
+  }
   return <PanelAbierto key={apertura.vez} aviso={apertura.aviso} onCerrar={() => setApertura(null)} />;
 }

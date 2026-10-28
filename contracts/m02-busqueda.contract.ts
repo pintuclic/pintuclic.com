@@ -160,6 +160,11 @@ import {
  *  F9  `enOferta=true`: solo productos con un evento de M06 en curso ahora mismo (menú «Ofertas»).
  *      Se combina con el resto de filtros y del orden. Si M06 no responde, el filtro falla con 500 en vez de
  *      mostrar «ninguna oferta»; sin el filtro, un fallo de M06 solo quita las etiquetas y el precio vuelve al base.
+ *  F10 `conVentas=true`: solo productos con unidades vendidas en los últimos DIAS_MAS_VENDIDOS días (O8). Se combina con
+ *      el resto de filtros y del orden; es lo que permite pintar «Los más vendidos» sin mostrar productos que nunca se
+ *      han vendido.
+ *  F11 `ids=1,2,3`: solo esos productos (hasta LIMITE_MAXIMO). Es lo que permite pintar la lista de favoritos con la misma
+ *      tarjeta del catálogo (color, oferta, precio vigente). Un identificador que no existe o no está visible no devuelve nada.
  *  F8  Los filtros de M01 que ya existen (superficie, ambiente) se conservan con el mismo nombre,
  *      para no romper las direcciones actuales (`?ambiente=interior`, `?idCategoria=3`).
  *
@@ -177,6 +182,11 @@ import {
  *  O5  Precio: se ordena por el precio final MÍNIMO de las variantes activas del producto (con el evento en
  *      curso), el mismo que usa `precioDesde` (CA-BUS-03-05). El descuento de empresa no entra (ver F5).
  *  O6  Novedad = `producto.fecha_creacion` descendente.
+ *  O8  MÁS VENDIDOS (`ordenar=mas_vendidos`). Se ordena por las UNIDADES vendidas en los últimos DIAS_MAS_VENDIDOS días,
+ *      de mayor a menor, contando las líneas de las órdenes de M08 que no estén canceladas ni devueltas (la línea guarda
+ *      la variante vendida; la unidad se asigna al producto de esa variante). Los productos sin ventas van al final, por
+ *      nombre (O4). No se publica el número de unidades, solo el orden. El patrocinio no actúa (O7 aplica solo a
+ *      `relevancia`). Si la lectura de las órdenes falla, el orden cae a nombre y `conVentas` no devuelve nada.
  *  O7  PATROCINIO (HU-BUS-04; contrato M14 · A8). Solo con `ordenar=relevancia` (el orden por defecto):
  *        · Sin texto de búsqueda, los productos de campañas vigentes con la ubicación `listado` van primero, por
  *          prioridad (mayor primero); el resto sigue su orden normal.
@@ -270,7 +280,9 @@ export const LIMITE_MAXIMO = 48;
 export const RETENCION_DIAS_POR_DEFECTO = 365;
 export const PRECIO_MAXIMO = 1_000_000_000;
 
-export const CRITERIOS_ORDEN = ['relevancia', 'precio_asc', 'precio_desc', 'novedad'] as const;
+export const CRITERIOS_ORDEN = ['relevancia', 'precio_asc', 'precio_desc', 'novedad', 'mas_vendidos'] as const;
+/** Ventana, en días, de las órdenes que cuentan para «más vendidos» (O8). */
+export const DIAS_MAS_VENDIDOS = 90;
 export const ordenResultadosSchema = z.enum(CRITERIOS_ORDEN);
 export type OrdenResultados = z.infer<typeof ordenResultadosSchema>;
 export const ORDEN_POR_DEFECTO: OrdenResultados = 'relevancia';
@@ -320,6 +332,13 @@ const listaIdsSchema = z.preprocess((valor) => {
   return lista.flatMap((v) => (typeof v === 'string' ? v.split(',') : [v])).filter((v) => v !== '');
 }, z.array(z.coerce.number().int().positive()).max(VALORES_MAXIMOS_POR_FILTRO).optional());
 
+/** Los productos pedidos por identificador (F11): hasta una página completa. */
+const listaIdsProductoSchema = z.preprocess((valor) => {
+  if (valor === undefined || valor === '') return undefined;
+  const lista = Array.isArray(valor) ? valor : [valor];
+  return lista.flatMap((v) => (typeof v === 'string' ? v.split(',') : [v])).filter((v) => v !== '');
+}, z.array(z.coerce.number().int().positive()).max(LIMITE_MAXIMO).optional());
+
 const precioSchema = z.coerce.number().min(0).max(PRECIO_MAXIMO);
 
 const booleanoQuerySchema = z.enum(['true', 'false']).transform((v) => v === 'true');
@@ -347,6 +366,10 @@ export const filtrosBusquedaBaseSchema = z.object({
   precioMax: precioSchema.optional(),
   /** Solo productos con un evento de M06 en curso (F9). */
   enOferta: booleanoQuerySchema.optional(),
+  /** Solo productos con unidades vendidas en la ventana de «más vendidos» (F10). */
+  conVentas: booleanoQuerySchema.optional(),
+  /** Solo estos productos (F11): la lista de favoritos. Se combina con el resto de filtros y del orden. */
+  ids: listaIdsProductoSchema,
 });
 export type FiltrosBusquedaBase = z.infer<typeof filtrosBusquedaBaseSchema>;
 

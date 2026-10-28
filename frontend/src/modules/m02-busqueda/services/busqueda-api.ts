@@ -39,6 +39,8 @@ function construirParametros(filtros: Partial<FiltrosBusqueda>): Record<string, 
   if (filtros.precioMin !== undefined) params.precioMin = filtros.precioMin;
   if (filtros.precioMax !== undefined) params.precioMax = filtros.precioMax;
   if (filtros.enOferta) params.enOferta = 'true';
+  if (filtros.conVentas) params.conVentas = 'true';
+  if (filtros.ids && filtros.ids.length > 0) params.ids = filtros.ids.join(',');
 
   if (filtros.ordenar && filtros.ordenar !== 'relevancia') params.ordenar = filtros.ordenar;
   if (filtros.pagina && filtros.pagina > 1) params.pagina = filtros.pagina;

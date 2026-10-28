@@ -6,9 +6,11 @@ import { ContenidoPublicoController } from './controllers/contenido-publico.cont
 import { PERMISOS_CONTENIDO } from './dtos/m16-contenido.dto';
 import type { ContenidoFaqPort } from './interfaces/contenido-faq.port';
 import type {
+  ContactoRepositoryPort,
   FaqRepositoryPort,
   PaginasRepositoryPort,
 } from './interfaces/contenido.interface';
+import { ContactoRepository } from './repositories/contacto.repository';
 import { FaqRepository } from './repositories/faq.repository';
 import { PaginasRepository } from './repositories/paginas.repository';
 import { ContenidoAdminService } from './services/contenido-admin.service';
@@ -17,6 +19,7 @@ import { ContenidoPublicoService } from './services/contenido-publico.service';
 export interface DependenciasM16 {
   paginasRepo?: PaginasRepositoryPort;
   faqRepo?: FaqRepositoryPort;
+  contactoRepo?: ContactoRepositoryPort;
 }
 
 export interface ModuloM16 {
@@ -45,15 +48,19 @@ export function construirModuloM16(
 
   const paginasRepo = deps.paginasRepo ?? new PaginasRepository();
   const faqRepo = deps.faqRepo ?? new FaqRepository();
+  const contactoRepo = deps.contactoRepo ?? new ContactoRepository();
 
-  const contenidoPublicoService = new ContenidoPublicoService(paginasRepo, faqRepo);
-  const contenidoAdminService = new ContenidoAdminService(paginasRepo, faqRepo);
+  const contenidoPublicoService = new ContenidoPublicoService(paginasRepo, faqRepo, contactoRepo);
+  const contenidoAdminService = new ContenidoAdminService(paginasRepo, faqRepo, contactoRepo);
 
   const publicoController = new ContenidoPublicoController(contenidoPublicoService);
   const adminController = new ContenidoAdminController(contenidoAdminService);
 
   /* ─── Router Administrativo (`/api/v1/admin/contenido`) ──────────────────── */
   const adminRouter = Router();
+
+  adminRouter.get('/contacto', puedeVer, adminController.obtenerContacto);
+  adminRouter.put('/contacto', puedeEditar, adminController.editarContacto);
 
   adminRouter.get('/paginas', puedeVer, adminController.listarPaginas);
   adminRouter.get('/paginas/:idPagina', puedeVer, adminController.obtenerPagina);
@@ -83,6 +90,7 @@ export function construirModuloM16(
   /* ─── Router Público (`/api/v1/contenido`) ───────────────────────────────── */
   const publicRouter = Router();
 
+  publicRouter.get('/contacto', publicoController.obtenerContacto);
   publicRouter.get('/paginas', publicoController.listarPaginas);
   publicRouter.get('/paginas/:slug', publicoController.obtenerPaginaPorSlug);
   publicRouter.get('/faq', publicoController.listarFaq);

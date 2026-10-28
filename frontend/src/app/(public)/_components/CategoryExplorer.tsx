@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { CategoryCard } from '@/core/components';
 import { catalogoPublicoApi } from '@/modules/m01-catalogo/services/consulta-publica-api';
+import { landingCategoriasPublicoApi } from '@/core/landing/landing-categorias-api';
 import { categoryTiles, type CategoryTileContent } from '../_data/home.content';
 
 const IMAGENES_RESPALDO: ReadonlyArray<string> = [
@@ -23,9 +24,12 @@ export function CategoryExplorer() {
 
   useEffect(() => {
     let activo = true;
+    // Las imágenes subidas por el personal son un extra: si fallan, las tarjetas usan su ilustración.
+    const imagenesPropias = landingCategoriasPublicoApi.listar().catch(() => []);
     catalogoPublicoApi
       .categorias()
-      .then((lista) => {
+      .then(async (lista) => {
+        const propias = new Map((await imagenesPropias).map((i) => [i.idCategoria, i]));
         if (!activo || lista.length === 0) return;
         const mapaBase = new Map(categoryTiles.map((c) => [c.idCategoria, c]));
         const seleccionadas = lista.slice(0, 5).map((cat, idx): CategoryTileContent => {
@@ -38,15 +42,17 @@ export function CategoryExplorer() {
                   .join(' · ')
               : 'Ver línea completa';
 
+          const propia = propias.get(cat.idCategoria);
           return {
             idCategoria: cat.idCategoria,
             title: cat.nombre,
             subtitle: resumenSubcategorias,
             href: `/productos?categoria=${cat.idCategoria}`,
             imageSrc:
-              base?.imageSrc ??
-              IMAGENES_RESPALDO[idx % IMAGENES_RESPALDO.length] ??
-              '/images/landing/categoria-pinturas.png',
+              propia !== undefined
+                ? landingCategoriasPublicoApi.urlImagen(cat.idCategoria, propia.version)
+                : (base?.imageSrc ?? IMAGENES_RESPALDO[idx % IMAGENES_RESPALDO.length] ?? '/images/landing/categoria-pinturas.png'),
+            ...(propia === undefined ? {} : { foco: { x: propia.focoX, y: propia.focoY } }),
           };
         });
         setCategorias(seleccionadas);
@@ -78,6 +84,7 @@ export function CategoryExplorer() {
               subtitle={categoria.subtitle}
               href={categoria.href}
               imageSrc={categoria.imageSrc}
+              {...(categoria.foco === undefined ? {} : { imageFocus: categoria.foco })}
             />
           </li>
         ))}

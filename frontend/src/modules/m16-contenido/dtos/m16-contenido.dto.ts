@@ -70,3 +70,103 @@ export const faqFormSchema = z.object({
 });
 
 export type FaqFormValues = z.infer<typeof faqFormSchema>;
+
+// ============================================================================
+// 8. CONTACTO DEL SITIO (HU-CON-05)
+// ============================================================================
+//
+// Los datos de contacto del pie de página (dirección, teléfono, correo y redes) los edita el personal desde el panel de
+// contenido y los lee el sitio público. Es una sola ficha (no una lista): lo que no se llena, no se muestra.
+//
+// Reglas (R9–R12):
+// - R9: Una sola ficha. `GET /api/v1/contenido/contacto` (público, sin sesión) devuelve siempre la ficha con todos sus
+//       campos; los que no se han llenado vienen en `null`. El pie de página no pinta lo que viene vacío.
+// - R10: `GET` y `PUT /api/v1/admin/contenido/contacto` exigen `configuracion.ver` y `configuracion.editar` (D1). Sin el
+//        permiso, 404 opaco (R5). `PUT` reemplaza la ficha completa; un campo que no viene o viene vacío se borra.
+// - R11: Las redes solo admiten enlaces `https://` (nunca `javascript:`, `data:` ni `http://`). El teléfono admite dígitos,
+//        espacios, `+`, `-`, paréntesis y `.`; el correo debe ser un correo válido.
+// - R12: Se registra quién y cuándo la editó (R6); el público nunca recibe esos datos (R4).
+
+export const CONTACTO_DIRECCION_MAX = 200 as const;
+
+const textoOpcional = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, `No puede superar ${String(max)} caracteres`)
+    .nullish()
+    .transform((v) => (v === undefined || v === null || v === '' ? null : v));
+
+const redSocialSchema = z
+  .string()
+  .trim()
+  .max(300, 'El enlace no puede superar 300 caracteres')
+  .nullish()
+  .transform((v) => (v === undefined || v === null || v === '' ? null : v))
+  .refine((v) => v === null || /^https:\/\/[^\s]+$/i.test(v), {
+    message: 'El enlace debe empezar por https://',
+  });
+
+/** PUT /admin/contenido/contacto — reemplaza la ficha completa (R10). */
+export const editarContactoRequestSchema = z.object({
+  direccion: textoOpcional(CONTACTO_DIRECCION_MAX),
+  telefono: z
+    .string()
+    .trim()
+    .max(30, 'El teléfono no puede superar 30 caracteres')
+    .nullish()
+    .transform((v) => (v === undefined || v === null || v === '' ? null : v))
+    .refine((v) => v === null || /^[0-9+()\-.\s]{5,30}$/.test(v), {
+      message: 'El teléfono solo puede tener números, espacios y los signos + - ( ) .',
+    }),
+  correo: z
+    .string()
+    .trim()
+    .max(150, 'El correo no puede superar 150 caracteres')
+    .nullish()
+    .transform((v) => (v === undefined || v === null || v === '' ? null : v))
+    .refine((v) => v === null || z.string().email().safeParse(v).success, {
+      message: 'Escriba un correo válido',
+    }),
+  facebook: redSocialSchema,
+  instagram: redSocialSchema,
+  youtube: redSocialSchema,
+  tiktok: redSocialSchema,
+});
+
+export type EditarContactoRequest = z.infer<typeof editarContactoRequestSchema>;
+
+/** La ficha tal como la recibe el sitio público (R9). */
+export const contactoPublicoSchema = z.object({
+  direccion: z.string().nullable(),
+  telefono: z.string().nullable(),
+  correo: z.string().nullable(),
+  facebook: z.string().nullable(),
+  instagram: z.string().nullable(),
+  youtube: z.string().nullable(),
+  tiktok: z.string().nullable(),
+});
+
+export type ContactoPublico = z.infer<typeof contactoPublicoSchema>;
+
+export const contactoPublicoResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: contactoPublicoSchema,
+});
+
+export type ContactoPublicoResponseEnvelope = z.infer<typeof contactoPublicoResponseEnvelopeSchema>;
+
+/** La ficha para el panel: lo mismo y cuándo y quién la editó por última vez. */
+export const contactoAdminEntitySchema = contactoPublicoSchema.extend({
+  fechaActualizacion: z.string().nullable(),
+  actualizadoPor: z.string().nullable(),
+});
+
+export type ContactoAdminEntity = z.infer<typeof contactoAdminEntitySchema>;
+
+export const contactoAdminResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: contactoAdminEntitySchema,
+});
+
+export type ContactoAdminResponseEnvelope = z.infer<typeof contactoAdminResponseEnvelopeSchema>;

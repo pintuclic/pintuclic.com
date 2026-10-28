@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.20 (v4.19 + M07: solicitudes de compra e intentos de pago)
+-- VERSIÓN: 4.22 (v4.21 + FP-01: imagen editable de las tarjetas de categorías del inicio)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 88
+-- TOTAL TABLAS: 89
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -2084,6 +2084,55 @@ CREATE TABLE IF NOT EXISTS pagina_institucional (
 );
 
 COMMENT ON TABLE pagina_institucional IS 'Páginas de contenido institucional y políticas informativas de vitrina (M16 - HU-CON-01, HU-CON-03)';
+
+-- Tabla: contacto_institucional
+-- Datos de contacto del sitio (pie de página): una sola fila, id = 1, que edita el personal desde el panel (M16 · HU-CON-05).
+-- Cada dato es opcional: el sitio no muestra lo que esté vacío.
+CREATE TABLE IF NOT EXISTS contacto_institucional (
+    id_contacto SMALLINT PRIMARY KEY DEFAULT 1,
+    direccion VARCHAR(200),
+    telefono VARCHAR(30),
+    correo VARCHAR(150),
+    facebook VARCHAR(300),
+    instagram VARCHAR(300),
+    youtube VARCHAR(300),
+    tiktok VARCHAR(300),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_contacto_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_contacto_unico CHECK (id_contacto = 1),
+    CONSTRAINT ck_contacto_redes CHECK (
+        (facebook IS NULL OR facebook ~* '^https://[^[:space:]]+$')
+        AND (instagram IS NULL OR instagram ~* '^https://[^[:space:]]+$')
+        AND (youtube IS NULL OR youtube ~* '^https://[^[:space:]]+$')
+        AND (tiktok IS NULL OR tiktok ~* '^https://[^[:space:]]+$')
+    )
+);
+
+COMMENT ON TABLE contacto_institucional IS 'Datos de contacto y redes del sitio para el pie de página; una sola fila (id = 1), todo opcional (M16)';
+COMMENT ON COLUMN contacto_institucional.facebook IS 'Enlace https:// al perfil; nunca javascript: ni http:// (M16)';
+
+-- Tabla: imagen_categoria_inicio
+-- Imagen de la tarjeta de cada categoría en «Explora nuestras categorías» del inicio (FP-01). Una por categoría, con su punto de
+-- enfoque (0 a 100, 50 = centro). Sin fila, la tarjeta usa la ilustración de respaldo.
+CREATE TABLE IF NOT EXISTS imagen_categoria_inicio (
+    id_categoria INT PRIMARY KEY,
+    contenido BYTEA NOT NULL,
+    mime_type VARCHAR(20) NOT NULL,
+    foco_x SMALLINT NOT NULL DEFAULT 50,
+    foco_y SMALLINT NOT NULL DEFAULT 50,
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_imagen_categoria_inicio_categoria FOREIGN KEY (id_categoria)
+        REFERENCES categoria (id_categoria) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_imagen_categoria_inicio_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_imagen_categoria_inicio_mime CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+    CONSTRAINT ck_imagen_categoria_inicio_foco CHECK (foco_x BETWEEN 0 AND 100 AND foco_y BETWEEN 0 AND 100)
+);
+
+COMMENT ON TABLE imagen_categoria_inicio IS 'Imagen de la tarjeta de categoría del inicio, editable por el personal, con su punto de enfoque (FP-01)';
 COMMENT ON COLUMN pagina_institucional.slug IS 'Identificador URL único en formato kebab-case (ej. sobre-nosotros, terminos-y-condiciones)';
 COMMENT ON COLUMN pagina_institucional.estado IS 'Ciclo de vida editorial: borrador, publicado o archivado. Solo publicado es visible en rutas públicas';
 COMMENT ON COLUMN pagina_institucional.id_autor IS 'Último usuario administrador/empleado que creó o editó la página';
@@ -2414,6 +2463,10 @@ CREATE TABLE IF NOT EXISTS anuncio_publicitario (
     fecha_inicio DATE NOT NULL,
     fecha_fin DATE NOT NULL,
     orden SMALLINT NOT NULL DEFAULT 0,
+    foco_escritorio_x SMALLINT NOT NULL DEFAULT 50,
+    foco_escritorio_y SMALLINT NOT NULL DEFAULT 50,
+    foco_movil_x SMALLINT NOT NULL DEFAULT 50,
+    foco_movil_y SMALLINT NOT NULL DEFAULT 50,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     id_usuario_actualizo INT,
@@ -2424,6 +2477,10 @@ CREATE TABLE IF NOT EXISTS anuncio_publicitario (
     CONSTRAINT ck_anuncio_texto_alternativo CHECK (length(btrim(texto_alternativo)) >= 3),
     CONSTRAINT ck_anuncio_fechas CHECK (fecha_fin >= fecha_inicio),
     CONSTRAINT ck_anuncio_orden CHECK (orden BETWEEN 0 AND 999),
+    CONSTRAINT ck_anuncio_foco CHECK (
+        foco_escritorio_x BETWEEN 0 AND 100 AND foco_escritorio_y BETWEEN 0 AND 100
+        AND foco_movil_x BETWEEN 0 AND 100 AND foco_movil_y BETWEEN 0 AND 100
+    ),
     CONSTRAINT ck_anuncio_enlace CHECK (
         enlace IS NULL
         OR enlace ~* '^https://[^[:space:]]+$'
@@ -2431,7 +2488,26 @@ CREATE TABLE IF NOT EXISTS anuncio_publicitario (
     )
 );
 
+-- Bases creadas antes del punto de enfoque (v4.20 o anteriores).
+ALTER TABLE anuncio_publicitario ADD COLUMN IF NOT EXISTS foco_escritorio_x SMALLINT NOT NULL DEFAULT 50;
+ALTER TABLE anuncio_publicitario ADD COLUMN IF NOT EXISTS foco_escritorio_y SMALLINT NOT NULL DEFAULT 50;
+ALTER TABLE anuncio_publicitario ADD COLUMN IF NOT EXISTS foco_movil_x SMALLINT NOT NULL DEFAULT 50;
+ALTER TABLE anuncio_publicitario ADD COLUMN IF NOT EXISTS foco_movil_y SMALLINT NOT NULL DEFAULT 50;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_anuncio_foco') THEN
+        ALTER TABLE anuncio_publicitario ADD CONSTRAINT ck_anuncio_foco CHECK (
+            foco_escritorio_x BETWEEN 0 AND 100 AND foco_escritorio_y BETWEEN 0 AND 100
+            AND foco_movil_x BETWEEN 0 AND 100 AND foco_movil_y BETWEEN 0 AND 100
+        );
+    END IF;
+END $$;
+
 COMMENT ON TABLE anuncio_publicitario IS 'Anuncios (imagen y enlace) de los espacios publicitarios del sitio, con vigencia y orden (M14 · B1-B9)';
+COMMENT ON COLUMN anuncio_publicitario.foco_escritorio_x IS 'Punto de enfoque de la imagen de escritorio, % desde la izquierda (0-100); decide qué parte se ve cuando el espacio la recorta (M14 · B8)';
+COMMENT ON COLUMN anuncio_publicitario.foco_escritorio_y IS 'Punto de enfoque de la imagen de escritorio, % desde arriba (0-100)';
+COMMENT ON COLUMN anuncio_publicitario.foco_movil_x IS 'Punto de enfoque de la imagen móvil, % desde la izquierda (0-100)';
+COMMENT ON COLUMN anuncio_publicitario.foco_movil_y IS 'Punto de enfoque de la imagen móvil, % desde arriba (0-100)';
 COMMENT ON COLUMN anuncio_publicitario.enlace IS 'https://… o ruta interna (/…); nunca javascript:, data: ni http:// (M14 · B6)';
 
 -- Tabla: anuncio_imagen
@@ -2866,5 +2942,5 @@ CREATE INDEX IF NOT EXISTS idx_lineacotizacion_cotizacion ON linea_cotizacion(id
 CREATE INDEX IF NOT EXISTS idx_lineacarrito_cotizacion ON linea_carrito(id_cotizacion) WHERE id_cotizacion IS NOT NULL;
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (85 TABLAS - v4.19)
+-- FIN DEL SCRIPT DDL (90 TABLAS - v4.22)
 -- ==============================================================================

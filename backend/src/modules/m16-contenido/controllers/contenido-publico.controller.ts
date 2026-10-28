@@ -28,6 +28,10 @@ export class ContenidoPublicoController {
     responderExito(res, pagina);
   });
 
+  obtenerContacto = manejarContenido(async (_req, res) => {
+    responderExito(res, await this.servicio.obtenerContactoPublico());
+  });
+
   listarFaq = manejarContenido(async (_req, res) => {
     const items = await this.servicio.listarFaqPublicas();
     responderExito(res, items);

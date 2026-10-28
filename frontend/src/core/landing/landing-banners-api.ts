@@ -15,6 +15,9 @@ export interface BannerInicioPublico {
   enlaceBotonSecundario: string | null;
   tieneImagenPersonalizada: boolean;
   orden: number;
+  /** Punto de enfoque de la imagen (0 a 100): qué parte se ve cuando se recorta. */
+  focoX: number;
+  focoY: number;
 }
 
 export interface BannerInicioAdmin extends BannerInicioPublico {
@@ -37,6 +40,8 @@ export interface CrearBannerInicioPayload {
   imagenMimeType?: TipoMimeBannerInicio;
   orden?: number;
   estado?: EstadoBannerInicio;
+  focoX?: number;
+  focoY?: number;
 }
 
 export interface EditarBannerInicioPayload {
@@ -50,6 +55,8 @@ export interface EditarBannerInicioPayload {
   imagenBase64?: string;
   imagenMimeType?: TipoMimeBannerInicio;
   orden?: number;
+  focoX?: number;
+  focoY?: number;
 }
 
 const RUTA_PUBLICA = '/landing/banners';

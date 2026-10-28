@@ -104,7 +104,7 @@ export const AnuncioEditor: React.FC<AnuncioEditorProps> = ({ anuncio, onCancela
           disabled={!esNuevo}
           onChange={(e) => cambiar({ espacio: e.target.value as EspacioPublicitario, imagen: null, imagenMovil: null })}
           options={ESPACIOS_PUBLICITARIOS.map((e) => ({ value: e, label: DEFINICION_ESPACIOS[e].etiqueta }))}
-          helperText={esNuevo ? 'Cada espacio tiene su propia forma de imagen.' : 'No se puede cambiar: cree otro anuncio para otro espacio.'}
+          helperText={esNuevo ? 'Cada espacio tiene su propia forma: la imagen se recorta para llenarlo.' : 'No se puede cambiar: cree otro anuncio para otro espacio.'}
         />
         <Input
           label="Orden"
@@ -124,6 +124,8 @@ export const AnuncioEditor: React.FC<AnuncioEditorProps> = ({ anuncio, onCancela
           actualUrl={anuncio === null ? null : conTamano(anuncio.urlImagen, 'mediano')}
           elegida={b.imagen}
           onElegir={(imagen) => cambiar({ imagen })}
+          foco={b.focoEscritorio}
+          onFoco={(focoEscritorio) => cambiar({ focoEscritorio })}
         />
         <ImagenCampo
           key={`movil-${b.espacio}`}
@@ -133,6 +135,8 @@ export const AnuncioEditor: React.FC<AnuncioEditorProps> = ({ anuncio, onCancela
           actualUrl={anuncio?.urlImagenMovil == null || b.quitarImagenMovil ? null : conTamano(anuncio.urlImagenMovil, 'pequeno')}
           elegida={b.imagenMovil}
           onElegir={(imagenMovil) => cambiar({ imagenMovil, quitarImagenMovil: false })}
+          foco={b.focoMovil}
+          onFoco={(focoMovil) => cambiar({ focoMovil })}
         />
         {anuncio?.tieneImagenMovil === true && b.imagenMovil === null && (
           <Checkbox
@@ -143,7 +147,7 @@ export const AnuncioEditor: React.FC<AnuncioEditorProps> = ({ anuncio, onCancela
         )}
         {!tieneMovil && (
           <Alert variant="warning">
-            {AVISO_SIN_MOVIL} Para que se vea bien en celulares, suba una imagen con forma 4:3.
+            {AVISO_SIN_MOVIL} Suba una imagen para celular y marque su punto de enfoque para que se vea bien.
           </Alert>
         )}
       </section>

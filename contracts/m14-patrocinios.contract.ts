@@ -124,23 +124,27 @@ import { productoPublicoTarjetaSchema } from './m01-catalogo-productos.contract'
  *  B7  IMÁGENES. Las sube el panel en base64 dentro del JSON, como M01 (D2): JPEG, PNG o WEBP de hasta 5 MB
  *      (IMAGEN_MAXIMO_BYTES), nunca SVG (puede ejecutar código). Se guardan en la base de datos y las sirve Pintu
  *      Clic: la página nunca pide una imagen a un tercero (no hay rastreadores ni filtración de la IP del cliente, M20).
- *  B8  PROPORCIÓN. La imagen de escritorio debe tener la proporción del espacio con un margen de
- *      TOLERANCIA_PROPORCION (10 %), y la móvil, la de PROPORCION_MOVIL (4:3). Si no, 400 IMAGEN_PROPORCION_INVALIDA
- *      con el tamaño recomendado: así nadie sube una imagen que se vea deformada o recortada.
+ *  B8  ENFOQUE (reemplaza la regla de proporción exacta). Se puede subir una imagen de CUALQUIER proporción y tamaño
+ *      (dentro de B7 y B13): ya no se rechaza por su forma. Como el espacio tiene forma fija (DEFINICION_ESPACIOS) y la
+ *      imagen se muestra cubriéndolo, el personal marca el PUNTO DE ENFOQUE (`focoEscritorio` y `focoMovil`: x e y, de 0
+ *      a 100 %, por defecto 50/50 = centro): lo que queda alrededor de ese punto es lo que se conserva cuando hay que
+ *      recortar. El panel muestra la vista previa tal como se verá (con la forma del espacio y en celular) y deja
+ *      mover el punto con un clic o con deslizadores (accesible con teclado). El punto se guarda por anuncio y se
+ *      publica con el anuncio para que la página use `object-position`.
  *  B9  ACCESIBILIDAD. `textoAlternativo` es OBLIGATORIO (3 a 150 caracteres).
  *
  *  B10 DISPOSITIVOS. Tres anchos: móvil (menos de PUNTO_QUIEBRE_MOVIL = 640 px), tablet (de 640 a 1023 px) y escritorio
- *      (1024 px o más). La imagen de escritorio sirve para tablet y escritorio: tiene la misma proporción y solo se
- *      escala. En móvil se usa la imagen móvil (4:3); sin ella se usa la de escritorio, que en un celular se ve muy
+ *      (1024 px o más). La imagen de escritorio sirve para tablet y escritorio: se muestra cubriendo el espacio y se
+ *      recorta según su punto de enfoque. En móvil se usa la imagen móvil (4:3); sin ella se usa la de escritorio, que en un celular se ve muy
  *      pequeña, así que el panel avisa «Sin imagen móvil: en celulares se verá muy pequeña».
  *  B11 PESO. Al subir una imagen, el servidor guarda además versiones reducidas (`pequeno` de 640 px y `mediano` de
  *      1232 px de ancho, en WEBP) y la página pide la adecuada con `srcset`/`<picture>`: un celular nunca descarga los
  *      5 MB originales.
  *  B12 TÁCTIL. En pantallas táctiles el slider se desliza con el dedo, se pausa mientras se toca y no depende del
  *      cursor; los puntos de navegación tienen una zona táctil de al menos 44×44 px.
- *  B13 TAMAÑO MÍNIMO. La imagen de escritorio mide al menos ANCHO_MINIMO_ESCRITORIO (1232 px) y la móvil al menos
- *      ANCHO_MINIMO_MOVIL (640 px), y ninguna pasa de ANCHO_MAXIMO_IMAGEN (4000 px); si no, 400 IMAGEN_TAMANO_INVALIDO.
- *      Para pantallas de alta densidad conviene subir el doble (2464×560).
+ *  B13 TAMAÑO. Ya no hay tamaño mínimo ni proporción obligatoria. Solo un tope de seguridad: ninguna imagen pasa de
+ *      ANCHO_MAXIMO_IMAGEN (8000 px de ancho); si no, 400 IMAGEN_TAMANO_INVALIDO. Para pantallas de alta densidad conviene
+ *      subir imágenes grandes (el servidor guarda las versiones reducidas de B11, así que nadie descarga el original).
  *
  * ── M. Reglas de la medición ────────────────────────────────────────────────
  *  M1  QUÉ SE MIDE. Dos números por campaña de productos y por anuncio: IMPRESIONES (veces que se mostró) y CLICS, y
@@ -226,14 +230,11 @@ export const MAXIMO_ANUNCIOS_VISIBLES = 10;
 export const SEGUNDOS_ROTACION_ANUNCIO = 6;
 export const IMAGEN_MAXIMO_BYTES = 5 * 1024 * 1024;
 export const IMAGEN_MAXIMO_BASE64 = LOGOTIPO_MAXIMO_BASE64;
-export const TOLERANCIA_PROPORCION = 0.1;
-export const PROPORCION_MOVIL = { ancho: 4, alto: 3 } as const;
-/** Tamaño recomendado de la imagen móvil (4:3), en píxeles (B10, B13). */
-export const TAMANO_MOVIL_RECOMENDADO = { ancho: 800, alto: 600 } as const;
 export const PUNTO_QUIEBRE_MOVIL = 640;
-export const ANCHO_MINIMO_ESCRITORIO = 1232;
-export const ANCHO_MINIMO_MOVIL = 640;
-export const ANCHO_MAXIMO_IMAGEN = 4000;
+/** Tope de seguridad del ancho de una imagen subida (B13). */
+export const ANCHO_MAXIMO_IMAGEN = 8000;
+/** Punto de enfoque por defecto: el centro (B8). */
+export const FOCO_CENTRADO = { x: 50, y: 50 } as const;
 /** Anchos de las versiones reducidas que el servidor guarda (B11). */
 export const ANCHO_PEQUENO = 640;
 export const ANCHO_MEDIANO = 1232;
@@ -451,9 +452,8 @@ export const espacioPublicitarioSchema = z.enum(ESPACIOS_PUBLICITARIOS);
 export type EspacioPublicitario = z.infer<typeof espacioPublicitarioSchema>;
 
 /**
- * Tamaño recomendado de la imagen de escritorio de cada espacio, en píxeles (B1, B8). Lo que cuenta es la
- * PROPORCIÓN (ancho / alto) con TOLERANCIA_PROPORCION; el tamaño sugerido es el que da buena nitidez en pantallas
- * de alta densidad. Propuesta, ver Q3.
+ * Forma de cada espacio, en píxeles (B1, B5). La proporción (ancho / alto) es la que reserva el espacio y la que muestra
+ * la vista previa del panel; la imagen subida puede tener otra y se recorta según su punto de enfoque (B8). Propuesta, ver Q3.
  */
 export const DEFINICION_ESPACIOS: Readonly<
   Record<EspacioPublicitario, { etiqueta: string; ancho: number; alto: number }>
@@ -479,6 +479,13 @@ export const enlaceAnuncioSchema = z
     message: 'El enlace debe empezar por https:// o por una ruta interna (/…)',
   });
 
+/** Punto de enfoque de una imagen: porcentajes enteros de 0 a 100 desde la izquierda (x) y desde arriba (y) (B8). */
+export const focoSchema = z.object({
+  x: z.number().int().min(0).max(100),
+  y: z.number().int().min(0).max(100),
+});
+export type Foco = z.infer<typeof focoSchema>;
+
 /** Campos de un anuncio que no son imagen. */
 const anuncioCamposSchema = z.object({
   /** Nombre interno, para reconocerlo en el panel. */
@@ -492,6 +499,9 @@ const anuncioCamposSchema = z.object({
   fechaFin: fechaSchema,
   /** Posición en el slider: el menor va primero (B4). */
   orden: z.number().int().min(0).max(999).default(0),
+  /** B8: qué parte de cada imagen se conserva cuando el espacio la recorta; por defecto el centro. */
+  focoEscritorio: focoSchema.default(FOCO_CENTRADO),
+  focoMovil: focoSchema.default(FOCO_CENTRADO),
 });
 
 /** POST /admin/patrocinios/anuncios — la imagen de escritorio es obligatoria; la móvil, opcional. */
@@ -559,6 +569,8 @@ export const anuncioSchema = z.object({
   estado: estadoSchema,
   situacion: situacionSchema,
   tieneImagenMovil: z.boolean(),
+  focoEscritorio: focoSchema,
+  focoMovil: focoSchema,
   /** Vista previa para el panel (sirve aunque el anuncio no esté vigente). */
   urlImagen: z.string(),
   urlImagenMovil: z.string().nullable(),
@@ -578,6 +590,9 @@ export const anuncioPublicoSchema = z.object({
   abrirEnNuevaPestana: z.boolean(),
   urlImagen: z.string(),
   urlImagenMovil: z.string().nullable(),
+  /** B8: la página los usa como `object-position` de cada imagen. */
+  focoEscritorio: focoSchema,
+  focoMovil: focoSchema,
 });
 export type AnuncioPublico = z.infer<typeof anuncioPublicoSchema>;
 
@@ -685,14 +700,13 @@ export type SerieMedicionResponseEnvelope = z.infer<typeof serieMedicionResponse
  * 6. ERRORES
  * ───────────────────────────────────────────────────────────────────────────
  * 400 PARAMETRO_INVALIDO · 400 IMAGEN_INVALIDA (no es una imagen válida o no es del tipo declarado) ·
- * 400 IMAGEN_PROPORCION_INVALIDA (B8; el mensaje trae el tamaño recomendado) · 400 IMAGEN_TAMANO_INVALIDO (B13) ·
+ * 400 IMAGEN_TAMANO_INVALIDO (B13: más ancha que ANCHO_MAXIMO_IMAGEN) ·
  * 404 RECURSO_NO_DISPONIBLE (no existe, no está vigente en una ruta pública, o falta el permiso: C1) ·
  * 409 NOMBRE_CAMPANIA_DUPLICADO (A11) · 409 OBJETIVO_NO_EXISTE (`details` = los objetivos que no existen).
  */
 export const CODIGOS_ERROR_PATROCINIOS = [
   'PARAMETRO_INVALIDO',
   'IMAGEN_INVALIDA',
-  'IMAGEN_PROPORCION_INVALIDA',
   'IMAGEN_TAMANO_INVALIDO',
   'RECURSO_NO_DISPONIBLE',
   'NOMBRE_CAMPANIA_DUPLICADO',

@@ -1,9 +1,11 @@
 import {
+  FOCO_CENTRADO,
   actualizarAnuncioRequestSchema,
   crearAnuncioRequestSchema,
   type ActualizarAnuncioRequest,
   type Anuncio,
   type CrearAnuncioRequest,
+  type Foco,
   type EspacioPublicitario,
 } from '../dtos/m14-patrocinios.dto';
 import { sumarDias } from './etiquetas';
@@ -27,6 +29,9 @@ export interface BorradorAnuncio {
   imagen: ImagenElegida | null;
   imagenMovil: ImagenElegida | null;
   quitarImagenMovil: boolean;
+  /** Qué parte de cada imagen se conserva al recortarla (B8). */
+  focoEscritorio: Foco;
+  focoMovil: Foco;
 }
 
 /** Un anuncio nuevo: empieza hoy, dura 30 días y va al inicio. */
@@ -43,6 +48,8 @@ export function borradorAnuncioVacio(hoy: string): BorradorAnuncio {
     imagen: null,
     imagenMovil: null,
     quitarImagenMovil: false,
+    focoEscritorio: { ...FOCO_CENTRADO },
+    focoMovil: { ...FOCO_CENTRADO },
   };
 }
 
@@ -59,6 +66,8 @@ export function borradorDesdeAnuncio(a: Anuncio): BorradorAnuncio {
     imagen: null,
     imagenMovil: null,
     quitarImagenMovil: false,
+    focoEscritorio: { ...a.focoEscritorio },
+    focoMovil: { ...a.focoMovil },
   };
 }
 
@@ -94,6 +103,8 @@ const camposComunes = (b: BorradorAnuncio) => ({
   fechaInicio: b.fechaInicio,
   fechaFin: b.fechaFin,
   orden: parsearOrden(b.orden) ?? 0,
+  focoEscritorio: b.focoEscritorio,
+  focoMovil: b.focoMovil,
 });
 
 const imagenSubida = (i: ImagenElegida) => ({ imagenBase64: i.imagenBase64, imagenMimeType: i.imagenMimeType });

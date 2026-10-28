@@ -1,4 +1,4 @@
-export type OrdenResultados = 'relevancia' | 'precio_asc' | 'precio_desc' | 'novedad';
+export type OrdenResultados = 'relevancia' | 'precio_asc' | 'precio_desc' | 'novedad' | 'mas_vendidos';
 export type PeriodoEstadistica = 'diario' | 'semanal' | 'mensual' | 'anual';
 
 export interface OpcionFiltro {

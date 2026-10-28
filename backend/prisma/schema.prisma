@@ -407,6 +407,8 @@ model Usuario {
   // M16 Relaciones
   paginasInstitucionales PaginaInstitucional[] @relation("PaginaInstitucionalAutor")
   entradasFaq            FaqEntrada[]          @relation("FaqEntradaAutor")
+  contactoActualizado    ContactoInstitucional[] @relation("ContactoInstitucionalUsuarioActualizo")
+  imagenesCategoriaInicio ImagenCategoriaInicio[] @relation("ImagenCategoriaInicioUsuarioActualizo")
 
   // M05 Relaciones
   carrito Carrito?
@@ -1141,6 +1143,7 @@ model Categoria {
   subcategorias            Subcategoria[]
   productosComplementarios Producto[]     @relation("CategoriaComplementaria")
   subcategoriasComplementarias Subcategoria[] @relation("SubcategoriaCategoriaComplementaria")
+  imagenInicio             ImagenCategoriaInicio?
 
   @@map("categoria")
 }
@@ -1715,6 +1718,40 @@ model PaginaInstitucional {
   @@map("pagina_institucional")
 }
 
+/// Datos de contacto y redes del sitio (pie de página): una sola fila, id = 1; todo opcional (M16)
+model ContactoInstitucional {
+  idContacto         Int      @id @default(1) @map("id_contacto") @db.SmallInt
+  direccion          String?  @db.VarChar(200)
+  telefono           String?  @db.VarChar(30)
+  correo             String?  @db.VarChar(150)
+  facebook           String?  @db.VarChar(300)
+  instagram          String?  @db.VarChar(300)
+  youtube            String?  @db.VarChar(300)
+  tiktok             String?  @db.VarChar(300)
+  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?     @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario? @relation("ContactoInstitucionalUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_contacto_usuario")
+
+  @@map("contacto_institucional")
+}
+
+/// Imagen de la tarjeta de una categoría en el inicio, con su punto de enfoque (0 a 100, 50 = centro) (FP-01)
+model ImagenCategoriaInicio {
+  idCategoria        Int      @id @map("id_categoria")
+  contenido          Bytes
+  mimeType           String   @map("mime_type") @db.VarChar(20)
+  focoX              Int      @default(50) @map("foco_x") @db.SmallInt
+  focoY              Int      @default(50) @map("foco_y") @db.SmallInt
+  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?     @map("id_usuario_actualizo")
+
+  categoria        Categoria @relation(fields: [idCategoria], references: [idCategoria], onDelete: Cascade, map: "fk_imagen_categoria_inicio_categoria")
+  usuarioActualizo Usuario?  @relation("ImagenCategoriaInicioUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_imagen_categoria_inicio_usuario")
+
+  @@map("imagen_categoria_inicio")
+}
+
 /// Entrada del catálogo de preguntas frecuentes (FAQ) para el Centro de Ayuda y puerto hacia M15
 model FaqEntrada {
   idFaq              Int           @id @default(autoincrement()) @map("id_faq")
@@ -1788,6 +1825,11 @@ model AnuncioPublicitario {
   fechaFin           DateTime            @map("fecha_fin") @db.Date
   /// Posición en el slider: el menor va primero (M14 · B4)
   orden              Int                 @default(0) @db.SmallInt
+  /// Punto de enfoque de las imágenes, 0 a 100 (50 = centro): qué parte se ve cuando el espacio recorta (M14 · B8)
+  focoEscritorioX    Int                 @default(50) @map("foco_escritorio_x") @db.SmallInt
+  focoEscritorioY    Int                 @default(50) @map("foco_escritorio_y") @db.SmallInt
+  focoMovilX         Int                 @default(50) @map("foco_movil_x") @db.SmallInt
+  focoMovilY         Int                 @default(50) @map("foco_movil_y") @db.SmallInt
   fechaCreacion      DateTime            @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
   fechaActualizacion DateTime            @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
   idUsuarioActualizo Int?                @map("id_usuario_actualizo")

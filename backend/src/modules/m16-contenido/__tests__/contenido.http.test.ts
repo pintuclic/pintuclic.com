@@ -13,6 +13,8 @@ import {
   PERMISOS_CONTENIDO,
   type EstadoFaq,
   type EstadoPaginaContenido,
+  type ContactoAdminEntity,
+  type EditarContactoRequest,
   type FaqAdminEntity,
   type FaqPublicaItem,
   type FiltroFaqAdminQuery,
@@ -26,6 +28,7 @@ import type {
   CrearPaginaDatos,
   EditarFaqDatos,
   EditarPaginaDatos,
+  ContactoRepositoryPort,
   FaqRepositoryPort,
   PaginasRepositoryPort,
 } from '../interfaces/contenido.interface';
@@ -287,6 +290,26 @@ class FaqMemoriaRepository implements FaqRepositoryPort {
   }
 }
 
+class ContactoMemoriaRepository implements ContactoRepositoryPort {
+  ficha: ContactoAdminEntity = {
+    direccion: null, telefono: null, correo: null, facebook: null, instagram: null, youtube: null, tiktok: null,
+    fechaActualizacion: null, actualizadoPor: null,
+  };
+
+  reset(): void {
+    this.ficha = { ...this.ficha, direccion: null, telefono: null, correo: null, facebook: null, instagram: null, youtube: null, tiktok: null, fechaActualizacion: null, actualizadoPor: null };
+  }
+
+  obtener(): Promise<ContactoAdminEntity> {
+    return Promise.resolve(this.ficha);
+  }
+
+  guardar(datos: EditarContactoRequest, idAutor: number | null): Promise<ContactoAdminEntity> {
+    this.ficha = { ...datos, fechaActualizacion: new Date().toISOString(), actualizadoPor: idAutor === null ? null : `Usuario ${String(idAutor)}` };
+    return Promise.resolve(this.ficha);
+  }
+}
+
 interface RespuestaJson {
   status: number;
   cuerpo: {
@@ -299,6 +322,7 @@ interface RespuestaJson {
 describe('M16 · Contenido Institucional y Centro de Ayuda (HTTP + Dominio)', () => {
   const paginasRepo = new PaginasMemoriaRepository();
   const faqRepo = new FaqMemoriaRepository();
+  const contactoRepo = new ContactoMemoriaRepository();
   const auditoria = {
     registrarAccesoDenegado: vi.fn(),
   } satisfies AuditoriaPort;
@@ -313,7 +337,7 @@ describe('M16 · Contenido Institucional y Centro de Ayuda (HTTP + Dominio)', ()
         Promise.resolve(PERMISOS_POR_USUARIO[idUsuario]?.includes(codigo) === true),
     };
     const autorizacion = new AutorizacionService(resolutor, auditoria);
-    modulo = construirModuloM16(autorizacion, { paginasRepo, faqRepo });
+    modulo = construirModuloM16(autorizacion, { paginasRepo, faqRepo, contactoRepo });
 
     const app: Express = express();
     app.use(express.json());
@@ -339,6 +363,7 @@ describe('M16 · Contenido Institucional y Centro de Ayuda (HTTP + Dominio)', ()
 
   beforeEach(() => {
     auditoria.registrarAccesoDenegado.mockClear();
+    contactoRepo.reset();
     const fechaSemilla = '2026-10-24T12:00:00.000Z';
     paginasRepo.sembrar([
       {
@@ -597,6 +622,76 @@ describe('M16 · Contenido Institucional y Centro de Ayuda (HTTP + Dominio)', ()
       );
       expect(inactivada.status).toBe(200);
       expect((inactivada.cuerpo.data as FaqAdminEntity).estado).toBe('inactivo');
+    });
+  });
+
+  describe('Contacto del sitio (HU-CON-05 · R9–R12)', () => {
+    const COMPLETO = {
+      direccion: 'Calle 10 # 5-20, Bogotá',
+      telefono: '+57 322 123 4567',
+      correo: 'contacto@pintuclic.com',
+      facebook: 'https://www.facebook.com/pintuclic',
+      instagram: 'https://www.instagram.com/pintuclic',
+      youtube: null,
+      tiktok: '',
+    };
+
+    it('R9: sin datos guardados el público recibe la ficha con todo en null y sin metadatos de edición', async () => {
+      const r = await peticionPublica('/contacto');
+      expect(r.status).toBe(200);
+      expect(r.cuerpo.data).toEqual({
+        direccion: null, telefono: null, correo: null, facebook: null, instagram: null, youtube: null, tiktok: null,
+      });
+    });
+
+    it('R10: el personal con configuracion.editar guarda la ficha y el público la ve; lo vacío queda en null y no se filtra quién la editó (R4)', async () => {
+      const guardada = await peticionAdmin('admin', 'PUT', '/contacto', COMPLETO);
+      expect(guardada.status).toBe(200);
+      const publica = await peticionPublica('/contacto');
+      expect(publica.cuerpo.data).toEqual({
+        direccion: 'Calle 10 # 5-20, Bogotá',
+        telefono: '+57 322 123 4567',
+        correo: 'contacto@pintuclic.com',
+        facebook: 'https://www.facebook.com/pintuclic',
+        instagram: 'https://www.instagram.com/pintuclic',
+        youtube: null,
+        tiktok: null,
+      });
+      expect(JSON.stringify(publica.cuerpo)).not.toMatch(/actualizadoPor|fechaActualizacion|idAutor/);
+      const admin = await peticionAdmin('admin', 'GET', '/contacto');
+      expect((admin.cuerpo.data as ContactoAdminEntity).actualizadoPor).not.toBeNull();
+    });
+
+    it('PUT reemplaza la ficha completa: un campo que no viene se borra', async () => {
+      await peticionAdmin('admin', 'PUT', '/contacto', COMPLETO);
+      await peticionAdmin('admin', 'PUT', '/contacto', { correo: 'otro@pintuclic.com' });
+      const publica = await peticionPublica('/contacto');
+      expect(publica.cuerpo.data).toMatchObject({ correo: 'otro@pintuclic.com', telefono: null, direccion: null, facebook: null });
+    });
+
+    it('R10: sin permiso es el 404 opaco; con solo configuracion.ver puede leer pero no editar', async () => {
+      expect((await peticionAdmin(null, 'GET', '/contacto')).status).toBe(404);
+      expect((await peticionAdmin('cliente', 'PUT', '/contacto', COMPLETO)).status).toBe(404);
+      expect((await peticionAdmin('lector', 'GET', '/contacto')).status).toBe(200);
+      expect((await peticionAdmin('lector', 'PUT', '/contacto', COMPLETO)).status).toBe(404);
+      expect((await peticionPublica('/contacto')).cuerpo.data).toMatchObject({ correo: null });
+    });
+
+    it('R11: rechaza redes que no son https://, teléfonos con letras y correos inválidos (400, sin guardar nada)', async () => {
+      for (const malo of [
+        { facebook: 'javascript:alert(1)' },
+        { instagram: 'http://instagram.com/x' },
+        { youtube: 'data:text/html,x' },
+        { tiktok: '//evil.com' },
+        { telefono: 'llamar ya' },
+        { correo: 'no-es-un-correo' },
+        { direccion: 'x'.repeat(201) },
+      ]) {
+        const r = await peticionAdmin('admin', 'PUT', '/contacto', malo);
+        expect(r.status, JSON.stringify(malo)).toBe(400);
+        expect(r.cuerpo.error?.code).toBe('VALIDATION_ERROR');
+      }
+      expect((await peticionPublica('/contacto')).cuerpo.data).toMatchObject({ correo: null, facebook: null });
     });
   });
 });

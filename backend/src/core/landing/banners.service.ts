@@ -154,6 +154,8 @@ export class BannersInicioService {
       orden: input.orden,
       estado: input.estado,
       idAutor,
+      focoX: input.focoX,
+      focoY: input.focoY,
     });
 
     this.invalidarCache();
@@ -217,6 +219,8 @@ export class BannersInicioService {
       ...(imagen !== undefined ? { imagen } : {}),
       ...(imagenMimeType !== undefined ? { imagenMimeType } : {}),
       ...(input.orden !== undefined ? { orden: input.orden } : {}),
+      ...(input.focoX !== undefined ? { focoX: input.focoX } : {}),
+      ...(input.focoY !== undefined ? { focoY: input.focoY } : {}),
       idAutor,
     });
 

@@ -82,13 +82,15 @@ describe('ProductCard con color de muestra', () => {
   it('pinta el panel de muestra detrás de la imagen, oculto para el lector de pantalla', () => {
     const html = tarjeta({ swatchColor: '#9CC9E8' });
     expect(html).toMatch(/<div aria-hidden="true" data-muestra-color="#9CC9E8"[^>]*>/);
-    expect(html).toContain('background-color:#9CC9E8');
-    expect(panel(html)).toContain('rounded-2xl');
-    expect(panel(html)).not.toContain('ring-neutral-light');
+    // El color llena la parte baja de lado a lado y termina arriba en una ola.
+    expect(html).toContain('fill="#9CC9E8"');
+    expect(panel(html)).toContain('inset-x-0');
+    expect(html).toMatch(/<path d="M0 20 C[^"]*"/);
+    expect(html).not.toContain('stroke-neutral-light');
   });
 
   it('un color muy claro lleva borde para verse sobre el blanco', () => {
-    expect(panel(tarjeta({ swatchColor: '#FDFDF8' }))).toContain('ring-1 ring-inset ring-neutral-light');
+    expect(tarjeta({ swatchColor: '#FDFDF8' })).toContain('stroke-neutral-light');
   });
 
   it('sin color, o con un color mal escrito, se queda el fondo neutro', () => {
@@ -96,6 +98,20 @@ describe('ProductCard con color de muestra', () => {
       expect(html).not.toContain('data-muestra-color');
       expect(html).toContain('bg-neutral-lightest');
     }
+  });
+
+  it('sin imagen muestra un círculo tachado (no una imagen de referencia) y avisa «Sin imagen disponible»', () => {
+    for (const html of [tarjeta(), tarjeta({ swatchColor: '#9CC9E8' })]) {
+      expect(html).toContain('aria-label="Sin imagen disponible"');
+      expect(html).toContain('rounded-full');
+      expect(html).not.toContain('<img');
+    }
+  });
+
+  it('el nombre del producto ya no inventa una imagen de referencia', () => {
+    const html = renderToStaticMarkup(<ProductCard id="v" name="Viniltex Ultralavable" price={1} />);
+    expect(html).not.toContain('/images/landing/catalogo-viniltex.png');
+    expect(html).not.toContain('<img');
   });
 
   it('con callback, el carrito es un botón y no otro enlace', () => {

@@ -7,6 +7,7 @@ import {
   cambiarEstadoPaginaRequestSchema,
   cambiarOrdenFaqRequestSchema,
   crearFaqRequestSchema,
+  editarContactoRequestSchema,
   crearPaginaRequestSchema,
   editarFaqRequestSchema,
   editarPaginaRequestSchema,
@@ -26,6 +27,18 @@ import {
  */
 export class ContenidoAdminController {
   constructor(private readonly servicio: ContenidoAdminService) {}
+
+  /* ─── Contacto del sitio (HU-CON-05) ─────────────────────────────────────── */
+
+  obtenerContacto = manejarContenido(async (_req, res) => {
+    responderExito(res, await this.servicio.obtenerContacto());
+  });
+
+  editarContacto = manejarContenido(async (req, res) => {
+    const cuerpo = validarEsquema(res, editarContactoRequestSchema, req.body);
+    if (cuerpo === null) return;
+    responderExito(res, await this.servicio.editarContacto(cuerpo, req.actor?.idUsuario ?? null));
+  });
 
   /* ─── Páginas Institucionales (HU-CON-01) ────────────────────────────────── */
 
