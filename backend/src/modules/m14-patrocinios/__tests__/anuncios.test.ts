@@ -64,8 +64,8 @@ describe('normalizarEnlace (B6, M2: no es un redirector abierto)', () => {
 });
 
 describe('prepararImagen (B7, B8, B11, B13)', () => {
-  it('acepta la medida recomendada de cada espacio y guarda original + 640 + 1232 en WEBP', async () => {
-    const p = await prepararImagen(await imagen(1232, 280), 'escritorio', 'inicio');
+  it('guarda el original y las versiones de 640 y 1232 de ancho en WEBP', async () => {
+    const p = await prepararImagen(await imagen(1232, 280), 'escritorio');
     expect(p.mimeType).toBe('image/jpeg');
     expect(p.original).toMatchObject({ ancho: 1232, alto: 280 });
     expect(p.mediano).toMatchObject({ ancho: 1232, alto: 280 });
@@ -73,73 +73,50 @@ describe('prepararImagen (B7, B8, B11, B13)', () => {
     for (const reducida of [p.pequeno, p.mediano]) {
       expect((await sharp(reducida.bytes).metadata()).format).toBe('webp');
     }
-    expect((await prepararImagen(await imagen(1232, 200), 'escritorio', 'catalogo')).original.alto).toBe(200);
-    expect((await prepararImagen(await imagen(1232, 200), 'escritorio', 'ficha')).original.alto).toBe(200);
   });
 
   it('una imagen del doble (alta densidad) se reduce a 1232 de ancho y no se agranda nunca', async () => {
-    const p = await prepararImagen(await imagen(2464, 560), 'escritorio', 'inicio');
+    const p = await prepararImagen(await imagen(2464, 560), 'escritorio');
     expect([p.original.ancho, p.mediano.ancho, p.pequeno.ancho]).toEqual([2464, 1232, 640]);
-    const justa = await prepararImagen(await imagen(1232, 280), 'escritorio', 'inicio');
-    expect(justa.mediano.ancho).toBe(1232);
+    const chica = await prepararImagen(await imagen(900, 300), 'escritorio');
+    expect([chica.mediano.ancho, chica.pequeno.ancho]).toEqual([900, 640]);
   });
 
   it('acepta PNG y WEBP además de JPEG', async () => {
-    expect((await prepararImagen(await imagen(1232, 280, 'png'), 'escritorio', 'inicio')).mimeType).toBe('image/png');
-    expect((await prepararImagen(await imagen(1232, 280, 'webp'), 'escritorio', 'inicio')).mimeType).toBe('image/webp');
+    expect((await prepararImagen(await imagen(1232, 280, 'png'), 'escritorio')).mimeType).toBe('image/png');
+    expect((await prepararImagen(await imagen(1232, 280, 'webp'), 'escritorio')).mimeType).toBe('image/webp');
   });
 
-  it('la imagen móvil es 4:3: 800×600 recomendada y 640×480 como mínimo', async () => {
-    expect((await prepararImagen(await imagen(800, 600), 'movil', 'inicio')).original.ancho).toBe(800);
-    expect((await prepararImagen(await imagen(640, 480), 'movil', 'ficha')).pequeno.ancho).toBe(640);
-    expect(await codigoDe(prepararImagen(await imagen(600, 450), 'movil', 'inicio'))).toBe('IMAGEN_TAMANO_INVALIDO');
+  it('B8: ya no exige proporción ni tamaño mínimo: cuadradas, verticales, panorámicas y chicas entran', async () => {
+    for (const [ancho, alto] of [[1500, 1500], [800, 1200], [3000, 400], [320, 240], [100, 100]] as const) {
+      const p = await prepararImagen(await imagen(ancho, alto), 'escritorio');
+      expect(p.original).toMatchObject({ ancho, alto });
+    }
+    // La móvil tampoco es de una forma fija.
+    expect((await prepararImagen(await imagen(1232, 280), 'movil')).original.ancho).toBe(1232);
   });
 
-  it('con la forma del espacio equivocada responde IMAGEN_PROPORCION_INVALIDA con la medida recomendada', async () => {
-    // Una imagen de catálogo (6,16:1) en el inicio (4,4:1).
-    const err = await prepararImagen(await imagen(1232, 200), 'escritorio', 'inicio').catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(PatrociniosError);
-    expect((err as PatrociniosError).code).toBe('IMAGEN_PROPORCION_INVALIDA');
-    expect((err as PatrociniosError).status).toBe(400);
-    expect((err as PatrociniosError).message).toContain('1232×280');
-    // Una foto cuadrada o vertical.
-    expect(await codigoDe(prepararImagen(await imagen(1500, 1500), 'escritorio', 'catalogo'))).toBe('IMAGEN_PROPORCION_INVALIDA');
-    // Una imagen de escritorio en el campo móvil y al revés.
-    expect(await codigoDe(prepararImagen(await imagen(1232, 280), 'movil', 'inicio'))).toBe('IMAGEN_PROPORCION_INVALIDA');
-    expect(await codigoDe(prepararImagen(await imagen(800, 600), 'escritorio', 'inicio'))).toBe('IMAGEN_PROPORCION_INVALIDA');
-  });
-
-  it('respeta la tolerancia del 10 % en el borde', async () => {
-    // Inicio = 4,4: el margen va de 3,96 a 4,84. 1232/255 = 4,83 entra; 1232/250 = 4,93 no.
-    expect((await prepararImagen(await imagen(1232, 255), 'escritorio', 'inicio')).original.alto).toBe(255);
-    expect(await codigoDe(prepararImagen(await imagen(1232, 250), 'escritorio', 'inicio'))).toBe('IMAGEN_PROPORCION_INVALIDA');
-    expect((await prepararImagen(await imagen(1232, 311), 'escritorio', 'inicio')).original.alto).toBe(311);
-    expect(await codigoDe(prepararImagen(await imagen(1232, 320), 'escritorio', 'inicio'))).toBe('IMAGEN_PROPORCION_INVALIDA');
-  });
-
-  it('con la proporción correcta pero muy pequeña o muy grande responde IMAGEN_TAMANO_INVALIDO (B13)', async () => {
-    expect(await codigoDe(prepararImagen(await imagen(616, 140), 'escritorio', 'inicio'))).toBe('IMAGEN_TAMANO_INVALIDO');
-    expect(await codigoDe(prepararImagen(await imagen(1231, 280), 'escritorio', 'inicio'))).toBe('IMAGEN_TAMANO_INVALIDO');
-    expect(await codigoDe(prepararImagen(await imagen(4400, 1000), 'escritorio', 'inicio'))).toBe('IMAGEN_TAMANO_INVALIDO');
-    expect((await prepararImagen(await imagen(4000, 909), 'escritorio', 'inicio')).original.ancho).toBe(4000);
+  it('B13: solo se rechaza lo que pasa del tope de ancho de seguridad', async () => {
+    expect(await codigoDe(prepararImagen(await imagen(8200, 400), 'escritorio'))).toBe('IMAGEN_TAMANO_INVALIDO');
+    expect((await prepararImagen(await imagen(8000, 300), 'escritorio')).original.ancho).toBe(8000);
   });
 
   it('rechaza lo que no es una imagen del tipo declarado (por la firma, no por el nombre)', async () => {
     const png = await imagen(1232, 280, 'png');
-    expect(await codigoDe(prepararImagen({ ...png, imagenMimeType: 'image/jpeg' }, 'escritorio', 'inicio'))).toBe('IMAGEN_INVALIDA');
+    expect(await codigoDe(prepararImagen({ ...png, imagenMimeType: 'image/jpeg' }, 'escritorio'))).toBe('IMAGEN_INVALIDA');
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>').toString('base64');
-    expect(await codigoDe(prepararImagen({ imagenBase64: svg, imagenMimeType: 'image/png' }, 'escritorio', 'inicio'))).toBe('IMAGEN_INVALIDA');
-    expect(await codigoDe(prepararImagen({ imagenBase64: 'esto no es base64!', imagenMimeType: 'image/png' }, 'escritorio', 'inicio'))).toBe('IMAGEN_INVALIDA');
+    expect(await codigoDe(prepararImagen({ imagenBase64: svg, imagenMimeType: 'image/png' }, 'escritorio'))).toBe('IMAGEN_INVALIDA');
+    expect(await codigoDe(prepararImagen({ imagenBase64: 'esto no es base64!', imagenMimeType: 'image/png' }, 'escritorio'))).toBe('IMAGEN_INVALIDA');
   });
 
   it('un archivo con la firma de JPEG pero dañado responde IMAGEN_INVALIDA, no un 500', async () => {
     const dañado = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from('basura que no es un jpeg')]);
-    expect(await codigoDe(prepararImagen({ imagenBase64: dañado.toString('base64'), imagenMimeType: 'image/jpeg' }, 'escritorio', 'inicio'))).toBe('IMAGEN_INVALIDA');
+    expect(await codigoDe(prepararImagen({ imagenBase64: dañado.toString('base64'), imagenMimeType: 'image/jpeg' }, 'escritorio'))).toBe('IMAGEN_INVALIDA');
   });
 
   it('rechaza más de 5 MB', async () => {
     const grande = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(5 * 1024 * 1024)]);
-    expect(await codigoDe(prepararImagen({ imagenBase64: grande.toString('base64'), imagenMimeType: 'image/jpeg' }, 'escritorio', 'inicio'))).toBe('IMAGEN_INVALIDA');
+    expect(await codigoDe(prepararImagen({ imagenBase64: grande.toString('base64'), imagenMimeType: 'image/jpeg' }, 'escritorio'))).toBe('IMAGEN_INVALIDA');
   });
 });
 
@@ -247,6 +224,8 @@ const anuncio = (sobre: Partial<FilaAnuncio> = {}): FilaAnuncio => ({
   fechaInicio: '2026-10-01',
   fechaFin: '2026-10-31',
   orden: 0,
+  focoEscritorio: { x: 50, y: 50 },
+  focoMovil: { x: 50, y: 50 },
   tieneImagenMovil: false,
   fechaCreacion: AHORA,
   fechaActualizacion: new Date('2026-10-20T12:00:00Z'),

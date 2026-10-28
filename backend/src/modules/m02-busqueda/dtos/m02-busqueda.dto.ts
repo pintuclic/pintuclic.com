@@ -75,7 +75,9 @@ export const LIMITE_MAXIMO = 48;
 export const RETENCION_DIAS_POR_DEFECTO = 365;
 export const PRECIO_MAXIMO = 1_000_000_000;
 
-export const CRITERIOS_ORDEN = ['relevancia', 'precio_asc', 'precio_desc', 'novedad'] as const;
+export const CRITERIOS_ORDEN = ['relevancia', 'precio_asc', 'precio_desc', 'novedad', 'mas_vendidos'] as const;
+/** Ventana, en días, de las órdenes que cuentan para «más vendidos» (O8). */
+export const DIAS_MAS_VENDIDOS = 90;
 export const ordenResultadosSchema = z.enum(CRITERIOS_ORDEN);
 export type OrdenResultados = z.infer<typeof ordenResultadosSchema>;
 export const ORDEN_POR_DEFECTO: OrdenResultados = 'relevancia';
@@ -137,6 +139,8 @@ export const filtrosBusquedaBaseSchema = z.object({
   precioMin: precioSchema.optional(),
   precioMax: precioSchema.optional(),
   enOferta: booleanoQuerySchema.optional(),
+  /** Solo productos con unidades vendidas en la ventana de «más vendidos» (F10). */
+  conVentas: booleanoQuerySchema.optional(),
 });
 export type FiltrosBusquedaBase = z.infer<typeof filtrosBusquedaBaseSchema>;
 

@@ -38,6 +38,13 @@ export const TIPOS_MIME_BANNER_INICIO = [
 
 export type TipoMimeBannerInicio = (typeof TIPOS_MIME_BANNER_INICIO)[number];
 
+/** Punto de enfoque de la imagen del banner: porcentajes de 0 a 100 (50 = centro). Decide qué parte se ve cuando se recorta. */
+export const focoBannerInicioSchema = z
+  .number()
+  .int('El punto de enfoque debe ser un número entero')
+  .min(0, 'El punto de enfoque no puede ser menor que 0')
+  .max(100, 'El punto de enfoque no puede ser mayor que 100');
+
 export const BANNER_INICIO_MAXIMO_BYTES = 5 * 1024 * 1024;
 
 export const CODIGOS_ERROR_LANDING = {
@@ -106,6 +113,9 @@ export const crearBannerInicioRequestSchema = z.object({
     .max(9999, 'El orden no puede superar 9999')
     .default(0),
   estado: estadoBannerInicioSchema.default('activo'),
+  /** La imagen puede ser de cualquier forma y tamaño: el punto de enfoque dice qué parte conservar al recortarla. */
+  focoX: focoBannerInicioSchema.default(50),
+  focoY: focoBannerInicioSchema.default(50),
 });
 
 export type CrearBannerInicioRequest = z.infer<
@@ -153,6 +163,8 @@ export const editarBannerInicioRequestSchema = z.object({
     .min(0, 'El orden no puede ser negativo')
     .max(9999, 'El orden no puede superar 9999')
     .optional(),
+  focoX: focoBannerInicioSchema.optional(),
+  focoY: focoBannerInicioSchema.optional(),
 });
 
 export type EditarBannerInicioRequest = z.infer<
@@ -182,6 +194,8 @@ export const bannerInicioPublicoItemSchema = z.object({
   enlaceBotonSecundario: z.string().nullable(),
   tieneImagenPersonalizada: z.boolean(),
   orden: z.number().int().nonnegative(),
+  focoX: focoBannerInicioSchema,
+  focoY: focoBannerInicioSchema,
 });
 
 export type BannerInicioPublicoItem = z.infer<
@@ -208,6 +222,8 @@ export const bannerInicioAdminEntitySchema = z.object({
   enlaceBotonSecundario: z.string().nullable(),
   tieneImagenPersonalizada: z.boolean(),
   orden: z.number().int().nonnegative(),
+  focoX: focoBannerInicioSchema,
+  focoY: focoBannerInicioSchema,
   estado: estadoBannerInicioSchema,
   idAutor: z.number().int().positive().nullable(),
   nombreAutor: z.string().nullable(),

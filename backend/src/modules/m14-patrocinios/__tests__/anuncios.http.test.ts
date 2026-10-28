@@ -186,25 +186,31 @@ describe.skipIf(URL_BD === undefined)('M14 · anuncios y medición (HTTP + Postg
       expect([programado.situacion, vencido.situacion, ultimoDia.situacion]).toEqual(['programado', 'vencido', 'vigente']);
     });
 
-    it('rechaza una imagen con otra forma que la del espacio (400 con la medida recomendada) y no guarda nada', async () => {
-      const r = await admin('POST', '/anuncios', cuerpo({ espacio: 'inicio', imagen: img.catalogo }));
-      expect([r.status, r.cuerpo.error?.code]).toEqual([400, 'IMAGEN_PROPORCION_INVALIDA']);
-      expect(r.cuerpo.error?.message).toContain('1232×280');
-      expect(await prisma.anuncioPublicitario.count({ where: { nombre: { startsWith: PREFIJO } } })).toBe(0);
+    it('B8: acepta una imagen de cualquier forma (cuadrada, vertical, pequeña) en cualquier espacio', async () => {
+      for (const [espacio, ancho, alto] of [['inicio', 1500, 1500], ['catalogo', 800, 1200], ['ficha', 320, 240]] as const) {
+        const r = await admin('POST', '/anuncios', cuerpo({ nombre: nombre(`Forma${espacio}`), espacio, imagen: await imagen(ancho, alto) }));
+        expect(r.status, JSON.stringify(r.cuerpo.error)).toBe(201);
+      }
+      const movil = await admin('POST', '/anuncios', cuerpo({ nombre: nombre('MovilLibre'), imagenMovil: img.inicio }));
+      expect(movil.status).toBe(201);
     });
 
-    it('cada espacio pide su propia forma: la de catálogo sirve en catálogo y en ficha', async () => {
-      expect((await admin('POST', '/anuncios', cuerpo({ nombre: nombre('Cat'), espacio: 'catalogo', imagen: img.catalogo }))).status).toBe(201);
-      expect((await admin('POST', '/anuncios', cuerpo({ nombre: nombre('Fic'), espacio: 'ficha', imagen: img.catalogo }))).status).toBe(201);
-      const r = await admin('POST', '/anuncios', cuerpo({ nombre: nombre('Mal'), espacio: 'ficha', imagen: img.inicio }));
-      expect(r.cuerpo.error?.code).toBe('IMAGEN_PROPORCION_INVALIDA');
+    it('el punto de enfoque se guarda, se devuelve y vale el centro si no se manda (B8)', async () => {
+      const sin = await crear({ nombre: nombre('SinFoco') });
+      expect(sin).toMatchObject({ focoEscritorio: { x: 50, y: 50 }, focoMovil: { x: 50, y: 50 } });
+      const con = await crear({ nombre: nombre('ConFoco'), focoEscritorio: { x: 20, y: 80 }, focoMovil: { x: 0, y: 100 } });
+      expect(con).toMatchObject({ focoEscritorio: { x: 20, y: 80 }, focoMovil: { x: 0, y: 100 } });
+      const fila = await prisma.anuncioPublicitario.findUniqueOrThrow({ where: { idAnuncio: con.idAnuncio as number } });
+      expect([fila.focoEscritorioX, fila.focoEscritorioY, fila.focoMovilX, fila.focoMovilY]).toEqual([20, 80, 0, 100]);
     });
 
-    it('rechaza una imagen pequeña (IMAGEN_TAMANO_INVALIDO), una móvil de escritorio y un archivo que no es imagen', async () => {
-      const pequena = await admin('POST', '/anuncios', cuerpo({ imagen: await imagen(616, 140) }));
-      expect(pequena.cuerpo.error?.code).toBe('IMAGEN_TAMANO_INVALIDO');
-      const movilMala = await admin('POST', '/anuncios', cuerpo({ imagenMovil: img.inicio }));
-      expect(movilMala.cuerpo.error?.code).toBe('IMAGEN_PROPORCION_INVALIDA');
+    it('rechaza un punto de enfoque fuera de 0 a 100 y un archivo que no es imagen o es demasiado ancho', async () => {
+      for (const foco of [{ x: -1, y: 50 }, { x: 50, y: 101 }, { x: 10.5, y: 50 }, { x: 'a', y: 50 }]) {
+        const r = await admin('POST', '/anuncios', cuerpo({ focoEscritorio: foco }));
+        expect(r.cuerpo.error?.code, JSON.stringify(foco)).toBe('PARAMETRO_INVALIDO');
+      }
+      const ancha = await admin('POST', '/anuncios', cuerpo({ imagen: await imagen(8200, 300) }));
+      expect(ancha.cuerpo.error?.code).toBe('IMAGEN_TAMANO_INVALIDO');
       const falsa = await admin('POST', '/anuncios', cuerpo({ imagen: { imagenBase64: Buffer.from('<svg/>').toString('base64'), imagenMimeType: 'image/png' } }));
       expect([falsa.status, falsa.cuerpo.error?.code]).toEqual([400, 'IMAGEN_INVALIDA']);
       expect(await prisma.anuncioPublicitario.count({ where: { nombre: { startsWith: PREFIJO } } })).toBe(0);
@@ -244,12 +250,13 @@ describe.skipIf(URL_BD === undefined)('M14 · anuncios y medición (HTTP + Postg
       expect(await prisma.anuncioImagen.count({ where: { idAnuncio: id } })).toBe(antes);
     });
 
-    it('editar puede reemplazar la imagen (validada contra el espacio del anuncio) y quitar la móvil', async () => {
+    it('editar puede reemplazar la imagen (de cualquier forma), mover el enfoque y quitar la móvil', async () => {
       const a = await crear({ imagenMovil: img.movil });
       const id = a.idAnuncio as number;
       const campos = { nombre: nombre('Banner'), anunciante: 'Pintuco', textoAlternativo: 'Koraza protege tu fachada', enlace: null, fechaInicio: AYER, fechaFin: EN_UNA_SEMANA, orden: 0 };
-      const mala = await admin('PUT', `/anuncios/${id}`, { ...campos, imagen: img.catalogo });
-      expect(mala.cuerpo.error?.code).toBe('IMAGEN_PROPORCION_INVALIDA');
+      const libre = await admin('PUT', `/anuncios/${id}`, { ...campos, imagen: img.catalogo, focoEscritorio: { x: 10, y: 30 } });
+      expect(libre.status, JSON.stringify(libre.cuerpo.error)).toBe(200);
+      expect(dato(libre)).toMatchObject({ focoEscritorio: { x: 10, y: 30 } });
       const nueva = await imagen(2464, 560, 'webp');
       const ok = await admin('PUT', `/anuncios/${id}`, { ...campos, imagen: nueva, quitarImagenMovil: true });
       expect(dato(ok)).toMatchObject({ tieneImagenMovil: false, urlImagenMovil: null });

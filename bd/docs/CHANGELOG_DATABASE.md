@@ -10,6 +10,16 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.22] - 2026-10-28
+### Esquema 4.21 (89 Tablas) - M14: punto de enfoque de las imágenes de anuncios · M16: contacto del sitio
+- **Alcance General:** cambio aditivo pedido por la remasterización del inicio. No se toca ni se borra nada de lo que existía.
+  - **`anuncio_publicitario`**: cuatro columnas `foco_escritorio_x/y` y `foco_movil_x/y` (SMALLINT, 0 a 100, por defecto 50 = centro) con `ck_anuncio_foco`. Reemplazan la regla de subir la imagen con proporción y tamaño exactos: el personal sube cualquier imagen y marca qué parte debe verse cuando el espacio la recorta (M14 · B8). Va también como `ALTER TABLE … ADD COLUMN IF NOT EXISTS` para las bases que ya tenían la tabla.
+  - **`contacto_institucional`**: fila única (`id_contacto = 1`) con dirección, teléfono, correo y cuatro redes (https:// o vacío) que edita el personal y lee el pie de página (M16). Todo es opcional: el sitio no muestra lo que esté vacío. Sin datos sembrados a propósito: los reales los carga el cliente.
+  - **Prisma:** campos nuevos en `AnuncioPublicitario` y modelo `ContactoInstitucional`.
+  - **Bases existentes en 4.20:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente).
+
+---
+
 ## [v3.21] - 2026-10-27
 ### Esquema 4.20 (88 Tablas) - M07: solicitudes de compra e intentos de pago
 - **Alcance General:** pedido por el contrato `contracts/m07-checkout.contract.ts` (P1). Cambio aditivo: tres tablas y dos ENUMs nuevos; no se toca nada de lo que existía. La tabla `pagos` (que exige una orden) no se usa: en M07 el pago ocurre antes de que exista la orden.

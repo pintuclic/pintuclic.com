@@ -27,8 +27,6 @@ export const errores = {
     new PatrociniosError('RECURSO_NO_DISPONIBLE', 'El recurso solicitado no está disponible.', 404),
   parametroInvalido: (mensaje: string): PatrociniosError => new PatrociniosError('PARAMETRO_INVALIDO', mensaje, 400),
   imagenInvalida: (mensaje: string): PatrociniosError => new PatrociniosError('IMAGEN_INVALIDA', mensaje, 400),
-  imagenProporcion: (mensaje: string): PatrociniosError =>
-    new PatrociniosError('IMAGEN_PROPORCION_INVALIDA', mensaje, 400),
   imagenTamano: (mensaje: string): PatrociniosError => new PatrociniosError('IMAGEN_TAMANO_INVALIDO', mensaje, 400),
   nombreDuplicado: (): PatrociniosError =>
     new PatrociniosError('NOMBRE_CAMPANIA_DUPLICADO', 'Ya existe una campaña con ese nombre.', 409),
