@@ -1426,6 +1426,7 @@ CREATE TABLE IF NOT EXISTS solicitud_compra (
     transaccion_pago_id VARCHAR(100) UNIQUE,
     monto_pagado NUMERIC(12, 2),
     codigo_orden VARCHAR(50),
+    compra_directa BOOLEAN NOT NULL DEFAULT false,
     reintentos_orden SMALLINT NOT NULL DEFAULT 0,
     proximo_intento_orden TIMESTAMPTZ,
     ultimo_error TEXT,
@@ -1449,6 +1450,9 @@ CREATE TABLE IF NOT EXISTS solicitud_compra (
     CONSTRAINT chk_solicitud_compra_reintentos CHECK (reintentos_orden >= 0)
 );
 
+-- Bases creadas con la primera versión de esta tabla (v3.21 sin la compra directa).
+ALTER TABLE solicitud_compra ADD COLUMN IF NOT EXISTS compra_directa BOOLEAN NOT NULL DEFAULT false;
+
 COMMENT ON TABLE solicitud_compra IS 'Solicitud de compra SOL-AAAA-NNNNN de M07: la compra congelada al pagar; también la cola de creación de la orden';
 COMMENT ON COLUMN solicitud_compra.descuento IS 'Suma de descuento_eventos, descuento_empresa e importe_cupon (resumen de M06)';
 COMMENT ON COLUMN solicitud_compra.total_mercancia IS 'Total de M06 (mercancía con IVA, sin envío)';
@@ -1456,6 +1460,7 @@ COMMENT ON COLUMN solicitud_compra.total IS 'Lo que se cobra: total_mercancia + 
 COMMENT ON COLUMN solicitud_compra.id_cupon IS 'Cupón aplicado (referencia a cupon, sin FK: esa tabla se crea más adelante en este script)';
 COMMENT ON COLUMN solicitud_compra.cupon_registrado IS 'true mientras el uso del cupón está registrado en M06 con referencia = codigo (M07 · R2 e, R3)';
 COMMENT ON COLUMN solicitud_compra.transaccion_pago_id IS 'Id de la transacción APROBADA en la pasarela; pasa a la orden (M08 · R2)';
+COMMENT ON COLUMN solicitud_compra.compra_directa IS 'Comprada con "Comprar ahora" desde la ficha, sin el carrito: al crear la orden no se toca el carrito (M07 · R17)';
 COMMENT ON COLUMN solicitud_compra.proximo_intento_orden IS 'Cuándo vuelve a intentarse crear la orden en M08; null si no hay nada pendiente (M07 · R6)';
 
 -- Tabla: linea_solicitud

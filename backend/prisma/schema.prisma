@@ -2090,6 +2090,8 @@ model SolicitudCompra {
   transaccionPagoId   String?               @unique @map("transaccion_pago_id") @db.VarChar(100)
   montoPagado         Decimal?              @map("monto_pagado") @db.Decimal(12, 2)
   codigoOrden         String?               @map("codigo_orden") @db.VarChar(50)
+  /// R17: comprada desde la ficha, sin el carrito
+  compraDirecta       Boolean               @default(false) @map("compra_directa")
   reintentosOrden     Int                   @default(0) @map("reintentos_orden") @db.SmallInt
   proximoIntentoOrden DateTime?             @map("proximo_intento_orden") @db.Timestamptz(6)
   ultimoError         String?               @map("ultimo_error")
