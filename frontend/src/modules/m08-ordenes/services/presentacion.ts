@@ -9,7 +9,7 @@ export const ETIQUETA_ESTADO: Record<EstadoOrden, string> = {
   orden_confirmada: 'Confirmado',
   revision_disponibilidad: 'Revisando disponibilidad',
   en_preparacion: 'En alistamiento',
-  preparada: 'Preparado',
+  preparada: 'Alistado',
   despachado: 'Enviado',
   entregado: 'Entregado',
   cancelado: 'Cancelado',
