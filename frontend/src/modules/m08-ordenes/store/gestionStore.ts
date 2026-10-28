@@ -191,6 +191,8 @@ export const useGestionStore = create<GestionState>((set, get) => ({
       const detalle = await cambiarEstado(actual.codigo, cambio);
       set((s) => ({
         ...(s.detalle?.codigo === actual.codigo ? { detalle } : {}),
+        // «Compras del cliente» incluye este pedido: muestra su estado nuevo sin volver a pedir el historial.
+        historialCliente: s.historialCliente.map((o) => (o.codigo === detalle.codigo ? { ...o, estado: detalle.estado } : o)),
         operando: false,
         aviso: 'Estado actualizado.',
       }));
