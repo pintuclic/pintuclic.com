@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { telefonoSchema } from '@/core/dtos/telefono.dto';
 
 /**
  * ============================================================================
@@ -26,11 +27,8 @@ export const correoSchema = z
   .max(150, 'El correo no puede exceder 150 caracteres')
   .toLowerCase();
 
-export const telefonoSchema = z
-  .string()
-  .trim()
-  .min(7, 'El teléfono debe tener al menos 7 dígitos')
-  .max(20, 'El teléfono no puede exceder 20 caracteres');
+/** Regla transversal del teléfono (registro, perfil, empresa y direcciones): vive en `core/dtos`. */
+export { telefonoSchema };
 
 export const nombreSchema = z
   .string()
@@ -250,7 +248,7 @@ export const solicitarAscensoEmpresaFormSchema = z.object({
 export type SolicitarAscensoEmpresaFormData = z.infer<typeof solicitarAscensoEmpresaFormSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
- * 9. SCHEMAS DE FORMULARIOS: HU-CUE-07 DIRECCIONES
+ * 9. SCHEMAS DE FORMULARIOS: HU-CUE-07 DIRECCIÓN DE ENTREGA
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export const direccionClienteFormSchema = z.object({
@@ -264,6 +262,22 @@ export const direccionClienteFormSchema = z.object({
   longitud: z.number().min(-180).max(180).optional(),
 });
 export type DireccionClienteFormData = z.infer<typeof direccionClienteFormSchema>;
+
+/**
+ * Respuesta de la geocodificación inversa (Nominatim) con la que se completa la
+ * dirección a partir de la ubicación del dispositivo. Solo se leen los campos útiles.
+ */
+export const geocodificacionInversaSchema = z.object({
+  address: z
+    .object({
+      road: z.string().optional(),
+      house_number: z.string().optional(),
+      neighbourhood: z.string().optional(),
+      quarter: z.string().optional(),
+    })
+    .optional(),
+});
+export type GeocodificacionInversa = z.infer<typeof geocodificacionInversaSchema>;
 
 /** Desactivación de la propia cuenta: exige la contraseña actual. */
 export const desactivarCuentaFormSchema = z.object({
@@ -306,6 +320,8 @@ export type PerfilUsuarioView = z.infer<typeof perfilUsuarioViewSchema>;
 export const dictamenSolicitudEmpresaFormSchema = z.object({
   decision: z.enum(['aprobar', 'rechazar']),
   motivoRechazo: z.string().trim().max(500).optional(),
+  /** M06 · D8: al aprobar una solicitud de cuenta (no una renovación de NIT) se elige el tipo de cliente. */
+  idSubRolEmpresa: z.number().int().positive().optional(),
 });
 export type DictamenSolicitudEmpresaFormData = z.infer<typeof dictamenSolicitudEmpresaFormSchema>;
 

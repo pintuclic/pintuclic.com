@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react';
 
 export interface CategoryCardProps {
   title: string;
+  subtitle?: string;
   href: string;
   /** Arte del mosaico, SIN texto incrustado: el título se renderiza como texto real. */
   imageSrc: string;
@@ -20,6 +21,7 @@ export interface CategoryCardProps {
  */
 export function CategoryCard({
   title,
+  subtitle,
   href,
   imageSrc,
   ctaLabel = 'Ver productos',
@@ -36,15 +38,22 @@ export function CategoryCard({
         alt=""
         fill
         sizes={sizes}
-        className="object-cover transition-transform duration-300 group-hover:scale-105"
+        className="scale-[1.04] object-cover object-top transition-transform duration-300 group-hover:scale-110"
       />
       <span
         aria-hidden="true"
-        className="absolute inset-0 bg-linear-to-r from-corporate/60 via-corporate/20 to-transparent"
+        className="absolute inset-0 bg-linear-to-r from-corporate/75 via-corporate/35 to-transparent"
       />
-      <span className="absolute inset-0 flex flex-col justify-start gap-2 p-4">
-        <span className="max-w-[60%] font-title text-lg font-semibold leading-tight text-neutral-white">
-          {title}
+      <span className="absolute inset-0 flex flex-col justify-between p-4">
+        <span className="flex flex-col gap-1">
+          <span className="max-w-[75%] font-title text-lg font-semibold leading-tight text-neutral-white">
+            {title}
+          </span>
+          {subtitle && (
+            <span className="max-w-[80%] font-sans text-xs font-medium text-neutral-white/85">
+              {subtitle}
+            </span>
+          )}
         </span>
         <span className="inline-flex items-center gap-1 font-sans text-sm font-medium text-neutral-white">
           {ctaLabel}

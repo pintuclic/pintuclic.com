@@ -27,6 +27,7 @@ export interface UsuarioSessionState {
     correoEmpresarial: string;
     telefono: string;
     fechaAprobacion: string;
+    tipoCliente?: { nombre: string; porcentaje: number; montoMinimoCompra: number } | null;
   } | null;
 }
 

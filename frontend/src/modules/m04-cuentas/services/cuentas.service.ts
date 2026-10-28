@@ -182,21 +182,14 @@ export async function crearDireccion(datos: DireccionClienteFormData): Promise<D
 export async function actualizarDireccion(idDireccion: string, datos: DireccionClienteFormData): Promise<Direccion> {
   const { data } = await apiClient.put<RespuestaExitosa<Direccion>>(
     `/cuentas/direcciones/${encodeURIComponent(idDireccion)}`,
-    cuerpoDireccion(datos),
+    // Al editar, sin ubicación en el formulario se envía null para borrar la que estaba guardada.
+    { latitud: null, longitud: null, ...cuerpoDireccion(datos) },
   );
   return data.data;
 }
 
 export async function eliminarDireccion(idDireccion: string): Promise<void> {
   await apiClient.delete(`/cuentas/direcciones/${encodeURIComponent(idDireccion)}`);
-}
-
-export async function marcarPredeterminada(idDireccion: string): Promise<Direccion> {
-  const { data } = await apiClient.patch<RespuestaExitosa<Direccion>>(
-    `/cuentas/direcciones/${encodeURIComponent(idDireccion)}/predeterminada`,
-    {},
-  );
-  return data.data;
 }
 
 /* ─── HU-CUE-06 (06-C) y HU-CUE-10 · Empresa ─── */

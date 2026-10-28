@@ -31,11 +31,13 @@ export const correoSchema = z
   .max(150, 'El correo no puede exceder 150 caracteres')
   .toLowerCase();
 
+/** Regla transversal del teléfono; su copia ejecutable vive en `backend/src/core/dtos/telefono.dto.ts`. */
 export const telefonoSchema = z
   .string()
   .trim()
   .min(7, 'El teléfono debe tener al menos 7 dígitos')
-  .max(20, 'El teléfono no puede exceder 20 caracteres');
+  .max(20, 'El teléfono no puede exceder 20 caracteres')
+  .regex(/^[0-9+\s()-]+$/, 'El teléfono solo debe contener números o caracteres de marcado');
 
 export const nombreSchema = z
   .string()
@@ -363,7 +365,13 @@ export const solicitarAscensoEmpresaRequestSchema = z.object({
 export type SolicitarAscensoEmpresaRequest = z.infer<typeof solicitarAscensoEmpresaRequestSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
- * 9. SCHEMAS: HU-CUE-07 LIBRETA DE DIRECCIONES DE ENTREGA
+ * 9. SCHEMAS: HU-CUE-07 DIRECCIÓN DE ENTREGA DEL CLIENTE
+ *
+ * Regla: cada cuenta guarda como máximo UNA dirección (RF-CUE-07-04). Un segundo
+ * POST responde 400 LIMITE_DIRECCIONES_ALCANZADO y la BD lo impide con el índice
+ * único uq_direccion_una_por_usuario. Como es la única, siempre queda marcada como
+ * predeterminada, por lo que no existe endpoint para cambiar la predeterminada.
+ * Para cambiarla el cliente la edita o la elimina y crea otra.
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export const direccionClienteItemSchema = z.object({
@@ -394,7 +402,11 @@ export const crearDireccionRequestSchema = z.object({
 });
 export type CrearDireccionRequest = z.infer<typeof crearDireccionRequestSchema>;
 
-export const actualizarDireccionRequestSchema = crearDireccionRequestSchema.partial();
+/** Al editar, `null` en las coordenadas las borra (el cliente quita su ubicación); ausentes se conservan. */
+export const actualizarDireccionRequestSchema = crearDireccionRequestSchema.partial().extend({
+  latitud: z.number().min(-90).max(90).nullable().optional(),
+  longitud: z.number().min(-180).max(180).nullable().optional(),
+});
 export type ActualizarDireccionRequest = z.infer<typeof actualizarDireccionRequestSchema>;
 
 export const listarDireccionesResponseSchema = z.array(direccionClienteItemSchema);
@@ -404,6 +416,17 @@ export type ListarDireccionesResponse = z.infer<typeof listarDireccionesResponse
  * 10. SCHEMAS: HU-CUE-08 CONSULTA DE ESTADO DE CUENTA
  * ─────────────────────────────────────────────────────────────────────────── */
 
+/**
+ * Tipo de cliente empresa de la cuenta (M06 · D8), tal como lo ve ella: su nombre y las condiciones de su descuento.
+ * Null mientras no tenga tipo asignado (cuentas anteriores a M06) o si el tipo está desactivado: sin descuento.
+ */
+export const tipoClienteResumenSchema = z.object({
+  nombre: z.string(),
+  porcentaje: z.number(),
+  montoMinimoCompra: z.number().nonnegative(),
+});
+export type TipoClienteResumen = z.infer<typeof tipoClienteResumenSchema>;
+
 export const cuentaEmpresaDetalleSchema = z.object({
   nit: nitSchema,
   nombreEmpresa: nombreSchema,
@@ -411,6 +434,7 @@ export const cuentaEmpresaDetalleSchema = z.object({
   correoEmpresarial: correoSchema,
   telefono: telefonoSchema,
   fechaAprobacion: z.string().datetime(),
+  tipoCliente: tipoClienteResumenSchema.nullable(),
 });
 export type CuentaEmpresaDetalle = z.infer<typeof cuentaEmpresaDetalleSchema>;
 
@@ -467,6 +491,85 @@ export const dictamenSolicitudEmpresaRequestSchema = z.object({
   motivoRechazo: z.string().trim().max(500).optional(),
 });
 export type DictamenSolicitudEmpresaRequest = z.infer<typeof dictamenSolicitudEmpresaRequestSchema>;
+
+/**
+ * Dictamen de una solicitud de cuenta empresa (registro o ascenso). Al APROBAR el administrador elige el tipo de
+ * cliente empresa (M06 · D8: Proveedor, Constructora…), que fija el descuento de la cuenta. Rechazar no lleva tipo.
+ * La renovación de NIT no cambia el tipo y sigue usando `dictamenSolicitudEmpresaRequestSchema`.
+ */
+export const dictamenCuentaEmpresaRequestSchema = dictamenSolicitudEmpresaRequestSchema
+  .extend({ idSubRolEmpresa: z.number().int().positive('Tipo de cliente inválido').optional() })
+  .refine((d) => d.decision !== 'aprobar' || d.idSubRolEmpresa !== undefined, {
+    message: 'Elija el tipo de cliente empresa para aprobar la solicitud',
+    path: ['idSubRolEmpresa'],
+  });
+export type DictamenCuentaEmpresaRequest = z.infer<typeof dictamenCuentaEmpresaRequestSchema>;
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 11b. SCHEMAS: TIPO DE CLIENTE EMPRESA (M06 · D8)
+ * ───────────────────────────────────────────────────────────────────────────
+ * Permiso `empresas.validar`. Rutas (montaje /api/v1/admin/empresas):
+ *  GET   /tipos                      → listarTiposClienteEmpresaResponse (los tipos activos, para el selector)
+ *  GET   /cuentas                    → listarCuentasEmpresaResponse (paginado; con su tipo)
+ *  PATCH /cuentas/:idUsuario/tipo    → cuentaEmpresaAdminItem (cambia el tipo de una cuenta)
+ * El tipo que se elija debe estar activo; si no, 400 TIPO_CLIENTE_INVALIDO. Los tipos y sus porcentajes se
+ * administran en M06 (`/admin/promociones`).
+ */
+
+export const tipoClienteOpcionSchema = z.object({
+  idSubRolEmpresa: z.number().int().positive(),
+  nombre: z.string(),
+  porcentaje: z.number(),
+  montoMinimoCompra: z.number().nonnegative(),
+});
+export type TipoClienteOpcion = z.infer<typeof tipoClienteOpcionSchema>;
+
+export const listarTiposClienteEmpresaResponseSchema = z.array(tipoClienteOpcionSchema);
+export type ListarTiposClienteEmpresaResponse = z.infer<typeof listarTiposClienteEmpresaResponseSchema>;
+
+export const cuentaEmpresaAdminItemSchema = z.object({
+  idUsuario: idUsuarioSchema,
+  nit: z.string(),
+  nombreEmpresa: nombreSchema,
+  nombreRepresentante: nombreSchema,
+  correoEmpresarial: correoSchema,
+  telefono: telefonoSchema,
+  fechaAprobacion: z.string().datetime(),
+  /** Null = sin tipo asignado: no recibe descuento hasta que se le asigne uno. */
+  tipoCliente: z
+    .object({
+      idSubRolEmpresa: z.number().int().positive(),
+      nombre: z.string(),
+      porcentaje: z.number(),
+      estado: z.enum(['activo', 'inactivo']),
+    })
+    .nullable(),
+});
+export type CuentaEmpresaAdminItem = z.infer<typeof cuentaEmpresaAdminItemSchema>;
+
+export const listarCuentasEmpresaQuerySchema = z.object({
+  /** Nombre de la empresa, representante o NIT. */
+  busqueda: z.string().trim().max(100).optional(),
+  /** true = solo las cuentas que no tienen tipo (las que están sin descuento). */
+  sinTipo: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+});
+export type ListarCuentasEmpresaQuery = z.infer<typeof listarCuentasEmpresaQuerySchema>;
+
+export const listarCuentasEmpresaResponseSchema = z.object({
+  items: z.array(cuentaEmpresaAdminItemSchema),
+  total: z.number().int().nonnegative(),
+});
+export type ListarCuentasEmpresaResponse = z.infer<typeof listarCuentasEmpresaResponseSchema>;
+
+export const cambiarTipoClienteRequestSchema = z.object({
+  idSubRolEmpresa: z.number().int().positive('Tipo de cliente inválido'),
+});
+export type CambiarTipoClienteRequest = z.infer<typeof cambiarTipoClienteRequestSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 12. SCHEMAS: HU-CUE-10 RENOVACIÓN DE NIT Y RUT ADJUNTO

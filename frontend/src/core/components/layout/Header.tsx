@@ -3,35 +3,64 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, Menu, ShoppingCart, User } from 'lucide-react';
+import { ChevronDown, Menu, Palette, ShoppingCart, User } from 'lucide-react';
 import { Button } from '../buttons/Button';
 import { IconButton } from '../buttons/IconButton';
 import { Badge } from '../data-display/Badge';
 import { Modal } from '../overlays/Modal';
+import { useResumenCarrito } from '../../hooks/useResumenCarrito';
 import { useAuthStore } from '../../store/authStore';
 import type { UsuarioAutenticado } from '../../types/usuario.type';
 import { formatCOP } from '../../utils/moneda';
-import { CategoriesMegaMenu, type MegaMenuAssistant, type MegaMenuGroup } from './CategoriesMegaMenu';
+import {
+  CategoriesMegaMenu,
+  type MegaMenuAssistant,
+  type MegaMenuGroup,
+  type MegaMenuTab,
+} from './CategoriesMegaMenu';
 import { Container } from './Container';
 import { Logo, type LogoProps } from './Logo';
 
 export interface HeaderNavItem {
   label: string;
   href: string;
-  /** `pill` muestra el elemento como insignia roja (p. ej. "OFERTAS"). */
-  variant?: 'link' | 'pill';
+  /**
+   * `pill` muestra el elemento como insignia roja (p. ej. "OFERTAS"); `destacado` lo muestra como un botón con borde de
+   * colores y un ícono de paleta, para la entrada que se quiere hacer notar (p. ej. "Paleta de color").
+   */
+  variant?: 'link' | 'pill' | 'destacado';
 }
 
 export interface HeaderProps {
   logo: LogoProps;
   navItems: ReadonlyArray<HeaderNavItem>;
   categoriesLabel?: string;
-  megaMenu: { groups: ReadonlyArray<MegaMenuGroup>; assistant: MegaMenuAssistant };
+  megaMenu: {
+    groups: ReadonlyArray<MegaMenuGroup>;
+    tabs?: ReadonlyArray<MegaMenuTab>;
+    assistant: MegaMenuAssistant;
+  };
   account: { label: string; sublabel: string; href: string };
   cart: { count: number; total: number; href: string };
 }
 
 const FOCO = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50';
+
+/** El botón llamativo del menú: borde en degradado de colores (como una paleta) y adentro un fondo claro de texto oscuro legible. */
+function BotonDestacado({ label, activo }: { label: string; activo: boolean }) {
+  return (
+    <span
+      className={`inline-flex rounded-full bg-gradient-to-r from-danger via-highlight via-45% to-action p-[2px] shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg ${
+        activo ? 'ring-2 ring-corporate/40' : ''
+      }`}
+    >
+      <span className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-neutral-white px-3 font-title text-sm font-bold text-corporate xl:px-4">
+        <Palette className="hidden h-4 w-4 text-action xl:block" aria-hidden="true" />
+        {label}
+      </span>
+    </span>
+  );
+}
 
 /** Con sesión abierta, "Mi cuenta" saluda por el primer nombre y lleva al perfil o al panel admin (M04 / M17). */
 export function cuentaDeEncabezado(
@@ -49,12 +78,13 @@ export function cuentaDeEncabezado(
 /**
  * Cabecera principal (UI Spec §3.1): logo, botón "Categorías" (abre el mega-menú
  * modal), navegación, acceso a "Mi cuenta" y carrito con contador y monto.
- * Por debajo de `lg` la navegación pasa a un panel modal.
+ * Por debajo de `xl` la navegación pasa a un panel modal: con sus siete enlaces, el botón de categorías, la cuenta
+ * y el carrito, en menos de 1280px las palabras se montaban unas sobre otras.
  */
 export function Header({
   logo,
   navItems,
-  categoriesLabel = 'Categorías',
+  categoriesLabel = '¿Qué buscas?',
   megaMenu,
   account,
   cart,
@@ -70,18 +100,21 @@ export function Header({
   const esActivo = (href: string): boolean =>
     href === '/' ? pathname === '/' : pathname === href || Boolean(pathname?.startsWith(`${href}/`));
 
-  const total = formatCOP(cart.total);
-  const etiquetaCarrito = `Carrito, ${cart.count} ${cart.count === 1 ? 'producto' : 'productos'}, total ${total}`;
+  // El carrito real (M05) manda sobre los valores por defecto de `cart`.
+  const resumen = useResumenCarrito();
+  const cantidad = resumen?.cantidadItems ?? cart.count;
+  const total = formatCOP(resumen?.total ?? cart.total);
+  const etiquetaCarrito = `Carrito, ${cantidad} ${cantidad === 1 ? 'producto' : 'productos'}, total ${total}`;
 
   return (
     <header className="border-b border-neutral-light bg-neutral-white">
-      <Container className="flex h-16 items-center gap-3 lg:h-[88px] lg:gap-8">
+      <Container className="flex h-16 items-center gap-4 lg:h-[88px] xl:gap-6 2xl:gap-10">
         <IconButton
           variant="ghost"
           aria-label="Abrir menú"
           aria-haspopup="dialog"
           aria-expanded={movilAbierto}
-          className="lg:hidden"
+          className="xl:hidden"
           onClick={() => setMovilAbierto(true)}
         >
           <Menu className="h-6 w-6" />
@@ -89,7 +122,7 @@ export function Header({
 
         <Logo {...logo} priority />
 
-        <div className="hidden lg:block">
+        <div className="hidden shrink-0 xl:block">
           <Button
             variant="primary-action"
             leftIcon={<Menu className="h-5 w-5" aria-hidden="true" />}
@@ -97,29 +130,37 @@ export function Header({
             aria-haspopup="dialog"
             aria-expanded={megaAbierto}
             onClick={() => setMegaAbierto(true)}
-            className="min-w-[170px] justify-between"
+            className="min-w-[164px] justify-between whitespace-nowrap"
           >
             {categoriesLabel}
           </Button>
         </div>
 
-        <nav aria-label="Principal" className="hidden lg:block">
-          <ul className="flex items-center gap-6">
+        <nav aria-label="Principal" className="hidden min-w-0 flex-1 xl:block">
+          <ul className="flex items-center justify-center gap-3 2xl:gap-6">
             {navItems.map((item) => (
-              <li key={item.href}>
+              <li key={item.href} className="shrink-0">
                 {item.variant === 'pill' ? (
-                  <Link href={item.href} className={`inline-flex rounded-full ${FOCO}`}>
+                  <Link href={item.href} className={`inline-flex whitespace-nowrap rounded-full ${FOCO}`}>
                     <Badge variant="offer" pill>
                       {item.label}
                     </Badge>
+                  </Link>
+                ) : item.variant === 'destacado' ? (
+                  <Link
+                    href={item.href}
+                    aria-current={esActivo(item.href) ? 'page' : undefined}
+                    className={`inline-flex whitespace-nowrap rounded-full ${FOCO}`}
+                  >
+                    <BotonDestacado label={item.label} activo={esActivo(item.href)} />
                   </Link>
                 ) : (
                   <Link
                     href={item.href}
                     aria-current={esActivo(item.href) ? 'page' : undefined}
-                    className={`relative inline-flex min-h-[44px] items-center rounded-btn px-1 font-sans text-sm font-medium transition-colors ${FOCO} ${
+                    className={`relative inline-flex min-h-[44px] items-center whitespace-nowrap rounded-btn px-1.5 font-sans text-sm font-medium transition-colors 2xl:text-[15px] ${FOCO} ${
                       esActivo(item.href)
-                        ? 'text-conversion-hover after:absolute after:inset-x-1 after:bottom-1 after:h-0.5 after:bg-conversion'
+                        ? 'text-conversion-hover after:absolute after:inset-x-1.5 after:bottom-1 after:h-0.5 after:bg-conversion'
                         : 'text-neutral-dark hover:text-action'
                     }`}
                   >
@@ -131,38 +172,38 @@ export function Header({
           </ul>
         </nav>
 
-        <div className="ml-auto flex items-center gap-1 lg:gap-6">
+        <div className="ml-auto flex shrink-0 items-center gap-2 xl:gap-3 2xl:gap-6">
           <Link
             href={cuenta.href}
             aria-label={`${cuenta.label}, ${cuenta.sublabel}`}
-            className={`flex min-h-[44px] items-center gap-2 rounded-btn p-2 ${FOCO}`}
+            className={`flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-btn p-2 ${FOCO}`}
           >
-            <User className="h-6 w-6 text-neutral-dark" aria-hidden="true" />
-            <span className="hidden flex-col leading-tight lg:flex">
-              <span className="font-title text-sm font-semibold text-neutral-black">{cuenta.label}</span>
-              <span className="text-xs text-neutral-medium">{cuenta.sublabel}</span>
+            <User className="h-6 w-6 shrink-0 text-neutral-dark" aria-hidden="true" />
+            <span className="hidden flex-col leading-tight whitespace-nowrap 2xl:flex">
+              <span className="font-title text-sm font-semibold whitespace-nowrap text-neutral-black">{cuenta.label}</span>
+              <span className="text-xs whitespace-nowrap text-neutral-medium">{cuenta.sublabel}</span>
             </span>
           </Link>
 
           <Link
             href={cart.href}
             aria-label={etiquetaCarrito}
-            className={`flex min-h-[44px] items-center gap-3.5 rounded-btn p-2 ${FOCO}`}
+            className={`flex min-h-[44px] shrink-0 items-center gap-3 whitespace-nowrap rounded-btn p-2 ${FOCO}`}
           >
-            <span className="relative">
+            <span className="relative shrink-0">
               <ShoppingCart className="h-6 w-6 text-neutral-dark" aria-hidden="true" />
-              {cart.count > 0 && (
+              {cantidad > 0 && (
                 <span
                   aria-hidden="true"
                   className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-neutral-white"
                 >
-                  {cart.count}
+                  {cantidad}
                 </span>
               )}
             </span>
-            <span className="hidden flex-col leading-tight lg:flex">
-              <span className="font-title text-sm font-semibold text-neutral-black">Carrito</span>
-              <span className="text-xs font-medium text-neutral-dark">{total}</span>
+            <span className="hidden flex-col leading-tight whitespace-nowrap 2xl:flex">
+              <span className="font-title text-sm font-semibold whitespace-nowrap text-neutral-black">Carrito</span>
+              <span className="text-xs font-medium whitespace-nowrap text-neutral-dark">{total}</span>
             </span>
           </Link>
         </div>
@@ -172,7 +213,9 @@ export function Header({
         isOpen={megaAbierto}
         onClose={cerrarMega}
         groups={megaMenu.groups}
+        tabs={megaMenu.tabs}
         assistant={megaMenu.assistant}
+        title={categoriesLabel}
       />
 
       <Modal isOpen={movilAbierto} onClose={cerrarMovil} size="sm" title="Menú">
@@ -202,6 +245,8 @@ export function Header({
                       <Badge variant="offer" pill>
                         {item.label}
                       </Badge>
+                    ) : item.variant === 'destacado' ? (
+                      <BotonDestacado label={item.label} activo={esActivo(item.href)} />
                     ) : (
                       item.label
                     )}

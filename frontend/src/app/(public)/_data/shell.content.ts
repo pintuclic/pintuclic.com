@@ -1,31 +1,94 @@
 /**
  * ============================================================================
- * CONTENIDO ESTÁTICO TEMPORAL — Frente propio FP-01 (landing page)
+ * CABECERA, NAVEGACIÓN Y PIE — Frente propio FP-01 (landing page)
  * ============================================================================
- * Cabecera, navegación y pie de las páginas públicas, tomados del mockup
- * (`docs/assets/mockups/VISTAS.pdf`, página 1) y de la UI Spec §3.1–§3.3.
- *
- * ⚠️ Provisional por decisión del Director Humano (2026-10-22): los datos del
- * carrito y de la sesión los alimentarán M05 y M04; las categorías, M01. Hasta
- * entonces viven aquí, en un único archivo, para sustituirlos de un solo golpe.
- *
- * Es UI, no catálogo de negocio: no se siembra ni se inserta en ninguna base de
- * datos (Directiva #10).
+ * Cabecera, mega-menú y pie de las páginas públicas (UI Spec §3.1–§3.3).
+ * Todos los enlaces apuntan a rutas reales implementadas en la plataforma
+ * (`/productos` con los IDs reales de categoría/subcategoría de M01, y las
+ * páginas institucionales/centro de ayuda de M16).
  * ============================================================================
  */
 
 import type {
   FooterProps,
   HeaderProps,
+  MegaMenuTab,
   TopbarItem,
 } from '@/core/components';
 
 export const topbarItems: ReadonlyArray<TopbarItem> = [
-  { icon: 'envio', label: 'Envíos a toda Colombia' },
-  { icon: 'calidad', label: 'Productos de calidad' },
-  { icon: 'asesoria', label: 'Asesoría experta' },
-  { icon: 'ayuda', label: '¿Necesitas ayuda?' },
+  { icon: 'envio', label: 'Envíos a toda Colombia', href: '/politicas-de-envio' },
+  { icon: 'calidad', label: 'Productos de calidad', href: '/productos' },
+  { icon: 'asesoria', label: 'Asesoría experta', href: '/centro-de-ayuda' },
+  { icon: 'ayuda', label: '¿Necesitas ayuda?', href: '/centro-de-ayuda' },
   { icon: 'telefono', label: '322 123 4567', href: 'tel:+573221234567' },
+];
+
+export const megaMenuTabs: ReadonlyArray<MegaMenuTab> = [
+  {
+    id: 'paredes-techos',
+    title: 'Paredes y Techos',
+    icon: 'paredes',
+    columns: [
+      {
+        title: 'Pinturas',
+        items: [
+          { label: 'Vinilos para muros', href: '/productos?subcategoria=1' },
+          { label: 'Pinturas para fachadas', href: '/productos?subcategoria=2' },
+        ],
+        verMasHref: '/productos?superficie=1',
+      },
+    ],
+  },
+  {
+    id: 'madera',
+    title: 'Madera',
+    icon: 'madera',
+    columns: [
+      {
+        title: 'Pinturas y Barnices',
+        items: [
+          { label: 'Barnices', href: '/productos?subcategoria=10' },
+          { label: 'Esmaltes', href: '/productos?subcategoria=3' },
+        ],
+        verMasHref: '/productos?superficie=2',
+      },
+    ],
+  },
+  {
+    id: 'metal',
+    title: 'Metal',
+    icon: 'metal',
+    columns: [
+      {
+        title: 'Pinturas para Metal',
+        items: [
+          { label: 'Esmaltes', href: '/productos?subcategoria=3' },
+        ],
+        verMasHref: '/productos?superficie=3',
+      },
+    ],
+  },
+  {
+    id: 'otras-superficies',
+    title: 'Otras Superficies',
+    icon: 'superficies',
+    columns: [],
+  },
+  {
+    id: 'herramientas',
+    title: 'Herramientas',
+    icon: 'herramientas',
+    columns: [
+      {
+        title: 'Aplicación',
+        items: [
+          { label: 'Brochas', href: '/productos?subcategoria=18' },
+        ],
+        verMasHref: '/productos?categoria=6',
+      },
+    ],
+  },
 ];
 
 export const header: HeaderProps = {
@@ -36,59 +99,58 @@ export const header: HeaderProps = {
     height: 303,
     className: 'h-11 w-auto lg:h-14',
   },
+  categoriesLabel: '¿Qué buscas?',
   navItems: [
     { label: 'Inicio', href: '/' },
     { label: 'Productos', href: '/productos' },
-    { label: 'Ofertas', href: '/ofertas', variant: 'pill' },
-    { label: 'Servicios', href: '/servicios' },
-    { label: 'Paleta de Color', href: '/paleta-de-color' },
+    { label: 'Ofertas', href: '/productos?enOferta=true', variant: 'pill' },
+    { label: 'Paleta de color', href: '/paleta-de-color', variant: 'destacado' },
+    { label: 'Asesoría', href: '/asesoria' },
+    { label: 'Ayuda y FAQ', href: '/centro-de-ayuda' },
     { label: 'Sobre Nosotros', href: '/sobre-nosotros' },
   ],
   megaMenu: {
+    tabs: megaMenuTabs,
     groups: [
       {
         title: 'Pinturas',
         items: [
-          { label: 'Decorativos', href: '/productos?categoria=decorativos' },
-          { label: 'Metales', href: '/productos?categoria=metales' },
-          { label: 'Automotriz', href: '/productos?categoria=automotriz' },
-          { label: 'Mantenimiento industrial', href: '/productos?categoria=mantenimiento-industrial' },
+          { label: 'Vinilos interior', href: '/productos?subcategoria=1' },
+          { label: 'Vinilos exterior', href: '/productos?subcategoria=2' },
+          { label: 'Esmaltes', href: '/productos?subcategoria=3' },
+          { label: 'Anticorrosivos', href: '/productos?subcategoria=4' },
         ],
       },
       {
         title: 'Construcción y Protección Personal',
         items: [
-          { label: 'Estuco', href: '/productos?categoria=estuco' },
-          { label: 'Graniplas', href: '/productos?categoria=graniplas' },
-          { label: 'Siliconas', href: '/productos?categoria=siliconas' },
-          { label: 'Guantes', href: '/productos?categoria=guantes' },
-          { label: 'Gafas', href: '/productos?categoria=gafas' },
-          { label: 'Respiradores', href: '/productos?categoria=respiradores' },
+          { label: 'Estucos plásticos', href: '/productos?subcategoria=5' },
+          { label: 'Barnices y lacas para madera', href: '/productos?subcategoria=6' },
+          { label: 'Tintes e inmunizantes', href: '/productos?subcategoria=7' },
+          { label: 'Impermeabilizantes', href: '/productos?subcategoria=8' },
+          { label: 'Solventes y preparadores', href: '/productos?subcategoria=9' },
         ],
       },
       {
         title: 'Accesorios y Herramientas',
         items: [
-          { label: 'Rodillos', href: '/productos?categoria=rodillos' },
-          { label: 'Brochas', href: '/productos?categoria=brochas' },
-          { label: 'Cintas', href: '/productos?categoria=cintas' },
-          { label: 'Lijas', href: '/productos?categoria=lijas' },
-          { label: 'Eléctricas', href: '/productos?categoria=herramientas-electricas' },
-          { label: 'Manuales', href: '/productos?categoria=herramientas-manuales' },
-          { label: 'Neumáticas', href: '/productos?categoria=herramientas-neumaticas' },
-          { label: 'Inalámbricas', href: '/productos?categoria=herramientas-inalambricas' },
+          { label: 'Brochas y rodillos', href: '/productos?subcategoria=10' },
+          { label: 'Cintas y protección', href: '/productos?subcategoria=11' },
+          { label: 'Lijas y espátulas', href: '/productos?subcategoria=12' },
+          { label: 'Todas las herramientas', href: '/productos?categoria=6' },
         ],
       },
     ],
     assistant: {
-      text: '¿No sabes qué pintura necesitas? Te ayudamos a encontrar el ideal para tu proyecto',
-      ctaLabel: 'Encontrar pintura ideal',
-      href: '/asesoria-de-color',
+      // Es justo lo que hace la búsqueda asistida de M03: unas pocas preguntas y el
+      // catálogo ya filtrado. Antes llevaba al centro de ayuda, que no responde eso.
+      text: '¿No sabes qué pintura necesitas? Responde unas pocas preguntas y te mostramos las que sirven para tu proyecto',
+      ctaLabel: 'Empezar la asesoría',
+      href: '/asesoria',
     },
   },
   account: { label: 'Mi cuenta', sublabel: 'Iniciar sesión', href: '/login' },
-  // TEMPORAL: los valores del mockup. M05 alimentará el carrito real.
-  cart: { count: 3, total: 178900, href: '/carrito' },
+  cart: { count: 0, total: 0, href: '/carrito' },
 };
 
 export const footer: FooterProps = {
@@ -101,7 +163,6 @@ export const footer: FooterProps = {
     className: 'h-14 w-auto',
   },
   description: 'Todo para tu proyecto en un solo lugar. Calidad, asesoría y envío rápido a toda Colombia.',
-  // TEMPORAL: dominios genéricos hasta recibir las cuentas oficiales de redes.
   socials: [
     { label: 'Facebook', href: 'https://www.facebook.com', icon: 'facebook' },
     { label: 'Instagram', href: 'https://www.instagram.com', icon: 'instagram' },
@@ -111,19 +172,21 @@ export const footer: FooterProps = {
     {
       title: 'Categorías',
       links: [
-        { label: 'Pinturas interiores', href: '/productos?categoria=pinturas-interiores' },
-        { label: 'Pinturas exteriores', href: '/productos?categoria=pinturas-exteriores' },
-        { label: 'Herramientas', href: '/productos?categoria=herramientas' },
-        { label: 'Accesorios', href: '/productos?categoria=accesorios' },
+        { label: 'Pinturas interiores', href: '/productos?ambiente=interior' },
+        { label: 'Pinturas exteriores', href: '/productos?ambiente=exterior' },
+        { label: 'Maderas y barnices', href: '/productos?categoria=3' },
+        { label: 'Herramientas y accesorios', href: '/productos?categoria=6' },
       ],
     },
     {
-      title: 'Servicios',
+      title: 'Servicios y Ayuda',
       links: [
-        { label: 'Asesoría de color', href: '/asesoria-de-color' },
-        { label: 'Calculadora de pintura', href: '/calculadora' },
-        { label: 'Directorio de pintores', href: '/directorio-de-pintores' },
+        { label: 'Catálogo completo', href: '/productos' },
+        { label: 'Qué pintura necesito', href: '/asesoria' },
+        { label: 'Calculadora de pintura', href: '/asesoria' },
         { label: 'Centro de ayuda', href: '/centro-de-ayuda' },
+        { label: 'Preguntas frecuentes', href: '/centro-de-ayuda#preguntas-frecuentes' },
+        { label: 'Sobre nosotros', href: '/sobre-nosotros' },
       ],
     },
   ],

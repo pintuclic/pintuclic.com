@@ -13,6 +13,7 @@ import { RecuperarForm } from '../components/auth/RecuperarForm';
 import { RegistroFlow } from '../components/auth/RegistroFlow';
 import { RestablecerForm } from '../components/auth/RestablecerForm';
 import { DireccionForm } from '../components/perfil/DireccionForm';
+import { SeguridadSection } from '../components/perfil/SeguridadSection';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),
@@ -113,17 +114,17 @@ describe('Recuperación y restablecimiento (HU-CUE-05)', () => {
 describe('Direcciones (HU-CUE-07)', () => {
   const guardar = async () => undefined;
 
-  it('la primera dirección se anuncia como predeterminada sin casilla', () => {
-    const salida = html(<DireccionForm esPrimera onGuardar={guardar} onCancelar={nada} />);
-    expect(salida).toContain('Será tu dirección predeterminada');
+  it('no ofrece elegir predeterminada: la única dirección siempre lo es', () => {
+    const salida = html(<DireccionForm onGuardar={guardar} onCancelar={nada} />);
     expect(salida).not.toContain('type="checkbox"');
+    expect(salida).not.toContain('predeterminada');
   });
 
-  it('las siguientes permiten elegir y ofrecen la ubicación del dispositivo', () => {
-    const salida = html(<DireccionForm esPrimera={false} onGuardar={guardar} onCancelar={nada} />);
-    expect(salida).toContain('type="checkbox"');
+  it('ofrece completar con la ubicación del dispositivo y mantiene la edición manual', () => {
+    const salida = html(<DireccionForm onGuardar={guardar} onCancelar={nada} />);
     expect(salida).toContain('Usar mi ubicación actual');
     expect(salida).toContain('Apartamento o casa (opcional)');
+    expect(salida).not.toContain('Quitar ubicación');
   });
 });
 
@@ -132,6 +133,37 @@ describe('Panel de empresas (HU-CUE-09)', () => {
     const salida = html(<DictamenPanel motivoObligatorio onDictaminar={async () => undefined} />);
     expect(salida).toContain('Aprobar');
     expect(salida).toContain('Rechazar');
+  });
+
+  describe('tipo de cliente empresa al aprobar (M06 · D8)', () => {
+    const tipos = [
+      { idSubRolEmpresa: 1, nombre: 'Proveedor', porcentaje: 15, montoMinimoCompra: 0 },
+      { idSubRolEmpresa: 2, nombre: 'Constructora', porcentaje: 10, montoMinimoCompra: 300000 },
+    ];
+
+    it('en una solicitud de cuenta pide elegir el tipo y no deja aprobar hasta elegirlo', () => {
+      const salida = html(<DictamenPanel motivoObligatorio onDictaminar={async () => undefined} tiposCliente={tipos} />);
+      expect(salida).toContain('Tipo de cliente empresa');
+      expect(salida).toContain('Proveedor · 15 % de descuento');
+      expect(salida).toContain('Constructora · 10 % de descuento');
+      // el botón Aprobar nace deshabilitado
+      expect(salida).toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Aprobar/s);
+    });
+
+    it('en una renovación de NIT (sin tipos) no pide tipo y deja aprobar', () => {
+      const salida = html(<DictamenPanel motivoObligatorio={false} onDictaminar={async () => undefined} />);
+      expect(salida).not.toContain('Tipo de cliente empresa');
+      expect(salida).not.toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Aprobar/s);
+    });
+
+    it('mientras cargan los tipos lo dice, y si no hay ninguno activo explica dónde crearlos', () => {
+      expect(html(<DictamenPanel motivoObligatorio onDictaminar={async () => undefined} tiposCliente={null} />)).toContain(
+        'Cargando los tipos de cliente',
+      );
+      const vacio = html(<DictamenPanel motivoObligatorio onDictaminar={async () => undefined} tiposCliente={[]} />);
+      expect(vacio).toContain('No hay tipos de cliente empresa activos');
+      expect(vacio).toContain('Promociones');
+    });
   });
 
   it('muestra el estado legible', () => {
@@ -214,5 +246,30 @@ describe('Header con sesión (M04 → Core)', () => {
       sublabel: 'Panel admin',
       href: '/admin',
     });
+  });
+});
+
+describe('Seguridad del perfil (HU-CUE-06)', () => {
+  const salida = html(
+    <SeguridadSection
+      perfil={{
+        idUsuario: 1,
+        nombre: 'Cliente Prueba',
+        correo: 'cliente@pintuclic.com',
+        telefono: '3000000000',
+        tipo: 'normal',
+        estado: 'activo',
+        cambioContrasenaPendiente: false,
+      }}
+      onCorreoCambiado={nada}
+      onSesionInvalidada={nada}
+    />,
+  );
+
+  it('desactiva el autocompletado de credenciales guardadas en cambio de correo y contraseña', () => {
+    expect(salida).not.toContain('autoComplete="current-password"');
+    expect(salida).not.toContain('autoComplete="email"');
+    expect(salida).toContain('id="correo-nuevo"');
+    expect(salida).toContain('id="correo-contrasena"');
   });
 });

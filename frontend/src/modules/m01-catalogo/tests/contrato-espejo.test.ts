@@ -19,15 +19,15 @@ function normalizar(texto: string): string {
 const PARES = [
   { contrato: 'contracts/m01-catalogo.contract.ts', dto: 'dtos/m01-catalogo.dto.ts' },
   { contrato: 'contracts/m01-catalogo-productos.contract.ts', dto: 'dtos/m01-catalogo-productos.dto.ts' },
+  { contrato: 'contracts/m01-catalogo-entrega3.contract.ts', dto: 'dtos/m01-catalogo-entrega3.dto.ts' },
 ];
 
 describe('M01 · los DTOs del frontend son espejo del contrato', () => {
   for (const par of PARES) {
     it(`${par.dto} coincide con ${par.contrato}`, () => {
-      const contrato = readFileSync(resolve(RAIZ, par.contrato), 'utf8').replace(
-        "'./m01-catalogo.contract'",
-        "'./m01-catalogo.dto'",
-      );
+      const contrato = readFileSync(resolve(RAIZ, par.contrato), 'utf8')
+        .replace("'./m01-catalogo.contract'", "'./m01-catalogo.dto'")
+        .replace("'./m01-catalogo-productos.contract'", "'./m01-catalogo-productos.dto'");
       const dto = readFileSync(resolve(__dirname, '..', par.dto), 'utf8');
       expect(normalizar(dto)).toBe(normalizar(contrato));
     });

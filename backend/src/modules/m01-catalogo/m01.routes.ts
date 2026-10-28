@@ -10,8 +10,13 @@ import {
 } from './controllers/catalogos.controller';
 import { ClasificacionController } from './controllers/clasificacion.controller';
 import { ColoresController } from './controllers/colores.controller';
+import { CombosController } from './controllers/combos.controller';
 import { ConsultaPublicaController } from './controllers/consulta-publica.controller';
+import { ImagenesController, ImagenMedidaController } from './controllers/imagenes.controller';
+import { PaletaController } from './controllers/paleta.controller';
 import { ProductosController, VariantesController } from './controllers/productos.controller';
+import { PaletaRepository } from './repositories/paleta.repository';
+import { PaletaService } from './services/paleta.service';
 import {
   crearAcabadoRequestSchema,
   crearBaseRequestSchema,
@@ -35,15 +40,23 @@ import {
 } from './repositories/catalogos-simples.repository';
 import { CategoriasRepository, SubcategoriasRepository } from './repositories/clasificacion.repository';
 import { ColoresRepository } from './repositories/colores.repository';
+import { CombosRepository } from './repositories/combos.repository';
+import { CompraRepository } from './repositories/compra.repository';
 import { ConsultaPublicaRepository } from './repositories/consulta-publica.repository';
+import { ImagenesRepository } from './repositories/imagenes.repository';
 import { ProductosRepository } from './repositories/productos.repository';
 import { VariantesRepository } from './repositories/variantes.repository';
 import { LineasRepository, MarcasRepository, MedidasRepository } from './repositories/marcas-lineas-medidas.repository';
 import { AcabadosService, CatalogoSimpleService, TiposMedidaService } from './services/catalogo-simple.service';
+import { CatalogoParaCompraService } from './services/catalogo-para-compra.service';
 import { ClasificacionService } from './services/clasificacion.service';
 import { ColoresService } from './services/colores.service';
+import { CombosService } from './services/combos.service';
 import { ConsultaPublicaService } from './services/consulta-publica.service';
+import { ImagenesService } from './services/imagenes.service';
 import { LineasService } from './services/lineas.service';
+import type { ImpactoReglasPort, OfertasPort } from './interfaces/ofertas.port';
+import type { PatrocinioPort } from './interfaces/patrocinio.port';
 import { MarcasService } from './services/marcas.service';
 import { MedidasService } from './services/medidas.service';
 import { ProductosService } from './services/productos.service';
@@ -72,6 +85,13 @@ export interface ModuloM01 {
   coloresService: ColoresService;
   productosService: ProductosService;
   variantesService: VariantesService;
+  imagenesService: ImagenesService;
+  combosService: CombosService;
+  /** Puerto interno para M05, M07, M08, M06 y M21 (entrega 3, sección 6). */
+  catalogoParaCompra: CatalogoParaCompraService;
+  /** Puerto interno para M14: tarjetas públicas, con su oferta, de una lista de productos (M14 · `TarjetasPublicasPort`). */
+  consultaPublicaService: ConsultaPublicaService;
+  paletaService: PaletaService;
 }
 
 /**
@@ -89,7 +109,15 @@ function permisoDeCambioEstado(autorizacion: AutorizacionService): RequestHandle
   };
 }
 
-export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01 {
+/** Lo que M01 pide a M06 (los puertos viven en `interfaces/ofertas.port.ts`). Sin ellos no hay ofertas ni conteo de eventos. */
+export interface DependenciasM01 {
+  ofertas?: OfertasPort;
+  impactoReglas?: ImpactoReglasPort;
+  /** M14: los productos de campañas vigentes van primero en los complementarios de la ficha. */
+  patrocinio?: PatrocinioPort;
+}
+
+export function construirModuloM01(autorizacion: AutorizacionService, dependencias: DependenciasM01 = {}): ModuloM01 {
   const ver = requirePermission(autorizacion, PERMISOS_CATALOGO.ver) as RequestHandler;
   const crear = requirePermission(autorizacion, PERMISOS_CATALOGO.crear) as RequestHandler;
   const editar = requirePermission(autorizacion, PERMISOS_CATALOGO.editar) as RequestHandler;
@@ -113,7 +141,18 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const medidasService = new MedidasService(medidasRepo, tiposMedidaRepo);
   const productosRepo = new ProductosRepository();
   const productosService = new ProductosService(productosRepo, marcasRepo, lineasRepo, subcategoriasRepo);
-  const variantesService = new VariantesService(new VariantesRepository(), productosRepo, medidasRepo);
+  const imagenesService = new ImagenesService(new ImagenesRepository(), productosRepo);
+  const variantesRepo = new VariantesRepository();
+  const variantesService = new VariantesService(variantesRepo, productosRepo, medidasRepo);
+  const combosService = new CombosService(
+    new CombosRepository(),
+    productosRepo,
+    variantesRepo,
+    marcasRepo,
+    subcategoriasRepo,
+    medidasRepo,
+    tiposMedidaRepo,
+  );
   const coloresService = new ColoresService(new ColoresRepository(), marcasRepo, basesRepo, acabadosRepo, familiasRepo);
 
   // Controladores
@@ -124,7 +163,17 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const colores = new ColoresController(coloresService);
   const productos = new ProductosController(productosService);
   const variantes = new VariantesController(variantesService);
-  const consultaPublica = new ConsultaPublicaController(new ConsultaPublicaService(new ConsultaPublicaRepository()));
+  const combos = new CombosController(combosService);
+  const imagenes = new ImagenesController(imagenesService);
+  const imagenMedida = new ImagenMedidaController(medidasService);
+  const consultaPublicaService = new ConsultaPublicaService(
+    new ConsultaPublicaRepository(),
+    dependencias.ofertas,
+    dependencias.patrocinio,
+  );
+  const consultaPublica = new ConsultaPublicaController(consultaPublicaService);
+  const paletaService = new PaletaService(new PaletaRepository());
+  const paleta = new PaletaController(paletaService);
   const superficies = controladorSimple({
     servicio: new CatalogoSimpleService(new SuperficiesRepository(), 'una superficie'),
     esquemaCrear: crearSuperficieRequestSchema,
@@ -244,7 +293,25 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   adminRouter.get('/productos/:idProducto/impacto-desactivacion', ver, productos.impacto as RequestHandler);
   adminRouter.get('/productos/:idProducto/colores', ver, productos.colores as RequestHandler);
 
+  // HU-CAT-07: imágenes de productos y de medidas
+  adminRouter.get('/productos/:idProducto/imagenes', ver, imagenes.listar as RequestHandler);
+  adminRouter.post('/productos/:idProducto/imagenes', editar, imagenes.subir as RequestHandler);
+  adminRouter.patch('/productos/:idProducto/imagenes/orden', editar, imagenes.ordenar as RequestHandler);
+  adminRouter.get('/imagenes/:idImagen', ver, imagenes.bytes as RequestHandler);
+  adminRouter.patch('/imagenes/:idImagen/principal', editar, imagenes.marcarPrincipal as RequestHandler);
+  adminRouter.patch('/imagenes/:idImagen/asociacion', editar, imagenes.cambiarAsociacion as RequestHandler);
+  adminRouter.delete('/imagenes/:idImagen', editar, imagenes.eliminar as RequestHandler);
+  adminRouter.get('/medidas/:idMedida/imagen', ver, imagenMedida.bytes as RequestHandler);
+  adminRouter.put('/medidas/:idMedida/imagen', editar, imagenMedida.reemplazar as RequestHandler);
+  adminRouter.delete('/medidas/:idMedida/imagen', editar, imagenMedida.quitar as RequestHandler);
+
   // HU-CAT-03: variantes
+  // Combos (entrega 3): un producto con una sola variante.
+  adminRouter.get('/combos', ver, combos.listar as RequestHandler);
+  adminRouter.post('/combos', crear, combos.crear as RequestHandler);
+  adminRouter.get('/combos/:idProducto', ver, combos.obtener as RequestHandler);
+  adminRouter.put('/combos/:idProducto', editar, combos.editar as RequestHandler);
+
   adminRouter.post('/productos/:idProducto/variantes', crear, variantes.crear as RequestHandler);
   adminRouter.put('/variantes/:idVariante', editar, variantes.editar as RequestHandler);
   adminRouter.patch('/variantes/:idVariante/estado', cambiarEstado, variantes.cambiarEstado as RequestHandler);
@@ -254,10 +321,24 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
   const publicRouter = Router();
   publicRouter.get('/categorias', consultaPublica.categorias as RequestHandler);
   publicRouter.get('/filtros', consultaPublica.filtros as RequestHandler);
+  // Paleta de color (entrega 4): los colores que se entregan hoy y sus armonías.
+  publicRouter.get('/paleta/colores', paleta.listar as RequestHandler);
+  publicRouter.get('/paleta/colores/:idColor/armonias', paleta.armonias as RequestHandler);
   publicRouter.get('/productos', consultaPublica.listar as RequestHandler);
   publicRouter.get('/productos/:idProducto', consultaPublica.ficha as RequestHandler);
   publicRouter.get('/productos/:idProducto/colores', consultaPublica.colores as RequestHandler);
+  publicRouter.get('/productos/:idProducto/ofertas', consultaPublica.ofertas as RequestHandler);
+  publicRouter.get('/productos/:idProducto/complementarios', consultaPublica.complementarios as RequestHandler);
+  publicRouter.get('/imagenes/:idImagen', consultaPublica.imagen as RequestHandler);
+  publicRouter.get('/medidas/:idMedida/imagen', consultaPublica.imagenMedida as RequestHandler);
   publicRouter.get('/marcas/:idMarca/logotipo', consultaPublica.logotipo as RequestHandler);
+
+  // M06: el impacto de desactivar cuenta los eventos que apuntan a la entidad (HU-CAT-11).
+  if (dependencias.impactoReglas !== undefined) {
+    for (const servicio of [clasificacionService, marcasService, lineasService, productosService, variantesService]) {
+      servicio.conectarImpactoReglas(dependencias.impactoReglas);
+    }
+  }
 
   return {
     adminRouter,
@@ -269,5 +350,10 @@ export function construirModuloM01(autorizacion: AutorizacionService): ModuloM01
     coloresService,
     productosService,
     variantesService,
+    imagenesService,
+    combosService,
+    catalogoParaCompra: new CatalogoParaCompraService(new CompraRepository()),
+    consultaPublicaService,
+    paletaService,
   };
 }

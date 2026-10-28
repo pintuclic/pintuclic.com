@@ -41,6 +41,15 @@ export const CODIGOS_PERMISO = [
   'configuracion.editar',
   'estadisticas.consultar',
   'empresas.validar',
+  'notificaciones.ver',
+  'notificaciones.editar',
+  'atencion.ver',
+  'atencion.editar',
+  'atencion.atender_clientes',
+  'patrocinios.ver',
+  'patrocinios.editar',
+  'asesoria.ver',
+  'asesoria.editar',
   'productos.crear',
   'productos.eliminar',
   'ordenes.ver',
@@ -57,6 +66,10 @@ export const AREA_FUNCIONAL = [
   'seguridad',
   'configuracion',
   'estadisticas',
+  'notificaciones',
+  'atencion',
+  'patrocinios',
+  'asesoria',
 ] as const;
 export const areaFuncionalSchema = z.enum(AREA_FUNCIONAL);
 export type AreaFuncional = z.infer<typeof areaFuncionalSchema>;
@@ -281,6 +294,9 @@ export const CLAVES_PARAMETROS = [
   'comercial.iva_porcentaje',
   'comercial.costo_envio_base',
   'comercial.umbral_envio_gratis',
+  'comercial.umbral_sugerir_empresa',
+  'comercial.dias_vigencia_carrito_visitante',
+  'comercial.dias_vigencia_cotizacion',
 ] as const;
 
 export const claveParametroSchema = z.enum(CLAVES_PARAMETROS);

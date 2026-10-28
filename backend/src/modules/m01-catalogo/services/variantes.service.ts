@@ -20,6 +20,7 @@ export class VariantesService extends ServicioCatalogoBase {
 
   async crear(idProducto: number, peticion: CrearVarianteRequest): Promise<Variante> {
     const producto = this.exigir(await this.productos.obtener(idProducto));
+    if (producto.esCombo) throw errores.comboSoloPorCombos();
     if (producto.estado !== 'activo') throw errores.padreInactivo('el producto');
 
     const medida = await this.medidas.obtener(peticion.idMedida);
@@ -48,7 +49,6 @@ export class VariantesService extends ServicioCatalogoBase {
         idMedida: peticion.idMedida,
         precio: peticion.precio,
         sku,
-        existenciaReferencial: peticion.existenciaReferencial,
         codigoProveedor,
       })
       .catch(traducirUnico);
@@ -56,6 +56,8 @@ export class VariantesService extends ServicioCatalogoBase {
 
   async editar(id: number, peticion: EditarVarianteRequest): Promise<Variante> {
     const actual = this.exigir(await this.variantes.obtener(id));
+    const producto = this.exigir(await this.productos.obtener(actual.idProducto));
+    if (producto.esCombo) throw errores.comboSoloPorCombos();
     if (peticion.sku !== undefined && peticion.sku.toLowerCase() !== actual.sku.toLowerCase()) {
       if (await this.variantes.existeSku(peticion.sku, id)) throw errores.duplicado('una variante con ese SKU', 'sku');
     }
@@ -69,9 +71,6 @@ export class VariantesService extends ServicioCatalogoBase {
     const cambios: EditarVarianteDatos = {
       ...(peticion.precio !== undefined ? { precio: peticion.precio } : {}),
       ...(peticion.sku !== undefined ? { sku: peticion.sku } : {}),
-      ...(peticion.existenciaReferencial !== undefined
-        ? { existenciaReferencial: peticion.existenciaReferencial }
-        : {}),
       ...(peticion.codigoProveedor !== undefined ? { codigoProveedor: peticion.codigoProveedor } : {}),
     };
     return this.variantes.editar(id, cambios).catch(traducirUnico);
@@ -82,7 +81,7 @@ export class VariantesService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.variantes.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.variantes.contarImpacto(id), { tipo: 'variante', id }),
       padreActivo: () => this.variantes.padreActivo(id),
       etiquetaPadre: 'el producto o la medida',
       cambiar: (estado) => this.variantes.cambiarEstado(id, estado),
@@ -91,7 +90,7 @@ export class VariantesService extends ServicioCatalogoBase {
 
   async impacto(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.variantes.obtener(id));
-    return this.variantes.contarImpacto(id);
+    return this.conReglasComerciales(this.variantes.contarImpacto(id), { tipo: 'variante', id });
   }
 }
 

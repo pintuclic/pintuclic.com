@@ -116,6 +116,14 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: consulta pública (HTTP
     await prisma.$disconnect();
   });
 
+  const subirImagen = async (id: number): Promise<void> => {
+    const r = await admin('POST', `/productos/${id}/imagenes`, {
+      imagenBase64: PNG_1X1.toString('base64'),
+      imagenMimeType: 'image/png',
+    });
+    expect(r.status, JSON.stringify(r.cuerpo)).toBe(201);
+  };
+
   /** Crea una pintura entonable con variantes y la deja publicada. */
   async function pinturaPublicada(
     extra: Dato = {},
@@ -135,10 +143,18 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: consulta pública (HTTP
     });
     expect(r.status, JSON.stringify(r.cuerpo)).toBe(201);
     const id = dato(r).idProducto as number;
-    for (const v of variantes) {
+    for (const { existenciaReferencial, ...v } of variantes) {
       const rv = await admin('POST', `/productos/${id}/variantes`, v);
       expect(rv.status, JSON.stringify(rv.cuerpo)).toBe(201);
+      // M01 ya no escribe la existencia (la escribe M13): se fija directo para probar la disponibilidad pública.
+      if (typeof existenciaReferencial === 'number') {
+        await prisma.variante.update({
+          where: { idVariante: dato(rv).idVariante as number },
+          data: { existenciaReferencial },
+        });
+      }
     }
+    await subirImagen(id);
     const p = await admin('PATCH', `/productos/${id}/publicacion`, { publicado: true });
     expect(p.status, JSON.stringify(p.cuerpo)).toBe(200);
     return id;
@@ -177,7 +193,8 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: consulta pública (HTTP
         superficies: [`${PREFIJO}-sup`],
         acabados: [{ id: fx.acabado, nombre: `${PREFIJO}-mate` }],
         caracteristicas: [{ nombre: 'Secado', valor: '2 h', orden: 1 }],
-        imagenPrincipalUrl: null,
+        manos: null,
+        imagenes: [{ idImagen: expect.any(Number) }],
       });
       const variantes = dato(r).variantes as Dato[];
       // Ordenadas por tamaño (cuarto antes que galón); U5: solo disponible/agotado.
@@ -221,6 +238,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: consulta pública (HTTP
       });
       const id = dato(r).idProducto as number;
       await admin('POST', `/productos/${id}/variantes`, { idMedida: fx.medidaMetro, precio: 9000 });
+      await subirImagen(id);
       await admin('PATCH', `/productos/${id}/publicacion`, { publicado: true });
       expect(dato(await ficha(id))).toMatchObject({
         linea: null,
@@ -338,7 +356,10 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: consulta pública (HTTP
         precioDesde: 25000,
         tieneColor: true,
         disponibilidad: 'disponible',
-        imagenPrincipalUrl: null,
+        idImagenPrincipal: expect.any(Number),
+        esCombo: false,
+        oferta: null,
+        compraBloqueada: false,
       });
       expect(lista(r)[1]).toMatchObject({
         idProducto: b,
@@ -538,6 +559,11 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: consulta pública (HTTP
         `/productos/${id}/colores?busqueda=${encodeURIComponent('-r2-')}&idFamiliaColor=${fx.familiaRojos}`,
       );
       expect(lista(buscado).map((c) => c.idColor)).toEqual([rojo2.idColor]);
+      // U8: la ficha abierta en un color lo pide por id; uno que el producto no ofrece no se devuelve.
+      const porId = await servidor.publica(`/productos/${id}/colores?idColor=${String(rojo1.idColor)}`);
+      expect(lista(porId).map((c) => c.idColor)).toEqual([rojo1.idColor]);
+      const ajenoPorId = await servidor.publica(`/productos/${id}/colores?idColor=${String(ajeno.idColor)}`);
+      expect(lista(ajenoPorId)).toEqual([]);
       // U7: sin datos de proveedor ni CIELAB internos.
       expect(JSON.stringify(r.cuerpo)).not.toContain('cielab');
     });

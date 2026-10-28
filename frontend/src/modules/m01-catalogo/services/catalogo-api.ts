@@ -9,10 +9,12 @@ import type {
   CrearLineaRequest,
   CrearMarcaRequest,
   CrearMedidaRequest,
+  CrearSubcategoriaRequest,
   CrearTipoMedidaRequest,
   EditarLineaRequest,
   EditarMarcaRequest,
   EditarMedidaRequest,
+  EditarSubcategoriaRequest,
   EditarTipoMedidaRequest,
   Estado,
   FamiliaColor,
@@ -35,13 +37,23 @@ import type {
   EditarColorRequest,
   EditarProductoRequest,
   EditarVarianteRequest,
+  ImagenProducto,
   ImportarColoresRequest,
   ColorOfrecido,
   FamiliaDisponible,
   ProductoDetalle,
   ProductoResumen,
+  SubirImagenRequest,
   Variante,
 } from '../dtos/m01-catalogo-productos.dto';
+import type {
+  CambiarAsociacionImagenRequest,
+  Combo,
+  CrearComboRequest,
+  EditarComboRequest,
+  SubirImagenAsociadaRequest,
+  TamanoImagen,
+} from '../dtos/m01-catalogo-entrega3.dto';
 import type { PaginaApi, PaginaColoresApi, PaginacionApi, ParametrosConsulta } from '../interfaces/catalogo.interface';
 
 const BASE = '/admin/catalogo';
@@ -143,9 +155,9 @@ export const categoriasApi = {
 };
 
 export const subcategoriasApi = {
-  crear: (idCategoria: number, cuerpo: CrearCategoriaRequest) =>
+  crear: (idCategoria: number, cuerpo: CrearSubcategoriaRequest) =>
     enviar<Subcategoria>('post', `${BASE}/categorias/${idCategoria}/subcategorias`, cuerpo),
-  editar: (id: number, cuerpo: Partial<CrearCategoriaRequest>) =>
+  editar: (id: number, cuerpo: EditarSubcategoriaRequest) =>
     enviar<Subcategoria>('put', `${BASE}/subcategorias/${id}`, cuerpo),
   cambiarEstado: (id: number, cuerpo: CambiarEstadoRequest) =>
     enviar<Subcategoria>('patch', `${BASE}/subcategorias/${id}/estado`, cuerpo),
@@ -154,12 +166,44 @@ export const subcategoriasApi = {
 
 /* ─── Marcas ─── */
 
+const URL_BASE = (): string => apiClient.defaults.baseURL ?? '/api/v1';
+
+/** Imágenes de la galería de un producto (administración). */
+export const imagenesApi = {
+  listar: (idProducto: number) => obtener<ImagenProducto[]>(`${BASE}/productos/${idProducto}/imagenes`),
+  subir: (idProducto: number, cuerpo: SubirImagenAsociadaRequest) =>
+    enviar<ImagenProducto>('post', `${BASE}/productos/${idProducto}/imagenes`, cuerpo),
+  /** Entrega 3 (I5): deja la imagen general o la asocia a una variante o a un color. */
+  cambiarAsociacion: (idImagen: number, cuerpo: CambiarAsociacionImagenRequest) =>
+    enviar<ImagenProducto>('patch', `${BASE}/imagenes/${idImagen}/asociacion`, cuerpo),
+  ordenar: (idProducto: number, idsOrdenados: number[]) =>
+    enviar<ImagenProducto[]>('patch', `${BASE}/productos/${idProducto}/imagenes/orden`, { idsOrdenados }),
+  marcarPrincipal: (idImagen: number) => enviar<ImagenProducto>('patch', `${BASE}/imagenes/${idImagen}/principal`, {}),
+  eliminar: async (idImagen: number): Promise<void> => {
+    await apiClient.delete(`${BASE}/imagenes/${idImagen}`);
+  },
+  /** Las miniaturas bastan para las cuadrículas de administración (I7). */
+  url: (idImagen: number, tamano: TamanoImagen = 'original'): string =>
+    `${URL_BASE()}${BASE}/imagenes/${idImagen}${tamano === 'original' ? '' : `?tamano=${tamano}`}`,
+};
+
+/** Imagen opcional de una medida (administración). */
+export const imagenMedidaApi = {
+  reemplazar: (idMedida: number, cuerpo: SubirImagenRequest) =>
+    enviar<Medida>('put', `${BASE}/medidas/${idMedida}/imagen`, cuerpo),
+  quitar: async (idMedida: number): Promise<Medida> => {
+    const { data } = await apiClient.delete<RespuestaExitosa<Medida>>(`${BASE}/medidas/${idMedida}/imagen`);
+    return data.data;
+  },
+  url: (idMedida: number): string => `${URL_BASE()}${BASE}/medidas/${idMedida}/imagen`,
+};
+
 export const marcasApi = {
   ...recursoPaginado<Marca, CrearMarcaRequest, EditarMarcaRequest>('marcas'),
   reemplazarLogotipo: (id: number, cuerpo: ReemplazarLogotipoRequest) =>
     enviar<Marca>('put', `${BASE}/marcas/${id}/logotipo`, cuerpo),
   /** URL del logotipo en administración (requiere sesión; el navegador envía la cookie). */
-  urlLogotipo: (id: number): string => `${apiClient.defaults.baseURL ?? '/api/v1'}${BASE}/marcas/${id}/logotipo`,
+  urlLogotipo: (id: number): string => `${URL_BASE()}${BASE}/marcas/${id}/logotipo`,
 };
 
 /* ─── Colores: importación por bloques (C8) ─── */
@@ -225,3 +269,25 @@ export async function obtenerColoresProducto(
 
 export const coloresProductoAdminApi = (idProducto: number, params?: ParametrosConsulta) =>
   obtenerColoresProducto(`${BASE}/productos/${idProducto}/colores`, params);
+
+/** Combos (entrega 3): un producto con una sola variante. Estado, publicación e imágenes usan `productosApi` e `imagenesApi`. */
+export const combosApi = {
+  listar: (params?: ParametrosConsulta) => obtenerPagina<Combo>(`${BASE}/combos`, params),
+  obtener: (idProducto: number) => obtener<Combo>(`${BASE}/combos/${idProducto}`),
+  crear: (cuerpo: CrearComboRequest) => enviar<Combo>('post', `${BASE}/combos`, cuerpo),
+  editar: (idProducto: number, cuerpo: EditarComboRequest) =>
+    enviar<Combo>('put', `${BASE}/combos/${idProducto}`, cuerpo),
+};
+
+/**
+ * La existencia de un combo se fija en el inventario (M13), el único lugar donde se escribe (D4).
+ * Aquí solo se llama a su API al crear el combo, para no obligar a ir a otra pantalla.
+ */
+export const existenciaDeComboApi = {
+  fijarInicial: (idVariante: number, existencia: number) =>
+    enviar<unknown>('put', `/admin/inventario/variantes/${idVariante}/existencia`, {
+      existencia,
+      motivo: 'ingreso_mercancia',
+      nota: 'Existencia inicial del combo',
+    }),
+};

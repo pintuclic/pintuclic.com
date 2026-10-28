@@ -1,13 +1,14 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { Building2, FileText } from 'lucide-react';
+import { Building2, FileText, UsersRound } from 'lucide-react';
 import { SegmentedTabs, Select } from '@/core/components';
 import { estadoSolicitudEmpresaSchema, type EstadoSolicitudEmpresa } from '../../dtos/m04-cuentas.dto';
+import { CuentasTab } from './CuentasTab';
 import { RenovacionesTab } from './RenovacionesTab';
 import { SolicitudesTab } from './SolicitudesTab';
 
-type Pestana = 'solicitudes' | 'renovaciones';
+type Pestana = 'solicitudes' | 'renovaciones' | 'cuentas';
 
 const OPCIONES_ESTADO = [
   { value: 'pendiente', label: 'Pendientes' },
@@ -39,11 +40,12 @@ export function EmpresasAdminView() {
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="sm:w-[420px]">
+        <div className="sm:w-[600px]">
           <SegmentedTabs
             options={[
               { value: 'solicitudes', label: 'Solicitudes de empresa' },
               { value: 'renovaciones', label: 'Renovaciones de NIT' },
+              { value: 'cuentas', label: 'Cuentas y descuentos' },
             ]}
             value={pestana}
             onChange={setPestana}
@@ -52,18 +54,20 @@ export function EmpresasAdminView() {
             panelId={`${idPestanas}-panel`}
           />
         </div>
-        <div className="sm:w-56">
-          <Select
-            id="filtro-estado-empresas"
-            label="Estado"
-            options={OPCIONES_ESTADO}
-            value={estado ?? ''}
-            onChange={(evento) => {
-              const valor = estadoSolicitudEmpresaSchema.safeParse(evento.target.value);
-              setEstado(valor.success ? valor.data : undefined);
-            }}
-          />
-        </div>
+        {pestana !== 'cuentas' && (
+          <div className="sm:w-56">
+            <Select
+              id="filtro-estado-empresas"
+              label="Estado"
+              options={OPCIONES_ESTADO}
+              value={estado ?? ''}
+              onChange={(evento) => {
+                const valor = estadoSolicitudEmpresaSchema.safeParse(evento.target.value);
+                setEstado(valor.success ? valor.data : undefined);
+              }}
+            />
+          </div>
+        )}
       </div>
 
       <section
@@ -73,21 +77,19 @@ export function EmpresasAdminView() {
         className="overflow-hidden rounded-card border border-neutral-light/70 bg-neutral-white shadow-card"
       >
         <div className="flex items-center gap-2 border-b border-neutral-light/60 px-6 py-4">
-          {pestana === 'solicitudes' ? (
-            <Building2 className="h-5 w-5 text-action" aria-hidden="true" />
-          ) : (
-            <FileText className="h-5 w-5 text-action" aria-hidden="true" />
-          )}
+          {pestana === 'solicitudes' && <Building2 className="h-5 w-5 text-action" aria-hidden="true" />}
+          {pestana === 'renovaciones' && <FileText className="h-5 w-5 text-action" aria-hidden="true" />}
+          {pestana === 'cuentas' && <UsersRound className="h-5 w-5 text-action" aria-hidden="true" />}
           <h2 className="font-title text-base font-bold text-neutral-black">
-            {pestana === 'solicitudes' ? 'Solicitudes de empresa' : 'Renovaciones de NIT'}
+            {pestana === 'solicitudes' && 'Solicitudes de empresa'}
+            {pestana === 'renovaciones' && 'Renovaciones de NIT'}
+            {pestana === 'cuentas' && 'Cuentas empresa y su descuento'}
           </h2>
         </div>
         {/* `key` reinicia la paginación al cambiar de filtro o de pestaña. */}
-        {pestana === 'solicitudes' ? (
-          <SolicitudesTab key={`s-${estado ?? 'todas'}`} estado={estado} />
-        ) : (
-          <RenovacionesTab key={`r-${estado ?? 'todas'}`} estado={estado} />
-        )}
+        {pestana === 'solicitudes' && <SolicitudesTab key={`s-${estado ?? 'todas'}`} estado={estado} />}
+        {pestana === 'renovaciones' && <RenovacionesTab key={`r-${estado ?? 'todas'}`} estado={estado} />}
+        {pestana === 'cuentas' && <CuentasTab />}
       </section>
     </div>
   );

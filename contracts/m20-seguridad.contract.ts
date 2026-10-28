@@ -9,8 +9,11 @@ import { z } from 'zod';
  * Regla de Oro #1: cero código sin contrato previo.
  * Regla de Oro #11: Tolerancia Cero al tipo `any`.
  *
- * Alcance: 5 de 6 historias. HU-SEG-04 (auditoría) está APLAZADA por el
- * Product Owner; de ella solo se contrata el PUERTO (sección 6), no su API.
+ * Alcance: 5 de 6 historias completas. De HU-SEG-04 (auditoría) se entrega la parte de
+ * ESCRITURA desde el esquema 4.18, pedida por M03: la tabla `registro_auditoria` inmutable
+ * y `registrarAccion` en el puerto (sección 6). Siguen PENDIENTES la consulta del registro
+ * por el administrador (RF-SEG-04-05) y la lista definitiva de acciones que se persisten
+ * (RF-SEG-04-01), que decide el Product Owner.
  *
  * Fuente funcional: docs/01_TRANSVERSALES/M20_SEGURIDAD_Y_AUDITORIA.md
  * ============================================================================
@@ -280,9 +283,54 @@ export const eventoAccesoDenegadoSchema = z.object({
 export type EventoAccesoDenegado = z.infer<typeof eventoAccesoDenegadoSchema>;
 
 /**
- * Contrato del puerto. El adaptador vigente en esta entrega escribe en el
- * registro técnico interno; el adaptador persistente llegará con HU-SEG-04.
+ * HU-SEG-04 — ACCIÓN AUDITADA (parte de ESCRITURA, desbloqueada con M03).
+ *
+ * `registro_auditoria` existe desde el esquema 4.18 y es INMUTABLE: el DDL revoca UPDATE,
+ * DELETE y TRUNCATE, de modo que ni el administrador pueda alterar un registro
+ * (RF-SEG-04-04). La prohibición vive en la base de datos, no solo en el código.
+ *
+ * Lo que sigue PENDIENTE de M20: la consulta del registro por el administrador
+ * (RF-SEG-04-05) y la lista definitiva de acciones que se persisten (RF-SEG-04-01). Los
+ * accesos denegados siguen yendo al registro técnico hasta que el Product Owner los incluya.
+ *
+ * El emisor recorta los valores antes de emitir: un texto largo se registra por su longitud
+ * y una huella, nunca completo. El evento jamás transporta contraseñas, hashes, datos de
+ * pago ni la clave de un servicio externo (RF-SEG-04-07).
+ */
+export const eventoAccionAuditadaSchema = z.object({
+  /** Null cuando la acción la hizo el sistema y no una persona. */
+  idUsuario: identificadorUsuarioSchema.nullable(),
+  /** Copia del nombre del actor: el registro sigue siendo legible si la cuenta se elimina. */
+  actor: z.string().max(150).nullable(),
+  /** Acción en punto, como el código de un permiso: `asesoria.configuracion.editar`. */
+  accion: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z]+(\.[a-z_]+)+$/, 'Formato esperado: area.recurso.accion'),
+  entidad: z.string().min(1).max(60),
+  idEntidad: z.string().max(60).nullable(),
+  valorAnterior: z.string().max(2000).nullable(),
+  valorNuevo: z.string().max(2000).nullable(),
+  resultado: z.enum(['exito', 'fallo']),
+  fecha: z.string().datetime(),
+  ipOrigen: z.string().max(45).nullable(),
+});
+export type EventoAccionAuditada = z.infer<typeof eventoAccionAuditadaSchema>;
+
+/**
+ * Contrato del puerto. `registrarAccesoDenegado` sigue escribiendo en el registro técnico;
+ * `registrarAccion` tiene adaptador persistente desde el esquema 4.18.
+ *
+ * Un fallo al auditar NO deshace la operación auditada: quien llama captura el error y
+ * continúa. Una bitácora caída no puede bloquear la operación del panel.
  */
 export interface AuditoriaPort {
   registrarAccesoDenegado(evento: EventoAccesoDenegado): Promise<void>;
+  /**
+   * Opcional a propósito (igual que `notificarCambioCorreoConfirmado` de M18): exigirlo
+   * obligaría a tocar los dobles de prueba de todos los módulos que ya inyectan el puerto.
+   * Quien audita comprueba que el método esté antes de llamarlo.
+   */
+  registrarAccion?(evento: EventoAccionAuditada): Promise<void>;
 }

@@ -190,6 +190,15 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
     expect(r.status, JSON.stringify(r.cuerpo)).toBe(201);
     return dato(r);
   }
+  /** Una imagen mínima: publicar exige al menos una. */
+  async function subirImagen(idProducto: unknown): Promise<Dato> {
+    const r = await admin('POST', `/productos/${String(idProducto)}/imagenes`, {
+      imagenBase64: PNG_1X1.toString('base64'),
+      imagenMimeType: 'image/png',
+    });
+    expect(r.status, JSON.stringify(r.cuerpo)).toBe(201);
+    return dato(r);
+  }
   async function crearColor(extra: Dato = {}): Promise<Dato> {
     const r = await admin('POST', '/colores', {
       idMarca: fx.marca,
@@ -218,7 +227,6 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
         publicado: false,
         usoInterior: true,
         usoExterior: false,
-        patrocinado: false,
         variantesActivas: 0,
         descripcion: 'Descripción',
         ficha: {
@@ -454,18 +462,19 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       });
       const r = await admin('PUT', `/productos/${p.idProducto}`, {
         descripcion: 'Nueva',
+        // Ya no existe el interruptor: un cliente viejo que lo envíe no lo guarda (el patrocinio es de M14).
         patrocinado: true,
         idMarca: fx.otraMarca,
       });
       expect(r.status).toBe(200);
       expect(dato(r)).toMatchObject({
         descripcion: 'Nueva',
-        patrocinado: true,
         idMarca: fx.marca,
         nombre: p.nombre,
         idLinea: fx.linea,
         claseColor: 'entonable',
       });
+      expect(dato(r)).not.toHaveProperty('patrocinado');
       expect(ids(dato(r).bases)).toEqual([fx.baseA]);
       expect(dato(r).caracteristicas).toEqual(p.caracteristicas);
       expect((await admin('PUT', `/productos/${p.idProducto}`, {})).status).toBe(400);
@@ -595,7 +604,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
   });
 
   describe('variantes (V1–V6)', () => {
-    it('crea con SKU generado P{producto}-V{variante}, precio y existencia 0 por defecto', async () => {
+    it('crea con SKU generado P{producto}-V{variante}, precio y existencia 0', async () => {
       const p = await crearProducto();
       const v = await crearVariante(p.idProducto, { precio: 123456.5 });
       expect(v).toMatchObject({
@@ -613,7 +622,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       expect(dato(detalle).variantesActivas).toBe(1);
     });
 
-    it('acepta SKU, existencia y código de proveedor propios', async () => {
+    it('acepta SKU y código de proveedor propios, e ignora una existencia enviada (la escribe M13)', async () => {
       const p = await crearProducto();
       const v = await crearVariante(p.idProducto, {
         sku: `S${ALEATORIO}-1`,
@@ -622,7 +631,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       });
       expect(v).toMatchObject({
         sku: `S${ALEATORIO}-1`,
-        existenciaReferencial: 7,
+        existenciaReferencial: 0,
         codigoProveedor: `CP${ALEATORIO}-1`,
       });
     });
@@ -632,8 +641,6 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       ['precio con tres decimales', { precio: 10.123 }],
       ['precio ausente', { precio: undefined }],
       ['SKU con caracteres inválidos', { sku: 'a b!' }],
-      ['existencia negativa', { existenciaReferencial: -1 }],
-      ['existencia decimal', { existenciaReferencial: 1.5 }],
       ['medida ausente', { idMedida: undefined }],
     ])('rechaza %s con 400', async (_n, extra) => {
       const p = await crearProducto();
@@ -716,7 +723,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       expect([prodInactivo.status, prodInactivo.cuerpo.error?.code]).toEqual([409, 'PADRE_INACTIVO']);
     });
 
-    it('edita precio, SKU, existencia y código; la medida no cambia', async () => {
+    it('edita precio, SKU y código; la medida no cambia y la existencia enviada se ignora', async () => {
       const p = await crearProducto();
       const v = await crearVariante(p.idProducto, {
         codigoProveedor: `ED${ALEATORIO}`,
@@ -731,7 +738,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       expect(dato(r)).toMatchObject({
         precio: 99.99,
         sku: `N${ALEATORIO}-1`,
-        existenciaReferencial: 12,
+        existenciaReferencial: 0,
         idMedida: fx.medidaGalon,
       });
       const limpio = await admin('PUT', `/variantes/${v.idVariante}`, {
@@ -763,6 +770,9 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       expect([sinVariante.status, sinVariante.cuerpo.error?.code]).toEqual([409, 'NO_PUBLICABLE']);
 
       const v = await crearVariante(p.idProducto);
+      const sinImagen = await admin('PATCH', `/productos/${p.idProducto}/publicacion`, { publicado: true });
+      expect([sinImagen.status, sinImagen.cuerpo.error?.code]).toEqual([409, 'NO_PUBLICABLE']);
+      await subirImagen(p.idProducto);
       const ok = await admin('PATCH', `/productos/${p.idProducto}/publicacion`, { publicado: true });
       expect(dato(ok)).toMatchObject({ publicado: true });
       expect(
@@ -812,6 +822,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       const v2 = await crearVariante(p.idProducto, {
         idMedida: fx.medidaCuarto,
       });
+      await subirImagen(p.idProducto);
       await admin('PATCH', `/productos/${p.idProducto}/publicacion`, {
         publicado: true,
       });
@@ -1081,6 +1092,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
       });
       const p = await crearProducto();
       await crearVariante(p.idProducto);
+      await subirImagen(p.idProducto);
       // El impacto solo cuenta productos visibles al público: publicado y con cadena activa.
       await admin('PATCH', `/productos/${p.idProducto}/publicacion`, {
         publicado: true,
@@ -1100,6 +1112,7 @@ describe.skipIf(URL_BD === undefined)('M01 · entrega 2: productos y variantes (
     it('lector solo consulta; editor crea, edita y publica pero no desactiva; cliente y anónimo no ven nada', async () => {
       const p = await crearProducto();
       const v = await crearVariante(p.idProducto);
+      await subirImagen(p.idProducto);
       const ver = (actor: 'lector' | 'cliente' | null) => servidor.peticion(actor, 'GET', `/productos/${p.idProducto}`);
       expect((await ver('lector')).status).toBe(200);
       expect((await ver('cliente')).status).toBe(404);

@@ -30,6 +30,13 @@ export type ResultadoLogin =
   | { tipo: 'sesion'; usuario: UsuarioResumen }
   | { tipo: 'cambio_obligatorio'; tokenCambio: string };
 
+/** Tipo de cliente empresa de la cuenta (M06 · D8); null = sin descuento de empresa. */
+export interface TipoClienteResumen {
+  nombre: string;
+  porcentaje: number;
+  montoMinimoCompra: number;
+}
+
 export interface EmpresaAprobada {
   nit: string;
   nombreEmpresa: string;
@@ -37,6 +44,7 @@ export interface EmpresaAprobada {
   correoEmpresarial: string;
   telefono: string;
   fechaAprobacion: string;
+  tipoCliente?: TipoClienteResumen | null;
 }
 
 /** GET /cuentas/perfil */
@@ -138,6 +146,33 @@ export interface ListaPaginada<T> {
 
 export interface FiltroSolicitudes {
   estado?: EstadoSolicitudEmpresa;
+  page?: number;
+  limit?: number;
+}
+
+/** GET /admin/empresas/tipos: un tipo de cliente empresa activo (M06 · D8). */
+export interface TipoClienteOpcion {
+  idSubRolEmpresa: number;
+  nombre: string;
+  porcentaje: number;
+  montoMinimoCompra: number;
+}
+
+/** GET /admin/empresas/cuentas */
+export interface CuentaEmpresaAdmin {
+  idUsuario: number;
+  nit: string;
+  nombreEmpresa: string;
+  nombreRepresentante: string;
+  correoEmpresarial: string;
+  telefono: string;
+  fechaAprobacion: string;
+  tipoCliente: { idSubRolEmpresa: number; nombre: string; porcentaje: number; estado: 'activo' | 'inactivo' } | null;
+}
+
+export interface FiltroCuentasEmpresa {
+  busqueda?: string;
+  sinTipo?: boolean;
   page?: number;
   limit?: number;
 }

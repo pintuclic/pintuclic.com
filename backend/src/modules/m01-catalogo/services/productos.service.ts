@@ -120,7 +120,6 @@ export class ProductosService extends ServicioCatalogoBase {
       usoInterior: peticion.usoInterior,
       usoExterior: peticion.usoExterior,
       idCategoriaComplementaria: peticion.idCategoriaComplementaria ?? null,
-      patrocinado: peticion.patrocinado,
       ficha:
         peticion.ficha === null || peticion.ficha === undefined
           ? null
@@ -129,6 +128,7 @@ export class ProductosService extends ServicioCatalogoBase {
               tipoCalidad: peticion.ficha.tipoCalidad ?? null,
               rendimientoMin: peticion.ficha.rendimientoMin ?? null,
               rendimientoMax: peticion.ficha.rendimientoMax ?? null,
+              manos: peticion.ficha.manos ?? null,
             },
       idsSuperficies: peticion.idsSuperficies,
       idsAcabados: peticion.idsAcabados,
@@ -166,6 +166,7 @@ export class ProductosService extends ServicioCatalogoBase {
 
   async editar(id: number, peticion: EditarProductoRequest): Promise<ProductoDetalle> {
     const actual = this.exigir(await this.productos.obtener(id));
+    if (actual.esCombo) throw errores.comboSoloPorCombos();
 
     const fichaFinal: FichaRecubrimientoDatos | null =
       peticion.ficha === undefined
@@ -176,6 +177,7 @@ export class ProductosService extends ServicioCatalogoBase {
               tipoCalidad: actual.ficha.tipoCalidad,
               rendimientoMin: actual.ficha.rendimientoMin,
               rendimientoMax: actual.ficha.rendimientoMax,
+              manos: actual.ficha.manos,
             }
         : peticion.ficha === null
           ? null
@@ -184,6 +186,7 @@ export class ProductosService extends ServicioCatalogoBase {
               tipoCalidad: peticion.ficha.tipoCalidad ?? null,
               rendimientoMin: peticion.ficha.rendimientoMin ?? null,
               rendimientoMax: peticion.ficha.rendimientoMax ?? null,
+              manos: peticion.ficha.manos ?? null,
             };
     const ids = (nuevos: number[] | undefined, previos: ReadonlyArray<{ id: number }>): readonly number[] =>
       nuevos ?? previos.map((r) => r.id);
@@ -256,7 +259,6 @@ export class ProductosService extends ServicioCatalogoBase {
       ...(peticion.idCategoriaComplementaria !== undefined
         ? { idCategoriaComplementaria: peticion.idCategoriaComplementaria }
         : {}),
-      ...(peticion.patrocinado !== undefined ? { patrocinado: peticion.patrocinado } : {}),
       ...(peticion.ficha !== undefined ? { ficha: fichaFinal } : {}),
       ...(peticion.idsSuperficies !== undefined ? { idsSuperficies: peticion.idsSuperficies } : {}),
       ...(peticion.idsAcabados !== undefined ? { idsAcabados: peticion.idsAcabados } : {}),
@@ -274,7 +276,7 @@ export class ProductosService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.productos.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.productos.contarImpacto(id), { tipo: 'producto', id }),
       padreActivo: () => this.productos.padreActivo(id),
       etiquetaPadre: 'la marca, la línea, la subcategoría o la categoría',
       cambiar: (estado) => this.productos.cambiarEstado(id, estado),
@@ -283,7 +285,7 @@ export class ProductosService extends ServicioCatalogoBase {
 
   async impacto(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.productos.obtener(id));
-    return this.productos.contarImpacto(id);
+    return this.conReglasComerciales(this.productos.contarImpacto(id), { tipo: 'producto', id });
   }
 
   /** P7: publicar exige producto activo y al menos una variante activa. Despublicar siempre se puede. */
@@ -296,6 +298,9 @@ export class ProductosService extends ServicioCatalogoBase {
       }
       if ((await this.productos.contarVariantesActivas(id)) === 0) {
         throw errores.noPublicable('Un producto necesita al menos una variante activa para publicarse.');
+      }
+      if ((await this.productos.contarImagenes(id)) === 0) {
+        throw errores.noPublicable('Un producto necesita al menos una imagen para publicarse.');
       }
     }
     return this.productos.cambiarPublicacion(id, publicado);

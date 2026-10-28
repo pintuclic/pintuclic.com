@@ -23,6 +23,20 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  /**
+   * `/faq` mostraba exactamente la misma vista que `/centro-de-ayuda`: dos rutas
+   * para una sola página. Queda el centro de ayuda, que además lleva el contacto
+   * con el equipo. Permanente para no perder los enlaces ya compartidos.
+   */
+  async redirects() {
+    return [
+      {
+        source: '/faq',
+        destination: '/centro-de-ayuda',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

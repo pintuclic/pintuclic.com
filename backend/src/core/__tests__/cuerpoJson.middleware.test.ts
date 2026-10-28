@@ -16,7 +16,7 @@ function cuerpoDe(bytes: number): string {
   return JSON.stringify({ contenidoBase64: 'A'.repeat(bytes) });
 }
 
-async function enviar(ruta: string, cuerpo: string, metodo: 'POST' | 'PUT' = 'POST') {
+async function enviar(ruta: string, cuerpo: string, metodo: 'POST' | 'PUT' | 'PATCH' = 'POST') {
   const respuesta = await fetch(`${base}${ruta}`, {
     method: metodo,
     headers: { 'Content-Type': 'application/json' },
@@ -36,7 +36,17 @@ beforeAll(async () => {
   app.post('/api/v1/admin/catalogo/marcas', eco);
   app.put('/api/v1/admin/catalogo/marcas/:idMarca/logotipo', eco);
   app.put('/api/v1/admin/catalogo/marcas/:idMarca', eco);
+  app.post('/api/v1/admin/catalogo/productos/:idProducto/imagenes', eco);
+  app.put('/api/v1/admin/catalogo/medidas/:idMedida/imagen', eco);
+  app.post('/api/v1/admin/catalogo/productos', eco);
   app.post('/api/v1/admin/catalogo/categorias', eco);
+  app.post('/api/v1/admin/patrocinios/anuncios', eco);
+  app.put('/api/v1/admin/patrocinios/anuncios/:idAnuncio', eco);
+  app.patch('/api/v1/admin/patrocinios/anuncios/:idAnuncio/estado', eco);
+  app.post('/api/v1/admin/patrocinios/campanias', eco);
+  app.post('/api/v1/admin/inventario/cargas/previsualizar', eco);
+  app.post('/api/v1/admin/inventario/cargas/aplicar', eco);
+  app.put('/api/v1/admin/inventario/variantes/:idVariante/existencia', eco);
   app.use((_error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(500).json({ manejadorGlobal: true });
   });
@@ -96,7 +106,7 @@ describe('construirParserJson — otros errores', () => {
   });
 });
 
-describe('construirParserJson — logotipo de marca de M01 (HU-CAT-04)', () => {
+describe('construirParserJson — imágenes de M01 (logotipos, productos y medidas)', () => {
   const base64DeCincoMb = Math.ceil((5 * MB) / 3) * 4;
 
   it('crear una marca acepta el base64 de un logotipo de 5 MB exactos', async () => {
@@ -109,13 +119,24 @@ describe('construirParserJson — logotipo de marca de M01 (HU-CAT-04)', () => {
     expect(status).toBe(200);
   });
 
-  it('por encima de 7 MB responde 413 CUERPO_DEMASIADO_GRANDE con mensaje del logotipo', async () => {
+  it('por encima de 7 MB responde 413 CUERPO_DEMASIADO_GRANDE con mensaje de la imagen', async () => {
     const { status, json } = await enviar('/api/v1/admin/catalogo/marcas', cuerpoDe(7 * MB + 1));
     expect(status).toBe(413);
     expect(json).toEqual({
       success: false,
-      error: { code: 'CUERPO_DEMASIADO_GRANDE', message: 'El logotipo no puede superar 5 MB.' },
+      error: { code: 'CUERPO_DEMASIADO_GRANDE', message: 'La imagen no puede superar 5 MB.' },
     });
+  });
+
+  it('subir una imagen de producto o de medida acepta 5 MB', async () => {
+    expect((await enviar('/api/v1/admin/catalogo/productos/7/imagenes', cuerpoDe(base64DeCincoMb))).status).toBe(200);
+    expect((await enviar('/api/v1/admin/catalogo/medidas/3/imagen', cuerpoDe(base64DeCincoMb), 'PUT')).status).toBe(200);
+  });
+
+  it('las demás rutas de productos y medidas conservan el límite de 100 kb', async () => {
+    expect((await enviar('/api/v1/admin/catalogo/productos', cuerpoDe(200 * 1024))).status).toBe(413);
+    expect((await enviar('/api/v1/admin/catalogo/productos/7/imagenes', cuerpoDe(1 * MB), 'PUT')).status).toBe(413);
+    expect((await enviar('/api/v1/admin/catalogo/medidas/abc/imagen', cuerpoDe(1 * MB), 'PUT')).status).toBe(413);
   });
 
   it('el resto del catálogo conserva el límite de 100 kb', async () => {
@@ -132,5 +153,56 @@ describe('construirParserJson — logotipo de marca de M01 (HU-CAT-04)', () => {
     // PUT /marcas (sin id) y POST /marcas/:id/logotipo no son rutas con logotipo.
     expect((await enviar('/api/v1/admin/catalogo/marcas', cuerpoDe(1 * MB), 'PUT')).status).toBe(413);
     expect((await enviar('/api/v1/admin/catalogo/marcas/12/logotipo', cuerpoDe(1 * MB), 'POST')).status).toBe(413);
+  });
+});
+
+describe('construirParserJson — cargas masivas de inventario (M13)', () => {
+  it('previsualizar y aplicar aceptan un bloque de ~900 kb', async () => {
+    expect((await enviar('/api/v1/admin/inventario/cargas/previsualizar', cuerpoDe(900 * 1024))).status).toBe(200);
+    expect((await enviar('/api/v1/admin/inventario/cargas/aplicar', cuerpoDe(900 * 1024))).status).toBe(200);
+  });
+
+  it('por encima de 1 MB responde 413 con el mensaje del bloque', async () => {
+    const { status, json } = await enviar('/api/v1/admin/inventario/cargas/aplicar', cuerpoDe(1 * MB + 1));
+    expect(status).toBe(413);
+    expect(json).toEqual({
+      success: false,
+      error: { code: 'CUERPO_DEMASIADO_GRANDE', message: 'El bloque de la carga supera el tamaño permitido.' },
+    });
+  });
+
+  it('el ajuste manual y otros métodos de la ruta conservan el límite de 100 kb', async () => {
+    const ajuste = '/api/v1/admin/inventario/variantes/5/existencia';
+    expect((await enviar(ajuste, cuerpoDe(200 * 1024), 'PUT')).status).toBe(413);
+    expect((await enviar('/api/v1/admin/inventario/cargas/aplicar', cuerpoDe(200 * 1024), 'PUT')).status).toBe(413);
+  });
+});
+
+describe('construirParserJson — imágenes de los anuncios de M14', () => {
+  const base64DeCincoMb = Math.ceil((5 * MB) / 3) * 4;
+
+  it('crear un anuncio acepta dos imágenes de 5 MB exactos en el mismo JSON (~13,4 MB)', async () => {
+    const dos = JSON.stringify({ a: 'A'.repeat(base64DeCincoMb), b: 'A'.repeat(base64DeCincoMb) });
+    expect((await enviar('/api/v1/admin/patrocinios/anuncios', dos)).status).toBe(200);
+  });
+
+  it('editar un anuncio (PUT) también acepta dos imágenes de 5 MB', async () => {
+    const dos = JSON.stringify({ a: 'A'.repeat(base64DeCincoMb), b: 'A'.repeat(base64DeCincoMb) });
+    expect((await enviar('/api/v1/admin/patrocinios/anuncios/9', dos, 'PUT')).status).toBe(200);
+  });
+
+  it('por encima de 14 MB responde 413 con el mensaje de las imágenes', async () => {
+    const { status, json } = await enviar('/api/v1/admin/patrocinios/anuncios', cuerpoDe(14 * MB + 1));
+    expect(status).toBe(413);
+    expect(json).toEqual({
+      success: false,
+      error: { code: 'CUERPO_DEMASIADO_GRANDE', message: 'Cada imagen no puede superar 5 MB.' },
+    });
+  });
+
+  it('el estado del anuncio, las campañas y un id no numérico conservan el límite de 100 kb', async () => {
+    expect((await enviar('/api/v1/admin/patrocinios/anuncios/9/estado', cuerpoDe(200 * 1024), 'PATCH')).status).toBe(413);
+    expect((await enviar('/api/v1/admin/patrocinios/campanias', cuerpoDe(200 * 1024))).status).toBe(413);
+    expect((await enviar('/api/v1/admin/patrocinios/anuncios/abc', cuerpoDe(1 * MB), 'PUT')).status).toBe(413);
   });
 });

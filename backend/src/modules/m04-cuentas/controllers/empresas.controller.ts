@@ -1,8 +1,10 @@
 import type { Request, Response } from 'express';
 import { responderExito, responderRecursoNoDisponible } from '../../../core/utils/apiResponse';
 import {
+  cambiarTipoClienteRequestSchema,
+  dictamenCuentaEmpresaRequestSchema,
   dictamenRenovacionNitRequestSchema,
-  dictamenSolicitudEmpresaRequestSchema,
+  listarCuentasEmpresaQuerySchema,
   listarSolicitudesEmpresaQuerySchema,
   registroEmpresaRequestSchema,
   solicitarAscensoEmpresaRequestSchema,
@@ -266,7 +268,7 @@ export class EmpresasController {
       return;
     }
 
-    const parse = dictamenSolicitudEmpresaRequestSchema.safeParse(req.body);
+    const parse = dictamenCuentaEmpresaRequestSchema.safeParse(req.body);
     if (!parse.success) {
       res.status(400).json({
         success: false,
@@ -291,6 +293,72 @@ export class EmpresasController {
           success: false,
           error: { code: error.codigo, message: error.message },
         });
+        return;
+      }
+      throw error;
+    }
+  };
+
+  /**
+   * M06 · D8: tipos de cliente empresa activos, para el selector al aprobar una cuenta.
+   * GET /admin/empresas/tipos
+   */
+  listarTiposCliente = async (req: Request, res: Response): Promise<void> => {
+    if (!req.actor) {
+      responderRecursoNoDisponible(res);
+      return;
+    }
+    responderExito(res, await this.empresasService.listarTiposCliente());
+  };
+
+  /**
+   * M06 · D8: cuentas empresa aprobadas con su tipo de cliente.
+   * GET /admin/empresas/cuentas
+   */
+  listarCuentas = async (req: Request, res: Response): Promise<void> => {
+    if (!req.actor) {
+      responderRecursoNoDisponible(res);
+      return;
+    }
+    const parse = listarCuentasEmpresaQuerySchema.safeParse(req.query);
+    if (!parse.success) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'DATOS_INVALIDOS', message: parse.error.issues[0]?.message ?? 'Parámetros de consulta inválidos' },
+      });
+      return;
+    }
+    responderExito(res, await this.empresasService.listarCuentas(parse.data));
+  };
+
+  /**
+   * M06 · D8: cambia el tipo de cliente de una cuenta empresa.
+   * PATCH /admin/empresas/cuentas/:idUsuario/tipo
+   */
+  cambiarTipoCuenta = async (req: Request, res: Response): Promise<void> => {
+    if (!req.actor) {
+      responderRecursoNoDisponible(res);
+      return;
+    }
+    const crudo = req.params.idUsuario;
+    const idUsuario = typeof crudo === 'string' && /^\d+$/.test(crudo) ? Number(crudo) : null;
+    if (idUsuario === null || !Number.isSafeInteger(idUsuario) || idUsuario < 1) {
+      responderRecursoNoDisponible(res);
+      return;
+    }
+    const parse = cambiarTipoClienteRequestSchema.safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'DATOS_INVALIDOS', message: parse.error.issues[0]?.message ?? 'Tipo de cliente inválido' },
+      });
+      return;
+    }
+    try {
+      responderExito(res, await this.empresasService.cambiarTipoCuenta(idUsuario, parse.data.idSubRolEmpresa), 'Tipo de cliente actualizado.');
+    } catch (error) {
+      if (error instanceof EmpresasError) {
+        res.status(error.statusCode).json({ success: false, error: { code: error.codigo, message: error.message } });
         return;
       }
       throw error;

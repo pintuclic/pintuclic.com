@@ -10,7 +10,7 @@ import { PrismaDocumentosRepository } from './repositories/documentos.repository
 import { PrismaSolicitudesEmpresaRepository } from './repositories/solicitudes-empresa.repository';
 import { PrismaDireccionesRepository } from './repositories/direcciones.repository';
 import { SistemaDateProviderAdapter } from './adapters/date-provider.adapter';
-import { crearNotificacionesAdapterDesdeEntorno } from './adapters/notificaciones.adapter';
+import { crearNotificacionesAdapterDesdeEntorno } from '../m18-notificaciones/adapters/notificaciones.adapter';
 import { GoogleAuthDeshabilitadoAdapter } from './adapters/google-auth.adapter';
 import { AuthCuentasService } from './services/auth-cuentas.service';
 import { RecuperacionPasswordService } from './services/recuperacion-password.service';
@@ -23,9 +23,10 @@ import { DireccionesController } from './controllers/direcciones.controller';
 import { RecuperacionPasswordController } from './controllers/recuperacion-password.controller';
 import { EmpresasController } from './controllers/empresas.controller';
 import type { DateProviderPort } from './interfaces/date-provider.port';
-import type { NotificacionesPort } from './interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../m18-notificaciones/interfaces/notificaciones.port';
 import type { GoogleAuthPort } from './interfaces/google-auth.port';
 import type { ParametrosCuentasPort } from './interfaces/parametros-cuentas.port';
+import type { TiposClientePort } from './interfaces/tipos-cliente.port';
 
 /**
  * RN-CUE-18 / HU-ADM-03: decidir sobre solicitudes de empresa exige este permiso
@@ -34,12 +35,20 @@ import type { ParametrosCuentasPort } from './interfaces/parametros-cuentas.port
  */
 export const PERMISO_VALIDAR_EMPRESAS = 'empresas.validar';
 
+/** Sin M06 conectado no hay tipos que ofrecer: la lista sale vacía y aprobar una cuenta empresa se rechaza. */
+const TIPOS_CLIENTE_NO_DISPONIBLES: TiposClientePort = {
+  listarActivos: () => Promise.resolve([]),
+  existeActivo: () => Promise.resolve(false),
+};
+
 export interface ModuloM04Config {
   dateProvider?: DateProviderPort;
   notificaciones?: NotificacionesPort;
   googleAuth?: GoogleAuthPort;
   /** HU-ADM-07: parámetros de autenticación de M17, inyectados desde app.routes.ts. */
   parametros?: ParametrosCuentasPort;
+  /** M06 · D8: tipos de cliente empresa (los administra M06). Sin él no se puede aprobar una cuenta empresa. */
+  tiposCliente?: TiposClientePort;
 }
 
 export function construirModuloM04(
@@ -105,6 +114,7 @@ export function construirModuloM04(
     solicitudesRepo,
     documentosRepo,
     notificaciones,
+    config?.tiposCliente ?? TIPOS_CLIENTE_NO_DISPONIBLES,
   );
 
   // Controladores
@@ -147,7 +157,6 @@ export function construirModuloM04(
   cuentasRouter.post('/direcciones', authMiddleware, direccionesController.crear as RequestHandler);
   cuentasRouter.put('/direcciones/:idDireccion', authMiddleware, direccionesController.actualizar as RequestHandler);
   cuentasRouter.delete('/direcciones/:idDireccion', authMiddleware, direccionesController.eliminar as RequestHandler);
-  cuentasRouter.patch('/direcciones/:idDireccion/predeterminada', authMiddleware, direccionesController.establecerPredeterminada as RequestHandler);
 
   cuentasRouter.get('/empresas/solicitudes/mias', authMiddleware, empresasController.misSolicitudes as RequestHandler);
   cuentasRouter.post('/empresas/ascenso', authMiddleware, empresasController.solicitarAscenso as RequestHandler);
@@ -166,6 +175,10 @@ export function construirModuloM04(
   adminEmpresasRouter.get('/solicitudes', empresasController.listarSolicitudes as RequestHandler);
   adminEmpresasRouter.get('/solicitudes/:idSolicitud', empresasController.obtenerDetalleSolicitud as RequestHandler);
   adminEmpresasRouter.post('/solicitudes/:idSolicitud/dictamen', empresasController.dictaminarSolicitud as RequestHandler);
+  // M06 · D8: tipo de cliente empresa (fija el descuento de la cuenta).
+  adminEmpresasRouter.get('/tipos', empresasController.listarTiposCliente as RequestHandler);
+  adminEmpresasRouter.get('/cuentas', empresasController.listarCuentas as RequestHandler);
+  adminEmpresasRouter.patch('/cuentas/:idUsuario/tipo', empresasController.cambiarTipoCuenta as RequestHandler);
   adminEmpresasRouter.get('/renovaciones', empresasController.listarRenovaciones as RequestHandler);
   adminEmpresasRouter.get('/renovaciones/:idSolicitud', empresasController.obtenerDetalleRenovacion as RequestHandler);
   adminEmpresasRouter.post('/renovaciones/:idSolicitud/dictamen', empresasController.dictaminarRenovacionNit as RequestHandler);

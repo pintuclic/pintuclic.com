@@ -1,0 +1,75 @@
+import { geocodificacionInversaSchema, type GeocodificacionInversa } from '../dtos/m04-cuentas.dto';
+
+const URL_GEOCODIFICACION_INVERSA = 'https://nominatim.openstreetmap.org/reverse';
+const ESPERA_MAXIMA_MS = 8000;
+
+/** Campos de la dirección que se pudieron deducir de las coordenadas; `null` si no hubo dato. */
+export interface DireccionSugerida {
+  direccion: string | null;
+  barrio: string | null;
+}
+
+/**
+ * Convierte la respuesta de geocodificación en los campos del formulario.
+ * La dirección sigue el formato colombiano ("Calle 12 # 5-37"). El barrio solo sale de los niveles
+ * que son barrio (`neighbourhood`, `quarter`): `suburb` y `city_district` suelen ser la localidad o la
+ * comuna, y guardarlas como barrio daría un dato equivocado.
+ */
+export function sugerirDireccion(respuesta: GeocodificacionInversa): DireccionSugerida {
+  const partes = respuesta.address;
+  const calle = partes?.road?.trim() || null;
+  const numero = partes?.house_number?.trim() || null;
+  const barrio = partes?.neighbourhood?.trim() || partes?.quarter?.trim() || null;
+
+  return {
+    direccion: calle ? (numero ? `${calle} # ${numero}` : calle) : null,
+    barrio,
+  };
+}
+
+/**
+ * HU-CUE-07 · Averigua la dirección de unas coordenadas. Devuelve `null` si el servicio
+ * no responde a tiempo, falla o no conoce el lugar: el formulario sigue siendo manual.
+ */
+export async function direccionDesdeCoordenadas(latitud: number, longitud: number): Promise<DireccionSugerida | null> {
+  const parametros = new URLSearchParams({
+    format: 'jsonv2',
+    lat: String(latitud),
+    lon: String(longitud),
+    zoom: '18',
+    addressdetails: '1',
+    'accept-language': 'es',
+  });
+  const controlador = new AbortController();
+  const temporizador = setTimeout(() => controlador.abort(), ESPERA_MAXIMA_MS);
+  try {
+    const respuesta = await fetch(`${URL_GEOCODIFICACION_INVERSA}?${parametros.toString()}`, {
+      signal: controlador.signal,
+      headers: { Accept: 'application/json' },
+    });
+    if (!respuesta.ok) return null;
+    const analizada = geocodificacionInversaSchema.safeParse(await respuesta.json());
+    if (!analizada.success) return null;
+    const sugerida = sugerirDireccion(analizada.data);
+    return sugerida.direccion || sugerida.barrio ? sugerida : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(temporizador);
+  }
+}
+
+/** Por qué el navegador no entregó la ubicación del dispositivo. */
+export type FalloUbicacion = 'conexion-insegura' | 'permiso' | 'no-disponible' | 'tiempo';
+
+/**
+ * Traduce el error de `navigator.geolocation` a una causa que el cliente pueda resolver.
+ * Códigos de `GeolocationPositionError`: 1 permiso denegado, 2 posición no disponible, 3 tiempo agotado.
+ * Sin HTTPS el navegador rechaza la ubicación aunque el usuario quiera darla.
+ */
+export function motivoFalloUbicacion(codigo: number | null, contextoSeguro: boolean): FalloUbicacion {
+  if (!contextoSeguro) return 'conexion-insegura';
+  if (codigo === 1) return 'permiso';
+  if (codigo === 3) return 'tiempo';
+  return 'no-disponible';
+}

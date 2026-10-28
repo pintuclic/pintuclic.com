@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { CodigoVerificacion, Usuario } from '@prisma/client';
 import type { CuentasRepository } from '../repositories/cuentas.repository';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
-import type { NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import { SimuladoDateProviderAdapter } from '../adapters/date-provider.adapter';
 import {
   RecuperacionPasswordError,
@@ -52,6 +52,9 @@ describe('RecuperacionPasswordService (HU-CUE-05)', () => {
       vincularIdentidadExterna: vi.fn(),
       buscarCuentaEmpresaPorNit: vi.fn(),
       buscarCuentaEmpresaPorIdUsuario: vi.fn(),
+      listarCuentasEmpresa: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+      buscarCuentaEmpresaConTipo: vi.fn().mockResolvedValue(null),
+      asignarTipoCuentaEmpresa: vi.fn().mockResolvedValue(true),
     };
 
     codigosRepo = {

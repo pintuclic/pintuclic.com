@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SlidersHorizontal } from 'lucide-react';
-import { Alert, Button, Container, Input, ProductCard, Select, Skeleton } from '@/core/components';
+import { Alert, Button, Checkbox, Container, Input, ProductCard, Select, Skeleton } from '@/core/components';
+import { EventosEnCurso } from '@/modules/m06-precios/components/publico/EventosEnCurso';
+import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { useCargar, useRetardo } from '../../hooks/useCargar';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
 import {
@@ -14,6 +16,7 @@ import {
   hayFiltros,
   type FiltrosVitrina,
 } from '../../services/filtros-publicos';
+import { precioVisible } from '../../services/ofertas-visuales';
 import { Paginador } from '../admin/comunes';
 
 const ORDENES: ReadonlyArray<{ value: FiltrosVitrina['ordenar']; label: string }> = [
@@ -81,6 +84,13 @@ export const CatalogoPublicoView: React.FC = () => {
       </div>
 
       <Input label="Buscar" type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+
+      <Checkbox
+        id="solo-ofertas"
+        label="Solo productos en oferta"
+        checked={filtros.enOferta}
+        onChange={(e) => aplicar({ enOferta: e.target.checked })}
+      />
 
       <nav aria-label="Categorías">
         <h3 className="mb-2 font-title text-sm font-medium text-neutral-dark">Categorías</h3>
@@ -171,14 +181,23 @@ export const CatalogoPublicoView: React.FC = () => {
           </li>
           <li aria-hidden="true">›</li>
           <li aria-current="page" className="text-neutral-dark">
-            Productos
+            {filtros.enOferta ? 'Ofertas' : 'Productos'}
           </li>
         </ol>
       </nav>
-      <h1 className="font-title text-3xl font-bold text-corporate">Catálogo de productos</h1>
+      <h1 className="font-title text-3xl font-bold text-corporate">
+        {filtros.enOferta ? 'Ofertas' : 'Catálogo de productos'}
+      </h1>
       <p className="mt-1 font-sans text-sm text-neutral-medium">
-        Encuentre la pintura y los accesorios para su proyecto.
+        {filtros.enOferta
+          ? 'Productos con descuento ahora mismo. El precio final de tu compra se confirma en el carrito.'
+          : 'Encuentre la pintura y los accesorios para su proyecto.'}
       </p>
+      {filtros.enOferta && (
+        <div className="mt-5">
+          <EventosEnCurso />
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside aria-label="Filtros" className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
@@ -228,10 +247,12 @@ export const CatalogoPublicoView: React.FC = () => {
           {productos.datos !== null && productos.datos.items.length === 0 && (
             <div className="rounded-card border border-dashed border-neutral-light bg-neutral-lightest px-4 py-12 text-center">
               <p className="font-title text-base font-semibold text-neutral-black">
-                No encontramos productos con esos filtros
+                {filtros.enOferta ? 'No hay productos en oferta con esos filtros' : 'No encontramos productos con esos filtros'}
               </p>
               <p className="mt-1 font-sans text-sm text-neutral-medium">
-                Pruebe con otra búsqueda o quite algún filtro.
+                {filtros.enOferta
+                  ? 'Las promociones cambian a lo largo del día y la semana: vuelva a revisar pronto.'
+                  : 'Pruebe con otra búsqueda o quite algún filtro.'}
               </p>
               {hayFiltros(filtros) && (
                 <Button className="mt-4" variant="outline" onClick={limpiar}>
@@ -248,9 +269,12 @@ export const CatalogoPublicoView: React.FC = () => {
                     id={String(p.idProducto)}
                     name={p.nombre}
                     brand={p.marca}
-                    description={`${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
-                    price={p.precioDesde ?? 0}
+                    description={`${p.esCombo ? 'Combo · ' : ''}${p.subcategoria}${p.precioDesde === null ? '' : ' · Precio desde'}${p.disponibilidad === 'agotado' ? ' · Agotado por ahora' : ''}`}
+                    {...precioVisible(p.precioDesde, p.oferta)}
                     href={`/productos/${p.idProducto}`}
+                    {...(p.idImagenPrincipal === null
+                      ? {}
+                      : { imageUrl: catalogoPublicoApi.urlImagen(p.idImagenPrincipal, 'miniatura') })}
                     className="w-full"
                   />
                 </li>
@@ -260,6 +284,17 @@ export const CatalogoPublicoView: React.FC = () => {
           {productos.datos !== null && (
             <Paginador paginacion={productos.datos.paginacion} onCambiar={(pagina) => aplicar({ pagina })} />
           )}
+
+          {/* Contacto directo de M15: el catálogo es uno de los puntos donde surge la duda (HU-ATC-03). */}
+          <div className="rounded-card border border-neutral-light bg-neutral-white p-5">
+            <h2 className="font-title text-base font-semibold text-corporate">
+              ¿No sabes cuál elegir?
+            </h2>
+            <p className="mt-1 mb-3 font-sans text-sm text-neutral-dark">
+              Escríbele a un asesor y te orientamos según la superficie y el tamaño de tu proyecto.
+            </p>
+            <BotonContactoDirecto referencia="Escribo desde el catálogo de productos." />
+          </div>
         </div>
       </div>
     </Container>

@@ -157,7 +157,7 @@ El **scope** es obligatorio para carpetas y commits ([GUIA_GIT_COMMITS_Y_PUSH.md
 | **M11** | Postventa (Devoluciones/Reembolsos) | 5 | `m11-postventa` | M08 | M12 | ❌ Sin spec |
 | **M19** | Reportes y Analítica | 5 | `m19-reportes` | M08 | — | ❌ Sin spec |
 | **M03** | Asesoría y IA (Simulador/Chatbot) | 6 | `m03-asesoria` | M01 (E2) | — | ❌ Sin spec |
-| **M15** | Atención al Cliente (WhatsApp/FAQ) | 6 | `m15-atencion` | — | M16, M03 | ❌ Sin spec |
+| **M15** | Atención al Cliente (WhatsApp/FAQ) | 6 | `m15-atencion` | — | M16, M03 | Spec ✅ |
 | **M14** | Patrocinios y Campañas | 6 | `m14-patrocinios` | M01 (E2), M19 | M02 | ❌ Sin spec |
 
 **M01 se entrega en dos partes** (no son módulos nuevos, es el mismo scope): la **Entrega 1** (categorías, marcas, líneas, bases, resinas, presentaciones) ya tiene contrato; la **Entrega 2** (colores, productos, variantes con precio base, combos, consulta pública, imágenes) es la que desbloquea casi todo lo demás.

@@ -6,7 +6,10 @@ import {
   BarChart3,
   CheckCircle2,
   FolderTree,
+  Headset,
   Lock,
+  Mail,
+  Megaphone,
   Save,
   Settings2,
   ShieldCheck,
@@ -17,6 +20,7 @@ import { Badge, Button, Checkbox, Modal, Skeleton } from '@/core/components';
 import type { CodigoPermiso } from '../../dtos/permisos.dto';
 import type { ResumenEmpleado } from '../../interfaces/empleados.interface';
 import type { ItemPermisoCatalogo } from '../../interfaces/permisos.interface';
+import { alternarPermiso } from '../../services/dependencias-permisos';
 import { actualizarPermisos, obtenerMatrizPermisos } from '../../services/permisos.service';
 import { mensajeDeError } from '../../services/mensaje-error';
 import { useEmpleadosStore } from '../../store/empleadosStore';
@@ -64,6 +68,21 @@ const AREAS_METADATA: Record<string, AreaInfo> = {
     descripcion: 'Métricas de rendimiento, KPIs y visualizaciones del negocio',
     icon: <BarChart3 className="w-4 h-4 text-action" />,
   },
+  notificaciones: {
+    titulo: 'Notificaciones y Comunicaciones',
+    descripcion: 'Plantillas de correo y registro de envíos y rebotes',
+    icon: <Mail className="w-4 h-4 text-action" />,
+  },
+  atencion: {
+    titulo: 'Atención al Cliente',
+    descripcion: 'Preguntas frecuentes, solicitudes de contacto, horario y canal de WhatsApp',
+    icon: <Headset className="w-4 h-4 text-corporate" />,
+  },
+  patrocinios: {
+    titulo: 'Patrocinios y Publicidad',
+    descripcion: 'Campañas de productos patrocinados, anuncios en los espacios del sitio y su medición',
+    icon: <Megaphone className="w-4 h-4 text-highlight" />,
+  },
 };
 
 export const PermisosModal: React.FC<PermisosModalProps> = ({ empleado, isOpen, onClose }) => {
@@ -109,53 +128,7 @@ export const PermisosModal: React.FC<PermisosModalProps> = ({ empleado, isOpen, 
 
   // Manejo de cascadas en frontend según ADR-008
   const togglePermiso = (codigo: CodigoPermiso) => {
-    const nuevos = new Set(seleccionados);
-
-    if (nuevos.has(codigo)) {
-      // Desmarcar
-      nuevos.delete(codigo);
-
-      // Si se desmarca un permiso de visualización base, revocar cascada
-      if (codigo === 'catalogo.ver') {
-        nuevos.delete('catalogo.crear');
-        nuevos.delete('catalogo.editar');
-        nuevos.delete('catalogo.eliminar');
-      }
-      if (codigo === 'ventas.ver') {
-        nuevos.delete('ventas.gestionar');
-        nuevos.delete('ventas.exportar');
-      }
-      if (codigo === 'personal.ver') {
-        nuevos.delete('personal.editar');
-        nuevos.delete('personal.desactivar');
-      }
-      if (codigo === 'configuracion.ver') {
-        nuevos.delete('configuracion.editar');
-      }
-    } else {
-      // Marcar
-      nuevos.add(codigo);
-
-      // Si se marca un permiso operativo, conceder automáticamente el permiso base
-      if (
-        codigo === 'catalogo.crear' ||
-        codigo === 'catalogo.editar' ||
-        codigo === 'catalogo.eliminar'
-      ) {
-        nuevos.add('catalogo.ver');
-      }
-      if (codigo === 'ventas.gestionar' || codigo === 'ventas.exportar') {
-        nuevos.add('ventas.ver');
-      }
-      if (codigo === 'personal.editar' || codigo === 'personal.desactivar') {
-        nuevos.add('personal.ver');
-      }
-      if (codigo === 'configuracion.editar') {
-        nuevos.add('configuracion.ver');
-      }
-    }
-
-    setSeleccionados(nuevos);
+    setSeleccionados(alternarPermiso(seleccionados, codigo));
   };
 
   const handleGuardar = async () => {

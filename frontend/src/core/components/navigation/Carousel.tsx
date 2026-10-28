@@ -74,7 +74,7 @@ export function Carousel({ slides, ariaLabel, autoPlayMs, className = '' }: Caro
           <IconButton
             variant="overlay"
             aria-label="Diapositiva anterior"
-            className="absolute left-3 top-1/2 -translate-y-1/2 md:left-4"
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 sm:left-2 md:left-2.5 z-20"
             onClick={() => ir(actual - 1)}
           >
             <ChevronLeft className="h-5 w-5" />
@@ -82,7 +82,7 @@ export function Carousel({ slides, ariaLabel, autoPlayMs, className = '' }: Caro
           <IconButton
             variant="overlay"
             aria-label="Diapositiva siguiente"
-            className="absolute right-3 top-1/2 -translate-y-1/2 md:right-4"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 sm:right-2 md:right-2.5 z-20"
             onClick={() => ir(actual + 1)}
           >
             <ChevronRight className="h-5 w-5" />

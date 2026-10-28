@@ -1,67 +1,81 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import {
+  Award,
+  Brush,
+  Droplets,
+  FolderTree,
+  Home,
+  Layers,
+  ListChecks,
+  type LucideIcon,
+  Package,
+  Ruler,
+  Tag,
+} from 'lucide-react';
 import { Alert, Badge, Container, Skeleton } from '@/core/components';
-import { formatCOP } from '@/core/utils/moneda';
-import type { ColorOfrecido, ProductoPublicoFicha, VariantePublica } from '../../dtos/m01-catalogo-productos.dto';
-import { leerErrorCatalogo } from '../../services/mensaje-error';
+import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
+import { EspacioPublicitario } from '@/modules/m14-patrocinios/components/EspacioPublicitario';
+import type { ColorOfrecido } from '../../dtos/m01-catalogo-productos.dto';
+import { useFichaPublica } from '../../hooks/useFichaPublica';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
-import { Muestra } from '../admin/comunes';
-import { SelectorColorProducto } from './SelectorColorProducto';
+import { type ClaveDato, datosFichaTecnica, textoAmbiente } from '../../services/ficha-tecnica';
+import { imagenParaSeleccion } from '../../services/galeria';
+import { textoRendimiento } from '../../services/rendimiento';
+import { direccionConColor, requiereColor } from '../../services/seleccion-ficha';
+import { AgregarAlCarrito } from './AgregarAlCarrito';
+import { ComplementariosProducto } from './ComplementariosProducto';
+import { GaleriaProducto } from './GaleriaProducto';
+import { MuestrasColor } from './MuestrasColor';
+import { PrecioPresentacion, SelectorPresentacion } from './PresentacionProducto';
+import { ModalColoresProducto } from './SelectorColorProducto';
 
-const TIPOS_CALIDAD: Record<number, string> = { 1: 'Tipo 1 (gama alta)', 2: 'Tipo 2', 3: 'Tipo 3' };
-
-const aTexto = (n: number): string => n.toLocaleString('es-CO', { maximumFractionDigits: 2 });
-
-/** U6: el rendimiento por presentación, siempre marcado como aproximado. */
-export function textoRendimiento(v: VariantePublica): string | null {
-  return v.rendimiento === null ? null : `Rinde aprox. ${aTexto(v.rendimiento.min)} a ${aTexto(v.rendimiento.max)} m²`;
-}
+const ICONO_DATO: Record<ClaveDato, LucideIcon> = {
+  marca: Tag,
+  categoria: FolderTree,
+  presentaciones: Package,
+  rendimiento: Ruler,
+  ambiente: Home,
+  superficies: Layers,
+  resina: Droplets,
+  calidad: Award,
+  acabados: Brush,
+  caracteristica: ListChecks,
+};
 
 export interface ProductoFichaViewProps {
   idProducto: number;
+  /** U8 y P11: el color con que se abre (`?color=`), desde la tarjeta del listado o la paleta de color. */
+  idColorInicial?: number | null;
 }
 
-/** HU-CAT-06: ficha pública de un producto con presentaciones, rendimiento y selector de color. */
-type EstadoFicha =
-  | { tipo: 'cargando' }
-  | { tipo: 'lista'; ficha: ProductoPublicoFicha }
-  | { tipo: 'no_disponible' }
-  | { tipo: 'error'; mensaje: string };
+/**
+ * HU-CAT-06 y U8: ficha pública. A la izquierda la imagen sobre la pared del color elegido, la descripción y la ficha
+ * técnica; a la derecha el panel de compra, que se queda a la vista al bajar.
+ */
+export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto, idColorInicial = null }) => {
+  const { estado, variante, elegirVariante, color, elegirColor, oferta } = useFichaPublica(idProducto, idColorInicial);
+  const [cartaAbierta, setCartaAbierta] = useState(false);
 
-export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto }) => {
-  const [estado, setEstado] = useState<EstadoFicha>({ tipo: 'cargando' });
-  const [idVariante, setIdVariante] = useState<number | null>(null);
-  const [color, setColor] = useState<ColorOfrecido | null>(null);
-
-  useEffect(() => {
-    let vigente = true;
-    setEstado({ tipo: 'cargando' });
-    setColor(null);
-    catalogoPublicoApi
-      .ficha(idProducto)
-      .then((ficha) => {
-        if (!vigente) return;
-        setIdVariante(ficha.variantes[0]?.idVariante ?? null);
-        setEstado({ tipo: 'lista', ficha });
-      })
-      .catch((err: unknown) => {
-        if (!vigente) return;
-        const error = leerErrorCatalogo(err, 'No se pudo cargar el producto.');
-        // U1: 404 uniforme para lo que no existe, no está publicado o tiene un padre inactivo.
-        setEstado(error.status === 404 ? { tipo: 'no_disponible' } : { tipo: 'error', mensaje: error.message });
-      });
-    return () => {
-      vigente = false;
-    };
-  }, [idProducto]);
+  // U8: la dirección sigue al color elegido, para compartir la ficha en ese color, sin recargar la página.
+  const elegirYRecordar = (c: ColorOfrecido): void => {
+    elegirColor(c);
+    window.history.replaceState(window.history.state, '', direccionConColor(window.location.href, c.idColor));
+  };
 
   if (estado.tipo === 'cargando') {
     return (
       <Container className="py-8">
-        <Skeleton className="h-8 w-2/3" rounded="btn" />
-        <Skeleton className="mt-6 h-96" rounded="card" />
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+          <Skeleton className="h-[28rem]" rounded="card" />
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-2/3" rounded="btn" />
+            <Skeleton className="h-5 w-1/2" rounded="btn" />
+            <Skeleton className="h-80" rounded="card" />
+          </div>
+        </div>
       </Container>
     );
   }
@@ -84,20 +98,10 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
   }
 
   const p = estado.ficha;
-  const variante = p.variantes.find((v) => v.idVariante === idVariante) ?? p.variantes[0] ?? null;
-  const rendimiento = variante === null ? null : textoRendimiento(variante);
-  const ambientes = [p.usoInterior ? 'Interior' : null, p.usoExterior ? 'Exterior' : null].filter(
-    (x): x is string => x !== null,
-  );
-  const datosTecnicos: Array<[string, string]> = [
-    ...(p.tipoResina === null ? [] : ([['Tipo de resina', p.tipoResina]] as Array<[string, string]>)),
-    ...(p.tipoCalidad === null
-      ? []
-      : ([['Calidad', TIPOS_CALIDAD[p.tipoCalidad] ?? `Tipo ${p.tipoCalidad}`]] as Array<[string, string]>)),
-    ...(ambientes.length === 0 ? [] : ([['Ambiente', ambientes.join(' y ')]] as Array<[string, string]>)),
-    ...(p.superficies.length === 0 ? [] : ([['Superficies', p.superficies.join(', ')]] as Array<[string, string]>)),
-    ...p.caracteristicas.map((c): [string, string] => [c.nombre, c.valor]),
-  ];
+  const rendimiento = variante === null ? null : textoRendimiento(variante.rendimiento, p.manos);
+  // Lo esencial a primera vista; el detalle completo va en la ficha técnica.
+  const destacados = [textoAmbiente(p), p.tipoResina, rendimiento].filter((x): x is string => x !== null);
+  const fichaTecnica = datosFichaTecnica(p, variante);
 
   return (
     <Container className="py-8">
@@ -123,110 +127,156 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
         </ol>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <div
-          className="flex min-h-72 items-center justify-center rounded-card bg-neutral-lightest p-6"
-          aria-label={color === null ? 'Sin color elegido' : `Color elegido: ${color.nombre}`}
-        >
-          {color !== null ? (
-            <div className="text-center">
-              <span
-                role="img"
-                aria-label={`Muestra del color ${color.nombre}`}
-                className="mx-auto block h-40 w-40 rounded-full border border-neutral-light shadow-card"
-                style={{ backgroundColor: color.hexadecimal }}
-              />
-              <p className="mt-4 font-title text-lg font-semibold text-neutral-black">{color.nombre}</p>
-              {color.codigo !== null && <p className="font-sans text-sm text-neutral-medium">Código {color.codigo}</p>}
-            </div>
-          ) : (
-            <p className="font-sans text-sm text-neutral-medium">Las imágenes del producto llegarán pronto.</p>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
+        {/* Columna izquierda: se desplaza con la página. */}
+        <div className="min-w-0 space-y-6">
+          <GaleriaProducto
+            nombre={p.nombre}
+            imagenes={p.imagenes.map((i) => ({
+              idImagen: i.idImagen,
+              url: catalogoPublicoApi.urlImagen(i.idImagen, 'mediana'),
+              urlMiniatura: catalogoPublicoApi.urlImagen(i.idImagen, 'miniatura'),
+            }))}
+            idImagenEnfocada={imagenParaSeleccion(p.imagenes, {
+              idColor: color?.idColor ?? null,
+              idVariante: variante?.idVariante ?? null,
+            })}
+            imagenMedidaUrl={
+              variante?.tieneImagenMedida === true ? catalogoPublicoApi.urlImagenMedida(variante.idMedida) : null
+            }
+            nombreMedida={variante?.medida ?? null}
+            color={color}
+          />
+
+          {p.descripcion !== null && (
+            <section
+              aria-labelledby="titulo-descripcion"
+              className="rounded-card border border-neutral-light bg-neutral-white p-5"
+            >
+              <h2 id="titulo-descripcion" className="font-title text-lg font-semibold text-corporate">
+                Descripción
+              </h2>
+              <p className="mt-2 font-sans text-sm leading-relaxed text-neutral-dark">{p.descripcion}</p>
+            </section>
+          )}
+
+          {fichaTecnica.length > 0 && (
+            <section
+              aria-labelledby="titulo-ficha-tecnica"
+              className="rounded-card border border-neutral-light bg-neutral-white p-5"
+            >
+              <h2 id="titulo-ficha-tecnica" className="font-title text-lg font-semibold text-corporate">
+                Ficha técnica
+              </h2>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                {fichaTecnica.map((d) => {
+                  const Icono = ICONO_DATO[d.clave];
+                  return (
+                    <div key={`${d.clave}-${d.etiqueta}`} className="flex gap-3 rounded-input bg-neutral-lightest p-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-subaction">
+                        <Icono className="h-4 w-4 text-action" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <dt className="font-sans text-xs text-neutral-medium">{d.etiqueta}</dt>
+                        <dd className="font-title text-sm font-medium text-neutral-black">{d.valor}</dd>
+                      </div>
+                    </div>
+                  );
+                })}
+              </dl>
+            </section>
           )}
         </div>
 
-        <div className="space-y-6">
+        {/* Columna derecha: el panel de compra se queda a la vista al bajar (y se desplaza solo si no cabe). */}
+        <aside
+          aria-label="Comprar"
+          className="space-y-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1"
+        >
           <div>
             <p className="font-title text-xs uppercase tracking-wider text-neutral-medium">
               {p.marca}
               {p.linea !== null && ` · ${p.linea}`}
             </p>
+            {p.esCombo && (
+              <p className="mt-1">
+                <Badge variant="action">Combo</Badge>
+              </p>
+            )}
             <h1 className="mt-1 font-title text-3xl font-bold text-neutral-black">{p.nombre}</h1>
-            {p.descripcion !== null && <p className="mt-2 font-sans text-sm text-neutral-dark">{p.descripcion}</p>}
+            {color !== null && <p className="mt-0.5 font-title text-lg text-neutral-dark">{color.nombre}</p>}
+            {destacados.length > 0 && (
+              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Lo esencial del producto">
+                {destacados.map((d) => (
+                  <li
+                    key={d}
+                    className="rounded-full bg-subaction px-3 py-1 font-sans text-xs font-medium text-corporate"
+                  >
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
-          {variante !== null && (
-            <div>
-              <p className="font-title text-3xl font-bold text-corporate">
-                {formatCOP(variante.precio)} <span className="text-base font-medium">COP</span>
-              </p>
-              <p className="mt-1 flex items-center gap-2 font-sans text-sm">
-                <Badge variant={variante.disponibilidad === 'disponible' ? 'success' : 'neutral'}>
-                  {variante.disponibilidad === 'disponible' ? 'Disponible' : 'Agotado por ahora'}
-                </Badge>
-                {rendimiento !== null && <span className="text-neutral-dark">{rendimiento}</span>}
-              </p>
+          {p.compraBloqueada && (
+            <Alert variant="warning">Este combo está agotado por ahora y no se puede comprar.</Alert>
+          )}
+
+          <div className="space-y-5 rounded-card border border-neutral-light bg-neutral-white p-5 shadow-card">
+            {requiereColor(p) && (
+              <MuestrasColor
+                idProducto={p.idProducto}
+                elegido={color}
+                onElegir={elegirYRecordar}
+                onVerTodos={() => setCartaAbierta(true)}
+              />
+            )}
+
+            {p.variantes.length > 0 ? (
+              <SelectorPresentacion
+                variantes={p.variantes}
+                idElegida={variante?.idVariante ?? null}
+                onElegir={elegirVariante}
+              />
+            ) : (
+              <Alert variant="info">Este producto no tiene presentaciones disponibles por ahora.</Alert>
+            )}
+
+            {variante !== null && <PrecioPresentacion variante={variante} oferta={oferta} rendimiento={rendimiento} />}
+
+            {/* M05 · P3: agregar la presentación y el color elegidos al carrito. */}
+            <div className="border-t border-neutral-light pt-4">
+              <AgregarAlCarrito
+                idVariante={variante?.idVariante ?? null}
+                idColor={color?.idColor ?? null}
+                requiereColor={requiereColor(p)}
+                bloqueado={p.compraBloqueada}
+              />
             </div>
-          )}
+          </div>
 
-          {p.variantes.length > 0 ? (
-            <fieldset className="space-y-2">
-              <legend className="font-title text-sm font-medium text-neutral-dark">Presentación</legend>
-              <div className="flex flex-wrap gap-2">
-                {p.variantes.map((v) => (
-                  <button
-                    key={v.idVariante}
-                    type="button"
-                    aria-pressed={variante?.idVariante === v.idVariante}
-                    onClick={() => setIdVariante(v.idVariante)}
-                    className={`min-h-11 rounded-full border px-4 font-title text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
-                      variante?.idVariante === v.idVariante
-                        ? 'border-action bg-subaction text-corporate'
-                        : 'border-neutral-light bg-neutral-white text-neutral-dark hover:border-neutral-medium'
-                    }`}
-                  >
-                    {v.medida}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-          ) : (
-            <Alert variant="info">Este producto no tiene presentaciones disponibles por ahora.</Alert>
-          )}
-
-          {p.claseColor !== 'sin_color' && (
-            <SelectorColorProducto idProducto={p.idProducto} elegido={color} onElegir={setColor} />
-          )}
-          {color !== null && (
-            <p className="flex items-center gap-2 font-sans text-sm text-neutral-dark" role="status">
-              <Muestra hexadecimal={color.hexadecimal} etiqueta={`Muestra de ${color.nombre}`} /> {color.nombre} ·{' '}
-              {color.acabado}
-            </p>
-          )}
-
-          {p.acabados.length > 0 && (
-            <p className="font-sans text-sm text-neutral-dark">
-              <span className="font-title font-medium">Acabados: </span>
-              {p.acabados.map((a) => a.nombre).join(', ')}
-            </p>
-          )}
-
-          {datosTecnicos.length > 0 && (
-            <details className="rounded-card border border-neutral-light bg-neutral-white" open>
-              <summary className="min-h-11 cursor-pointer px-4 py-3 font-title text-sm font-semibold text-corporate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50">
-                Ficha técnica
-              </summary>
-              <dl className="divide-y divide-neutral-light px-4 pb-2">
-                {datosTecnicos.map(([nombre, valor]) => (
-                  <div key={nombre} className="grid grid-cols-[1fr_2fr] gap-3 py-2 font-sans text-sm">
-                    <dt className="text-neutral-medium">{nombre}</dt>
-                    <dd className="text-neutral-black">{valor}</dd>
-                  </div>
-                ))}
-              </dl>
-            </details>
-          )}
-        </div>
+          {/* Contacto directo de M15 con la referencia del producto (HU-ATC-03). */}
+          <BotonContactoDirecto
+            referencia={`Me interesa ${p.marca} ${p.nombre}${color === null ? '' : ` en ${color.nombre}`}${
+              variante === null ? '' : ` (${variante.medida})`
+            }.`}
+          />
+        </aside>
       </div>
+
+      {cartaAbierta && (
+        <ModalColoresProducto
+          idProducto={p.idProducto}
+          elegido={color}
+          onElegir={elegirYRecordar}
+          onClose={() => setCartaAbierta(false)}
+        />
+      )}
+
+      {/* Espacio publicitario bajo los datos, antes de los complementarios (M14 · B1) */}
+      <EspacioPublicitario espacio="ficha" className="mt-10" />
+      <ComplementariosProducto idProducto={p.idProducto} />
     </Container>
   );
 };

@@ -19,6 +19,9 @@ export const CLAVES_PARAMETROS = [
   'comercial.iva_porcentaje',
   'comercial.costo_envio_base',
   'comercial.umbral_envio_gratis',
+  'comercial.umbral_sugerir_empresa',
+  'comercial.dias_vigencia_carrito_visitante',
+  'comercial.dias_vigencia_cotizacion',
 ] as const;
 
 export const claveParametroSchema = z.enum(CLAVES_PARAMETROS);

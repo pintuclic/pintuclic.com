@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 4.4 (alineado con schema_pintuclic.sql v4.4 - equivalencia en galones)
+-- VERSIÓN: 4.18 (alineado con schema_pintuclic.sql v4.18 - asesoría M03 y auditoría M20)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -15,14 +15,14 @@ BEGIN;
 
 -- 1.1 Descuentos
 INSERT INTO descuento (id_descuento, tope, porcentaje_descuento, estado) VALUES
-    (1, 500000.00, 15.00, 'activo'),
-    (2, 200000.00, 10.00, 'activo')
+    (1, 0.00, 15.00, 'activo'),
+    (2, 0.00, 10.00, 'activo')
 ON CONFLICT (id_descuento) DO NOTHING;
 
 -- 1.2 Sub-Roles de Empresa
 INSERT INTO sub_rol_empresa (id_sub_rol_empresa, nombre, id_descuento, estado) VALUES
-    (1, 'Distribuidor Mayorista', 1, 'activo'),
-    (2, 'Contratista Comercial',  2, 'activo')
+    (1, 'Proveedor',     1, 'activo'),
+    (2, 'Constructora',  2, 'activo')
 ON CONFLICT (id_sub_rol_empresa) DO NOTHING;
 
 -- 1.3 Roles Principales
@@ -58,7 +58,20 @@ INSERT INTO permisos (id_permiso, nombre, descripcion, estado) VALUES
     -- Analítica de Búsqueda (M02 HU-BUS-06)
     (20, 'estadisticas.consultar',         'Consultar estadísticas de búsqueda sin resultado',  'activo'),
     -- Validación de Cuentas Empresa (M04 HU-CUE-09, RFC-M04-001 C-9)
-    (21, 'empresas.validar',               'Aprobar o rechazar solicitudes de cuenta empresa, ascenso y renovación de NIT', 'activo')
+    (21, 'empresas.validar',               'Aprobar o rechazar solicitudes de cuenta empresa, ascenso y renovación de NIT', 'activo'),
+    -- Notificaciones y Comunicaciones (M18 HU-NOT-03)
+    (22, 'notificaciones.ver',             'Ver plantillas de comunicación y el registro de envíos y rebotes', 'activo'),
+    (23, 'notificaciones.editar',          'Editar el contenido de las plantillas de comunicación',            'activo'),
+    -- Atención al cliente (M15 HU-ATC-02, HU-ATC-03, HU-ATC-04, HU-ATC-05)
+    (24, 'atencion.ver',                   'Ver solicitudes de contacto, horario y canal de atención',         'activo'),
+    (25, 'atencion.editar',                'Gestionar el horario de atención y el canal de WhatsApp',          'activo'),
+    (26, 'atencion.atender_clientes',      'Atender las consultas escaladas a un asesor humano',               'activo'),
+    -- Patrocinios y publicidad (M14 HU-PAT-01, HU-PAT-02)
+    (27, 'patrocinios.ver',                'Consultar campañas de patrocinio, anuncios y su medición',         'activo'),
+    (28, 'patrocinios.editar',             'Crear y editar campañas de patrocinio y anuncios publicitarios',   'activo'),
+    -- Asesoría y asistencia (M03 HU-ASE-01, HU-ASE-05, HU-ASE-06)
+    (29, 'asesoria.ver',                   'Consultar el cuestionario guiado, los guiones y los incidentes del servicio de IA', 'activo'),
+    (30, 'asesoria.editar',                'Editar el cuestionario guiado, los guiones y los parámetros del servicio de IA',    'activo')
 ON CONFLICT (id_permiso) DO NOTHING;
 
 -- 1.5 Asignación de Permisos a Roles
@@ -67,7 +80,9 @@ INSERT INTO asignacion_permiso (id_rol, id_permiso) VALUES
     (1, 6), (1, 7), (1, 8), (1, 9), (1, 10),
     (1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
     (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
-    (1, 21)
+    (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26),
+    (1, 27), (1, 28), (1, 29), (1, 30),
+    (3, 4), (3, 10)
 ON CONFLICT (id_rol, id_permiso) DO NOTHING;
 
 -- El rol de cliente empresa (3) NO tiene permisos del personal. El seed le daba `ordenes.ver` (4) y
@@ -262,13 +277,13 @@ INSERT INTO color (id_color, id_marca, nombre, codigo, id_base, id_acabado, id_f
 ON CONFLICT (id_color) DO NOTHING;
 
 -- 3.8 Productos (marca → línea opcional → producto)
-INSERT INTO producto (id_producto, id_marca, id_linea, id_subcategoria, nombre, descripcion, uso_interior, uso_exterior, estado, publicado, id_categoria_complementaria, patrocinado) VALUES
-    (1, 1, 1,    1,  'Viniltex Ultralavable',      'Vinilo tipo 1 de alta lavabilidad para muros interiores.',          true,  false, 'activo', true, 6,    false),
-    (2, 1, 2,    2,  'Koraza Sol & Lluvia',        'Pintura para fachadas con protección contra sol y lluvia.',         false, true,  'activo', true, 6,    true),
-    (3, 1, 3,    3,  'Pintulux 3 en 1',            'Esmalte que prepara, protege y decora metal y madera.',             true,  true,  'activo', true, 6,    false),
-    (4, 1, 4,    3,  'Esmalte ICO',                'Esmalte de colores de fábrica, sin preparación por colorimetría.',  true,  true,  'activo', true, NULL, false),
-    (5, 1, NULL, 10, 'Barniz Transparente',        'Barniz para proteger y realzar la madera.',                         true,  true,  'activo', true, 6,    false),
-    (6, 2, NULL, 18, 'Brocha de cerda natural',    'Brocha para pinturas base agua y base aceite.',                    false, false, 'activo', true, NULL, false)
+INSERT INTO producto (id_producto, id_marca, id_linea, id_subcategoria, nombre, descripcion, uso_interior, uso_exterior, estado, publicado, id_categoria_complementaria) VALUES
+    (1, 1, 1,    1,  'Viniltex Ultralavable',      'Vinilo tipo 1 de alta lavabilidad para muros interiores.',          true,  false, 'activo', true, 6),
+    (2, 1, 2,    2,  'Koraza Sol & Lluvia',        'Pintura para fachadas con protección contra sol y lluvia.',         false, true,  'activo', true, 6),
+    (3, 1, 3,    3,  'Pintulux 3 en 1',            'Esmalte que prepara, protege y decora metal y madera.',             true,  true,  'activo', true, 6),
+    (4, 1, 4,    3,  'Esmalte ICO',                'Esmalte de colores de fábrica, sin preparación por colorimetría.',  true,  true,  'activo', true, NULL),
+    (5, 1, NULL, 10, 'Barniz Transparente',        'Barniz para proteger y realzar la madera.',                         true,  true,  'activo', true, 6),
+    (6, 2, NULL, 18, 'Brocha de cerda natural',    'Brocha para pinturas base agua y base aceite.',                    false, false, 'activo', true, NULL)
 ON CONFLICT (id_producto) DO NOTHING;
 
 INSERT INTO ficha_recubrimiento (id_producto, id_tipo_resina, tipo_calidad, rendimiento_min, rendimiento_max) VALUES
@@ -354,10 +369,21 @@ ON CONFLICT (id_linea_carrito) DO NOTHING;
 -- ==============================================================================
 
 -- 5.1 Cotización
-INSERT INTO cotizacion (id_cotizacion, id_usuario, id_rol, estado, fecha_creacion) VALUES
-    (1, 4, 3, 'aprobada', now() - interval '2 days'),
-    (2, 2, 2, 'borrador', now())
+INSERT INTO cotizacion (id_cotizacion, id_usuario, id_rol, estado, fecha_creacion, comentario_cliente, nota_para_cliente,
+                        fecha_envio, fecha_vencimiento, fecha_respuesta, id_usuario_responde, total_referencia, total_acordado) VALUES
+    (1, 4, 3, 'aprobada', now() - interval '2 days', 'Pintura para la bodega nueva', 'Precio especial por volumen',
+        now() - interval '1 day', CURRENT_DATE + 14, now() - interval '12 hours', 1, 859000.00, 790000.00),
+    (2, 2, 2, 'solicitada', now(), '¿Tienen precio si llevo varias unidades?', NULL,
+        NULL, NULL, NULL, NULL, 114800.00, NULL)
 ON CONFLICT (id_cotizacion) DO NOTHING;
+
+-- 5.1.1 Líneas de cotización (M21): copia del carrito al pedirla.
+INSERT INTO linea_cotizacion (id_linea_cotizacion, id_cotizacion, id_variante, id_color, cantidad, precio_referencia,
+                              precio_acordado, nombre_producto, marca, medida, sku, color_nombre, color_hexadecimal) VALUES
+    (1, 1, 1, 13, 10, 85900.00, 79000.00, 'Viniltex Ultralavable', 'Pintuco', '1 galón', 'VIN-ULT-GAL', 'Azul Cielo', '#9CC9E8'),
+    (2, 2, 1, 13, 1, 85900.00, NULL, 'Viniltex Ultralavable', 'Pintuco', '1 galón', 'VIN-ULT-GAL', 'Azul Cielo', '#9CC9E8'),
+    (3, 2, 2, 19, 1, 28900.00, NULL, 'Viniltex Ultralavable', 'Pintuco', '1/4 de galón', 'VIN-ULT-QT', 'Maní', '#C9A16A')
+ON CONFLICT (id_linea_cotizacion) DO NOTHING;
 
 -- 5.2 Orden (v3.9: modo de entrega, IVA congelado y solicitud SOL de origen).
 -- En bases creadas antes de v3.9, ORD-2026-0001 y 0002 ya existen: conservan los campos nuevos en NULL.
@@ -546,7 +572,6 @@ ON CONFLICT (id_solicitud_supresion) DO NOTHING;
 -- 9.1 Direcciones de Cliente (HU-CUE-07)
 INSERT INTO direccion_cliente (id_direccion, id_usuario, direccion, barrio, apartamento_casa, nombre_apellido, telefono, es_predeterminada, latitud, longitud) VALUES
     ('d0000000-0000-0000-0000-000000000001', 2, 'Carrera 7 # 45-23', 'Chapinero', 'Apto 402', 'Cliente Activo', '3001234567', true, 4.6300000, -74.0650000),
-    ('d0000000-0000-0000-0000-000000000002', 2, 'Calle 100 # 15-20', 'Chicó', 'Oficina 501', 'Cliente Activo', '3001234567', false, 4.6850000, -74.0500000),
     ('d0000000-0000-0000-0000-000000000003', 4, 'Zona Industrial Acopi Cl 15 # 22-10', 'Acopi', 'Bodega 3', 'Pinturas del Valle S.A.S.', '3157778899', true, 3.5100000, -76.5100000),
     ('d0000000-0000-0000-0000-000000000004', 5, 'Carrera 7 # 32-16', 'Centro', 'Piso 5', 'Laura Martínez', '3124567890', true, 4.6100000, -74.0700000)
 ON CONFLICT (id_direccion) DO NOTHING;
@@ -563,6 +588,9 @@ SELECT id_usuario, nit, nombre_empresa, nombre_representante, correo_empresarial
 FROM solicitud_empresa
 WHERE estado = 'aprobada'
 ON CONFLICT (id_usuario) DO NOTHING;
+
+-- 9.2b Tipo de cliente empresa de la cuenta de prueba (M06 · D8): Proveedor, 15 % de descuento
+UPDATE cuenta_empresa SET id_sub_rol_empresa = 1 WHERE id_usuario = 4 AND id_sub_rol_empresa IS NULL;
 
 -- 9.3a Documento de soporte (RUT adjunto - RFC-M04-001 C-3). Mock: PDF mínimo de 15 bytes
 INSERT INTO documento_soporte (id_documento, nombre_original, tipo_mime, tamano_bytes, sha256, contenido) VALUES
@@ -602,7 +630,10 @@ INSERT INTO parametro_sistema (id_parametro, clave, area, tipo_dato, descripcion
     (8, 'comercial.iva_porcentaje', 'comercial', 'numero', 'Porcentaje general de impuesto al valor agregado (IVA) aplicable a ventas', '19'::jsonb, '19'::jsonb, 0, 50),
     (9, 'comercial.costo_envio_base', 'comercial', 'numero', 'Tarifa base de despacho estándar a domicilio', '15000'::jsonb, '15000'::jsonb, 0, NULL),
     (10, 'comercial.umbral_envio_gratis', 'comercial', 'numero', 'Monto mínimo de compra para exoneración de costos de envío', '200000'::jsonb, '200000'::jsonb, 0, NULL),
-    (11, 'auth.vigencia_enlace_activacion_horas', 'autenticacion', 'numero', 'Vigencia en horas del enlace con el que un colaborador nuevo define su contraseña', '72'::jsonb, '72'::jsonb, 1, 168)
+    (11, 'auth.vigencia_enlace_activacion_horas', 'autenticacion', 'numero', 'Vigencia en horas del enlace con el que un colaborador nuevo define su contraseña', '72'::jsonb, '72'::jsonb, 1, 168),
+    (12, 'comercial.umbral_sugerir_empresa', 'comercial', 'numero', 'Total del carrito desde el que se invita a un cliente registrado a solicitar la cuenta empresa (M06 · R12)', '500000'::jsonb, '500000'::jsonb, 0, NULL),
+    (13, 'comercial.dias_vigencia_carrito_visitante', 'comercial', 'numero', 'Días sin actividad tras los cuales se borra el carrito de un visitante sin sesión (M05 · C13)', '30'::jsonb, '30'::jsonb, 1, 365),
+    (14, 'comercial.dias_vigencia_cotizacion', 'comercial', 'numero', 'Días que una cotización enviada sigue vigente si el equipo comercial no pone otra fecha (M21 · D4)', '15'::jsonb, '15'::jsonb, 1, 90)
 ON CONFLICT (clave) DO NOTHING;
 
 -- Alineación con el piso de contraseña de M20 (12 caracteres, RN-SEG-01 / RFC-M17-001 D-5).
@@ -613,7 +644,335 @@ SET rango_minimo = 12,
 WHERE clave = 'auth.complejidad_minima_contrasena' AND rango_minimo < 12;
 
 -- ==============================================================================
+-- 9D. MÓDULO DE NOTIFICACIONES Y COMUNICACIONES (6 Plantillas - M18 - HU-NOT-03)
+-- Copia introductoria inicial: solo texto plano, sin HTML ni variables (el admin no edita
+-- ninguna de las dos). El maquetado y los datos dinámicos van fijos en
+-- backend/src/modules/m18-notificaciones/adapters/plantillas-html.ts.
+-- ON CONFLICT DO NOTHING: re-ejecutar el seed NO pisa ediciones ya hechas por un administrador.
+-- ==============================================================================
+
+INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
+(
+    'registro_otp',
+    'Código de verificación de tu cuenta · Pintu Clic',
+    'Bienvenido a Pintu Clic. Usa el código de verificación que aparece abajo para activar tu cuenta.'
+),
+(
+    'recuperacion_password',
+    'Restablecimiento de contraseña · Pintu Clic',
+    'Recibimos una solicitud para restablecer la contraseña de tu cuenta en Pintu Clic. Usa el botón de abajo para crear una nueva.'
+),
+(
+    'activacion_empleado',
+    'Activa tu cuenta de colaborador · Pintu Clic',
+    'Te crearon una cuenta de colaborador en Pintu Clic. Usa el botón de abajo para definir tu contraseña y comenzar.'
+),
+(
+    'cambio_correo_otp',
+    'Confirma tu nuevo correo electrónico · Pintu Clic',
+    'Solicitaste actualizar el correo electrónico de tu cuenta en Pintu Clic. Usa el código de abajo para confirmar el cambio.'
+),
+(
+    'cambio_correo_confirmado',
+    'Aviso de seguridad: cambio de correo electrónico · Pintu Clic',
+    'Te informamos que el correo electrónico asociado a tu cuenta de Pintu Clic fue actualizado. Si no reconoces esta operación, contacta de inmediato a nuestro equipo de soporte.'
+),
+(
+    'dictamen_empresa',
+    'Resultado de tu solicitud de cuenta empresarial · Pintu Clic',
+    'Gracias por tu solicitud de cuenta empresarial en Pintu Clic. A continuación encontrarás el resultado de la revisión.'
+),
+(
+    'alerta_servicio_ia',
+    'El asistente de la tienda no está respondiendo · Pintu Clic',
+    'El servicio de inteligencia artificial que atiende el asistente y la búsqueda asistida acumuló varios fallos seguidos y dejó de responder. El resto del sitio sigue funcionando con normalidad. Revisa el detalle en el panel, en Asesoría.'
+)
+ON CONFLICT (tipo) DO NOTHING;
+
+-- ==============================================================================
+-- 9E. MÓDULO DE CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (2 Tablas - M16)
+-- ==============================================================================
+
+-- 9E.1 Páginas Institucionales Publicadas (HU-CON-01 / HU-CON-03)
+INSERT INTO pagina_institucional (id_pagina, slug, titulo, resumen, cuerpo_markdown, estado, id_autor) VALUES
+    (
+        1,
+        'sobre-nosotros',
+        'Sobre Nosotros',
+        'Conoce nuestra historia, misión, visión y horarios de atención especializada en recubrimientos y pinturas.',
+        '## Nuestra Historia
+Pintu Clic nació con el propósito de modernizar el suministro de pinturas arquitectónicas, recubrimientos industriales y accesorios para el hogar y la construcción en Colombia, integrando asesoría técnica especializada con una experiencia digital ágil para clientes particulares (B2C) y empresas (B2B).
+
+## Misión
+Brindar soluciones integrales en recubrimientos, pinturas y herramientas de aplicación con respaldo técnico, entregas confiables y trazabilidad completa en cada orden, acompañando tanto al maestro de obra y al hogar como a las grandes constructoras e industrias del país.
+
+## Visión
+Consolidarnos como la plataforma líder de comercio especializado en pinturas y acabados en Colombia, reconocida por la precisión de nuestro catálogo técnico, la transparencia comercial y la excelencia en el servicio postventa.
+
+## Horarios de Atención
+- **Lunes a Viernes:** 7:30 a. m. a 5:30 p. m. (jornada continua)
+- **Sábados:** 8:00 a. m. a 1:00 p. m.
+- **Domingos y Festivos:** Atención digital de autogestión en plataforma 24/7
+
+## Nuestros Pilares
+- **Respaldo Técnico:** Fichas técnicas verificadas, rendimientos claros por metro cuadrado y compatibilidad de superficies.
+- **Atención Corporativa B2B:** Condiciones comerciales dedicadas para empresas con NIT validado.
+- **Calidad Garantizada:** Trabajamos exclusivamente con marcas certificadas y lotes trazables.',
+        'publicado',
+        1
+    ),
+    (
+        2,
+        'terminos-y-condiciones',
+        'Términos y Condiciones',
+        'Condiciones legales de uso de la plataforma Pintu Clic, formación de órdenes, precios y responsabilidades.',
+        '## 1. Aceptación de los Términos
+El acceso y uso de la plataforma **Pintu Clic** implica la aceptación plena de los presentes Términos y Condiciones por parte de visitantes, clientes particulares y cuentas corporativas registradas.
+
+## 2. Catálogo, Variantes y Colores Entonados
+- Los productos exhibidos especifican su presentación, medida, acabado y ficha técnica de referencia.
+- Las tonalidades visualizadas en pantalla son aproximaciones digitales; el cliente debe verificar el código de color seleccionado antes de confirmar su compra.
+- Los productos preparados bajo modalidad de **color entonado a medida** se fabrican específicamente para la orden confirmada y no admiten retracto por cambio de tonalidad una vez procesados.
+
+## 3. Precios, Impuestos y Confirmación de Orden
+- Todos los precios publicados en el portal están expresados en pesos colombianos (COP).
+- Una orden de compra nace únicamente cuando el pago ha sido confirmado y validado por la pasarela o medio autorizado, congelando de forma inmutable los precios, descuentos e impuestos vigentes en ese instante.
+
+## 4. Cuentas Empresariales (B2B)
+Las cuentas corporativas requieren validación documental del NIT y RUT vigente por parte del equipo administrativo antes de habilitar beneficios o escalas de descuento empresarial.',
+        'publicado',
+        1
+    ),
+    (
+        3,
+        'politica-de-privacidad',
+        'Política de Privacidad y Tratamiento de Datos',
+        'Lineamientos de protección de datos personales conforme a la Ley 1581 de 2012 y ejercicio de derechos Habeas Data.',
+        '## 1. Marco Normativo y Responsable
+En cumplimiento de la **Ley Estatutaria 1581 de 2012** y el **Decreto 1377 de 2013** de la República de Colombia, **Pintu Clic** informa a sus usuarios, clientes y colaboradores los lineamientos bajo los cuales recolecta, almacena y protege sus datos personales.
+
+## 2. Finalidades del Tratamiento
+Los datos recolectados se utilizan estrictamente para:
+- Gestionar el registro de cuentas particulares y la verificación tributaria de cuentas empresa (B2B).
+- Procesar órdenes de compra, despachos a domicilio, entregas en almacén y facturación legal.
+- Enviar notificaciones transaccionales de seguridad (códigos de verificación, alertas de sesión y estados de pedido).
+- Atender consultas, garantías y solicitudes de derechos ARCO.
+
+## 3. Derechos de los Titulares (Habeas Data)
+Todo titular de datos personales tiene derecho a:
+- Conocer, actualizar y rectificar sus datos personales desde su perfil de cuenta.
+- Solicitar prueba de la autorización otorgada al momento del registro.
+- Presentar solicitudes de supresión de cuenta y revocatoria de consentimiento a través de los mecanismos dispuestos en la plataforma, siempre que no exista un deber legal o contractual de permanencia.
+
+## 4. Seguridad de la Información
+Aplicamos controles criptográficos de contraseñas, sesiones seguras y segregación de privilegios administrativos para impedir el acceso no autorizado a la información personal.',
+        'publicado',
+        1
+    ),
+    (
+        4,
+        'politicas-de-envio',
+        'Políticas de Envío y Entregas',
+        'Modalidades de despacho a domicilio, recogida en almacén, tiempos estimados y recepción de mercancía.',
+        '## 1. Modalidades de Entrega
+En **Pintu Clic** ofrecemos dos modalidades de entrega seleccionables durante el proceso de compra:
+- **Envío a domicilio:** Despacho directo a la dirección registrada y confirmada por el cliente.
+- **Recogida en almacén:** Retiro presencial sin costo de flete en nuestro punto autorizado una vez la orden cambie a estado preparada.
+
+## 2. Tarifas y Exoneración de Envío
+- El costo base de despacho estándar se calcula automáticamente en el resumen de compra según los parámetros comerciales vigentes.
+- Las órdenes que superen el umbral de compra establecido por la tienda obtienen **envío estándar gratuito** de manera automática.
+
+## 3. Tiempos de Preparación y Despacho
+- Las órdenes con productos de línea estándar se alistan entre **24 y 48 horas hábiles** tras la confirmación del pago.
+- Los pedidos que incluyan preparación de colores entonados o volúmenes industriales pueden requerir validación adicional de alistamiento, notificada oportunamente en el seguimiento de la orden.
+
+## 4. Recomendaciones al Recibir su Pedido
+Verifique al momento de la entrega que los envases se encuentren sellados, sin abolladuras que comprometan el contenido y que las referencias coincidan con el detalle de su orden.',
+        'publicado',
+        1
+    )
+ON CONFLICT (slug) DO NOTHING;
+
+-- 9E.2 Preguntas Frecuentes del Centro de Ayuda (HU-CON-02 / HU-CON-04)
+INSERT INTO faq_entrada (id_faq, pregunta, respuesta_markdown, orden, estado, id_autor) VALUES
+    (
+        1,
+        '¿Cómo solicito una cuenta empresarial (B2B) con precios para negocios?',
+        'Puedes registrarte seleccionando la modalidad **Cuenta Empresa** o solicitar el ascenso desde tu perfil particular adjuntando los datos de tu empresa y el **NIT**. Nuestro equipo administrativo verificará la información tributaria y te notificará la activación de tus condiciones corporativas.',
+        1,
+        'activo',
+        1
+    ),
+    (
+        2,
+        '¿Cuánto tardan los envíos a domicilio y cuándo aplica el envío gratis?',
+        'El alistamiento y despacho estándar toma entre **24 y 48 horas hábiles** después de confirmado el pago. Las compras que igualen o superen el monto mínimo vigente reciben **envío gratis** automáticamente en el resumen del pedido.',
+        2,
+        'activo',
+        1
+    ),
+    (
+        3,
+        '¿Puedo devolver o cambiar una pintura preparada con color entonado a medida?',
+        'Las pinturas preparadas bajo **sistema de entonado a medida** se formulan exclusivamente para tu orden según el código de color seleccionado; por ello no admiten cambios por elección de tono, salvo defecto técnico comprobado de fabricación.',
+        3,
+        'activo',
+        1
+    ),
+    (
+        4,
+        '¿Cómo calculo cuántos galones de pintura necesito para mi proyecto?',
+        'En la ficha técnica de cada recubrimiento encontrarás el **rendimiento estimado en metros cuadrados por galón** ($m^2/gal$) y el número de manos recomendado según la superficie. Divide el área total a pintar entre el rendimiento indicado para estimar la cantidad necesaria.',
+        4,
+        'activo',
+        1
+    ),
+    (
+        5,
+        '¿Qué modalidades de entrega están disponibles al realizar un pedido?',
+        'Puedes elegir entre **Envío a domicilio** a cualquiera de las direcciones guardadas en tu libreta o **Recogida en almacén** sin costo de transporte cuando tu orden se encuentre lista para entrega.',
+        5,
+        'activo',
+        1
+    )
+ON CONFLICT (id_faq) DO NOTHING;
+
+-- ==============================================================================
+-- 9F. MÓDULO DE ATENCIÓN AL CLIENTE (2 Tablas - M15 - HU-ATC-03, HU-ATC-04)
+-- Las preguntas frecuentes se siembran arriba, en M16: son suyas.
+-- ==============================================================================
+
+-- 9F.1 Horario de atención humana, una fila por día (HU-ATC-04).
+-- Domingo cerrado: sin horas, como exige ck_horario_franja_coherente.
+INSERT INTO horario_atencion (dia_semana, abierto, hora_inicio, hora_fin) VALUES
+    ('lunes',     TRUE,  '08:00', '18:00'),
+    ('martes',    TRUE,  '08:00', '18:00'),
+    ('miercoles', TRUE,  '08:00', '18:00'),
+    ('jueves',    TRUE,  '08:00', '18:00'),
+    ('viernes',   TRUE,  '08:00', '18:00'),
+    ('sabado',    TRUE,  '08:00', '13:00'),
+    ('domingo',   FALSE, NULL,    NULL)
+ON CONFLICT (dia_semana) DO NOTHING;
+
+-- 9F.2 Canal de contacto directo por WhatsApp, fila única (HU-ATC-03).
+-- Hoy apunta al canal de difusión de la empresa: es temporal, solo para verificar la redirección,
+-- y un canal no acepta texto prellenado. `mensaje_base` queda listo para cuando el destino sea un
+-- número de WhatsApp Business y el botón arme el enlace wa.me con la referencia del producto.
+INSERT INTO configuracion_atencion_whatsapp (id_configuracion, destino, mensaje_base) VALUES
+    (1, 'https://whatsapp.com/channel/0029VbDzCHgGehEKg98m4J3X', 'Hola, quiero información sobre sus productos.')
+ON CONFLICT (id_configuracion) DO NOTHING;
+
+-- 9F.3 Solicitudes de contacto con hilo de conversación y calificación (HU-ATC-02, R12, R13).
+INSERT INTO solicitud_contacto (id_solicitud, id_usuario, tipo, descripcion, estado, calificacion, fecha_calificacion, fecha_creacion) VALUES
+    ('d0000000-0000-0000-0000-000000000001', 2, 'consulta', 'Hola, necesito confirmar si el vinilo tipo 1 rinde igual sobre estuco plástico nuevo en sala y comedor.', 'en_revision', NULL, NULL, now() - interval '3 hours'),
+    ('d0000000-0000-0000-0000-000000000002', 2, 'cotizacion', 'Requiero orientación para pintar una bodega de 450 m2 con recubrimiento de alta resistencia.', 'atendida', 5, now() - interval '30 minutes', now() - interval '1 day')
+ON CONFLICT (id_solicitud) DO NOTHING;
+
+INSERT INTO mensaje_solicitud_contacto (id_mensaje, id_solicitud, id_autor, rol_autor, contenido, fecha_creacion) VALUES
+    ('d1000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 1, 'equipo', '¡Hola! Sobre estuco plástico nuevo recomendamos aplicar primero una mano de sellador acrílico o diluir la primera mano al 20 % para asegurar adherencia y rendimiento.', now() - interval '2 hours'),
+    ('d1000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000001', 2, 'cliente', 'Perfecto, ¿cuántos galones necesitaría para unos 85 metros cuadrados a dos manos?', now() - interval '1 hour'),
+    ('d1000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000002', 1, 'equipo', 'Para piso y muros de bodega te sugerimos nuestra línea epóxica poliamida de dos componentes. Ya puedes agregar las presentaciones de 1 galón o cuñete desde el carrito para formalizar tu cotización.', now() - interval '18 hours')
+ON CONFLICT (id_mensaje) DO NOTHING;
+
+-- ==============================================================================
+-- Precios, eventos de descuento y cupones (M06) — ejemplos INACTIVOS: no cambian ningún precio hasta activarlos
+-- ==============================================================================
+-- "Miércoles de color" (RC-23): todos los miércoles, Viniltex 15 % y Koraza 10 %, sin la familia de color Blancos.
+INSERT INTO evento_descuento (id_evento, nombre, descripcion, estado, fecha_inicio, fecha_fin, dias_semana, hora_inicio, hora_fin) VALUES
+    (1, 'Miércoles de color', 'Descuento semanal en líneas seleccionadas de Pintuco, excepto los blancos', 'inactivo', '2026-11-04', NULL, '{3}', NULL, NULL)
+ON CONFLICT (id_evento) DO NOTHING;
+
+INSERT INTO evento_regla (id_regla, id_evento, tipo_objetivo, id_objetivo, porcentaje, orden) VALUES
+    (1, 1, 'linea', 1, 15.00, 1),
+    (2, 1, 'linea', 2, 10.00, 2)
+ON CONFLICT (id_regla) DO NOTHING;
+
+INSERT INTO evento_exclusion (id_exclusion, id_evento, id_regla, tipo, id_objetivo) VALUES
+    (1, 1, NULL, 'familia_color', 1)
+ON CONFLICT (id_exclusion) DO NOTHING;
+
+INSERT INTO cupon (id_cupon, codigo, nombre, descripcion, tipo_valor, valor, monto_minimo_compra, usos_maximos, usos_por_usuario, audiencia, fecha_inicio, fecha_fin, estado) VALUES
+    (1, 'BIENVENIDA10', 'Bienvenida', '10 % en la primera compra', 'porcentaje', 10.00, 50000.00, 100, 1, 'todos', '2026-11-01T05:00:00Z', NULL, 'inactivo')
+ON CONFLICT (id_cupon) DO NOTHING;
+
+-- ==============================================================================
+-- 9F. ASESORÍA Y ASISTENCIA (5 Tablas - M03)
+-- ==============================================================================
+
+-- 9F.1 Configuración (fila única, M03 · D8). Arranca en modo `fijo` a propósito: no necesita
+-- la clave de Gemini, así que el cuestionario se puede probar sin servicio externo (M03 · Q3).
+-- `manos_por_defecto` queda en NULL porque RF-ASE-02-06 prohíbe suponer las manos (M03 · K9).
+-- Los valores de IA son los supuestos del contrato mientras no llegue el anexo B (M03 · Q1).
+INSERT INTO configuracion_asesoria (
+    id_configuracion, modo_cuestionario, manos_por_defecto,
+    guion_cuestionario, guion_asistente,
+    ia_tiempo_espera_ms, ia_reintentos, ia_suspension_cuota_minutos,
+    ia_retencion_incidentes_dias, ia_fallos_consecutivos_alerta
+) VALUES (
+    1, 'fijo', NULL,
+    'Ayuda a quien no sabe qué pintura necesita. Haz una pregunta por turno, siempre con opciones cerradas, y usa como máximo seis. Pregunta primero por la superficie, luego por el ambiente, el color deseado, el estado de la superficie y con qué se va a aplicar. Cuando ya tengas con qué filtrar, termina. No prometas resultados ni hables de precios.',
+    'Eres el asesor de pintura de Pintu Clic. Responde en español, breve y claro, como alguien que atiende en el mostrador. Hablas de pintura, preparación de superficies, aplicación y de los productos de la tienda. No das precios, descuentos, existencias ni plazos de entrega: para eso remites al catálogo o al carrito. Para calcular cuánta pintura se necesita, remites a la calculadora. No inventas productos ni rendimientos. Si te preguntan algo ajeno a la pintura, lo dices con amabilidad y ofreces hablar con un asesor.',
+    8000, 2, 60, 90, 5
+) ON CONFLICT (id_configuracion) DO NOTHING;
+
+-- 9F.2 Cuestionario de partida (M03 · F6, V3). Es el de la spec CONTRASTADO con lo que M01
+-- tiene de verdad: se omiten la opción «Zona húmeda» y la pregunta «¿Qué uso tendrá el
+-- espacio?», porque no existe el dato ni el filtro que las exprese (M03 · D11, Q4b).
+INSERT INTO pregunta_asesoria (id_pregunta, texto, orden, origen_opciones, estado) VALUES
+    (1, '¿Qué superficie va a pintar?',               1, 'manual',         'activo'),
+    (2, '¿El espacio es abierto o cerrado?',          2, 'manual',         'activo'),
+    (3, '¿Qué color desea?',                          3, 'familias_color', 'activo'),
+    (4, '¿En qué condiciones está la superficie?',    4, 'manual',         'activo'),
+    (5, '¿Con qué se va a aplicar o diluir?',         5, 'manual',         'activo')
+ON CONFLICT (id_pregunta) DO NOTHING;
+
+-- La pregunta 3 no lleva opciones: son las familias cromáticas activas del catálogo (M03 · F3).
+INSERT INTO opcion_asesoria (id_opcion, id_pregunta, texto, orden, estado) VALUES
+    (1,  1, 'Pared o techo interior',   1, 'activo'),
+    (2,  1, 'Fachada o muro exterior',  2, 'activo'),
+    (3,  1, 'Madera',                   3, 'activo'),
+    (4,  1, 'Metal',                    4, 'activo'),
+    (5,  1, 'Piso',                     5, 'activo'),
+    (6,  2, 'Interior cerrado',         1, 'activo'),
+    (7,  2, 'Exterior a la intemperie', 2, 'activo'),
+    (8,  4, 'Nueva sin tratar',         1, 'activo'),
+    (9,  4, 'Pintada en buen estado',   2, 'activo'),
+    (10, 4, 'Deteriorada',              3, 'activo'),
+    (11, 5, 'Agua',                     1, 'activo'),
+    (12, 5, 'Solvente',                 2, 'activo'),
+    (13, 5, 'Indiferente',              3, 'activo')
+ON CONFLICT (id_opcion) DO NOTHING;
+
+-- Correspondencia opción → filtro (M03 · F2). Todos los objetivos existen en el catálogo:
+-- superficies 1-4 (Paredes y techos, Madera, Metal, Pisos), subcategoría 2 (Pinturas para
+-- fachadas), 4 (Anticorrosivos) y 8 (Selladores e imprimantes), categoría 2 (Preparación de
+-- superficies) y 4 (Impermeabilizantes), tipos de resina 1 (Base agua) y 2 (Base aceite).
+-- «Pintada en buen estado» (9) e «Indiferente» (13) no llevan efecto a propósito: no filtran.
+INSERT INTO efecto_opcion_asesoria (id_efecto, id_opcion, tipo, dimension, id_objetivo, ambiente, requiere_opciones) VALUES
+    (1,  1,  'filtrar',          'superficie',   1,    NULL,       '{}'),
+    (2,  2,  'filtrar',          'subcategoria', 2,    NULL,       '{}'),
+    (3,  3,  'filtrar',          'superficie',   2,    NULL,       '{}'),
+    (4,  4,  'filtrar',          'superficie',   3,    NULL,       '{}'),
+    (5,  5,  'filtrar',          'superficie',   4,    NULL,       '{}'),
+    (6,  6,  'filtrar_ambiente', NULL,           NULL, 'interior', '{}'),
+    (7,  7,  'filtrar_ambiente', NULL,           NULL, 'exterior', '{}'),
+    -- CA-ASE-01-03: a la intemperie, el resultado incluye impermeabilizantes
+    (8,  7,  'incluir',          'categoria',    4,    NULL,       '{}'),
+    -- Superficie nueva: se proponen selladores e imprimantes
+    (9,  8,  'incluir',          'subcategoria', 8,    NULL,       '{}'),
+    -- Superficie deteriorada: se propone la preparación de superficies
+    (10, 10, 'incluir',          'categoria',    2,    NULL,       '{}'),
+    -- CA-ASE-01-02: metal (opción 4) deteriorado, el resultado incluye anticorrosivos
+    (11, 10, 'incluir',          'subcategoria', 4,    NULL,       '{4}'),
+    (12, 11, 'filtrar',          'tipo_resina',  1,    NULL,       '{}'),
+    (13, 12, 'filtrar',          'tipo_resina',  2,    NULL,       '{}')
+ON CONFLICT (id_efecto) DO NOTHING;
+
+
+-- ==============================================================================
 -- 10. ACTUALIZACIÓN AUTOMÁTICA DE SECUENCIAS (EVITA COLISIONES DE IDs)
+
 -- ==============================================================================
 
 SELECT setval('descuento_id_descuento_seq',                      COALESCE((SELECT MAX(id_descuento) FROM descuento), 1));
@@ -643,6 +1002,7 @@ SELECT setval('variante_combo_id_variante_combo_seq',            COALESCE((SELEC
 SELECT setval('carrito_id_carrito_seq',                          COALESCE((SELECT MAX(id_carrito) FROM carrito), 1));
 SELECT setval('linea_carrito_id_linea_carrito_seq',              COALESCE((SELECT MAX(id_linea_carrito) FROM linea_carrito), 1));
 SELECT setval('cotizacion_id_cotizacion_seq',                    COALESCE((SELECT MAX(id_cotizacion) FROM cotizacion), 1));
+SELECT setval('linea_cotizacion_id_linea_cotizacion_seq',        COALESCE((SELECT MAX(id_linea_cotizacion) FROM linea_cotizacion), 1));
 SELECT setval('orden_id_orden_seq',                              COALESCE((SELECT MAX(id_orden) FROM orden), 1));
 SELECT setval('linea_orden_id_linea_orden_seq',                  COALESCE((SELECT MAX(id_linea_orden) FROM linea_orden), 1));
 SELECT setval('linea_orden_descuento_id_linea_orden_descuento_seq', COALESCE((SELECT MAX(id_linea_orden_descuento) FROM linea_orden_descuento), 1));
@@ -658,5 +1018,20 @@ SELECT setval('consentimiento_usuario_id_consentimiento_seq',    COALESCE((SELEC
 SELECT setval('solicitud_supresion_id_solicitud_supresion_seq',  COALESCE((SELECT MAX(id_solicitud_supresion) FROM solicitud_supresion), 1));
 SELECT setval('usuario_identidad_externa_id_identidad_seq',      COALESCE((SELECT MAX(id_identidad) FROM usuario_identidad_externa), 1));
 SELECT setval('parametro_sistema_id_parametro_seq',              COALESCE((SELECT MAX(id_parametro) FROM parametro_sistema), 1));
+SELECT setval('pagina_institucional_id_pagina_seq',              COALESCE((SELECT MAX(id_pagina) FROM pagina_institucional), 1));
+SELECT setval('faq_entrada_id_faq_seq',                          COALESCE((SELECT MAX(id_faq) FROM faq_entrada), 1));
+SELECT setval('horario_atencion_id_horario_seq',                 COALESCE((SELECT MAX(id_horario) FROM horario_atencion), 1));
+
+SELECT setval('evento_descuento_id_evento_seq',       COALESCE((SELECT MAX(id_evento) FROM evento_descuento), 1));
+SELECT setval('evento_regla_id_regla_seq',            COALESCE((SELECT MAX(id_regla) FROM evento_regla), 1));
+SELECT setval('evento_exclusion_id_exclusion_seq',    COALESCE((SELECT MAX(id_exclusion) FROM evento_exclusion), 1));
+SELECT setval('cupon_id_cupon_seq',                   COALESCE((SELECT MAX(id_cupon) FROM cupon), 1));
+
+-- M03 y M20 (v4.18)
+SELECT setval('pregunta_asesoria_id_pregunta_seq',       COALESCE((SELECT MAX(id_pregunta) FROM pregunta_asesoria), 1));
+SELECT setval('opcion_asesoria_id_opcion_seq',           COALESCE((SELECT MAX(id_opcion) FROM opcion_asesoria), 1));
+SELECT setval('efecto_opcion_asesoria_id_efecto_seq',    COALESCE((SELECT MAX(id_efecto) FROM efecto_opcion_asesoria), 1));
+SELECT setval('incidente_ia_id_incidente_seq',           COALESCE((SELECT MAX(id_incidente) FROM incidente_ia), 1));
+SELECT setval('registro_auditoria_id_registro_seq',      COALESCE((SELECT MAX(id_registro) FROM registro_auditoria), 1));
 
 COMMIT;

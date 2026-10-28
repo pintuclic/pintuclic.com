@@ -53,7 +53,7 @@ describe('Landing · todas las imágenes referenciadas existen en public/', () =
   const imagenes = [
     header.logo.src,
     footer.logo.src,
-    ...featuredProducts.map((p) => p.imageUrl),
+    ...featuredProducts.flatMap((p) => (p.imageUrl ? [p.imageUrl] : [])),
     ...categoryTiles.map((c) => c.imageSrc),
   ];
 
@@ -68,8 +68,14 @@ describe('Landing · cabecera y pie (UI Spec §3.1)', () => {
     expect(telefono?.href).toMatch(/^tel:\+57\d{10}$/);
   });
 
+  it('el carrito de la cabecera lleva a /carrito (M05)', () => {
+    expect(header.cart.href).toBe('/carrito');
+  });
+
   it('la navegación incluye "Ofertas" como insignia', () => {
-    expect(header.navItems.find((item) => item.variant === 'pill')?.label).toBe('Ofertas');
+    const ofertas = header.navItems.find((item) => item.variant === 'pill');
+    expect(ofertas?.label).toBe('Ofertas');
+    expect(ofertas?.href).toBe('/productos?enOferta=true');
   });
 
   it('el mega-menú tiene los 3 grupos de la UI Spec §3.2', () => {
@@ -83,7 +89,13 @@ describe('Landing · cabecera y pie (UI Spec §3.1)', () => {
   it('ningún enlace interno queda vacío o como "#"', () => {
     const enlaces = [
       ...header.navItems.map((n) => n.href),
-      ...header.megaMenu.groups.flatMap((g) => g.items.map((i) => i.href)),
+      ...((header.megaMenu.groups ?? []).flatMap((g) => g.items.map((i) => i.href))),
+      ...((header.megaMenu.tabs ?? []).flatMap((t) =>
+        t.columns.flatMap((c) => [
+          ...c.items.map((i) => i.href),
+          ...(c.verMasHref ? [c.verMasHref] : []),
+        ])
+      )),
       ...footer.columns.flatMap((c) => c.links.map((l) => l.href)),
       ...footer.legalLinks.map((l) => l.href),
     ];

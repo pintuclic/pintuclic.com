@@ -626,7 +626,7 @@ A su vez, incluye un robusto modelo para productos entonables y de colores fijos
 | ID | Tipo | Categoría | Requisito | Origen | Prioridad |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **RF-CAT-08-01** | RF | Complemen. | El sistema debe permitir asociar a un producto o categoría la categoría de la que se extraen sus complementarios. | Definido | Media |
-| **RF-CAT-08-02** | RF | Complemen. | El sistema debe presentar hasta 4 productos, priorizando los patrocinados; si no hay configurados, mostrar solo patrocinados, si no hay ninguno, ocultar la sección. | Definido | Media |
+| **RF-CAT-08-02** | RF | Complemen. | El sistema debe presentar hasta 4 productos, priorizando los patrocinados por una campaña de M14 (el producto ya no tiene un interruptor «patrocinado»); si no hay categoría configurada, mostrar solo los de campañas, y si no hay ninguno, ocultar la sección. | Definido | Media |
 | **RF-CAT-08-03** | RF | Complemen. | El sistema debe excluir el propio producto consultado, variantes inactivos y combos agotados. No debe sugerirlos en el carrito. | Deducido | Media |
 
 #### Criterios de Aceptación (Gherkin)
@@ -635,11 +635,11 @@ A su vez, incluye un robusto modelo para productos entonables y de colores fijos
   - **Cuando** abro su ficha
   - **Entonces** se presentan productos activos de esa categoría.
 - **CA-CAT-08-02:**
-  - **Dado que** la categoría complementaria contiene productos patrocinados
+  - **Dado que** la categoría complementaria contiene productos con una campaña de patrocinio vigente (M14)
   - **Cuando** consulto la ficha
-  - **Entonces** aparecen antes que los no patrocinados; cuando no los contiene, aparecen al azar.
+  - **Entonces** aparecen antes que los demás, por prioridad de la campaña; cuando no los contiene, aparecen al azar.
 - **CA-CAT-08-03:**
-  - **Dado que** el producto no tiene categoría configurada y no hay patrocinados
+  - **Dado que** el producto no tiene categoría configurada y no hay productos de campañas vigentes
   - **Cuando** consulto su ficha
   - **Entonces** no se muestra la sección.
 - **CA-CAT-08-04:**

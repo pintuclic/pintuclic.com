@@ -1,8 +1,9 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, KeyRound, LogOut, MapPin, Package, UserRound } from 'lucide-react';
+import { Building2, KeyRound, LogOut, MapPin, MessageSquare, Package, UserRound } from 'lucide-react';
 import { Alert, ButtonLink, Container, SectionNav, Skeleton, type SectionNavItem } from '@/core/components';
 import { useAuthStore } from '@/core/store/authStore';
 import type { PerfilUsuario } from '../../interfaces/api.interfaces';
@@ -24,6 +25,7 @@ const RUTA_PEDIDOS = '/perfil/pedidos';
 
 const SECCIONES: ReadonlyArray<SectionNavItem<ItemMenu>> = [
   { id: 'datos', label: 'Mis datos', icon: UserRound },
+  { id: 'solicitudes', label: 'Mis solicitudes', icon: MessageSquare },
   { id: 'seguridad', label: 'Seguridad', icon: KeyRound },
   { id: 'direcciones', label: 'Direcciones', icon: MapPin },
   { id: 'pedidos', label: 'Mis pedidos', icon: Package },
@@ -41,7 +43,13 @@ type Estado =
  * HU-CUE-06 / 07 / 10 · "Mi cuenta". El servidor decide si hay sesión (HU-SEG-03):
  * esta vista solo pinta lo que `GET /cuentas/perfil` devuelve al titular.
  */
-export function PerfilView({ seccionInicial = 'datos' }: { seccionInicial?: SeccionPerfilId }) {
+export function PerfilView({
+  seccionInicial = 'datos',
+  solicitudesSlot,
+}: {
+  seccionInicial?: SeccionPerfilId;
+  solicitudesSlot?: ReactNode;
+}) {
   const router = useRouter();
   const usuario = useAuthStore((s) => s.usuario);
   const establecerUsuario = useAuthStore((s) => s.establecerUsuario);
@@ -144,6 +152,7 @@ export function PerfilView({ seccionInicial = 'datos' }: { seccionInicial?: Secc
 
             <div id="perfil-seccion" className="min-w-0">
               {seccion === 'datos' && <DatosSection perfil={estado.perfil} onActualizado={actualizarPerfil} />}
+              {seccion === 'solicitudes' && solicitudesSlot}
               {seccion === 'seguridad' && (
                 <SeguridadSection
                   perfil={estado.perfil}

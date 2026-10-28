@@ -98,6 +98,18 @@ describe('PrismaSolicitudesEmpresaRepository · decisiones atómicas', () => {
       expect(fake.tx.usuarioIdentidadExterna.deleteMany).toHaveBeenCalledWith({ where: { idUsuario: 33 } });
     });
 
+    it('aprobar con tipo de cliente crea la cuenta con ese tipo; sin tipo nace sin descuento (M06 · D8)', async () => {
+      await repo.decidirSolicitud('sol-1', { estado: 'aprobada', idAdminRevisor: 1, idSubRolEmpresa: 2 });
+      expect(fake.tx.cuentaEmpresa.create).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ idUsuario: 33, idSubRolEmpresa: 2 }),
+      });
+
+      await repo.decidirSolicitud('sol-1', { estado: 'aprobada', idAdminRevisor: 1 });
+      expect(fake.tx.cuentaEmpresa.create).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ idSubRolEmpresa: null }),
+      });
+    });
+
     it('la decisión se registra antes que cualquier efecto sobre la cuenta', async () => {
       await repo.decidirSolicitud('sol-1', { estado: 'aprobada', idAdminRevisor: 1 });
 

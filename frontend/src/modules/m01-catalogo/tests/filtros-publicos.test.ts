@@ -11,7 +11,9 @@ import {
 describe('M01 · filtros de la vitrina en la URL', () => {
   it('lee una URL completa', () => {
     const f = filtrosDesdeUrl(
-      new URLSearchParams('q=vinilo&categoria=2&subcategoria=5&marca=3&superficie=7&ambiente=exterior&orden=precio_desc&pagina=3'),
+      new URLSearchParams(
+        'q=vinilo&categoria=2&subcategoria=5&marca=3&superficie=7&ambiente=exterior&orden=precio_desc&pagina=3',
+      ),
     );
     expect(f).toEqual({
       busqueda: 'vinilo',
@@ -20,13 +22,27 @@ describe('M01 · filtros de la vitrina en la URL', () => {
       idMarca: '3',
       idSuperficie: '7',
       ambiente: 'exterior',
+      enOferta: false,
       ordenar: 'precio_desc',
       pagina: 3,
     });
   });
 
+  it('«enOferta» solo se activa con "true", viaja en la URL y en la consulta a la API', () => {
+    expect(filtrosDesdeUrl(new URLSearchParams('enOferta=true')).enOferta).toBe(true);
+    expect(filtrosDesdeUrl(new URLSearchParams('enOferta=1')).enOferta).toBe(false);
+    const f = { ...FILTROS_INICIALES, enOferta: true };
+    expect(filtrosAUrl(f).toString()).toBe('enOferta=true');
+    expect(filtrosDesdeUrl(filtrosAUrl(f))).toEqual(f);
+    expect(filtrosAConsulta(f)).toMatchObject({ enOferta: 'true' });
+    expect(filtrosAConsulta(FILTROS_INICIALES)).not.toHaveProperty('enOferta');
+    expect(hayFiltros(f)).toBe(true);
+  });
+
   it('ignora valores inválidos, incluidos los enlaces del menú con slugs', () => {
-    const f = filtrosDesdeUrl(new URLSearchParams('categoria=decorativos&marca=-1&ambiente=sotano&orden=azar&pagina=0'));
+    const f = filtrosDesdeUrl(
+      new URLSearchParams('categoria=decorativos&marca=-1&ambiente=sotano&orden=azar&pagina=0'),
+    );
     expect(f).toEqual(FILTROS_INICIALES);
     expect(filtrosDesdeUrl(new URLSearchParams('pagina=2.5&marca=1e3')).pagina).toBe(1);
   });

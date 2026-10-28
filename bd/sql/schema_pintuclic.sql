@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.4 (v4.3 + M01: equivalencia en galones de los tipos de medida)
+-- VERSIÓN: 4.19 (v4.18 + M03: cuestionario guiado e incidentes de IA; M20: registro de auditoría)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 58
+-- TOTAL TABLAS: 85
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -52,7 +52,7 @@ BEGIN
 
     -- Estado del ciclo de vida de una cotización
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_cotizacion') THEN
-        CREATE TYPE enum_estado_cotizacion AS ENUM ('borrador', 'enviada', 'aprobada', 'rechazada', 'vencida');
+        CREATE TYPE enum_estado_cotizacion AS ENUM ('solicitada', 'borrador', 'enviada', 'aprobada', 'rechazada', 'vencida');
     END IF;
 
     -- Estado de la transacción de pago
@@ -122,6 +122,142 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_modo_entrega') THEN
         CREATE TYPE enum_modo_entrega AS ENUM ('domicilio', 'recogida');
     END IF;
+
+    -- Catálogo de comunicaciones transaccionales que envía el sistema (M18 - RF-NOT-01-02).
+    -- Espejo de NotificacionesPort.EventoNotificacion['tipo'] (m18-notificaciones).
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_comunicacion') THEN
+        CREATE TYPE enum_tipo_comunicacion AS ENUM (
+            'registro_otp', 'recuperacion_password', 'activacion_empleado',
+            'cambio_correo_otp', 'cambio_correo_confirmado', 'dictamen_empresa'
+        );
+    END IF;
+
+    -- Resultado de un intento de envío transaccional (M18 - RF-NOT-01-03, RF-NOT-01-04)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_envio_notificacion') THEN
+        CREATE TYPE enum_estado_envio_notificacion AS ENUM ('pendiente', 'enviado', 'fallido');
+    END IF;
+
+    -- Motivo y origen de un ajuste de existencia referencial (M13 - HU-INV)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_motivo_ajuste_inventario') THEN
+        CREATE TYPE enum_motivo_ajuste_inventario AS ENUM ('conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_origen_ajuste_inventario') THEN
+        CREATE TYPE enum_origen_ajuste_inventario AS ENUM ('manual', 'carga_masiva', 'samit');
+    END IF;
+
+    -- Precios, eventos de descuento y cupones (M06)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_valor_descuento') THEN
+        CREATE TYPE enum_tipo_valor_descuento AS ENUM ('porcentaje', 'importe_fijo');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_audiencia_descuento') THEN
+        CREATE TYPE enum_audiencia_descuento AS ENUM ('todos', 'particular', 'empresa');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_objetivo_evento') THEN
+        CREATE TYPE enum_tipo_objetivo_evento AS ENUM ('marca', 'linea', 'categoria', 'subcategoria', 'producto', 'variante');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_exclusion_evento') THEN
+        CREATE TYPE enum_tipo_exclusion_evento AS ENUM ('marca', 'linea', 'categoria', 'subcategoria', 'producto', 'variante', 'color', 'familia_color');
+    END IF;
+
+    -- Estado editorial de una página institucional (M16 - HU-CON-01 / HU-CON-03)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_contenido') THEN
+        CREATE TYPE enum_estado_contenido AS ENUM ('borrador', 'publicado', 'archivado');
+    END IF;
+
+    -- Tipo y estado de una solicitud del formulario de contacto (M15 - HU-ATC-02).
+    -- 'cotizacion' es solo intención: el camino formal es el carrito (RF-ATC-02-07).
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_solicitud_contacto') THEN
+        CREATE TYPE enum_tipo_solicitud_contacto AS ENUM ('consulta', 'cotizacion', 'reclamo');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_solicitud_contacto') THEN
+        CREATE TYPE enum_estado_solicitud_contacto AS ENUM ('en_revision', 'atendida', 'rechazada');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_rol_autor_mensaje_solicitud') THEN
+        CREATE TYPE enum_rol_autor_mensaje_solicitud AS ENUM ('cliente', 'equipo');
+    END IF;
+
+    -- Día de la semana del horario de atención humana (M15 - HU-ATC-04)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_dia_semana') THEN
+        CREATE TYPE enum_dia_semana AS ENUM ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo');
+    END IF;
+
+    -- Patrocinios y publicidad (M14 - contracts/m14-patrocinios.contract.ts)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ubicacion_patrocinio') THEN
+        CREATE TYPE enum_ubicacion_patrocinio AS ENUM ('listado', 'inicio', 'complementarios');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_objetivo_patrocinio') THEN
+        CREATE TYPE enum_tipo_objetivo_patrocinio AS ENUM ('producto', 'linea', 'marca');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_espacio_publicitario') THEN
+        CREATE TYPE enum_espacio_publicitario AS ENUM ('inicio', 'catalogo', 'ficha');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_variante_imagen_anuncio') THEN
+        CREATE TYPE enum_variante_imagen_anuncio AS ENUM ('escritorio', 'movil');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tamano_imagen_anuncio') THEN
+        CREATE TYPE enum_tamano_imagen_anuncio AS ENUM ('original', 'mediano', 'pequeno');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_entidad_medicion') THEN
+        CREATE TYPE enum_entidad_medicion AS ENUM ('campania', 'anuncio');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_evento_medicion') THEN
+        CREATE TYPE enum_evento_medicion AS ENUM ('impresion', 'clic');
+    END IF;
+
+    -- M03: cuál de los dos cuestionarios está vigente (contrato M03 · D3)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_modo_cuestionario') THEN
+        CREATE TYPE enum_modo_cuestionario AS ENUM ('fijo', 'asistido');
+    END IF;
+
+    -- M03: de dónde salen las opciones de una pregunta del modo fijo (M03 · F3)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_origen_opciones_asesoria') THEN
+        CREATE TYPE enum_origen_opciones_asesoria AS ENUM ('manual', 'familias_color');
+    END IF;
+
+    -- M03: qué hace elegir una opción (M03 · F2)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_efecto_asesoria') THEN
+        CREATE TYPE enum_tipo_efecto_asesoria AS ENUM ('filtrar', 'filtrar_ambiente', 'incluir');
+    END IF;
+
+    -- M03: dimensiones que M02 sabe filtrar y que por tanto viajan en la URL del catálogo (M03 · V1, V2)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_dimension_filtro_asesoria') THEN
+        CREATE TYPE enum_dimension_filtro_asesoria AS ENUM (
+            'categoria', 'subcategoria', 'superficie', 'familia_color', 'tipo_resina', 'linea'
+        );
+    END IF;
+
+    -- M03: ambiente del producto (producto.uso_interior / uso_exterior de M01, sin ENUM propio hasta ahora)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_ambiente_asesoria') THEN
+        CREATE TYPE enum_ambiente_asesoria AS ENUM ('interior', 'exterior');
+    END IF;
+
+    -- M03: servicio de inteligencia artificial del incidente (M03 · I7)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_servicio_ia') THEN
+        CREATE TYPE enum_servicio_ia AS ENUM ('gemini');
+    END IF;
+
+    -- M03: qué función pedía el servicio cuando falló (M03 · I7)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_funcion_ia') THEN
+        CREATE TYPE enum_funcion_ia AS ENUM ('chat', 'cuestionario');
+    END IF;
+
+    -- M03: tipo de fallo del servicio de IA (M03 · I7)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_incidente_ia') THEN
+        CREATE TYPE enum_tipo_incidente_ia AS ENUM (
+            'tiempo_agotado', 'no_disponible', 'cuota_agotada',
+            'respuesta_no_procesable', 'error_configuracion'
+        );
+    END IF;
+
+    -- M03: cómo terminó el intento (M03 · I7, I9)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_resultado_incidente_ia') THEN
+        CREATE TYPE enum_resultado_incidente_ia AS ENUM ('recuperado', 'fallido', 'suspendido');
+    END IF;
+
+    -- M20 (HU-SEG-04): resultado de la acción auditada (RF-SEG-04-02)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_resultado_auditoria') THEN
+        CREATE TYPE enum_resultado_auditoria AS ENUM ('exito', 'fallo');
+    END IF;
 END $$;
 
 -- ------------------------------------------------------------------------------
@@ -152,6 +288,29 @@ ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'revision_disponibilidad' A
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'preparada' AFTER 'en_preparacion';
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'devuelto' AFTER 'cancelado';
 
+-- M13 (ExistenciaComboPort): la existencia de un combo baja al crearse la orden y vuelve al cancelarse.
+ALTER TYPE enum_origen_ajuste_inventario ADD VALUE IF NOT EXISTS 'orden' AFTER 'samit';
+ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'venta' AFTER 'carga_masiva';
+ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'devolucion' AFTER 'venta';
+-- M21 (v4.18): el cliente pide la cotización desde el carrito; 'borrador' queda por datos anteriores.
+ALTER TYPE enum_estado_cotizacion ADD VALUE IF NOT EXISTS 'solicitada' BEFORE 'borrador';
+
+-- M15 (v4.12): migración idempotente de enum_estado_solicitud_contacto ('pendiente' -> 'en_revision') y adición de 'rechazada'
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+               WHERE t.typname = 'enum_estado_solicitud_contacto' AND e.enumlabel = 'pendiente')
+       AND NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+               WHERE t.typname = 'enum_estado_solicitud_contacto' AND e.enumlabel = 'en_revision') THEN
+        ALTER TYPE enum_estado_solicitud_contacto RENAME VALUE 'pendiente' TO 'en_revision';
+    END IF;
+END $$;
+
+ALTER TYPE enum_estado_solicitud_contacto ADD VALUE IF NOT EXISTS 'rechazada' AFTER 'atendida';
+
+-- M18 (v4.18): aviso al administrador cuando el servicio de IA acumula fallos (M03 · I9, M18 HU-NOT-01)
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'alerta_servicio_ia';
+
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS
 -- ==============================================================================
@@ -171,6 +330,16 @@ COMMENT ON COLUMN descuento.tope IS 'Monto tope máximo en valor monetario aplic
 COMMENT ON COLUMN descuento.porcentaje_descuento IS 'Porcentaje de descuento (0 a 100)';
 COMMENT ON COLUMN descuento.estado IS 'Estado de la regla de descuento (activo/inactivo)';
 
+-- M06 (v4.13): total del carrito (después de eventos, IVA incluido) desde el que aplica el descuento de empresa; 0 = sin mínimo.
+ALTER TABLE descuento ADD COLUMN IF NOT EXISTS monto_minimo_compra NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_descuento_monto_minimo') THEN
+        ALTER TABLE descuento ADD CONSTRAINT chk_descuento_monto_minimo CHECK (monto_minimo_compra >= 0);
+    END IF;
+END $$;
+COMMENT ON COLUMN descuento.monto_minimo_compra IS 'Total mínimo del carrito para que aplique el descuento de empresa; 0 = sin mínimo (M06 · R10)';
+
 -- Tabla: sub_rol_empresa
 CREATE TABLE IF NOT EXISTS sub_rol_empresa (
     id_sub_rol_empresa SERIAL PRIMARY KEY,
@@ -183,6 +352,8 @@ CREATE TABLE IF NOT EXISTS sub_rol_empresa (
 
 COMMENT ON TABLE sub_rol_empresa IS 'Sub-roles empresariales asociados a políticas de descuento';
 COMMENT ON COLUMN sub_rol_empresa.id_descuento IS 'Referencia opcional a una política de descuento';
+COMMENT ON TABLE sub_rol_empresa IS 'Tipos de cliente empresa (Proveedor, Constructora…) con su política de descuento. Se asigna en cuenta_empresa (M06 · D8)';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sub_rol_empresa_nombre ON sub_rol_empresa (lower(btrim(nombre)));
 
 -- Tabla: rol
 CREATE TABLE IF NOT EXISTS rol (
@@ -359,6 +530,18 @@ CREATE TABLE IF NOT EXISTS subcategoria (
 
 COMMENT ON TABLE subcategoria IS 'Nivel 2 y último de la clasificación (RF-CAT-01-02). Mismo nombre permitido bajo categorías distintas (RF-CAT-01-03).';
 
+-- M01 entrega 3 (D6): categoría de la que se extraen los complementarios por defecto de sus productos (RF-CAT-08-01).
+ALTER TABLE subcategoria ADD COLUMN IF NOT EXISTS id_categoria_complementaria INT;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_subcategoria_categoria_complementaria') THEN
+        ALTER TABLE subcategoria ADD CONSTRAINT fk_subcategoria_categoria_complementaria
+            FOREIGN KEY (id_categoria_complementaria) REFERENCES categoria (id_categoria)
+            ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+END $$;
+COMMENT ON COLUMN subcategoria.id_categoria_complementaria IS 'Categoría de la que se sugieren complementarios a los productos de esta subcategoría que no tienen una propia (RF-CAT-08-01). Opcional.';
+
 -- Tabla: superficie
 CREATE TABLE IF NOT EXISTS superficie (
     id_superficie SERIAL PRIMARY KEY,
@@ -476,14 +659,29 @@ CREATE TABLE IF NOT EXISTS medida (
     valor NUMERIC(12, 3) NOT NULL,
     nombre VARCHAR(60) NOT NULL UNIQUE,
     estado enum_estado_general NOT NULL DEFAULT 'activo',
+    imagen BYTEA,
+    imagen_mime_type VARCHAR(50),
     CONSTRAINT fk_medida_tipo FOREIGN KEY (id_tipo_medida)
         REFERENCES tipo_medida (id_tipo_medida) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT chk_medida_valor CHECK (valor > 0),
     CONSTRAINT uq_medida_valor_tipo UNIQUE (id_tipo_medida, valor)
 );
 
+-- Esquema 4.5: en bases creadas con el 4.4 la tabla ya existe sin las columnas de imagen.
+ALTER TABLE medida ADD COLUMN IF NOT EXISTS imagen BYTEA;
+ALTER TABLE medida ADD COLUMN IF NOT EXISTS imagen_mime_type VARCHAR(50);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_medida_imagen') THEN
+        ALTER TABLE medida ADD CONSTRAINT chk_medida_imagen
+            CHECK ((imagen IS NULL) = (imagen_mime_type IS NULL));
+    END IF;
+END $$;
+
 COMMENT ON TABLE medida IS 'Medida vendible reutilizable entre productos: valor + tipo de medida (ej. 1 galón, 5 galones, 2 pulgadas).';
 COMMENT ON COLUMN medida.nombre IS 'Cómo se muestra al cliente (ej. "1/4 de galón")';
+COMMENT ON COLUMN medida.imagen IS 'Imagen opcional de la medida (ej. la silueta del envase), en bytes. Se muestra junto a la galería del producto.';
+COMMENT ON COLUMN medida.imagen_mime_type IS 'Tipo de la imagen de la medida: image/jpeg, image/png o image/webp. Va siempre junto con imagen.';
 
 -- ------------------------------------------------------------------------------
 -- 3.4 Color
@@ -548,7 +746,6 @@ CREATE TABLE IF NOT EXISTS producto (
     estado enum_estado_general NOT NULL DEFAULT 'activo',
     publicado BOOLEAN NOT NULL DEFAULT false,
     id_categoria_complementaria INT,
-    patrocinado BOOLEAN NOT NULL DEFAULT false,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT fk_producto_marca FOREIGN KEY (id_marca)
         REFERENCES marca (id_marca) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -561,10 +758,20 @@ CREATE TABLE IF NOT EXISTS producto (
     CONSTRAINT uq_producto_nombre_marca UNIQUE (id_marca, nombre)
 );
 
+-- Migración idempotente (M14 · A13): el interruptor manual `patrocinado` se retira. El patrocinio es de las campañas de M14
+-- (campania_patrocinio), con vigencia, prioridad y ubicación. M01 dejó de leer y escribir la columna antes de este cambio.
+ALTER TABLE producto DROP COLUMN IF EXISTS patrocinado;
+
 COMMENT ON TABLE producto IS 'Producto del catálogo (HU-CAT-02): marca → línea (opcional) → producto. Pertenece a una subcategoría y se etiqueta con superficies y ambiente.';
 COMMENT ON CONSTRAINT fk_producto_linea_marca ON producto IS 'La línea, si existe, debe ser de la misma marca del producto (RF-CAT-11-02, CA-CAT-11-02).';
 COMMENT ON COLUMN producto.uso_interior IS 'Ambiente: apto para interiores. Junto con uso_exterior alimenta las pestañas Pintura Interior / Exterior.';
 COMMENT ON COLUMN producto.publicado IS 'Visible en el catálogo público (RF-CAT-02-05).';
+
+-- M01 entrega 3 (K1, K4): combos como producto con una sola variante.
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS es_combo BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS excluido_de_descuentos BOOLEAN NOT NULL DEFAULT false;
+COMMENT ON COLUMN producto.es_combo IS 'Combo (HU-CAT-13): paquete a precio propio con una única variante; único producto cuya venta se limita por existencia. No cambia después de creado.';
+COMMENT ON COLUMN producto.excluido_de_descuentos IS 'Si es true, M06 no le aplica descuentos ni a clientes empresa (RF-CAT-13-01, CA-CAT-13-09). Pensado para combos.';
 
 -- Tabla: ficha_recubrimiento (1:1 opcional con producto)
 CREATE TABLE IF NOT EXISTS ficha_recubrimiento (
@@ -573,6 +780,7 @@ CREATE TABLE IF NOT EXISTS ficha_recubrimiento (
     tipo_calidad SMALLINT,
     rendimiento_min NUMERIC(8, 2),
     rendimiento_max NUMERIC(8, 2),
+    manos SMALLINT,
     CONSTRAINT fk_ficha_producto FOREIGN KEY (id_producto)
         REFERENCES producto (id_producto) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_ficha_resina FOREIGN KEY (id_tipo_resina)
@@ -582,12 +790,23 @@ CREATE TABLE IF NOT EXISTS ficha_recubrimiento (
         (rendimiento_min IS NULL AND rendimiento_max IS NULL)
         OR (rendimiento_min IS NOT NULL AND rendimiento_max IS NOT NULL
             AND rendimiento_min > 0 AND rendimiento_min <= rendimiento_max)
-    )
+    ),
+    CONSTRAINT chk_ficha_manos CHECK (manos IS NULL OR manos BETWEEN 1 AND 10)
 );
+
+-- Esquema 4.5: en bases creadas con el 4.4 la tabla ya existe sin la columna.
+ALTER TABLE ficha_recubrimiento ADD COLUMN IF NOT EXISTS manos SMALLINT;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_ficha_manos') THEN
+        ALTER TABLE ficha_recubrimiento ADD CONSTRAINT chk_ficha_manos CHECK (manos IS NULL OR manos BETWEEN 1 AND 10);
+    END IF;
+END $$;
 
 COMMENT ON TABLE ficha_recubrimiento IS 'Datos técnicos de pinturas, estucos, barnices y demás recubrimientos (HU-CAT-10). Las herramientas no tienen ficha.';
 COMMENT ON COLUMN ficha_recubrimiento.tipo_calidad IS 'Tipo 1, 2 o 3 del fabricante (1 = gama alta, ej. Viniltex Ultralavable). Opcional.';
 COMMENT ON COLUMN ficha_recubrimiento.rendimiento_min IS 'Rendimiento mínimo en m² por galón (RF-CAT-10-02).';
+COMMENT ON COLUMN ficha_recubrimiento.manos IS 'Manos de aplicación con las que se logra el rendimiento (ej. 35 m² por galón a 2 manos). Opcional, de 1 a 10.';
 
 -- Tabla: producto_superficie
 CREATE TABLE IF NOT EXISTS producto_superficie (
@@ -709,6 +928,19 @@ CREATE TABLE IF NOT EXISTS imagen (
 
 COMMENT ON TABLE imagen IS 'Imágenes de un producto (HU-CAT-07) como BYTEA (RF-CAT-07-03). Pueden asociarse a una variante o a un color (RF-CAT-07-02).';
 
+-- M01 entrega 3 (I5, I7): una imagen se asocia a una variante o a un color, nunca a ambos; y lleva miniaturas.
+ALTER TABLE imagen ADD COLUMN IF NOT EXISTS miniatura BYTEA;
+ALTER TABLE imagen ADD COLUMN IF NOT EXISTS mediana BYTEA;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_imagen_una_asociacion') THEN
+        ALTER TABLE imagen ADD CONSTRAINT chk_imagen_una_asociacion
+            CHECK (id_variante IS NULL OR id_color IS NULL);
+    END IF;
+END $$;
+COMMENT ON COLUMN imagen.miniatura IS 'Miniatura de 320 px en WebP, para los listados (RNF-CAT-07-01). Null en imágenes anteriores: se genera al pedirla por primera vez.';
+COMMENT ON COLUMN imagen.mediana IS 'Versión de 960 px en WebP, para la ficha. Null en imágenes anteriores: se genera al pedirla por primera vez.';
+
 -- Una sola imagen principal por producto (CA-CAT-07-02)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_imagen_principal ON imagen (id_producto) WHERE es_principal;
 
@@ -749,12 +981,32 @@ CREATE TABLE IF NOT EXISTS carrito (
     token_visitante VARCHAR(255),
     id_usuario INT,
     fecha_ultima_actividad TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_carrito_usuario FOREIGN KEY (id_usuario) 
-        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
+    CONSTRAINT fk_carrito_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_carrito_usuario UNIQUE (id_usuario),
+    CONSTRAINT uq_carrito_token_visitante UNIQUE (token_visitante)
 );
 
+-- M05 (v4.15): un carrito por cuenta y uno por token de visitante (contrato m05-carrito, P1). En PostgreSQL
+-- los NULL no chocan entre sí. Bases anteriores: se agregan las restricciones si no hay duplicados.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_carrito_usuario') THEN
+        IF EXISTS (SELECT 1 FROM carrito WHERE id_usuario IS NOT NULL GROUP BY id_usuario HAVING count(*) > 1) THEN
+            RAISE EXCEPTION 'M05 (4.15): hay cuentas con más de un carrito. Unirlos a mano antes de aplicar el esquema.';
+        END IF;
+        ALTER TABLE carrito ADD CONSTRAINT uq_carrito_usuario UNIQUE (id_usuario);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_carrito_token_visitante') THEN
+        IF EXISTS (SELECT 1 FROM carrito WHERE token_visitante IS NOT NULL GROUP BY token_visitante HAVING count(*) > 1) THEN
+            RAISE EXCEPTION 'M05 (4.15): hay tokens de visitante repetidos en carrito. Corregirlos a mano antes de aplicar el esquema.';
+        END IF;
+        ALTER TABLE carrito ADD CONSTRAINT uq_carrito_token_visitante UNIQUE (token_visitante);
+    END IF;
+END $$;
+
 COMMENT ON TABLE carrito IS 'Cabecera del carrito de compras vivo para usuarios y visitantes';
-COMMENT ON COLUMN carrito.token_visitante IS 'Identificador para carritos anónimos antes del inicio de sesión';
+COMMENT ON COLUMN carrito.token_visitante IS 'SHA-256 del token opaco de la cookie pc_cart del visitante (nunca el token); null en el carrito de una cuenta (M05 · C2)';
 COMMENT ON COLUMN carrito.id_usuario IS 'Cliente autenticado propietario del carrito (nullable)';
 
 -- Tabla: linea_carrito
@@ -791,7 +1043,7 @@ CREATE TABLE IF NOT EXISTS cotizacion (
     id_cotizacion SERIAL PRIMARY KEY,
     id_usuario INT,
     id_rol INT,
-    estado enum_estado_cotizacion NOT NULL DEFAULT 'borrador',
+    estado enum_estado_cotizacion NOT NULL DEFAULT 'solicitada',
     fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_cotizacion_usuario FOREIGN KEY (id_usuario)
         REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
@@ -799,7 +1051,87 @@ CREATE TABLE IF NOT EXISTS cotizacion (
         REFERENCES rol (id_rol) ON UPDATE CASCADE ON DELETE SET NULL
 );
 
-COMMENT ON TABLE cotizacion IS 'Cotizaciones comerciales B2B / B2C vinculadas a usuario y rol que pueden originar órdenes';
+-- M21 (v4.18): datos de la cotización (contrato m21-cotizaciones). Columnas nuevas, idempotentes.
+ALTER TABLE cotizacion ALTER COLUMN estado SET DEFAULT 'solicitada';
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS codigo_visible VARCHAR(20)
+    GENERATED ALWAYS AS ('COT-' || lpad(id_cotizacion::text, 6, '0')) STORED;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS comentario_cliente VARCHAR(500);
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS nota_para_cliente VARCHAR(1000);
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS motivo_rechazo VARCHAR(500);
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS fecha_envio TIMESTAMPTZ;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS fecha_vencimiento DATE;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS fecha_respuesta TIMESTAMPTZ;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS id_usuario_responde INT;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS total_referencia NUMERIC(14, 2) NOT NULL DEFAULT 0;
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS total_acordado NUMERIC(14, 2);
+ALTER TABLE cotizacion ADD COLUMN IF NOT EXISTS fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now();
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_cotizacion_usuario_responde') THEN
+        ALTER TABLE cotizacion ADD CONSTRAINT fk_cotizacion_usuario_responde FOREIGN KEY (id_usuario_responde)
+            REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_cotizacion_totales') THEN
+        ALTER TABLE cotizacion ADD CONSTRAINT chk_cotizacion_totales
+            CHECK (total_referencia >= 0 AND (total_acordado IS NULL OR total_acordado >= 0));
+    END IF;
+END $$;
+
+COMMENT ON TABLE cotizacion IS 'Cotización pedida por un cliente desde su carrito y respondida por el equipo comercial (M21)';
+COMMENT ON COLUMN cotizacion.codigo_visible IS 'Código para el cliente (COT-000123); lo calcula la base a partir del id (M21 · R13)';
+COMMENT ON COLUMN cotizacion.nota_para_cliente IS 'Nota del equipo comercial que ve el cliente (M21 · R5)';
+COMMENT ON COLUMN cotizacion.fecha_vencimiento IS 'Último día de vigencia en hora de Colombia; pasada, una enviada queda vencida (M21 · R10)';
+COMMENT ON COLUMN cotizacion.total_referencia IS 'Suma de precio_referencia × cantidad de sus líneas (M21 · R11)';
+COMMENT ON COLUMN cotizacion.total_acordado IS 'Suma de precio_acordado × cantidad al enviarla; null mientras no se envía (M21 · R11)';
+
+-- Tabla: linea_cotizacion
+-- Copia de una línea del carrito al pedir la cotización, con el precio que fija el equipo comercial (M21 · R2, R5).
+CREATE TABLE IF NOT EXISTS linea_cotizacion (
+    id_linea_cotizacion SERIAL PRIMARY KEY,
+    id_cotizacion INT NOT NULL,
+    id_variante INT NOT NULL,
+    id_color INT,
+    cantidad INT NOT NULL,
+    precio_referencia NUMERIC(12, 2) NOT NULL,
+    precio_acordado NUMERIC(12, 2),
+    nombre_producto VARCHAR(150) NOT NULL,
+    marca VARCHAR(100),
+    medida VARCHAR(100),
+    sku VARCHAR(60),
+    color_nombre VARCHAR(100),
+    color_hexadecimal CHAR(7),
+    CONSTRAINT fk_lineacotizacion_cotizacion FOREIGN KEY (id_cotizacion)
+        REFERENCES cotizacion (id_cotizacion) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_lineacotizacion_variante FOREIGN KEY (id_variante)
+        REFERENCES variante (id_variante) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_lineacotizacion_color FOREIGN KEY (id_color)
+        REFERENCES color (id_color) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT chk_lineacotizacion_cantidad CHECK (cantidad BETWEEN 1 AND 9999),
+    CONSTRAINT chk_lineacotizacion_precios CHECK (precio_referencia >= 0 AND (precio_acordado IS NULL OR precio_acordado >= 0)),
+    CONSTRAINT chk_lineacotizacion_hex CHECK (color_hexadecimal IS NULL OR color_hexadecimal ~ '^#[0-9A-Fa-f]{6}$'),
+    CONSTRAINT uq_lineacotizacion_variante_color UNIQUE NULLS NOT DISTINCT (id_cotizacion, id_variante, id_color)
+);
+
+COMMENT ON TABLE linea_cotizacion IS 'Líneas de una cotización: copia del carrito al pedirla y precio acordado por el equipo comercial (M21)';
+COMMENT ON COLUMN linea_cotizacion.precio_referencia IS 'Precio unitario que veía el cliente al pedirla, calculado por M06 (M21 · R2)';
+COMMENT ON COLUMN linea_cotizacion.precio_acordado IS 'Precio unitario que fija el equipo comercial; null mientras no lo define (M21 · R5)';
+
+-- M21 (v4.18): líneas del carrito que vienen de una cotización aceptada, con su precio fijo (M05 · C15).
+ALTER TABLE linea_carrito ADD COLUMN IF NOT EXISTS id_cotizacion INT;
+ALTER TABLE linea_carrito ADD COLUMN IF NOT EXISTS precio_acordado NUMERIC(12, 2);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_lineacarrito_cotizacion') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT fk_lineacarrito_cotizacion FOREIGN KEY (id_cotizacion)
+            REFERENCES cotizacion (id_cotizacion) ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_lineacarrito_acordada') THEN
+        ALTER TABLE linea_carrito ADD CONSTRAINT chk_lineacarrito_acordada
+            CHECK ((id_cotizacion IS NULL) = (precio_acordado IS NULL) AND (precio_acordado IS NULL OR precio_acordado >= 0));
+    END IF;
+END $$;
+COMMENT ON COLUMN linea_carrito.id_cotizacion IS 'Cotización aceptada de la que viene la línea; null en una línea normal (M05 · C15)';
+COMMENT ON COLUMN linea_carrito.precio_acordado IS 'Precio unitario pactado en la cotización; M06 lo respeta sin descuentos (R3)';
 
 -- Tabla: orden
 -- Reemplazo inmutable de pedido. Posee código visible, origen y trazabilidad legal.
@@ -1207,7 +1539,7 @@ CREATE TABLE IF NOT EXISTS direccion_cliente (
         REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-COMMENT ON TABLE direccion_cliente IS 'Libreta de direcciones de entrega guardadas por cada cliente (HU-CUE-07)';
+COMMENT ON TABLE direccion_cliente IS 'Dirección de entrega guardada por el cliente: una sola por cuenta (HU-CUE-07)';
 COMMENT ON COLUMN direccion_cliente.id_direccion IS 'UUID único de la dirección; referenciado en órdenes de despacho';
 COMMENT ON COLUMN direccion_cliente.es_predeterminada IS 'Bandera de dirección principal seleccionada para compras rápidas';
 COMMENT ON COLUMN direccion_cliente.latitud IS 'Coordenada geográfica de latitud para geolocalización precisa';
@@ -1265,6 +1597,18 @@ CREATE TABLE IF NOT EXISTS cuenta_empresa (
 COMMENT ON TABLE cuenta_empresa IS 'Datos y NIT vigente de las cuentas empresa aprobadas; extensión 1:1 de usuario (HU-CUE-09, HU-CUE-10)';
 COMMENT ON COLUMN cuenta_empresa.id_usuario IS 'Cuenta empresa a la que pertenece (PK y FK: relación 1:1 con usuario)';
 COMMENT ON COLUMN cuenta_empresa.nit IS 'NIT o RUT VIGENTE. Solo cambia por una renovación aprobada (RN-CUE-13); único en todo el sistema (RN-CUE-14)';
+
+-- M06 (v4.13): tipo de cliente empresa que fija el descuento de la cuenta. Lo asigna el administrador al aprobar la
+-- solicitud y lo puede cambiar después; NULL = sin descuento (cuentas anteriores a M06).
+ALTER TABLE cuenta_empresa ADD COLUMN IF NOT EXISTS id_sub_rol_empresa INT;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_cuenta_empresa_sub_rol') THEN
+        ALTER TABLE cuenta_empresa ADD CONSTRAINT fk_cuenta_empresa_sub_rol FOREIGN KEY (id_sub_rol_empresa)
+            REFERENCES sub_rol_empresa (id_sub_rol_empresa) ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+END $$;
+COMMENT ON COLUMN cuenta_empresa.id_sub_rol_empresa IS 'Tipo de cliente empresa (sub-rol) que define su descuento; NULL = sin descuento (M06 · D8, R20)';
 COMMENT ON COLUMN cuenta_empresa.id_solicitud_origen IS 'Solicitud de empresa cuya aprobación dio origen a esta cuenta; trazabilidad histórica';
 COMMENT ON COLUMN cuenta_empresa.fecha_aprobacion IS 'Momento en que se habilitaron las condiciones comerciales de empresa';
 
@@ -1480,6 +1824,710 @@ CREATE TRIGGER trg_parametro_sistema_fecha
     FOR EACH ROW EXECUTE FUNCTION fn_parametro_sistema_fecha();
 
 -- ==============================================================================
+-- 9D. MÓDULO DE NOTIFICACIONES Y COMUNICACIONES (M18)
+-- ==============================================================================
+
+-- Tabla: plantilla_notificacion
+-- Copia introductoria editable desde el panel para cada comunicación transaccional (M18 · HU-NOT-03).
+-- Solo texto plano: el admin nunca edita HTML ni variables. El maquetado (caja de código, botón,
+-- datos dinámicos) vive fijo en código (adapters/plantillas-html.ts) para que no pueda romperse
+-- desde el panel ni dejar de sustituirse una variable por error de escritura.
+CREATE TABLE IF NOT EXISTS plantilla_notificacion (
+    id_plantilla UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tipo enum_tipo_comunicacion NOT NULL UNIQUE,
+    asunto VARCHAR(200) NOT NULL,
+    contenido_texto TEXT NOT NULL,
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_plantilla_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+COMMENT ON TABLE plantilla_notificacion IS 'Copia introductoria de cada comunicación transaccional, editable desde el panel (M18 · HU-NOT-03)';
+COMMENT ON COLUMN plantilla_notificacion.contenido_texto IS 'Texto plano sin HTML ni variables; el sistema lo inserta en el maquetado fijo de cada tipo';
+
+-- Tabla: envio_notificacion
+-- Registro de cada envío transaccional intentado, con su resultado final, para diagnosticar fallos de
+-- entrega (RF-NOT-01-04, RT-23). Distinto de la auditoría de seguridad (RN-SEG-12): nunca sustituye esa.
+CREATE TABLE IF NOT EXISTS envio_notificacion (
+    id_envio UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tipo enum_tipo_comunicacion NOT NULL,
+    destinatario VARCHAR(150) NOT NULL,
+    estado enum_estado_envio_notificacion NOT NULL DEFAULT 'pendiente',
+    intentos INT NOT NULL DEFAULT 0,
+    max_intentos INT NOT NULL DEFAULT 3,
+    ultimo_error TEXT,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_resultado TIMESTAMPTZ,
+    CONSTRAINT ck_envio_intentos_no_negativo CHECK (intentos >= 0)
+);
+
+COMMENT ON TABLE envio_notificacion IS 'Registro de envíos transaccionales con su resultado y reintentos, para diagnóstico de entregabilidad (M18 · RF-NOT-01-03, RF-NOT-01-04)';
+COMMENT ON COLUMN envio_notificacion.ultimo_error IS 'Mensaje de error genérico del último intento fallido; nunca contenido sensible ni trazas';
+
+-- Tabla: rebote_notificacion
+-- Rebotes de entrega reportados por el proveedor SMTP para un envío ya registrado (M18 · RF-NOT-04-04).
+CREATE TABLE IF NOT EXISTS rebote_notificacion (
+    id_rebote UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_envio UUID,
+    destinatario VARCHAR(150) NOT NULL,
+    motivo TEXT,
+    fecha_registro TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_rebote_envio FOREIGN KEY (id_envio)
+        REFERENCES envio_notificacion (id_envio) ON DELETE SET NULL
+);
+
+COMMENT ON TABLE rebote_notificacion IS 'Rebotes de entrega de correo para diagnóstico (M18 · HU-NOT-04, RF-NOT-04-04)';
+
+-- Tabla: ajuste_inventario
+-- Historial inmutable de cada cambio de la existencia referencial de una variante (M13). Se escribe en la
+-- misma transacción que el cambio de variante.existencia_referencial; solo se inserta, nunca se edita ni se borra.
+-- id_usuario queda NULL si el usuario se elimina; la variante no se puede eliminar mientras tenga historial.
+CREATE TABLE IF NOT EXISTS ajuste_inventario (
+    id_ajuste SERIAL PRIMARY KEY,
+    id_variante INT NOT NULL,
+    existencia_anterior INT NOT NULL,
+    existencia_nueva INT NOT NULL,
+    motivo enum_motivo_ajuste_inventario NOT NULL DEFAULT 'correccion',
+    nota VARCHAR(500),
+    origen enum_origen_ajuste_inventario NOT NULL DEFAULT 'manual',
+    id_carga UUID,
+    id_usuario INT,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_ajuste_variante FOREIGN KEY (id_variante)
+        REFERENCES variante (id_variante) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_ajuste_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_ajuste_existencia_anterior CHECK (existencia_anterior >= 0),
+    CONSTRAINT ck_ajuste_existencia_nueva CHECK (existencia_nueva >= 0),
+    CONSTRAINT ck_ajuste_cambio_real CHECK (existencia_anterior <> existencia_nueva)
+);
+
+COMMENT ON TABLE ajuste_inventario IS 'Historial inmutable de ajustes de la existencia referencial por variante (M13); el inventario no bloquea ventas';
+COMMENT ON COLUMN ajuste_inventario.id_carga IS 'Identificador generado por el cliente para agrupar los ajustes de una misma carga masiva; sin tabla propia';
+-- M13 (P6): el movimiento de una orden guarda su referencia; con ella, repetir la misma operación no mueve dos veces.
+ALTER TABLE ajuste_inventario ADD COLUMN IF NOT EXISTS referencia VARCHAR(100);
+COMMENT ON COLUMN ajuste_inventario.referencia IS 'Identificador de la orden que movió la existencia de un combo (origen orden). Único por variante y motivo: hace idempotente descontar y reponer.';
+COMMENT ON COLUMN ajuste_inventario.origen IS 'manual = ajuste en pantalla; carga_masiva = plantilla CSV; samit = integración futura';
+
+-- ==============================================================================
+-- 9E. MÓDULO DE CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (M16 - HU-CON-01 a HU-CON-04)
+-- ==============================================================================
+
+-- Tabla: pagina_institucional
+-- Páginas estáticas e institucionales administrables (Sobre Nosotros, Términos, Privacidad, Envíos).
+-- Separada de aviso_privacidad (M20 Habeas Data) para respetar fronteras de módulo.
+CREATE TABLE IF NOT EXISTS pagina_institucional (
+    id_pagina SERIAL PRIMARY KEY,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    titulo VARCHAR(160) NOT NULL,
+    resumen VARCHAR(300),
+    cuerpo_markdown TEXT NOT NULL,
+    estado enum_estado_contenido NOT NULL DEFAULT 'borrador',
+    id_autor INT,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_pagina_institucional_autor FOREIGN KEY (id_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_pagina_slug_formato CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+    CONSTRAINT ck_pagina_titulo_no_vacio CHECK (length(trim(titulo)) >= 3),
+    CONSTRAINT ck_pagina_cuerpo_no_vacio CHECK (length(trim(cuerpo_markdown)) >= 10)
+);
+
+COMMENT ON TABLE pagina_institucional IS 'Páginas de contenido institucional y políticas informativas de vitrina (M16 - HU-CON-01, HU-CON-03)';
+COMMENT ON COLUMN pagina_institucional.slug IS 'Identificador URL único en formato kebab-case (ej. sobre-nosotros, terminos-y-condiciones)';
+COMMENT ON COLUMN pagina_institucional.estado IS 'Ciclo de vida editorial: borrador, publicado o archivado. Solo publicado es visible en rutas públicas';
+COMMENT ON COLUMN pagina_institucional.id_autor IS 'Último usuario administrador/empleado que creó o editó la página';
+
+-- Tabla: faq_entrada
+-- Preguntas frecuentes del Centro de Ayuda público (HU-CON-02, HU-CON-04) y puerto hacia M15.
+CREATE TABLE IF NOT EXISTS faq_entrada (
+    id_faq SERIAL PRIMARY KEY,
+    pregunta VARCHAR(240) NOT NULL,
+    respuesta_markdown TEXT NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    id_autor INT,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_faq_entrada_autor FOREIGN KEY (id_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_faq_pregunta_no_vacia CHECK (length(trim(pregunta)) >= 5),
+    CONSTRAINT ck_faq_respuesta_no_vacia CHECK (length(trim(respuesta_markdown)) >= 5),
+    CONSTRAINT ck_faq_orden_no_negativo CHECK (orden >= 0)
+);
+
+COMMENT ON TABLE faq_entrada IS 'Entradas del catálogo de preguntas frecuentes (FAQ) para el Centro de Ayuda y puerto hacia M15 (M16 - HU-CON-02, HU-CON-04)';
+COMMENT ON COLUMN faq_entrada.orden IS 'Posición de visualización ascendente en el Centro de Ayuda público';
+COMMENT ON COLUMN faq_entrada.estado IS 'Visibilidad pública de la entrada: activo o inactivo';
+COMMENT ON COLUMN faq_entrada.id_autor IS 'Último usuario administrador/empleado que creó o modificó la entrada';
+
+-- ==============================================================================
+-- 9F. MÓDULO DE ATENCIÓN AL CLIENTE (M15 - HU-ATC-02, HU-ATC-03, HU-ATC-04)
+-- Las preguntas frecuentes NO viven aquí: son de M16 (`faq_entrada`), que las
+-- expone por puerto. M15 aporta el contacto, el horario y el canal directo.
+-- ==============================================================================
+
+-- Tabla: solicitud_contacto
+-- Solicitudes enviadas desde el formulario de contacto por un usuario autenticado (M15 · HU-ATC-02).
+-- Los datos de contacto NO se guardan aquí: se resuelven desde la cuenta al mostrarlas (RF-ATC-02-04).
+-- Una solicitud de tipo 'cotizacion' es un mensaje de intención y nunca genera una cotización (RF-ATC-02-07).
+CREATE TABLE IF NOT EXISTS solicitud_contacto (
+    id_solicitud UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario INT NOT NULL,
+    tipo enum_tipo_solicitud_contacto NOT NULL,
+    descripcion VARCHAR(2000) NOT NULL,
+    estado enum_estado_solicitud_contacto NOT NULL DEFAULT 'en_revision',
+    calificacion SMALLINT,
+    fecha_calificacion TIMESTAMPTZ,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_solicitud_contacto_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_solicitud_contacto_calificacion CHECK (
+        calificacion IS NULL OR (calificacion >= 1 AND calificacion <= 5)
+    )
+);
+
+-- Evolución idempotente para bases creadas en v4.11
+ALTER TABLE solicitud_contacto ALTER COLUMN estado SET DEFAULT 'en_revision';
+ALTER TABLE solicitud_contacto ADD COLUMN IF NOT EXISTS calificacion SMALLINT;
+ALTER TABLE solicitud_contacto ADD COLUMN IF NOT EXISTS fecha_calificacion TIMESTAMPTZ;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_solicitud_contacto_calificacion') THEN
+        ALTER TABLE solicitud_contacto ADD CONSTRAINT ck_solicitud_contacto_calificacion
+            CHECK (calificacion IS NULL OR (calificacion >= 1 AND calificacion <= 5));
+    END IF;
+END $$;
+
+COMMENT ON TABLE solicitud_contacto IS 'Solicitudes del formulario de contacto (consulta, cotización o reclamo) con hilo de conversación y calificación (M15 · HU-ATC-02)';
+COMMENT ON COLUMN solicitud_contacto.tipo IS 'cotizacion = intención de cotizar; el camino formal es el carrito (RF-ATC-02-07)';
+COMMENT ON COLUMN solicitud_contacto.calificacion IS 'Valoración de 1 a 5 estrellas otorgada por el cliente cuando la solicitud pasa a atendida (R13)';
+
+-- Tabla: mensaje_solicitud_contacto
+-- Mensajes del hilo de conversación ("ping-pong" libre) entre el cliente titular y el equipo (M15 · R12).
+CREATE TABLE IF NOT EXISTS mensaje_solicitud_contacto (
+    id_mensaje UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_solicitud UUID NOT NULL,
+    id_autor INT NOT NULL,
+    rol_autor enum_rol_autor_mensaje_solicitud NOT NULL,
+    contenido VARCHAR(2000) NOT NULL,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_mensaje_solicitud_contacto FOREIGN KEY (id_solicitud)
+        REFERENCES solicitud_contacto (id_solicitud) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_mensaje_solicitud_autor FOREIGN KEY (id_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+COMMENT ON TABLE mensaje_solicitud_contacto IS 'Mensajes del hilo de conversación de una solicitud de contacto entre el cliente y el equipo (M15 · R12)';
+
+-- Tabla: horario_atencion
+-- Horario de atención humana configurable, una fila por día de la semana (M15 · HU-ATC-04).
+-- Un día con abierto = FALSE está cerrado toda la jornada y no lleva horas. Solo condiciona los
+-- canales atendidos por personas; los automatizados operan igual fuera de él (RF-ATC-04-04).
+CREATE TABLE IF NOT EXISTS horario_atencion (
+    id_horario SERIAL PRIMARY KEY,
+    dia_semana enum_dia_semana NOT NULL UNIQUE,
+    abierto BOOLEAN NOT NULL DEFAULT TRUE,
+    hora_inicio VARCHAR(5),
+    hora_fin VARCHAR(5),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_horario_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_horario_formato_horas CHECK (
+        (hora_inicio IS NULL OR hora_inicio ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        AND (hora_fin IS NULL OR hora_fin ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ),
+    CONSTRAINT ck_horario_franja_coherente CHECK (
+        (abierto = FALSE AND hora_inicio IS NULL AND hora_fin IS NULL)
+        OR (abierto = TRUE AND hora_inicio IS NOT NULL AND hora_fin IS NOT NULL AND hora_fin > hora_inicio)
+    )
+);
+
+COMMENT ON TABLE horario_atencion IS 'Horario de atención humana por día de la semana, configurable desde el panel (M15 · HU-ATC-04)';
+COMMENT ON COLUMN horario_atencion.hora_inicio IS 'Hora local "HH:mm" en 24h; NULL cuando el día está cerrado';
+
+-- Tabla: configuracion_atencion_whatsapp
+-- Destino del botón de contacto directo por WhatsApp, de fila única (M15 · HU-ATC-03).
+-- `destino` admite una URL completa (hoy el canal de difusión de la empresa, que no acepta texto
+-- prellenado) o un número de WhatsApp Business cuando exista; en ese caso el botón arma el enlace
+-- wa.me con el mensaje base y la referencia del producto (RF-ATC-03-02, RF-ATC-03-03).
+CREATE TABLE IF NOT EXISTS configuracion_atencion_whatsapp (
+    id_configuracion SMALLINT PRIMARY KEY DEFAULT 1,
+    destino VARCHAR(300) NOT NULL,
+    mensaje_base VARCHAR(300),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_whatsapp_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_whatsapp_fila_unica CHECK (id_configuracion = 1)
+);
+
+COMMENT ON TABLE configuracion_atencion_whatsapp IS 'Destino y mensaje base del botón de contacto directo por WhatsApp; fila única (M15 · HU-ATC-03)';
+COMMENT ON COLUMN configuracion_atencion_whatsapp.destino IS 'URL completa (canal de difusión) o número de WhatsApp Business; el enlace se arma según cuál sea';
+
+-- ==============================================================================
+-- 9.x PRECIOS, EVENTOS DE DESCUENTO Y CUPONES (M06 · contracts/m06-precios.contract.ts)
+-- ==============================================================================
+
+-- Tabla: evento_descuento
+-- Evento de descuento con calendario (M06 · R4). Fechas y horas son de calendario en hora de Colombia, sin huso:
+-- las horas van como texto "HH:mm" (igual que horario_atencion). dias_semana: ISO 1 = lunes … 7 = domingo; vacío = todos.
+CREATE TABLE IF NOT EXISTS evento_descuento (
+    id_evento SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(500),
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE,
+    dias_semana SMALLINT[] NOT NULL DEFAULT '{}',
+    hora_inicio VARCHAR(5),
+    hora_fin VARCHAR(5),
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_evento_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_evento_nombre CHECK (length(btrim(nombre)) >= 3),
+    CONSTRAINT ck_evento_fechas CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio),
+    CONSTRAINT ck_evento_dias_semana CHECK (dias_semana <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::SMALLINT[]),
+    CONSTRAINT ck_evento_formato_horas CHECK (
+        (hora_inicio IS NULL OR hora_inicio ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        AND (hora_fin IS NULL OR hora_fin ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+    ),
+    CONSTRAINT ck_evento_horas_coherentes CHECK (
+        (hora_inicio IS NULL AND hora_fin IS NULL)
+        OR (hora_inicio IS NOT NULL AND hora_fin IS NOT NULL AND hora_fin > hora_inicio)
+    )
+);
+
+COMMENT ON TABLE evento_descuento IS 'Eventos de descuento con calendario: fechas, días de la semana que se repiten y horas (M06 · R4)';
+COMMENT ON COLUMN evento_descuento.nombre IS 'Se muestra al cliente y se congela como origen del descuento en la orden (M06 · D11)';
+COMMENT ON COLUMN evento_descuento.dias_semana IS 'Días ISO (1 = lunes … 7 = domingo); vacío = todos los días del rango';
+COMMENT ON COLUMN evento_descuento.hora_inicio IS 'Hora local "HH:mm" en 24h; NULL con hora_fin NULL = todo el día';
+
+-- Tabla: evento_regla
+-- Una regla de un evento: objetivo (marca, línea, categoría, subcategoría, producto o variante; NULL = todo el
+-- catálogo) y su propio porcentaje (M06 · R5). El id_objetivo no lleva FK porque apunta a seis tablas (M06 · D10).
+CREATE TABLE IF NOT EXISTS evento_regla (
+    id_regla SERIAL PRIMARY KEY,
+    id_evento INT NOT NULL,
+    tipo_objetivo enum_tipo_objetivo_evento,
+    id_objetivo INT,
+    porcentaje NUMERIC(5, 2) NOT NULL,
+    orden SMALLINT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_evento_regla_evento FOREIGN KEY (id_evento)
+        REFERENCES evento_descuento (id_evento) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_evento_regla_evento UNIQUE (id_regla, id_evento),
+    CONSTRAINT ck_evento_regla_porcentaje CHECK (porcentaje > 0 AND porcentaje <= 100),
+    CONSTRAINT ck_evento_regla_objetivo CHECK ((tipo_objetivo IS NULL) = (id_objetivo IS NULL))
+);
+
+COMMENT ON TABLE evento_regla IS 'Reglas de un evento: objetivo y porcentaje propio; así un evento da 15 % a una línea y 10 % a otra (M06 · R5)';
+COMMENT ON COLUMN evento_regla.tipo_objetivo IS 'NULL con id_objetivo NULL = todo el catálogo';
+
+-- Tabla: evento_exclusion
+-- Excepciones: de una regla (id_regla informado) o de todo el evento (id_regla NULL) (M06 · R6).
+-- La FK compuesta obliga a que la regla sea del mismo evento.
+CREATE TABLE IF NOT EXISTS evento_exclusion (
+    id_exclusion SERIAL PRIMARY KEY,
+    id_evento INT NOT NULL,
+    id_regla INT,
+    tipo enum_tipo_exclusion_evento NOT NULL,
+    id_objetivo INT NOT NULL,
+    CONSTRAINT fk_evento_exclusion_evento FOREIGN KEY (id_evento)
+        REFERENCES evento_descuento (id_evento) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_evento_exclusion_regla FOREIGN KEY (id_regla, id_evento)
+        REFERENCES evento_regla (id_regla, id_evento) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+COMMENT ON TABLE evento_exclusion IS 'Excepciones de un evento: producto, variante, color, familia de color, línea, marca… (M06 · R6)';
+COMMENT ON COLUMN evento_exclusion.id_regla IS 'NULL = excepción de todo el evento; con valor, solo de esa regla';
+
+-- Tabla: cupon
+-- Código que el cliente escribe en el carrito (M06 · R13, R14). El código se guarda en mayúsculas y es único.
+CREATE TABLE IF NOT EXISTS cupon (
+    id_cupon SERIAL PRIMARY KEY,
+    codigo VARCHAR(30) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(500),
+    tipo_valor enum_tipo_valor_descuento NOT NULL,
+    valor NUMERIC(12, 2) NOT NULL,
+    monto_minimo_compra NUMERIC(12, 2),
+    usos_maximos INT,
+    usos_por_usuario INT,
+    audiencia enum_audiencia_descuento NOT NULL DEFAULT 'todos',
+    fecha_inicio TIMESTAMPTZ NOT NULL,
+    fecha_fin TIMESTAMPTZ,
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT uq_cupon_codigo UNIQUE (codigo),
+    CONSTRAINT fk_cupon_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_cupon_codigo CHECK (codigo ~ '^[A-Z0-9_-]{6,30}$'),
+    CONSTRAINT ck_cupon_valor CHECK (valor > 0 AND (tipo_valor <> 'porcentaje' OR valor <= 100)),
+    CONSTRAINT ck_cupon_monto_minimo CHECK (monto_minimo_compra IS NULL OR monto_minimo_compra >= 0),
+    CONSTRAINT ck_cupon_usos_maximos CHECK (usos_maximos IS NULL OR usos_maximos >= 1),
+    CONSTRAINT ck_cupon_usos_por_usuario CHECK (usos_por_usuario IS NULL OR usos_por_usuario >= 1),
+    CONSTRAINT ck_cupon_fechas CHECK (fecha_fin IS NULL OR fecha_fin > fecha_inicio)
+);
+
+COMMENT ON TABLE cupon IS 'Cupones de descuento que el cliente escribe en el carrito (M06 · HU de precios, R13-R15)';
+COMMENT ON COLUMN cupon.codigo IS 'Mayúsculas, números, guion y guion bajo (6 a 30). No cambia una vez creado';
+COMMENT ON COLUMN cupon.usos_maximos IS 'NULL = sin límite de usos en total';
+COMMENT ON COLUMN cupon.usos_por_usuario IS 'NULL = sin límite por persona; con valor, el cupón exige sesión';
+
+-- Tabla: cupon_uso
+-- Un uso de un cupón, registrado al crearse la orden (M06 · R15). `referencia` (la orden) es única: hace idempotente el
+-- registro; al cancelarse la orden se marca liberado_en y deja de contar. Solo se inserta y se libera, no se borra.
+CREATE TABLE IF NOT EXISTS cupon_uso (
+    id_cupon_uso SERIAL PRIMARY KEY,
+    id_cupon INT NOT NULL,
+    id_usuario INT,
+    referencia VARCHAR(100) NOT NULL,
+    importe_descuento NUMERIC(12, 2) NOT NULL,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    liberado_en TIMESTAMPTZ,
+    CONSTRAINT uq_cupon_uso_referencia UNIQUE (referencia),
+    CONSTRAINT fk_cupon_uso_cupon FOREIGN KEY (id_cupon)
+        REFERENCES cupon (id_cupon) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_cupon_uso_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_cupon_uso_importe CHECK (importe_descuento >= 0),
+    CONSTRAINT ck_cupon_uso_referencia CHECK (length(btrim(referencia)) > 0)
+);
+
+COMMENT ON TABLE cupon_uso IS 'Usos de cupones por orden; los liberados (orden cancelada) no cuentan para los límites (M06 · R15)';
+COMMENT ON COLUMN cupon_uso.referencia IS 'Identificador de la orden; único, para que registrar dos veces lo mismo no consuma dos usos';
+
+-- ==============================================================================
+-- 9.y PATROCINIOS Y PUBLICIDAD (M14 · contracts/m14-patrocinios.contract.ts)
+-- ==============================================================================
+
+-- Tabla: campania_patrocinio
+-- Campaña que pone productos por delante en el sitio (M14 · A1-A13). Fechas de calendario en hora de Colombia; fecha_fin
+-- es obligatoria: toda campaña caduca. `ubicaciones` repite el conjunto cerrado del contrato (sin duplicados: lo valida la API).
+CREATE TABLE IF NOT EXISTS campania_patrocinio (
+    id_campania SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(500),
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL,
+    prioridad SMALLINT NOT NULL DEFAULT 0,
+    ubicaciones enum_ubicacion_patrocinio[] NOT NULL,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_campania_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_campania_nombre CHECK (length(btrim(nombre)) >= 3),
+    CONSTRAINT ck_campania_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT ck_campania_prioridad CHECK (prioridad BETWEEN 0 AND 100),
+    CONSTRAINT ck_campania_ubicaciones CHECK (cardinality(ubicaciones) BETWEEN 1 AND 3)
+);
+
+COMMENT ON TABLE campania_patrocinio IS 'Campañas de patrocinio de productos con vigencia, prioridad y ubicaciones (M14 · A1-A7)';
+COMMENT ON COLUMN campania_patrocinio.prioridad IS '0 a 100; el mayor va primero y es el único criterio entre campañas (M14 · A4)';
+COMMENT ON COLUMN campania_patrocinio.ubicaciones IS 'Dónde se ve: listado, inicio o complementarios (M14 · A7)';
+
+-- Tabla: campania_objetivo
+-- Qué patrocina una campaña: un producto, una línea o una marca (M14 · A3). `id_referencia` NO es una clave foránea:
+-- apunta a tres tablas según `tipo` y, si el objetivo deja de existir, la campaña lo ignora y el panel lo marca.
+CREATE TABLE IF NOT EXISTS campania_objetivo (
+    id_campania_objetivo SERIAL PRIMARY KEY,
+    id_campania INT NOT NULL,
+    tipo enum_tipo_objetivo_patrocinio NOT NULL,
+    id_referencia INT NOT NULL,
+    CONSTRAINT fk_campania_objetivo_campania FOREIGN KEY (id_campania)
+        REFERENCES campania_patrocinio (id_campania) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_campania_objetivo UNIQUE (id_campania, tipo, id_referencia),
+    CONSTRAINT ck_campania_objetivo_referencia CHECK (id_referencia > 0)
+);
+
+COMMENT ON TABLE campania_objetivo IS 'Productos, líneas o marcas que patrocina una campaña; se resuelven al consultar (M14 · A3)';
+COMMENT ON COLUMN campania_objetivo.id_referencia IS 'Id del producto, línea o marca según `tipo`; sin FK a propósito (polimórfico)';
+
+-- Tabla: anuncio_publicitario
+-- Anuncio de un espacio publicitario: una imagen con un enlace que lleva al anunciante (M14 · B1-B9). Las imágenes viven
+-- en `anuncio_imagen`. El enlace es https:// o una ruta interna que empieza por una sola "/" (B6).
+CREATE TABLE IF NOT EXISTS anuncio_publicitario (
+    id_anuncio SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    anunciante VARCHAR(100) NOT NULL,
+    espacio enum_espacio_publicitario NOT NULL,
+    texto_alternativo VARCHAR(150) NOT NULL,
+    enlace VARCHAR(500),
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL,
+    orden SMALLINT NOT NULL DEFAULT 0,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_anuncio_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_anuncio_nombre CHECK (length(btrim(nombre)) >= 3),
+    CONSTRAINT ck_anuncio_anunciante CHECK (length(btrim(anunciante)) >= 2),
+    CONSTRAINT ck_anuncio_texto_alternativo CHECK (length(btrim(texto_alternativo)) >= 3),
+    CONSTRAINT ck_anuncio_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT ck_anuncio_orden CHECK (orden BETWEEN 0 AND 999),
+    CONSTRAINT ck_anuncio_enlace CHECK (
+        enlace IS NULL
+        OR enlace ~* '^https://[^[:space:]]+$'
+        OR enlace ~ '^/([^/[:space:]][^[:space:]]*)?$'
+    )
+);
+
+COMMENT ON TABLE anuncio_publicitario IS 'Anuncios (imagen y enlace) de los espacios publicitarios del sitio, con vigencia y orden (M14 · B1-B9)';
+COMMENT ON COLUMN anuncio_publicitario.enlace IS 'https://… o ruta interna (/…); nunca javascript:, data: ni http:// (M14 · B6)';
+
+-- Tabla: anuncio_imagen
+-- Imágenes de un anuncio: la de escritorio (obligatoria) y la móvil (opcional), cada una con su original y sus
+-- versiones reducidas en WEBP (M14 · B7, B11). Se guardan en la base y las sirve Pintu Clic (nunca un tercero).
+CREATE TABLE IF NOT EXISTS anuncio_imagen (
+    id_anuncio INT NOT NULL,
+    variante enum_variante_imagen_anuncio NOT NULL,
+    tamano enum_tamano_imagen_anuncio NOT NULL,
+    contenido BYTEA NOT NULL,
+    mime_type VARCHAR(20) NOT NULL,
+    ancho INT NOT NULL,
+    alto INT NOT NULL,
+    PRIMARY KEY (id_anuncio, variante, tamano),
+    CONSTRAINT fk_anuncio_imagen_anuncio FOREIGN KEY (id_anuncio)
+        REFERENCES anuncio_publicitario (id_anuncio) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_anuncio_imagen_mime CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+    CONSTRAINT ck_anuncio_imagen_dimensiones CHECK (ancho > 0 AND alto > 0)
+);
+
+COMMENT ON TABLE anuncio_imagen IS 'Imagen de escritorio y móvil de un anuncio, original y reducidas (M14 · B7, B11)';
+
+-- Tabla: medicion_patrocinio
+-- Impresiones y clics por día de una campaña o de un anuncio (M14 · M1-M9). SOLO totales: ni IP, ni sesión, ni navegador (M20).
+-- `lugar` es la ubicación de la campaña (listado, inicio, complementarios) o el espacio del anuncio (inicio, catalogo, ficha).
+-- Sin claves foráneas: apunta a dos tablas según `entidad` y las cifras se conservan siempre.
+CREATE TABLE IF NOT EXISTS medicion_patrocinio (
+    fecha DATE NOT NULL,
+    entidad enum_entidad_medicion NOT NULL,
+    id_entidad INT NOT NULL,
+    lugar VARCHAR(20) NOT NULL,
+    evento enum_evento_medicion NOT NULL,
+    total BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (fecha, entidad, id_entidad, lugar, evento),
+    CONSTRAINT ck_medicion_total CHECK (total >= 0),
+    CONSTRAINT ck_medicion_entidad CHECK (id_entidad > 0)
+);
+
+COMMENT ON TABLE medicion_patrocinio IS 'Totales diarios de impresiones y clics de campañas y anuncios; sin datos personales (M14 · M1)';
+
+-- ==============================================================================
+-- 9.y ASESORÍA Y ASISTENCIA (M03 · contracts/m03-asesoria.contract.ts)
+-- ==============================================================================
+
+-- Tabla: pregunta_asesoria
+-- Pregunta del cuestionario del modo `fijo` (M03 · F1). Las preguntas no se borran, se
+-- desactivan (F5), para no romper un flujo a medias. `origen_opciones = familias_color`
+-- significa que las opciones son las familias cromáticas activas del catálogo y la tabla
+-- `opcion_asesoria` queda vacía para esa pregunta (F3).
+CREATE TABLE IF NOT EXISTS pregunta_asesoria (
+    id_pregunta SERIAL PRIMARY KEY,
+    texto VARCHAR(200) NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    origen_opciones enum_origen_opciones_asesoria NOT NULL DEFAULT 'manual',
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_pregunta_asesoria_texto CHECK (btrim(texto) <> ''),
+    CONSTRAINT ck_pregunta_asesoria_orden CHECK (orden >= 0)
+);
+
+COMMENT ON TABLE pregunta_asesoria IS 'Pregunta del cuestionario guiado administrable (M03 · HU-ASE-01, modo fijo)';
+COMMENT ON COLUMN pregunta_asesoria.origen_opciones IS 'manual = opciones en opcion_asesoria; familias_color = las familias cromáticas activas del catálogo (M03 · F3)';
+
+-- Tabla: opcion_asesoria
+-- Opción cerrada de una pregunta del modo `fijo`. Se desactiva, nunca se borra (F5).
+CREATE TABLE IF NOT EXISTS opcion_asesoria (
+    id_opcion SERIAL PRIMARY KEY,
+    id_pregunta INT NOT NULL,
+    texto VARCHAR(100) NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    estado enum_estado_general NOT NULL DEFAULT 'activo',
+    CONSTRAINT fk_opcion_asesoria_pregunta FOREIGN KEY (id_pregunta)
+        REFERENCES pregunta_asesoria (id_pregunta) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_opcion_asesoria_texto CHECK (btrim(texto) <> ''),
+    CONSTRAINT ck_opcion_asesoria_orden CHECK (orden >= 0)
+);
+
+COMMENT ON TABLE opcion_asesoria IS 'Opción cerrada de una pregunta del cuestionario fijo (M03 · HU-ASE-01)';
+
+-- Tabla: efecto_opcion_asesoria
+-- Qué hace elegir una opción (M03 · F2). Sin clave foránea hacia el catálogo porque
+-- `id_objetivo` apunta a una tabla distinta según `dimension` (categoría, subcategoría,
+-- superficie, familia_color, tipo_resina o línea); el servicio comprueba que el objetivo
+-- exista y esté activo y, si no, ignora el efecto sin error (M03 · F4).
+--   · filtrar          → `dimension` + `id_objetivo` obligatorios, `ambiente` nulo.
+--   · filtrar_ambiente → `ambiente` obligatorio, `dimension` e `id_objetivo` nulos.
+--   · incluir          → `dimension` limitada a categoria/subcategoria (complementos, M03 · R8).
+CREATE TABLE IF NOT EXISTS efecto_opcion_asesoria (
+    id_efecto SERIAL PRIMARY KEY,
+    id_opcion INT NOT NULL,
+    tipo enum_tipo_efecto_asesoria NOT NULL,
+    dimension enum_dimension_filtro_asesoria,
+    id_objetivo INT,
+    ambiente enum_ambiente_asesoria,
+    -- M03 · F2: opciones que también deben estar elegidas para que el efecto aplique
+    requiere_opciones INT[] NOT NULL DEFAULT '{}',
+    CONSTRAINT fk_efecto_asesoria_opcion FOREIGN KEY (id_opcion)
+        REFERENCES opcion_asesoria (id_opcion) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_efecto_asesoria_forma CHECK (
+        (tipo = 'filtrar'          AND dimension IS NOT NULL AND id_objetivo IS NOT NULL AND ambiente IS NULL)
+     OR (tipo = 'filtrar_ambiente' AND dimension IS NULL     AND id_objetivo IS NULL     AND ambiente IS NOT NULL)
+     OR (tipo = 'incluir'          AND dimension IN ('categoria', 'subcategoria') AND id_objetivo IS NOT NULL AND ambiente IS NULL)
+    ),
+    CONSTRAINT ck_efecto_asesoria_objetivo CHECK (id_objetivo IS NULL OR id_objetivo > 0),
+    CONSTRAINT ck_efecto_asesoria_requiere CHECK (array_length(requiere_opciones, 1) IS NULL OR array_length(requiere_opciones, 1) <= 5)
+);
+
+COMMENT ON TABLE efecto_opcion_asesoria IS 'Correspondencia entre una opción y el filtro que aplica, editable por el administrador (M03 · RF-ASE-01-02, F2)';
+COMMENT ON COLUMN efecto_opcion_asesoria.id_objetivo IS 'Id del valor del catálogo según `dimension`; sin FK porque apunta a seis tablas. El servicio valida que exista y esté activo (M03 · F4)';
+COMMENT ON COLUMN efecto_opcion_asesoria.requiere_opciones IS 'Otras opciones que deben estar elegidas para que el efecto aplique, p. ej. Metal + Deteriorada (M03 · F2)';
+
+-- Tabla: configuracion_asesoria
+-- Fila única con el modo vigente, los guiones de la IA y los parámetros de resiliencia
+-- (M03 · D8, Q1). Los guiones orientan al modelo pero NUNCA levantan las reglas duras del
+-- código: vocabulario cerrado, lista cerrada de productos y esquema de salida (M03 · R12).
+CREATE TABLE IF NOT EXISTS configuracion_asesoria (
+    id_configuracion SMALLINT PRIMARY KEY DEFAULT 1,
+    modo_cuestionario enum_modo_cuestionario NOT NULL DEFAULT 'fijo',
+    -- M03 · K9: sugerencia de manos; NULL = no se sugiere ninguna y el campo nace vacío
+    manos_por_defecto SMALLINT,
+    guion_cuestionario TEXT NOT NULL DEFAULT '',
+    guion_asistente TEXT NOT NULL DEFAULT '',
+    ia_tiempo_espera_ms INT NOT NULL DEFAULT 8000,
+    ia_reintentos SMALLINT NOT NULL DEFAULT 2,
+    ia_suspension_cuota_minutos INT NOT NULL DEFAULT 60,
+    ia_retencion_incidentes_dias INT NOT NULL DEFAULT 90,
+    ia_fallos_consecutivos_alerta SMALLINT NOT NULL DEFAULT 5,
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_config_asesoria_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_config_asesoria_fila_unica CHECK (id_configuracion = 1),
+    CONSTRAINT ck_config_asesoria_manos CHECK (manos_por_defecto IS NULL OR manos_por_defecto BETWEEN 1 AND 10),
+    CONSTRAINT ck_config_asesoria_espera CHECK (ia_tiempo_espera_ms BETWEEN 1000 AND 60000),
+    CONSTRAINT ck_config_asesoria_reintentos CHECK (ia_reintentos BETWEEN 0 AND 5),
+    CONSTRAINT ck_config_asesoria_suspension CHECK (ia_suspension_cuota_minutos BETWEEN 1 AND 1440),
+    CONSTRAINT ck_config_asesoria_retencion CHECK (ia_retencion_incidentes_dias BETWEEN 1 AND 3650),
+    CONSTRAINT ck_config_asesoria_fallos CHECK (ia_fallos_consecutivos_alerta BETWEEN 1 AND 100),
+    CONSTRAINT ck_config_asesoria_guiones CHECK (length(guion_cuestionario) <= 4000 AND length(guion_asistente) <= 4000)
+);
+
+COMMENT ON TABLE configuracion_asesoria IS 'Modo de cuestionario, guiones de la IA y parámetros de resiliencia; fila única (M03 · D3, D8)';
+COMMENT ON COLUMN configuracion_asesoria.modo_cuestionario IS 'fijo = preguntas administrables; asistido = las propone Gemini. Se cambia desde el panel, sin despliegue (M03 · D3)';
+
+-- Tabla: incidente_ia
+-- Registro técnico de fallos del servicio de IA (M03 · RF-ASE-06-06, I7). NUNCA guarda el
+-- texto de la persona, la respuesta del modelo, la dirección IP ni la clave del servicio.
+-- Se PURGA por retención (M03 · I8), y por eso no vive en `registro_auditoria`, que es
+-- inmutable (M03 · D10).
+CREATE TABLE IF NOT EXISTS incidente_ia (
+    id_incidente SERIAL PRIMARY KEY,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    servicio enum_servicio_ia NOT NULL DEFAULT 'gemini',
+    funcion enum_funcion_ia NOT NULL,
+    tipo enum_tipo_incidente_ia NOT NULL,
+    intentos SMALLINT NOT NULL,
+    resultado enum_resultado_incidente_ia NOT NULL,
+    CONSTRAINT ck_incidente_ia_intentos CHECK (intentos >= 1)
+);
+
+COMMENT ON TABLE incidente_ia IS 'Incidentes del servicio de IA, sin datos de la persona ni del contenido; se purgan por retención (M03 · I7, I8)';
+COMMENT ON COLUMN incidente_ia.resultado IS 'recuperado = un reintento lo salvó; fallido = se agotaron los intentos; suspendido = se rechazó por cuota agotada (M03 · I9)';
+
+-- ==============================================================================
+-- 9.z REGISTRO DE AUDITORÍA (M20 · HU-SEG-04, parte de escritura)
+-- ==============================================================================
+
+-- Tabla: registro_auditoria
+-- Quién hizo cada cambio importante y cuándo (RF-SEG-04-02), con el valor anterior y el
+-- nuevo cuando la acción modifica un dato (RF-SEG-04-03). M03 es su primer cliente: escribe
+-- aquí cada cambio del administrador a la configuración y los guiones (M03 · A1).
+--
+-- INMUTABLE (RF-SEG-04-04): más abajo se revocan UPDATE y DELETE sobre la tabla, de modo que
+-- ni el administrador de la aplicación pueda alterar o borrar un registro. La prohibición vive
+-- en la base de datos, no solo en el código.
+--
+-- `id_usuario` queda en NULL cuando la acción la hizo el sistema, y la FK es ON DELETE SET
+-- NULL: si la cuenta desaparece, el registro se conserva con el nombre que se guardó.
+CREATE TABLE IF NOT EXISTS registro_auditoria (
+    id_registro BIGSERIAL PRIMARY KEY,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario INT,
+    -- Copia del nombre del actor: el registro debe seguir siendo legible si la cuenta se borra
+    actor VARCHAR(150),
+    -- Acción en punto, como el código de un permiso: `asesoria.configuracion.editar`
+    accion VARCHAR(100) NOT NULL,
+    entidad VARCHAR(60) NOT NULL,
+    id_entidad VARCHAR(60),
+    valor_anterior TEXT,
+    valor_nuevo TEXT,
+    resultado enum_resultado_auditoria NOT NULL DEFAULT 'exito',
+    ip_origen VARCHAR(45),
+    CONSTRAINT fk_auditoria_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_auditoria_accion CHECK (accion ~ '^[a-z]+(\.[a-z_]+)+$'),
+    CONSTRAINT ck_auditoria_entidad CHECK (btrim(entidad) <> ''),
+    CONSTRAINT ck_auditoria_valores CHECK (
+        (valor_anterior IS NULL OR length(valor_anterior) <= 2000)
+    AND (valor_nuevo    IS NULL OR length(valor_nuevo)    <= 2000)
+    )
+);
+
+COMMENT ON TABLE registro_auditoria IS 'Bitácora inmutable de acciones relevantes: actor, acción, entidad, valor anterior y nuevo (M20 · HU-SEG-04, RF-SEG-04-02, RF-SEG-04-03)';
+COMMENT ON COLUMN registro_auditoria.actor IS 'Copia del nombre de quien actuó, para que el registro siga siendo legible si la cuenta se elimina';
+COMMENT ON COLUMN registro_auditoria.valor_anterior IS 'Valor previo, ya recortado por el emisor; los textos largos se registran por longitud y huella, no completos (M03 · A2)';
+
+-- RF-SEG-04-04, primera barrera: se revoca el permiso a PUBLIC y al rol conectado.
+-- INSERT y SELECT se conservan. Idempotente.
+DO $$
+BEGIN
+    EXECUTE 'REVOKE UPDATE, DELETE, TRUNCATE ON TABLE registro_auditoria FROM PUBLIC';
+    EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON TABLE registro_auditoria FROM %I', current_user);
+EXCEPTION
+    WHEN insufficient_privilege THEN
+        RAISE NOTICE 'No se pudo revocar UPDATE/DELETE sobre registro_auditoria: hágalo el administrador de la base (RF-SEG-04-04)';
+END $$;
+
+-- RF-SEG-04-04, segunda barrera: el disparador.
+-- La revocación de arriba NO basta: PostgreSQL deja pasar a un SUPERUSUARIO y al dueño de la
+-- tabla por encima de cualquier permiso (comprobado el 2026-10-26: conectados como `postgres`,
+-- un UPDATE y un DELETE alteraron y borraron registros aunque el permiso estuviera revocado).
+-- El requisito dice «incluso por parte del administrador», así que el disparador rechaza el
+-- cambio sea quien sea quien lo intente. Un superusuario todavía podría desactivarlo a mano,
+-- pero eso ya es un acto deliberado y no un descuido ni un error de la aplicación.
+CREATE OR REPLACE FUNCTION fn_registro_auditoria_inmutable() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'El registro de auditoría es inmutable: no se permite % (RF-SEG-04-04)', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END $$;
+
+COMMENT ON FUNCTION fn_registro_auditoria_inmutable() IS 'Rechaza UPDATE, DELETE y TRUNCATE sobre registro_auditoria, sin importar el rol (M20 · RF-SEG-04-04)';
+
+DROP TRIGGER IF EXISTS trg_registro_auditoria_sin_cambios ON registro_auditoria;
+CREATE TRIGGER trg_registro_auditoria_sin_cambios
+    BEFORE UPDATE OR DELETE ON registro_auditoria
+    FOR EACH ROW EXECUTE FUNCTION fn_registro_auditoria_inmutable();
+
+DROP TRIGGER IF EXISTS trg_registro_auditoria_sin_truncate ON registro_auditoria;
+CREATE TRIGGER trg_registro_auditoria_sin_truncate
+    BEFORE TRUNCATE ON registro_auditoria
+    FOR EACH STATEMENT EXECUTE FUNCTION fn_registro_auditoria_inmutable();
+
+-- ==============================================================================
 -- 10. ÍNDICES DE RENDIMIENTO (OPTIMIZACIÓN DE BÚSQUEDAS Y JOINS)
 -- ==============================================================================
 
@@ -1568,6 +2616,17 @@ CREATE INDEX IF NOT EXISTS idx_direccion_predeterminada ON direccion_cliente(id_
 -- C-4: Dirección predeterminada única por usuario y prevención de duplicados (RN-CUE-21)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_predeterminada_unica ON direccion_cliente (id_usuario) WHERE es_predeterminada;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_no_duplicada ON direccion_cliente (id_usuario, lower(direccion), lower(barrio), lower(coalesce(apartamento_casa, '')));
+-- M04 (v4.14): una sola dirección por cliente (HU-CUE-07). Antes de crear el índice se retiran las
+-- direcciones sobrantes de las cuentas que ya tenían varias, conservando la predeterminada
+-- (o, si ninguna lo es, la más reciente).
+DELETE FROM direccion_cliente d
+USING (
+    SELECT id_direccion,
+           row_number() OVER (PARTITION BY id_usuario ORDER BY es_predeterminada DESC, fecha_creacion DESC, id_direccion) AS posicion
+    FROM direccion_cliente
+) r
+WHERE d.id_direccion = r.id_direccion AND r.posicion > 1;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_direccion_una_por_usuario ON direccion_cliente (id_usuario);
 
 CREATE INDEX IF NOT EXISTS idx_solicitud_empresa_nit ON solicitud_empresa(nit);
 CREATE INDEX IF NOT EXISTS idx_solicitud_empresa_usuario ON solicitud_empresa(id_usuario);
@@ -1593,10 +2652,70 @@ CREATE INDEX IF NOT EXISTS idx_codigo_expiracion ON codigo_verificacion(expiraci
 -- C-6: Control de intentos de acceso y bloqueo
 CREATE INDEX IF NOT EXISTS idx_control_intento_bloqueo ON control_intento_acceso (bloqueado_hasta);
 
+-- M18: diagnóstico de envíos y rebotes de notificaciones
+CREATE INDEX IF NOT EXISTS idx_envio_destinatario_tipo ON envio_notificacion(destinatario, tipo);
+CREATE INDEX IF NOT EXISTS idx_envio_estado ON envio_notificacion(estado);
+CREATE INDEX IF NOT EXISTS idx_rebote_envio ON rebote_notificacion(id_envio);
+
+-- M13: historial de ajustes por variante (más reciente primero), por carga y por usuario
+CREATE INDEX IF NOT EXISTS idx_ajuste_variante_fecha ON ajuste_inventario(id_variante, fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_ajuste_carga ON ajuste_inventario(id_carga);
+CREATE INDEX IF NOT EXISTS idx_ajuste_usuario ON ajuste_inventario(id_usuario);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ajuste_referencia_variante_motivo ON ajuste_inventario(referencia, id_variante, motivo) WHERE referencia IS NOT NULL;
+
 -- Índices en Analítica de Búsqueda (M02 - HU-BUS-06): filtro por periodo y agrupación por término
 CREATE INDEX IF NOT EXISTS idx_bsr_fecha ON busqueda_sin_resultado(fecha);
 CREATE INDEX IF NOT EXISTS idx_bsr_termino ON busqueda_sin_resultado(termino);
 
+-- Índices en Contenido Institucional y FAQ (M16 - HU-CON-01 a HU-CON-04)
+CREATE INDEX IF NOT EXISTS idx_pagina_institucional_estado ON pagina_institucional(estado);
+CREATE INDEX IF NOT EXISTS idx_pagina_institucional_autor ON pagina_institucional(id_autor);
+CREATE INDEX IF NOT EXISTS idx_faq_entrada_estado_orden ON faq_entrada(estado, orden, id_faq);
+CREATE INDEX IF NOT EXISTS idx_faq_entrada_autor ON faq_entrada(id_autor);
+
+-- M15: bandeja de solicitudes de contacto e hilo de mensajes
+CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_usuario ON solicitud_contacto(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_solicitud_contacto_estado_fecha ON solicitud_contacto(estado, fecha_creacion DESC);
+CREATE INDEX IF NOT EXISTS idx_mensaje_solicitud_fecha ON mensaje_solicitud_contacto(id_solicitud, fecha_creacion ASC);
+CREATE INDEX IF NOT EXISTS idx_mensaje_solicitud_autor ON mensaje_solicitud_contacto(id_autor);
+
+-- M06: eventos, cupones y tipos de cliente empresa
+CREATE INDEX IF NOT EXISTS idx_evento_estado_fechas ON evento_descuento(estado, fecha_inicio, fecha_fin);
+CREATE INDEX IF NOT EXISTS idx_evento_regla_evento ON evento_regla(id_evento);
+CREATE INDEX IF NOT EXISTS idx_evento_regla_objetivo ON evento_regla(tipo_objetivo, id_objetivo);
+CREATE INDEX IF NOT EXISTS idx_evento_exclusion_evento ON evento_exclusion(id_evento);
+CREATE INDEX IF NOT EXISTS idx_evento_exclusion_regla ON evento_exclusion(id_regla);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_evento_exclusion_evento ON evento_exclusion(id_evento, tipo, id_objetivo) WHERE id_regla IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_evento_exclusion_regla ON evento_exclusion(id_regla, tipo, id_objetivo) WHERE id_regla IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_cupon_estado_fechas ON cupon(estado, fecha_inicio, fecha_fin);
+CREATE INDEX IF NOT EXISTS idx_cupon_uso_cupon_usuario ON cupon_uso(id_cupon, id_usuario) WHERE liberado_en IS NULL;
+CREATE INDEX IF NOT EXISTS idx_cuenta_empresa_sub_rol ON cuenta_empresa(id_sub_rol_empresa);
+
+-- M03: cuestionario guiado, incidentes de IA
+CREATE INDEX IF NOT EXISTS idx_pregunta_asesoria_orden ON pregunta_asesoria(estado, orden);
+CREATE INDEX IF NOT EXISTS idx_opcion_asesoria_pregunta ON opcion_asesoria(id_pregunta, orden);
+CREATE INDEX IF NOT EXISTS idx_efecto_asesoria_opcion ON efecto_opcion_asesoria(id_opcion);
+CREATE INDEX IF NOT EXISTS idx_incidente_ia_fecha ON incidente_ia(fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_incidente_ia_tipo_fecha ON incidente_ia(tipo, fecha DESC);
+
+-- M20: registro de auditoría (consulta por fecha y por entidad afectada, RF-SEG-04-05)
+CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON registro_auditoria(fecha DESC);
+CREATE INDEX IF NOT EXISTS idx_auditoria_entidad ON registro_auditoria(entidad, id_entidad);
+CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON registro_auditoria(id_usuario);
+
+-- M14: campañas, anuncios y medición
+CREATE INDEX IF NOT EXISTS idx_campania_estado_fechas ON campania_patrocinio(estado, fecha_inicio, fecha_fin);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_campania_nombre ON campania_patrocinio (lower(btrim(nombre)));
+CREATE INDEX IF NOT EXISTS idx_campania_objetivo_referencia ON campania_objetivo(tipo, id_referencia);
+CREATE INDEX IF NOT EXISTS idx_anuncio_espacio_vigencia ON anuncio_publicitario(espacio, estado, fecha_inicio, fecha_fin);
+CREATE INDEX IF NOT EXISTS idx_medicion_entidad_fecha ON medicion_patrocinio(entidad, id_entidad, fecha);
+
+-- M21: cotizaciones del cliente, bandeja del equipo comercial y líneas
+CREATE INDEX IF NOT EXISTS idx_cotizacion_usuario_estado ON cotizacion(id_usuario, estado);
+CREATE INDEX IF NOT EXISTS idx_cotizacion_estado_fecha ON cotizacion(estado, fecha_creacion DESC);
+CREATE INDEX IF NOT EXISTS idx_lineacotizacion_cotizacion ON linea_cotizacion(id_cotizacion);
+CREATE INDEX IF NOT EXISTS idx_lineacarrito_cotizacion ON linea_carrito(id_cotizacion) WHERE id_cotizacion IS NOT NULL;
+
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (53 TABLAS - v4.2)
+-- FIN DEL SCRIPT DDL (85 TABLAS - v4.19)
 -- ==============================================================================

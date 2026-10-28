@@ -1,14 +1,19 @@
 import { createHash } from 'node:crypto';
 import { derivarContrasena } from '../../../core/utils/crypto';
-import type { CuentasRepository } from '../repositories/cuentas.repository';
+import type { CuentaEmpresaConTipo, CuentasRepository } from '../repositories/cuentas.repository';
 import type { SolicitudesEmpresaRepository } from '../repositories/solicitudes-empresa.repository';
 import type { AlmacenDocumentosPort } from '../interfaces/almacen-documentos.port';
+import type { TiposClientePort } from '../interfaces/tipos-cliente.port';
 import type { EntidadDocumentoSoporte, MisSolicitudesEmpresa } from '../interfaces/cuentas.interfaces';
-import type { NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import type {
+  CuentaEmpresaAdminItem,
+  DictamenCuentaEmpresaRequest,
   DictamenRenovacionNitRequest,
-  DictamenSolicitudEmpresaRequest,
+  ListarCuentasEmpresaQuery,
+  ListarCuentasEmpresaResponse,
   ListarSolicitudesEmpresaQuery,
+  ListarTiposClienteEmpresaResponse,
   RegistroEmpresaRequest,
   SolicitarAscensoEmpresaRequest,
   SolicitarRenovacionNitRequest,
@@ -34,6 +39,7 @@ export class EmpresasService {
     private readonly solicitudesRepo: SolicitudesEmpresaRepository,
     private readonly almacenDocumentos: AlmacenDocumentosPort,
     private readonly notificaciones: NotificacionesPort,
+    private readonly tiposCliente: TiposClientePort,
   ) {}
 
   /**
@@ -274,7 +280,7 @@ export class EmpresasService {
   async dictaminarSolicitud(
     idSolicitud: string,
     idAdmin: number,
-    dictamen: DictamenSolicitudEmpresaRequest,
+    dictamen: DictamenCuentaEmpresaRequest,
   ) {
     const solicitud = await this.solicitudesRepo.buscarPorId(idSolicitud);
     if (!solicitud) {
@@ -303,11 +309,19 @@ export class EmpresasService {
       );
     }
 
+    // M06 · D8: al aprobar se elige el tipo de cliente empresa (fija el descuento de la cuenta). Se valida antes de
+    // decidir para no dejar la solicitud decidida con un tipo que no existe o está desactivado.
+    let idSubRolEmpresa: number | null = null;
+    if (estado === 'aprobada') {
+      idSubRolEmpresa = await this.exigirTipoActivo(dictamen.idSubRolEmpresa);
+    }
+
     const decision = await this.solicitudesRepo.decidirSolicitud(idSolicitud, {
       estado,
       idAdminRevisor: idAdmin,
       motivoRechazo: motivo,
       fechaRevision: new Date(),
+      idSubRolEmpresa,
     });
 
     if (decision.resultado === 'ya_decidida') {
@@ -331,6 +345,77 @@ export class EmpresasService {
       solicitud: decision.solicitud,
       mensaje: `Solicitud corporativa ${estado === 'aprobada' ? 'aprobada y cuenta activada' : 'rechazada'} exitosamente.`,
     };
+  }
+
+  /** El tipo elegido debe existir y estar activo; si no, 400 TIPO_CLIENTE_INVALIDO (M06 · D8). */
+  private async exigirTipoActivo(idSubRolEmpresa: number | undefined): Promise<number> {
+    if (idSubRolEmpresa === undefined) {
+      throw new EmpresasError('Elija el tipo de cliente empresa para aprobar la solicitud.', 'DATOS_INVALIDOS', 400);
+    }
+    if (!(await this.tiposCliente.existeActivo(idSubRolEmpresa))) {
+      throw new EmpresasError(
+        'El tipo de cliente empresa elegido no existe o está desactivado.',
+        'TIPO_CLIENTE_INVALIDO',
+        400,
+      );
+    }
+    return idSubRolEmpresa;
+  }
+
+  /** Tipos de cliente empresa activos, para el selector del panel. */
+  async listarTiposCliente(): Promise<ListarTiposClienteEmpresaResponse> {
+    return (await this.tiposCliente.listarActivos()).map((t) => ({
+      idSubRolEmpresa: t.idSubRolEmpresa,
+      nombre: t.nombre,
+      porcentaje: t.porcentaje,
+      montoMinimoCompra: t.montoMinimoCompra,
+    }));
+  }
+
+  private aItemCuenta(c: CuentaEmpresaConTipo): CuentaEmpresaAdminItem {
+    const tipo = c.subRolEmpresa;
+    const d = tipo?.descuento ?? null;
+    return {
+      idUsuario: c.idUsuario,
+      nit: c.nit,
+      nombreEmpresa: c.nombreEmpresa,
+      nombreRepresentante: c.nombreRepresentante,
+      correoEmpresarial: c.correoEmpresarial,
+      telefono: c.telefono,
+      fechaAprobacion: c.fechaAprobacion.toISOString(),
+      tipoCliente:
+        tipo === undefined || tipo === null || d === null
+          ? null
+          : {
+              idSubRolEmpresa: tipo.idSubRolEmpresa,
+              nombre: tipo.nombre,
+              porcentaje: Number(d.porcentajeDescuento),
+              estado: tipo.estado,
+            },
+    };
+  }
+
+  /** Cuentas empresa aprobadas con su tipo; `sinTipo` deja solo las que están sin descuento. */
+  async listarCuentas(query: ListarCuentasEmpresaQuery): Promise<ListarCuentasEmpresaResponse> {
+    const { items, total } = await this.cuentasRepo.listarCuentasEmpresa({
+      ...(query.busqueda === undefined ? {} : { busqueda: query.busqueda }),
+      ...(query.sinTipo === undefined ? {} : { sinTipo: query.sinTipo }),
+      page: query.page,
+      limit: query.limit,
+    });
+    return { items: items.map((c) => this.aItemCuenta(c)), total };
+  }
+
+  /** Cambia el tipo de cliente de una cuenta empresa; desde ese momento rige su nuevo descuento. */
+  async cambiarTipoCuenta(idUsuario: number, idSubRolEmpresa: number): Promise<CuentaEmpresaAdminItem> {
+    if ((await this.cuentasRepo.buscarCuentaEmpresaPorIdUsuario(idUsuario)) === null) {
+      throw new EmpresasError('Cuenta empresa no encontrada.', 'RECURSO_NO_ENCONTRADO', 404);
+    }
+    await this.exigirTipoActivo(idSubRolEmpresa);
+    await this.cuentasRepo.asignarTipoCuentaEmpresa(idUsuario, idSubRolEmpresa);
+    const cuenta = await this.cuentasRepo.buscarCuentaEmpresaConTipo(idUsuario);
+    if (cuenta === null) throw new EmpresasError('Cuenta empresa no encontrada.', 'RECURSO_NO_ENCONTRADO', 404);
+    return this.aItemCuenta(cuenta);
   }
 
   /**

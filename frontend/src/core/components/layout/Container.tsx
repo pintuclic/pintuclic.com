@@ -8,11 +8,11 @@ export interface ContainerProps {
 }
 
 /**
- * Contenedor de página (UI Spec §2.4): `max-w-7xl` centrado, 24px laterales en
- * escritorio y 16px en móvil. Es la ÚNICA columna de alineación del sitio.
+ * Contenedor de página (UI Spec §2.4): hasta 1536px centrado, 16px laterales en móvil, 24px en escritorio y 40px en
+ * pantallas muy anchas. Es la ÚNICA columna de alineación del sitio: el encabezado, el pie y cada página la comparten.
  */
 export function Container({ as: Etiqueta = 'div', className = '', children }: ContainerProps) {
   return (
-    <Etiqueta className={`mx-auto w-full max-w-7xl px-4 md:px-6 ${className}`}>{children}</Etiqueta>
+    <Etiqueta className={`mx-auto w-full max-w-[96rem] px-4 md:px-6 2xl:px-10 ${className}`}>{children}</Etiqueta>
   );
 }

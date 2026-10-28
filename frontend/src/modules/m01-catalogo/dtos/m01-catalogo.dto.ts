@@ -39,6 +39,8 @@ export const subcategoriaSchema = z.object({
   nombre: z.string(),
   orden: ordenSchema,
   estado: estadoSchema,
+  /** Categoría de la que se sugieren complementarios a sus productos sin una propia (entrega 3, D6). */
+  idCategoriaComplementaria: idSchema.nullable(),
 });
 export type Subcategoria = z.infer<typeof subcategoriaSchema>;
 
@@ -125,12 +127,14 @@ export const medidaSchema = z.object({
   valor: z.number().positive(),
   nombre: z.string(),
   estado: estadoSchema,
+  /** Los bytes se piden aparte: GET /medidas/:idMedida/imagen (entrega 2). */
+  tieneImagen: z.boolean(),
 });
 export type Medida = z.infer<typeof medidaSchema>;
 
 /**
  * Efecto de una desactivación (R6). Cada recurso llena solo lo que le aplica; el
- * resto vale 0. `reglasComerciales` es de M06 y vale 0 hasta que exista.
+ * resto vale 0. `reglasComerciales` son los eventos de M06 (en curso o programados) que apuntan a la marca, línea, categoría, subcategoría, producto o variante.
  */
 export const impactoDesactivacionSchema = z.object({
   productos: z.number().int().nonnegative(),
@@ -199,9 +203,17 @@ export const editarCategoriaRequestSchema = z
 export type EditarCategoriaRequest = z.infer<typeof editarCategoriaRequestSchema>;
 
 /** POST /categorias/:idCategoria/subcategorias — el padre va en la ruta. */
-export const crearSubcategoriaRequestSchema = crearCategoriaRequestSchema;
+export const crearSubcategoriaRequestSchema = crearCategoriaRequestSchema.extend({
+  idCategoriaComplementaria: idSchema.nullable().optional(),
+});
 export type CrearSubcategoriaRequest = z.infer<typeof crearSubcategoriaRequestSchema>;
-export const editarSubcategoriaRequestSchema = editarCategoriaRequestSchema;
+export const editarSubcategoriaRequestSchema = z
+  .object({
+    nombre: nombreSchema.optional(),
+    orden: ordenSchema.optional(),
+    idCategoriaComplementaria: idSchema.nullable().optional(),
+  })
+  .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
 export type EditarSubcategoriaRequest = z.infer<typeof editarSubcategoriaRequestSchema>;
 
 /** Superficies, acabados y bases comparten forma: nombre corto y orden. */
@@ -299,9 +311,13 @@ export const crearMedidaRequestSchema = z.object({
   nombre: z.string().trim().min(1).max(60).optional(),
 });
 export type CrearMedidaRequest = z.infer<typeof crearMedidaRequestSchema>;
-/** El tipo no cambia; para otro tipo se crea otra medida. */
+/** Se puede cambiar el tipo (debe estar activo) y el valor; el nombre generado se recalcula (R12). */
 export const editarMedidaRequestSchema = z
-  .object({ valor: z.number().positive().max(9_999_999).optional(), nombre: z.string().trim().min(1).max(60).optional() })
+  .object({
+    idTipoMedida: idSchema.optional(),
+    valor: z.number().positive().max(9_999_999).optional(),
+    nombre: z.string().trim().min(1).max(60).optional(),
+  })
   .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
 export type EditarMedidaRequest = z.infer<typeof editarMedidaRequestSchema>;
 

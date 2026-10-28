@@ -2,10 +2,13 @@ import { apiClient } from '@/core/api/apiClient';
 import type { RespuestaExitosa } from '@/core/types/respuesta-api.type';
 import type { DictamenSolicitudEmpresaFormData } from '../dtos/m04-cuentas.dto';
 import type {
+  CuentaEmpresaAdmin,
+  FiltroCuentasEmpresa,
   FiltroSolicitudes,
   ListaPaginada,
   RenovacionNitAdmin,
   SolicitudEmpresaAdmin,
+  TipoClienteOpcion,
 } from '../interfaces/api.interfaces';
 
 /**
@@ -25,7 +28,14 @@ function parametros(filtro: FiltroSolicitudes): Record<string, string | number> 
 /** Un motivo vacío o de espacios se envía como ausente (es opcional, RN-CUE-17). */
 function cuerpoDictamen(dictamen: DictamenSolicitudEmpresaFormData) {
   const motivo = dictamen.motivoRechazo?.trim();
-  return { decision: dictamen.decision, ...(motivo ? { motivoRechazo: motivo } : {}) };
+  return {
+    decision: dictamen.decision,
+    ...(motivo ? { motivoRechazo: motivo } : {}),
+    // El tipo de cliente solo viaja al aprobar (M06 · D8).
+    ...(dictamen.decision === 'aprobar' && dictamen.idSubRolEmpresa !== undefined
+      ? { idSubRolEmpresa: dictamen.idSubRolEmpresa }
+      : {}),
+  };
 }
 
 export async function listarSolicitudes(filtro: FiltroSolicitudes): Promise<ListaPaginada<SolicitudEmpresaAdmin>> {
@@ -79,4 +89,32 @@ export async function descargarRut(idDocumento: string): Promise<Blob> {
     responseType: 'blob',
   });
   return data;
+}
+
+/** M06 · D8: tipos de cliente empresa activos, para elegir al aprobar una cuenta. */
+export async function listarTiposCliente(): Promise<TipoClienteOpcion[]> {
+  const { data } = await apiClient.get<RespuestaExitosa<TipoClienteOpcion[]>>('/admin/empresas/tipos');
+  return data.data;
+}
+
+/** M06 · D8: cuentas empresa aprobadas con su tipo de cliente. */
+export async function listarCuentasEmpresa(filtro: FiltroCuentasEmpresa): Promise<ListaPaginada<CuentaEmpresaAdmin>> {
+  const params: Record<string, string | number | boolean> = {};
+  if (filtro.busqueda?.trim()) params.busqueda = filtro.busqueda.trim();
+  if (filtro.sinTipo) params.sinTipo = true;
+  if (filtro.page) params.page = filtro.page;
+  if (filtro.limit) params.limit = filtro.limit;
+  const { data } = await apiClient.get<RespuestaExitosa<ListaPaginada<CuentaEmpresaAdmin>>>('/admin/empresas/cuentas', {
+    params,
+  });
+  return data.data;
+}
+
+/** M06 · D8: cambia el tipo de cliente de una cuenta empresa. */
+export async function cambiarTipoCliente(idUsuario: number, idSubRolEmpresa: number): Promise<CuentaEmpresaAdmin> {
+  const { data } = await apiClient.patch<RespuestaExitosa<CuentaEmpresaAdmin>>(
+    `/admin/empresas/cuentas/${idUsuario}/tipo`,
+    { idSubRolEmpresa },
+  );
+  return data.data;
 }

@@ -18,6 +18,9 @@ import {
   respuestaUno,
   paginacionSchema,
   impactoDesactivacionSchema,
+  LOGOTIPO_MAXIMO_BASE64,
+  tipoMimeLogotipoSchema,
+  medidaSchema,
 } from './m01-catalogo.dto';
 
 
@@ -210,8 +213,13 @@ export const fichaRecubrimientoRequestSchema = z
     tipoCalidad: tipoCalidadSchema.nullable().optional(),
     rendimientoMin: z.number().positive().max(99_999).nullable().optional(),
     rendimientoMax: z.number().positive().max(99_999).nullable().optional(),
+    /** Manos con las que se logra el rendimiento ("35 m² por galón a 2 manos"). Exige rendimiento. */
+    manos: z.number().int().min(1).max(10).nullable().optional(),
   })
-  .refine(rendimientoCompleto, MENSAJE_RENDIMIENTO);
+  .refine(rendimientoCompleto, MENSAJE_RENDIMIENTO)
+  .refine((v) => (v.manos ?? null) === null || ((v.rendimientoMin ?? null) !== null && (v.rendimientoMax ?? null) !== null), {
+    message: 'Las manos se indican junto con el rendimiento',
+  });
 export type FichaRecubrimientoRequest = z.infer<typeof fichaRecubrimientoRequestSchema>;
 
 export const caracteristicaRequestSchema = z.object({
@@ -237,7 +245,6 @@ export const crearProductoRequestSchema = z
     usoInterior: z.boolean().default(false),
     usoExterior: z.boolean().default(false),
     idCategoriaComplementaria: idSchema.nullable().optional(),
-    patrocinado: z.boolean().default(false),
     ficha: fichaRecubrimientoRequestSchema.nullable().optional(),
     idsSuperficies: listaIdsSchema.default([]),
     idsAcabados: listaIdsSchema.default([]),
@@ -281,7 +288,6 @@ export const editarProductoRequestSchema = z
     usoInterior: z.boolean().optional(),
     usoExterior: z.boolean().optional(),
     idCategoriaComplementaria: idSchema.nullable().optional(),
-    patrocinado: z.boolean().optional(),
     ficha: fichaRecubrimientoRequestSchema.nullable().optional(),
     idsSuperficies: listaIdsSchema.optional(),
     idsAcabados: listaIdsSchema.optional(),
@@ -312,6 +318,8 @@ export const listarProductosRequestSchema = paginacionQuerySchema.extend({
   claseColor: claseColorSchema.optional(),
   estado: estadoSchema.optional(),
   publicado: booleanoQuerySchema.optional(),
+  /** Entrega 3: true = solo combos; false = sin combos; sin enviar = todos. */
+  esCombo: booleanoQuerySchema.optional(),
 });
 export type ListarProductosRequest = z.infer<typeof listarProductosRequestSchema>;
 
@@ -325,6 +333,7 @@ export const fichaRecubrimientoSchema = z.object({
   /** m² por galón (RF-CAT-10-02). */
   rendimientoMin: z.number().nullable(),
   rendimientoMax: z.number().nullable(),
+  manos: z.number().int().nullable(),
 });
 export type FichaRecubrimiento = z.infer<typeof fichaRecubrimientoSchema>;
 
@@ -366,10 +375,50 @@ export const productoResumenSchema = z.object({
   claseColor: claseColorSchema,
   estado: estadoSchema,
   publicado: z.boolean(),
-  patrocinado: z.boolean(),
+  /** Entrega 3 (K1, K4). */
+  esCombo: z.boolean(),
+  excluidoDeDescuentos: z.boolean(),
   variantesActivas: z.number().int().nonnegative(),
 });
 export type ProductoResumen = z.infer<typeof productoResumenSchema>;
+
+export const MAXIMO_IMAGENES_PRODUCTO = 12;
+
+/** POST /productos/:idProducto/imagenes y PUT /medidas/:idMedida/imagen (I1, I4) */
+export const subirImagenRequestSchema = z.object({
+  imagenBase64: z.string().min(1, 'Elija una imagen').max(LOGOTIPO_MAXIMO_BASE64, 'La imagen no puede superar 5 MB'),
+  imagenMimeType: tipoMimeLogotipoSchema,
+});
+export type SubirImagenRequest = z.infer<typeof subirImagenRequestSchema>;
+
+/** Los bytes se piden aparte: GET /imagenes/:idImagen. */
+export const imagenProductoSchema = z.object({
+  idImagen: idSchema,
+  orden: z.number().int().nonnegative(),
+  esPrincipal: z.boolean(),
+  mimeType: tipoMimeLogotipoSchema,
+  /** Entrega 3 (I5): a lo sumo una de las dos; null en ambas = imagen general del producto. */
+  idVariante: idSchema.nullable(),
+  idColor: idSchema.nullable(),
+});
+export type ImagenProducto = z.infer<typeof imagenProductoSchema>;
+
+/** PATCH /productos/:idProducto/imagenes/orden (I3) */
+export const ordenarImagenesRequestSchema = z.object({
+  idsOrdenados: z
+    .array(idSchema)
+    .min(1)
+    .max(MAXIMO_IMAGENES_PRODUCTO)
+    .refine((ids) => new Set(ids).size === ids.length, { message: 'Hay ids repetidos' }),
+});
+export type OrdenarImagenesRequest = z.infer<typeof ordenarImagenesRequestSchema>;
+
+export const imagenResponseEnvelopeSchema = respuestaUno(imagenProductoSchema);
+export type ImagenResponseEnvelope = z.infer<typeof imagenResponseEnvelopeSchema>;
+export const imagenesResponseEnvelopeSchema = respuestaLista(imagenProductoSchema);
+export type ImagenesResponseEnvelope = z.infer<typeof imagenesResponseEnvelopeSchema>;
+export const medidaImagenResponseEnvelopeSchema = respuestaUno(medidaSchema);
+export type MedidaImagenResponseEnvelope = z.infer<typeof medidaImagenResponseEnvelopeSchema>;
 
 export const productoDetalleSchema = productoResumenSchema.extend({
   descripcion: z.string().nullable(),
@@ -380,6 +429,7 @@ export const productoDetalleSchema = productoResumenSchema.extend({
   bases: z.array(referenciaSchema),
   coloresFabrica: z.array(referenciaSchema),
   caracteristicas: z.array(caracteristicaSchema),
+  imagenes: z.array(imagenProductoSchema),
   variantes: z.array(varianteSchema),
 });
 export type ProductoDetalle = z.infer<typeof productoDetalleSchema>;
@@ -402,7 +452,6 @@ export const crearVarianteRequestSchema = z.object({
   idMedida: idSchema,
   precio: precioSchema,
   sku: skuSchema.optional(),
-  existenciaReferencial: existenciaSchema.default(0),
   codigoProveedor: codigoProveedorSchema.nullable().optional(),
 });
 export type CrearVarianteRequest = z.infer<typeof crearVarianteRequestSchema>;
@@ -412,7 +461,6 @@ export const editarVarianteRequestSchema = z
   .object({
     precio: precioSchema.optional(),
     sku: skuSchema.optional(),
-    existenciaReferencial: existenciaSchema.optional(),
     codigoProveedor: codigoProveedorSchema.nullable().optional(),
   })
   .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
@@ -430,6 +478,8 @@ export const listarColoresProductoRequestSchema = paginacionQuerySchema.extend({
   busqueda: z.string().trim().max(100).optional(),
   idFamiliaColor: z.coerce.number().int().positive().optional(),
   idAcabado: z.coerce.number().int().positive().optional(),
+  /** Solo ese color, si el producto lo ofrece (paleta de color · P11). */
+  idColor: z.coerce.number().int().positive().optional(),
 });
 export type ListarColoresProductoRequest = z.infer<typeof listarColoresProductoRequestSchema>;
 
@@ -502,8 +552,26 @@ export const listarProductosPublicosRequestSchema = paginacionQuerySchema.extend
   idMarca: z.coerce.number().int().positive().optional(),
   idLinea: z.coerce.number().int().positive().optional(),
   ordenar: z.enum(['nombre', 'precio_asc', 'precio_desc']).default('nombre'),
+  /** true = solo los productos con una oferta en curso (pestaña Promociones). */
+  enOferta: booleanoQuerySchema.optional(),
 });
 export type ListarProductosPublicosRequest = z.infer<typeof listarProductosPublicosRequestSchema>;
+
+/**
+ * Oferta de un evento de M06 que está en curso (la etiqueta "−15 %" y el precio tachado). El descuento de las
+ * cuentas empresa NUNCA aparece aquí: depende del total del carrito y solo se ve en el carrito.
+ */
+export const ofertaPublicaSchema = z.object({
+  /** Nombre del evento, tal como se muestra al cliente. */
+  nombre: z.string(),
+  /** La etiqueta de la tarjeta. */
+  porcentaje: z.number().gt(0).max(100),
+  /** Precio unitario sin la oferta (el que se tacha), IVA incluido. */
+  precioAntes: z.number().nonnegative(),
+  /** Precio unitario con la oferta, IVA incluido. */
+  precioConOferta: z.number().nonnegative(),
+});
+export type OfertaPublica = z.infer<typeof ofertaPublicaSchema>;
 
 export const productoPublicoTarjetaSchema = z.object({
   idProducto: idSchema,
@@ -516,10 +584,26 @@ export const productoPublicoTarjetaSchema = z.object({
   precioDesde: z.number().nonnegative().nullable(),
   tieneColor: z.boolean(),
   disponibilidad: disponibilidadSchema,
-  /** Siempre null hasta la entrega 3 (D9). */
-  imagenPrincipalUrl: z.string().nullable(),
+  /** GET /catalogo/imagenes/:idImagen?tamano=miniatura */
+  idImagenPrincipal: idSchema.nullable(),
+  /** Entrega 3: combo; y `compraBloqueada` = combo agotado (se ve, no se compra, K5). */
+  esCombo: z.boolean(),
+  compraBloqueada: z.boolean(),
+  /**
+   * Oferta en curso de la variante en oferta de menor precio (D5 de M06); null si el producto no está en oferta.
+   * `precioDesde` sigue siendo el mínimo de las variantes sin oferta.
+   */
+  oferta: ofertaPublicaSchema.nullable(),
 });
 export type ProductoPublicoTarjeta = z.infer<typeof productoPublicoTarjetaSchema>;
+
+/** Elemento de la galería de la ficha pública. */
+export const imagenPublicaSchema = z.object({
+  idImagen: idSchema,
+  idVariante: idSchema.nullable(),
+  idColor: idSchema.nullable(),
+});
+export type ImagenPublica = z.infer<typeof imagenPublicaSchema>;
 export const listarProductosPublicosResponseEnvelopeSchema = respuestaPaginada(productoPublicoTarjetaSchema);
 export type ListarProductosPublicosResponseEnvelope = z.infer<typeof listarProductosPublicosResponseEnvelopeSchema>;
 
@@ -539,7 +623,13 @@ export const variantePublicaSchema = z.object({
   sku: z.string(),
   precio: z.number().nonnegative(),
   disponibilidad: disponibilidadSchema,
+  /** Entrega 3 (K5): true cuando es un combo sin existencia. */
+  compraBloqueada: z.boolean(),
+  /** Oferta en curso de esta variante, sin elegir color (con color, ver `GET /productos/:id/ofertas`). */
+  oferta: ofertaPublicaSchema.nullable(),
   rendimiento: rendimientoAproximadoSchema.nullable(),
+  /** GET /catalogo/medidas/:idMedida/imagen */
+  tieneImagenMedida: z.boolean(),
 });
 export type VariantePublica = z.infer<typeof variantePublicaSchema>;
 
@@ -556,15 +646,41 @@ export const productoPublicoFichaSchema = z.object({
   claseColor: claseColorSchema,
   tipoResina: z.string().nullable(),
   tipoCalidad: tipoCalidadSchema.nullable(),
+  /** Manos con las que se logra el rendimiento de la ficha. */
+  manos: z.number().int().nullable(),
   superficies: z.array(z.string()),
   acabados: z.array(referenciaSchema),
   caracteristicas: z.array(caracteristicaSchema),
   variantes: z.array(variantePublicaSchema),
-  imagenPrincipalUrl: z.string().nullable(),
+  /** Entrega 3: combo; `compraBloqueada` = combo agotado. */
+  esCombo: z.boolean(),
+  compraBloqueada: z.boolean(),
+  /**
+   * Galería en orden; la primera es la principal. Cada imagen puede pertenecer a una variante o a un
+   * color (I6). GET /catalogo/imagenes/:idImagen?tamano=mediana
+   */
+  imagenes: z.array(imagenPublicaSchema),
 });
 export type ProductoPublicoFicha = z.infer<typeof productoPublicoFichaSchema>;
 export const productoPublicoResponseEnvelopeSchema = respuestaUno(productoPublicoFichaSchema);
 export type ProductoPublicoResponseEnvelope = z.infer<typeof productoPublicoResponseEnvelopeSchema>;
+
+/**
+ * GET /catalogo/productos/:idProducto/ofertas?idColor= — la oferta de cada variante CON el color elegido, porque las
+ * excepciones por color (p. ej. "el blanco no entra") solo se pueden evaluar sabiendo el color (R8 de M06).
+ */
+export const ofertasProductoRequestSchema = z.object({
+  idColor: z.coerce.number().int().positive().optional(),
+});
+export type OfertasProductoRequest = z.infer<typeof ofertasProductoRequestSchema>;
+
+export const ofertaVarianteSchema = z.object({
+  idVariante: idSchema,
+  oferta: ofertaPublicaSchema.nullable(),
+});
+export type OfertaVariante = z.infer<typeof ofertaVarianteSchema>;
+export const ofertasProductoResponseEnvelopeSchema = respuestaLista(ofertaVarianteSchema);
+export type OfertasProductoResponseEnvelope = z.infer<typeof ofertasProductoResponseEnvelopeSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 7. ERRORES
@@ -573,7 +689,7 @@ export type ProductoPublicoResponseEnvelope = z.infer<typeof productoPublicoResp
 /**
  * Mismo envelope global que la entrega 1. Estados HTTP: 400 PARAMETRO_INVALIDO · 404 RECURSO_NO_DISPONIBLE
  * (también toda denegación y toda ficha pública no disponible) · 409 DUPLICADO, RELACION_INVALIDA,
- * PADRE_INACTIVO, CONFIRMACION_REQUERIDA, NO_PUBLICABLE.
+ * PADRE_INACTIVO, CONFIRMACION_REQUERIDA, NO_PUBLICABLE, LIMITE_IMAGENES · 400 IMAGEN_INVALIDA.
  */
 export const CODIGOS_ERROR_PRODUCTOS = [
   'PARAMETRO_INVALIDO',
@@ -583,6 +699,8 @@ export const CODIGOS_ERROR_PRODUCTOS = [
   'PADRE_INACTIVO',
   'CONFIRMACION_REQUERIDA',
   'NO_PUBLICABLE',
+  'IMAGEN_INVALIDA',
+  'LIMITE_IMAGENES',
 ] as const;
 
 export const errorProductosEnvelopeSchema = z.object({
@@ -613,6 +731,12 @@ export type ErrorProductosEnvelope = z.infer<typeof errorProductosEnvelopeSchema
  *  GET /productos/:idProducto/impacto-desactivacion
  *  GET /productos/:idProducto/colores                      (P5, paginado)
  *
+ *  Imágenes (POST y PUT/DELETE de medidas con límite JSON de 7 MB)
+ *  GET /productos/:idProducto/imagenes · POST /productos/:idProducto/imagenes
+ *  PATCH /productos/:idProducto/imagenes/orden
+ *  GET /imagenes/:idImagen (bytes) · PATCH /imagenes/:idImagen/principal · DELETE /imagenes/:idImagen
+ *  GET /medidas/:idMedida/imagen (bytes) · PUT /medidas/:idMedida/imagen · DELETE /medidas/:idMedida/imagen
+ *
  *  Variantes
  *  POST /productos/:idProducto/variantes
  *  PUT /variantes/:idVariante · PATCH /variantes/:idVariante/estado
@@ -624,5 +748,8 @@ export type ErrorProductosEnvelope = z.infer<typeof errorProductosEnvelopeSchema
  *  GET /productos                tarjetas paginadas con filtros
  *  GET /productos/:idProducto    ficha con variantes (404 si no está disponible, U1)
  *  GET /productos/:idProducto/colores   carta paginada por familia (U3, U4)
+ *  GET /productos/:idProducto/ofertas   oferta de cada variante con el color elegido (M06)
  *  GET /marcas/:idMarca/logotipo bytes del logotipo
+ *  GET /imagenes/:idImagen       bytes de una imagen de producto visible
+ *  GET /medidas/:idMedida/imagen bytes de la imagen de una medida
  * ─────────────────────────────────────────────────────────────────────────── */

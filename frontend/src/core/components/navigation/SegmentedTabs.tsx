@@ -42,7 +42,13 @@ export function SegmentedTabs<T extends string>({
   };
 
   return (
-    <div role="tablist" aria-label={ariaLabel} className="grid grid-cols-2 gap-1 rounded-btn bg-subaction p-1">
+    // `grid-flow-col auto-cols-fr` reparte columnas iguales para cualquier número
+    // de pestañas; con `grid-cols-2` la tercera se iba a una segunda fila.
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className="grid grid-flow-col auto-cols-fr gap-1 rounded-btn bg-subaction p-1"
+    >
       {options.map((opcion, indice) => {
         const activa = opcion.value === value;
         return (
@@ -59,7 +65,7 @@ export function SegmentedTabs<T extends string>({
             tabIndex={activa ? 0 : -1}
             onClick={() => onChange(opcion.value)}
             onKeyDown={(e) => alPulsar(indice, e)}
-            className={`min-h-[40px] rounded-btn font-title text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
+            className={`min-h-[44px] rounded-btn font-title text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
               activa ? 'bg-neutral-white text-neutral-black shadow-card' : 'text-neutral-medium hover:text-neutral-dark'
             }`}
           >

@@ -52,7 +52,7 @@ export class MarcasService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.marcas.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.marcas.contarImpacto(id), { tipo: 'marca', id }),
       padreActivo: () => this.marcas.padreActivo(id),
       etiquetaPadre: 'el padre',
       cambiar: (estado) => this.marcas.cambiarEstado(id, estado),
@@ -61,6 +61,6 @@ export class MarcasService extends ServicioCatalogoBase {
 
   async impacto(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.marcas.obtener(id));
-    return this.marcas.contarImpacto(id);
+    return this.conReglasComerciales(this.marcas.contarImpacto(id), { tipo: 'marca', id });
   }
 }

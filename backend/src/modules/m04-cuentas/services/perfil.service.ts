@@ -1,7 +1,11 @@
 import { derivarContrasena, verificarContrasena } from '../../../core/utils/crypto';
-import { esUsuarioAdministrativo, type CuentasRepository } from '../repositories/cuentas.repository';
+import {
+  esUsuarioAdministrativo,
+  type CuentaEmpresaConTipo,
+  type CuentasRepository,
+} from '../repositories/cuentas.repository';
 import type { CodigosVerificacionRepository } from '../repositories/codigos-verificacion.repository';
-import type { NotificacionesPort } from '../interfaces/notificaciones.port';
+import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import type { DateProviderPort } from '../interfaces/date-provider.port';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import { generarCodigoOtp } from './codigo-otp';
@@ -12,6 +16,7 @@ import type {
   DesactivarCuentaRequest,
   PerfilUsuarioResponse,
   SolicitarCambioCorreoRequest,
+  TipoClienteResumen,
 } from '../dtos/m04-cuentas.dto';
 
 const MINUTOS_VIGENCIA_CAMBIO_CORREO = 15;
@@ -25,6 +30,18 @@ export class PerfilError extends Error {
     super(message);
     this.name = 'PerfilError';
   }
+}
+
+/**
+ * Nombre y condiciones del descuento de la cuenta (M06 · D8). Sin tipo, o con el tipo o su política desactivados,
+ * la cuenta no tiene descuento y se informa null.
+ */
+function tipoClienteVigente(empresa: CuentaEmpresaConTipo): TipoClienteResumen | null {
+  const tipo = empresa.subRolEmpresa;
+  if (tipo === undefined || tipo === null || tipo.estado !== 'activo') return null;
+  const d = tipo.descuento;
+  if (d === null || d.estado !== 'activo') return null;
+  return { nombre: tipo.nombre, porcentaje: Number(d.porcentajeDescuento), montoMinimoCompra: Number(d.montoMinimoCompra) };
 }
 
 export class PerfilService {
@@ -65,6 +82,7 @@ export class PerfilService {
             correoEmpresarial: empresa.correoEmpresarial,
             telefono: empresa.telefono,
             fechaAprobacion: empresa.fechaAprobacion.toISOString(),
+            tipoCliente: tipoClienteVigente(empresa),
           }
         : null,
     };

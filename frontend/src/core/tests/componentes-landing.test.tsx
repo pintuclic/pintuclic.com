@@ -4,12 +4,13 @@ import { getButtonClassName } from '../components/buttons/button-styles';
 import { CategoryCard } from '../components/data-display/CategoryCard';
 import { ProductCard } from '../components/data-display/ProductCard';
 import { SearchBar } from '../components/forms/SearchBar';
-import { Footer, type FooterProps } from '../components/layout/Footer';
+import { claveDeEnlace, Footer, type FooterProps } from '../components/layout/Footer';
 import { Header, type HeaderProps } from '../components/layout/Header';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { AdminPageHeader } from '../components/layout/AdminPageHeader';
 import { AdminStatCard } from '../components/data-display/AdminStatCard';
 import { Carousel } from '../components/navigation/Carousel';
+import { esColorMuyClaro } from '../utils/color-muestra';
 import { formatCOP } from '../utils/moneda';
 
 /**
@@ -55,8 +56,8 @@ describe('ProductCard con href', () => {
     />
   );
 
-  it('el nombre y "Ver producto" son enlaces a la ficha, no botones', () => {
-    expect(html.match(/href="\/productos\/brocha-premium-3"/g)).toHaveLength(2);
+  it('el nombre, "Ver producto" y la acción de compra son enlaces a la ficha cuando no hay callback de carrito', () => {
+    expect(html.match(/href="\/productos\/brocha-premium-3"/g)).toHaveLength(3);
     expect(html).toContain('aria-label="Ver producto: Brocha Premium 3&quot;"');
   });
 
@@ -67,6 +68,79 @@ describe('ProductCard con href', () => {
 
   it('la imagen declara dimensiones y texto alternativo', () => {
     expect(html).toMatch(/<img[^>]*alt="Brocha Premium 3&quot;"[^>]*width="400"[^>]*height="300"/);
+  });
+});
+
+describe('ProductCard con color de muestra', () => {
+  const panel = (html: string): string =>
+    /<div aria-hidden="true" data-muestra-color="[^"]*" class="([^"]*)"/.exec(html)?.[1] ?? '';
+  const tarjeta = (props: { swatchColor?: string; swatchLabel?: string; showViewDetails?: boolean } = {}): string =>
+    renderToStaticMarkup(
+      <ProductCard id="p2" name="Viniltex" price={85900} href="/productos/1" onAddToCart={() => undefined} {...props} />,
+    );
+
+  it('pinta el panel de muestra detrás de la imagen, oculto para el lector de pantalla', () => {
+    const html = tarjeta({ swatchColor: '#9CC9E8' });
+    expect(html).toMatch(/<div aria-hidden="true" data-muestra-color="#9CC9E8"[^>]*>/);
+    expect(html).toContain('background-color:#9CC9E8');
+    expect(panel(html)).toContain('rounded-2xl');
+    expect(panel(html)).not.toContain('ring-neutral-light');
+  });
+
+  it('un color muy claro lleva borde para verse sobre el blanco', () => {
+    expect(panel(tarjeta({ swatchColor: '#FDFDF8' }))).toContain('ring-1 ring-inset ring-neutral-light');
+  });
+
+  it('sin color, o con un color mal escrito, se queda el fondo neutro', () => {
+    for (const html of [tarjeta(), tarjeta({ swatchColor: 'azul' })]) {
+      expect(html).not.toContain('data-muestra-color');
+      expect(html).toContain('bg-neutral-lightest');
+    }
+  });
+
+  it('con callback, el carrito es un botón y no otro enlace', () => {
+    expect(tarjeta().match(/href="\/productos\/1"/g)).toHaveLength(2);
+    expect(tarjeta()).toContain('aria-label="Agregar Viniltex al carrito"');
+  });
+
+  it('muestra el nombre del color bajo el nombre del producto, solo si hay muestra', () => {
+    expect(tarjeta({ swatchColor: '#9CC9E8', swatchLabel: 'Azul Cielo · y 45 colores más' })).toContain(
+      'Azul Cielo · y 45 colores más',
+    );
+    expect(tarjeta({ swatchLabel: 'Azul Cielo' })).not.toContain('Azul Cielo');
+  });
+});
+
+describe('ProductCard sin "Ver producto"', () => {
+  const html = renderToStaticMarkup(
+    <ProductCard id="p3" name="Koraza" price={99900} href="/productos/2" onAddToCart={() => undefined} showViewDetails={false} />,
+  );
+
+  it('no pinta "Ver producto" y deja el carrito junto al precio', () => {
+    expect(html).not.toContain('Ver producto');
+    expect(html).toMatch(/99\.900 COP<\/span><\/div><button[^>]*aria-label="Agregar Koraza al carrito"/);
+  });
+
+  it('la imagen lleva a la ficha sin repetir el enlace para el teclado', () => {
+    expect(html).toMatch(/<a[^>]*tabindex="-1"[^>]*aria-hidden="true"[^>]*href="\/productos\/2"|<a[^>]*href="\/productos\/2"[^>]*tabindex="-1"[^>]*aria-hidden="true"/);
+    expect(html.match(/href="\/productos\/2"/g)).toHaveLength(2);
+  });
+
+  it('con muestra, la foto no se mezcla con el color', () => {
+    const conColor = renderToStaticMarkup(
+      <ProductCard id="p4" name="ICO" price={27900} imageUrl="/x.png" swatchColor="#111111" showViewDetails={false} />,
+    );
+    expect(conColor).not.toContain('mix-blend-multiply');
+    expect(conColor).toContain('drop-shadow-md');
+  });
+});
+
+describe('esColorMuyClaro', () => {
+  it('distingue blancos de colores con cuerpo', () => {
+    expect(esColorMuyClaro('#FFFFFF')).toBe(true);
+    expect(esColorMuyClaro('#F7F3E8')).toBe(true);
+    expect(esColorMuyClaro('#9CC9E8')).toBe(false);
+    expect(esColorMuyClaro('#000000')).toBe(false);
   });
 });
 
@@ -165,6 +239,14 @@ describe('Footer', () => {
   };
   const html = renderToStaticMarkup(<Footer {...props} />);
 
+  it('dos enlaces a la misma página no repiten la clave', () => {
+    const enlaces = [
+      { label: 'Qué pintura necesito', href: '/asesoria' },
+      { label: 'Calculadora de pintura', href: '/asesoria' },
+    ];
+    expect(new Set(enlaces.map(claveDeEnlace)).size).toBe(2);
+  });
+
   it('calcula el año en lugar de fijarlo', () => {
     expect(html).toContain(`© ${new Date().getFullYear()} Pintu Clic`);
   });
@@ -182,11 +264,11 @@ describe('Footer', () => {
 });
 
 describe('Admin Core Kit (AdminLayout, AdminPageHeader, AdminStatCard)', () => {
-  it('AdminLayout renderiza el sidebar full-height, el logo oficial, el menú sin jerga interna y el widget inferior', () => {
+  it('AdminLayout renderiza el sidebar full-height, el logo oficial y el menú, sin adornos que no hacen nada', () => {
     const html = renderToStaticMarkup(
       <AdminLayout>
         <AdminPageHeader
-          title="¡Hola, Carlos!"
+          title="¡Hola, equipo!"
           subtitle="Resumen del panel"
           metaPrimary="Viernes, 23 de octubre de 2026"
           metaSecondary="Pintu Clic Admin"
@@ -195,10 +277,14 @@ describe('Admin Core Kit (AdminLayout, AdminPageHeader, AdminStatCard)', () => {
     );
 
     expect(html).toContain('aria-label="Navegación administrativa"');
-    expect(html).toContain('Hacemos crecer tu negocio');
     expect(html).not.toContain('Módulos M17');
-    expect(html).toContain('Buscar productos, marcas, categorías o pedidos...');
-    expect(html).toContain('¡Hola, Carlos!');
+    // Nada de maqueta: ni tarjeta publicitaria abajo, ni buscador que no busca, ni campana de notificaciones sin función.
+    expect(html).not.toContain('Hacemos crecer tu negocio');
+    expect(html).not.toContain('Buscar productos, marcas, categorías o pedidos');
+        expect(html).not.toMatch(/aria-label="Notificaciones/);
+    // Sin sesión no se inventa una persona.
+    expect(html).not.toContain('Carlos');
+    expect(html).toContain('¡Hola, equipo!');
     expect(html).toContain('Pintu Clic Admin');
   });
 

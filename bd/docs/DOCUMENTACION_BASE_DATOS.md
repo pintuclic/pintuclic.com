@@ -1,8 +1,8 @@
 # 📘 Arquitectura y Documentación del Esquema de Base de Datos - PINTUCLIC
 
-> **Versión Actual:** 3.3 — esquema 4.4 (M01 Catálogo: equivalencia en galones de los tipos de medida).  
+> **Versión Actual:** 3.19 — esquema 4.18 (M21 Cotizaciones: solicitud desde el carrito, líneas y precio acordado).  
 > **Motor de Base de Datos:** PostgreSQL 13+ (`gen_random_uuid()` nativo; compatible con PostgreSQL 18)  
-> **Total de Tablas:** 58  
+> **Total de Tablas:** 79  
 > **Script DDL Oficial:** [`../sql/schema_pintuclic.sql`](../sql/schema_pintuclic.sql)  
 > **Script de Mocks / Seed Oficial:** [`../sql/seed_pintuclic.sql`](../sql/seed_pintuclic.sql)  
 > **Guía Oficial de Mocks y Datos de Prueba:** [`./GUIA_MOCKS_Y_DATOS_PRUEBA.md`](./GUIA_MOCKS_Y_DATOS_PRUEBA.md)  
@@ -14,6 +14,18 @@
 
 | Versión | Fecha | Tablas Nuevas | Tablas Deprecadas | Cambios Destacados | Detalle Completo |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| **v3.19** (esquema 4.18) | 2026-10-27 | `linea_cotizacion` (1) | Ninguna | M21: estado `solicitada`; columnas de la cotización (código, notas, fechas, totales); líneas con precio de referencia y acordado; `linea_carrito.id_cotizacion` y `precio_acordado`; parámetro de vigencia. Total 79 tablas. | [Ver v3.19](./CHANGELOG_DATABASE.md#v319---2026-10-27) |
+| **v3.17** (esquema 4.17) | 2026-10-27 | Ninguna | Ninguna | M14 · A13: se elimina la columna `producto.patrocinado` (interruptor manual que M01 ya no usa); el patrocinio queda solo en las campañas de M14. Total 78 tablas. | [Ver v3.17](./CHANGELOG_DATABASE.md#v317---2026-10-27) |
+| **v3.16** (esquema 4.16) | 2026-10-26 | `campania_patrocinio`, `campania_objetivo`, `anuncio_publicitario`, `anuncio_imagen`, `medicion_patrocinio` (5) | Ninguna | M14: campañas de patrocinio de productos (por producto, línea o marca, con vigencia y prioridad), anuncios de espacios publicitarios con sus imágenes y medición diaria de impresiones y clics sin datos personales. Siete ENUMs nuevos. Total 78 tablas. | [Ver v3.16](./CHANGELOG_DATABASE.md#v316---2026-10-26) |
+| **v3.15** (esquema 4.15) | 2026-10-26 | Ninguna | Ninguna | M14: permisos `patrocinios.ver` y `patrocinios.editar` (27-28) en el seed. Total 73 tablas. | [Ver v3.15](./CHANGELOG_DATABASE.md#v315---2026-10-26) |
+| **v3.14** (esquema 4.15) | 2026-10-26 | Ninguna | Ninguna | M05: restricciones únicas `carrito(id_usuario)` y `carrito(token_visitante)` (un carrito por dueño); el token se guarda con SHA-256. Modelos Prisma `Carrito` y `LineaCarrito`. Total 73 tablas. | [Ver v3.14](./CHANGELOG_DATABASE.md#v314---2026-10-26) |
+| **v3.11** (esquema 4.13) | 2026-10-26 | `evento_descuento`, `evento_regla`, `evento_exclusion`, `cupon`, `cupon_uso` (5) | Ninguna | M06: eventos de descuento con calendario (fechas, días de la semana, horas), reglas con porcentaje propio por objetivo y excepciones (incluidos color y familia de color); cupones con usos; `descuento.monto_minimo_compra`; `cuenta_empresa.id_sub_rol_empresa` (tipo de cliente empresa). Cuatro ENUMs nuevos. Total 73 tablas. | [Ver v3.11](./CHANGELOG_DATABASE.md#v311---2026-10-26) |
+| **v3.9** (esquema 4.11) | 2026-10-25 | `solicitud_contacto`, `horario_atencion`, `configuracion_atencion_whatsapp` (3) | Ninguna | M15 Atención al cliente: solicitudes del formulario de contacto sin duplicar datos de contacto, horario de atención humana por día con franja coherente y destino del botón de WhatsApp en fila única. Tres ENUMs nuevos y los permisos `atencion.*`. Las preguntas frecuentes son de M16. Total 67 tablas. | [Ver v3.9](./CHANGELOG_DATABASE.md#v39---2026-10-25) |
+| **v3.8** (esquema 4.10) | 2026-10-25 | Ninguna | Ninguna | M13: `ajuste_inventario.referencia` (única por variante y motivo) y valores `orden`, `venta` y `devolucion` en sus ENUMs, para descontar y reponer la existencia de los combos de forma idempotente. Total 64 tablas. | [Ver v3.8](./CHANGELOG_DATABASE.md#v38---2026-10-25) |
+| **v3.7** (esquema 4.9) | 2026-10-25 | Ninguna | Ninguna | M01 entrega 3: `producto.es_combo` y `excluido_de_descuentos`; `subcategoria.id_categoria_complementaria`; `imagen.miniatura` y `mediana` (+ una imagen se asocia a variante o a color, no a ambos). Total 64 tablas. | [Ver v3.7](./CHANGELOG_DATABASE.md#v37---2026-10-25) |
+| **v3.6** (esquema 4.8) | 2026-10-25 | `pagina_institucional`, `faq_entrada` (2) | Ninguna | M16: páginas institucionales administrables (`sobre-nosotros`, `terminos-y-condiciones`, `politica-de-privacidad`, `politicas-de-envio`) con ciclo editorial (`enum_estado_contenido`) y catálogo de preguntas frecuentes (FAQ) ordenadas para el Centro de Ayuda y puerto hacia M15. Total 64 tablas. | [Ver v3.6](./CHANGELOG_DATABASE.md#v36---2026-10-25) |
+| **v3.5** (esquema 4.7) | 2026-10-25 | `ajuste_inventario` (+ `envio_notificacion`, `rebote_notificacion`, `plantilla_notificacion` de M18, esquema 4.6) | Ninguna | M13: historial inmutable de cada cambio de la existencia referencial de una variante, con motivo, origen, nota, usuario y `id_carga` para agrupar cargas masivas. Dos ENUMs nuevos. Total 62 tablas. | [Ver v3.5](./CHANGELOG_DATABASE.md#v35---2026-10-25) |
+| **v3.4** (esquema 4.5) | 2026-10-24 | Ninguna | Ninguna | `ficha_recubrimiento.manos` (opcional, 1 a 10): manos con las que se logra el rendimiento. `medida.imagen` e `imagen_mime_type` (opcionales, siempre juntas): imagen de la medida para la galería del producto. Total 58 tablas. | [Ver v3.4](./CHANGELOG_DATABASE.md#v34---2026-10-24) |
 | **v3.3** (esquema 4.4) | 2026-10-24 | Ninguna | Ninguna | `tipo_medida.equivalencia_galones` (opcional, mayor que 0): galones que equivale una unidad (litro = 0,264172052). Permite derivar el rendimiento por medida a partir del rendimiento por galón (`RF-CAT-10-03`). Seed: galón, litro y mililitro. Total 58 tablas. | [Ver v3.3](./CHANGELOG_DATABASE.md#v33---2026-10-24) |
 | **v3.2** (esquema 4.3) | 2026-10-24 | `superficie`, `acabado`, `familia_color`, `tipo_medida`, `medida`, `ficha_recubrimiento`, `producto_superficie`, `producto_acabado`, `producto_color`, `producto_caracteristica` (10) | `sub_subcategorias`, `tonos`, `presentacion`, `caracteristica`, `producto_subcategoria` (5) | M01 Catálogo rediseñado con las reglas del Tech Lead: color con base opcional, acabado y familia; bases globales; variante = producto + medida con su precio; producto en una subcategoría con superficies y ambiente; color en `linea_carrito` y `sku_vendido` en `linea_orden`. Total 58 tablas. | [Ver v3.2](./CHANGELOG_DATABASE.md#v32---2026-10-24) |
 | **v3.1** (esquema 4.2) | 2026-10-23 | Ninguna | Ninguna | Sin cambios de DDL ni de Prisma. Seed: parámetro 11 `auth.vigencia_enlace_activacion_horas` (72 h, rango 1–168). `codigo_verificacion` guarda también el enlace de activación de empleados y los tokens de gobernanza del admin (antes en memoria); la recuperación ya no guarda el valor plano. M17 ya persiste el catálogo con Prisma. | [Ver v3.1](./WALKTHROUGH_DATABASE.md#-versión-31-2026-10-23) |
@@ -561,7 +573,7 @@ erDiagram
 
 ---
 
-## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (58 Tablas)
+## 🏛️ 3. Módulos del Sistema y Diccionario de Datos (78 Tablas)
 
 ### Módulo 1: Seguridad, Roles y Descuentos (5 Tablas)
 | Tabla | PK | FKs | Descripción |
@@ -585,7 +597,7 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | Tabla | PK | FKs | Descripción |
 | :--- | :--- | :--- | :--- |
 | **`categoria`** | `id_categoria` | Ninguna | Qué ES el producto (Pinturas, Maderas, Herramientas…). `nombre` UNIQUE, `orden`, `estado`. |
-| **`subcategoria`** | `id_subcategoria` | `id_categoria` (RESTRICT) | Segundo y último nivel. Nombre único por categoría. |
+| **`subcategoria`** | `id_subcategoria` | `id_categoria` (RESTRICT), `id_categoria_complementaria` (SET NULL) | Segundo y último nivel. Nombre único por categoría. La categoría complementaria es opcional y es el valor por defecto de sus productos (v3.7). |
 | **`superficie`** | `id_superficie` | Ninguna | Dónde se aplica (Paredes y techos, Madera, Metal…). Etiqueta N:M. |
 | **`marca`** | `id_marca` | Ninguna | Marca con logotipo `BYTEA` (máx. 5 MB, jpeg/png/webp). |
 | **`linea`** | `id_linea` | `id_marca` (RESTRICT) | Línea comercial; nombre único por marca. `UNIQUE (id_linea, id_marca)` soporta la FK compuesta de producto. |
@@ -596,7 +608,7 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | **`tipo_medida`** | `id_tipo_medida` | Ninguna | Galón, litro, mililitro, pulgada, metro, unidad. `equivalencia_galones` (> 0, opcional) deriva el rendimiento por medida (RF-CAT-10-03). |
 | **`medida`** | `id_medida` | `id_tipo_medida` (RESTRICT) | Valor + tipo (ej. 1/4 de galón). `UNIQUE (id_tipo_medida, valor)`. |
 | **`color`** | `id_color` | `id_marca`, `id_base` (opcional), `id_acabado`, `id_familia_color` (opcional) | Hexadecimal obligatorio; CIELAB opcional y completo o vacío. `UNIQUE (id_marca, nombre, id_acabado)`; código único por marca. |
-| **`producto`** | `id_producto` | `id_marca`, `(id_linea, id_marca)` → `linea`, `id_subcategoria`, `id_categoria_complementaria` (SET NULL) | Nombre único por marca; ambiente, publicación y patrocinio. La FK compuesta impide una línea de otra marca. |
+| **`producto`** | `id_producto` | `id_marca`, `(id_linea, id_marca)` → `linea`, `id_subcategoria`, `id_categoria_complementaria` (SET NULL) | Nombre único por marca; ambiente, publicación y patrocinio. La FK compuesta impide una línea de otra marca. `es_combo` (paquete con una sola variante, único producto con venta limitada por existencia) y `excluido_de_descuentos` (v3.7). |
 | **`ficha_recubrimiento`** | `id_producto` | `id_producto` (CASCADE), `id_tipo_resina` | 1:1 opcional: resina, tipo 1/2/3, rendimiento m²/galón. Las herramientas no tienen. |
 | **`producto_superficie`** | `(id_producto, id_superficie)` | ambos | Superficies del producto. |
 | **`producto_acabado`** | `(id_producto, id_acabado)` | ambos | Acabados del producto; filtran su carta. |
@@ -604,7 +616,7 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | **`producto_color`** | `(id_producto, id_color)` | ambos | Colores de fábrica / exclusivos del producto. |
 | **`producto_caracteristica`** | `id_caracteristica` | `id_producto` (CASCADE) | Atributos técnicos nombre/valor. |
 | **`variante`** | `id_variante` | `id_producto` (RESTRICT), `id_medida` (RESTRICT) | Producto + medida, `sku` UNIQUE, `precio_vigente`, existencia referencial, `codigo_proveedor` (SAMIT futuro). |
-| **`imagen`** | `id_imagen` | `id_producto`, `id_variante`, `id_color` | Imágenes `BYTEA`; una principal por producto. |
+| **`imagen`** | `id_imagen` | `id_producto`, `id_variante`, `id_color` | Imágenes `BYTEA`; una principal por producto. Se asocia a una variante o a un color, no a ambos. `miniatura` y `mediana` (WebP, opcionales) para listados y ficha (v3.7). |
 | **`combo`** / **`variante_combo`** | `id_combo` / `id_variante_combo` | — | Combos; pendientes de rediseño en su entrega. |
 
 ### Módulo 4: Carrito Vivo de Compras (2 Tablas)
@@ -665,11 +677,48 @@ Reglas de negocio: [`M01_REGLAS_ADICIONALES.md`](../../docs/02_MODULOS_FUNCIONAL
 | :--- | :--- | :--- | :--- |
 | **`busqueda_sin_resultado`** | `id_busqueda` (**BIGSERIAL**) | Ninguna | Analítica de búsquedas sin resultado (M02 HU-BUS-06): una fila por evento, con el `termino` normalizado y su `fecha`, **sin identidad de usuario** (M20 HU-SEG-06). Permite acotar por periodo y agregar repeticiones con `GROUP BY termino`. |
 
+### Módulo 12: Inventario Referencial — M13 (1 Tabla)
+| Tabla | PK | FKs | Descripción |
+| :--- | :--- | :--- | :--- |
+| **`ajuste_inventario`** *(v3.5)* | `id_ajuste` | `id_variante` $\rightarrow$ `variante` (RESTRICT), `id_usuario` $\rightarrow$ `usuario` (SET NULL) | Historial inmutable de cambios de `variante.existencia_referencial`: existencia anterior y nueva (≥ 0 y distintas), `motivo`, `origen` (`manual`, `carga_masiva`, `samit`), nota opcional, `id_carga` (UUID del cliente que agrupa una carga masiva, sin tabla propia) y `fecha`. Solo se inserta, en la misma transacción que el cambio de la variante. El inventario es referencial y no bloquea ventas, salvo en los combos, cuya existencia baja al crearse la orden y vuelve al cancelarse (`origen = orden`, con su `referencia`, v3.8). |
+
+### Módulo 13: Atención al Cliente — M15 (3 Tablas, esquema 4.11)
+Las preguntas frecuentes no están aquí: son de M16 (`faq_entrada`), que las expone por puerto.
+
+| Tabla | PK | FKs | Descripción |
+| :--- | :--- | :--- | :--- |
+| **`solicitud_contacto`** *(v3.9)* | `id_solicitud` (**UUID**) | `id_usuario` $\rightarrow$ `usuario` (CASCADE) | Solicitudes del formulario de contacto, que exige sesión (HU-ATC-02): `tipo` (`consulta`, `cotizacion`, `reclamo`), `descripcion` y `estado` (`pendiente`, `atendida`) para la bandeja del administrador. **No duplica los datos de contacto**: se leen de la cuenta al mostrarla (RF-ATC-02-04). Una solicitud de tipo `cotizacion` es solo intención y nunca genera una cotización formal (RF-ATC-02-07). |
+| **`horario_atencion`** *(v3.9)* | `id_horario` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Horario de atención humana, una fila por día de la semana (`dia_semana` UNIQUE, HU-ATC-04). Las horas son `"HH:mm"` en 24h validadas por `ck_horario_formato_horas`, y `ck_horario_franja_coherente` exige que un día cerrado no lleve horas y que uno abierto tenga `hora_fin > hora_inicio`. Solo condiciona los canales atendidos por personas (RF-ATC-04-04). |
+| **`configuracion_atencion_whatsapp`** *(v3.9)* | `id_configuracion` (**fila única**, `ck_whatsapp_fila_unica`) | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Destino del botón de contacto directo por WhatsApp (HU-ATC-03). Admite una URL completa —hoy el canal de difusión, que no acepta texto prellenado— o un número de WhatsApp Business cuando exista; en ese caso el botón arma el enlace `wa.me` con `mensaje_base` y la referencia del producto. Es un enlace saliente: el sistema no recibe, almacena ni responde conversaciones (RF-ATC-03-04). |
+
+### Módulo 14: Precios, Eventos de Descuento y Cupones — M06 (5 Tablas, esquema 4.13)
+Además amplía `descuento` (`monto_minimo_compra`) y `cuenta_empresa` (`id_sub_rol_empresa`, el tipo de cliente empresa). El IVA no está aquí: es el parámetro `comercial.iva_porcentaje` de M17.
+
+| Tabla | PK | FKs | Descripción |
+| :--- | :--- | :--- | :--- |
+| **`evento_descuento`** *(v3.11)* | `id_evento` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Evento con calendario: fechas (DATE), `dias_semana` (ISO 1-7, vacío = todos) y horas `"HH:mm"` (las dos o ninguna). Hora de Colombia. |
+| **`evento_regla`** *(v3.11)* | `id_regla` | `id_evento` $\rightarrow$ `evento_descuento` (CASCADE) | Objetivo (marca, línea, categoría, subcategoría, producto o variante; NULL = todo el catálogo) y su porcentaje propio. Sin FK en `id_objetivo` (apunta a seis tablas). |
+| **`evento_exclusion`** *(v3.11)* | `id_exclusion` | `(id_regla, id_evento)` $\rightarrow$ `evento_regla` (CASCADE); `id_evento` $\rightarrow$ `evento_descuento` (CASCADE) | Excepciones de una regla o de todo el evento: marca, línea, categoría, subcategoría, producto, variante, color o familia de color. |
+| **`cupon`** *(v3.11)* | `id_cupon` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Código único en mayúsculas, porcentaje o importe fijo, mínimo de compra, límites de uso, audiencia y vigencia. |
+| **`cupon_uso`** *(v3.11)* | `id_cupon_uso` | `id_cupon` $\rightarrow$ `cupon` (RESTRICT); `id_usuario` $\rightarrow$ `usuario` (SET NULL) | Un uso por orden (`referencia` única, idempotente); `liberado_en` marca la orden cancelada. |
+
+### Módulo 15: Patrocinios y Publicidad — M14 (5 Tablas, esquema 4.16)
+No toca ninguna tabla existente. La columna `producto.patrocinado` (interruptor manual de M01) se eliminó en la v3.17 (esquema 4.17), cuando M01 dejó de usarla (contrato M14 · A13).
+
+| Tabla | PK | FKs | Descripción |
+| :--- | :--- | :--- | :--- |
+| **`campania_patrocinio`** *(v3.16)* | `id_campania` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Campaña con vigencia (`fecha_fin` obligatoria: caduca sola), `prioridad` 0-100 y `ubicaciones` (listado, inicio, complementarios). Nombre único sin distinguir mayúsculas (`uq_campania_nombre`). |
+| **`campania_objetivo`** *(v3.16)* | `id_campania_objetivo` | `id_campania` $\rightarrow$ `campania_patrocinio` (CASCADE) | Producto, línea o marca que patrocina la campaña. Sin FK en `id_referencia` (apunta a tres tablas según `tipo`); un objetivo que ya no existe se ignora. |
+| **`anuncio_publicitario`** *(v3.16)* | `id_anuncio` | `id_usuario_actualizo` $\rightarrow$ `usuario` (SET NULL) | Anuncio de un espacio (inicio, catálogo, ficha) con texto alternativo obligatorio, vigencia y orden en el slider. `enlace` solo `https://` o ruta interna (`ck_anuncio_enlace`). |
+| **`anuncio_imagen`** *(v3.16)* | `(id_anuncio, variante, tamano)` | `id_anuncio` $\rightarrow$ `anuncio_publicitario` (CASCADE) | Imagen de escritorio y móvil, cada una con su original y sus versiones reducidas (WEBP). JPEG, PNG o WEBP; nunca SVG. |
+| **`medicion_patrocinio`** *(v3.16)* | `(fecha, entidad, id_entidad, lugar, evento)` | Ninguna (apunta a dos tablas según `entidad`) | Impresiones y clics por día de una campaña o un anuncio. Solo totales: ni IP, ni sesión, ni navegador. Se conservan siempre. |
+
 ---
 
 ## 🛡️ 4. Tipos Enumerados (ENUMs)
 
-Para asegurar la máxima robustez en PostgreSQL, el esquema utiliza 21 tipos enumerados nativos:
+Para asegurar la máxima robustez en PostgreSQL, el esquema utiliza 40 tipos enumerados nativos.
+`enum_clase_color` aparece abajo pero **todavía no existe en el DDL**: queda pendiente de la Entrega 2 de M01.
 
 ```sql
 enum_estado_general     -- ('activo', 'inactivo')
@@ -705,6 +754,36 @@ enum_tipo_dato_parametro      -- ('numero', 'texto', 'booleano')
 
 -- Catálogo (M01 - HU-CAT-02, RF-CAT-02-03)
 enum_clase_color              -- ('entonable', 'colores_fijos', 'sin_color')
+
+-- Inventario referencial (M13)
+enum_motivo_ajuste_inventario -- ('conteo_fisico', 'ingreso_mercancia', 'salida', 'correccion', 'otro', 'carga_masiva', 'venta', 'devolucion')
+enum_origen_ajuste_inventario -- ('manual', 'carga_masiva', 'samit', 'orden')
+enum_tipo_valor_descuento -- ('porcentaje', 'importe_fijo')
+enum_audiencia_descuento -- ('todos', 'particular', 'empresa')
+enum_tipo_objetivo_evento -- ('marca', 'linea', 'categoria', 'subcategoria', 'producto', 'variante')
+enum_tipo_exclusion_evento -- ('marca', 'linea', 'categoria', 'subcategoria', 'producto', 'variante', 'color', 'familia_color')
+
+-- Notificaciones y comunicaciones (M18)
+enum_tipo_comunicacion  -- ('registro_otp', 'recuperacion_password', 'activacion_empleado',
+                        --  'cambio_correo_otp', 'cambio_correo_confirmado', 'dictamen_empresa')
+enum_estado_envio_notificacion -- ('pendiente', 'enviado', 'fallido')
+
+-- Contenido institucional (M16)
+enum_estado_contenido   -- ('borrador', 'publicado', 'archivado')
+
+-- Patrocinios y publicidad (M14)
+enum_ubicacion_patrocinio      -- ('listado', 'inicio', 'complementarios')
+enum_tipo_objetivo_patrocinio  -- ('producto', 'linea', 'marca')
+enum_espacio_publicitario      -- ('inicio', 'catalogo', 'ficha')
+enum_variante_imagen_anuncio   -- ('escritorio', 'movil')
+enum_tamano_imagen_anuncio     -- ('original', 'mediano', 'pequeno')
+enum_entidad_medicion          -- ('campania', 'anuncio')
+enum_evento_medicion           -- ('impresion', 'clic')
+
+-- Atención al cliente (M15)
+enum_tipo_solicitud_contacto   -- ('consulta', 'cotizacion', 'reclamo')
+enum_estado_solicitud_contacto -- ('pendiente', 'atendida')
+enum_dia_semana         -- ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo')
 ```
 
 ---

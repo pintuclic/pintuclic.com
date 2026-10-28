@@ -15,6 +15,7 @@ export interface FichaRecubrimientoDatos {
   tipoCalidad: 1 | 2 | 3 | null;
   rendimientoMin: number | null;
   rendimientoMax: number | null;
+  manos: number | null;
 }
 
 /** Datos finales de un producto nuevo (ya normalizados y validados por el servicio). */
@@ -27,7 +28,6 @@ export interface CrearProductoDatos {
   usoInterior: boolean;
   usoExterior: boolean;
   idCategoriaComplementaria: number | null;
-  patrocinado: boolean;
   ficha: FichaRecubrimientoDatos | null;
   idsSuperficies: number[];
   idsAcabados: number[];
@@ -45,7 +45,6 @@ export interface EditarProductoDatos {
   usoInterior?: boolean;
   usoExterior?: boolean;
   idCategoriaComplementaria?: number | null;
-  patrocinado?: boolean;
   ficha?: FichaRecubrimientoDatos | null;
   idsSuperficies?: number[];
   idsAcabados?: number[];
@@ -95,6 +94,9 @@ export interface ProductosRepositoryPort extends RecursoCatalogoPort<
   verificarRelaciones(relaciones: RelacionesAVerificar): Promise<CampoRelacion | null>;
   cambiarPublicacion(id: number, publicado: boolean): Promise<ProductoDetalle>;
   contarVariantesActivas(idProducto: number): Promise<number>;
+  contarImagenes(idProducto: number): Promise<number>;
+  /** Entrega 3 (I5, P2): ¿está el color en la carta o entre los colores de fábrica del producto? */
+  colorOfrecido(idProducto: number, idColor: number): Promise<boolean>;
   /** P5: colores que ofrece el producto, paginados, con las familias presentes. */
   listarColores(idProducto: number, query: ListarColoresProductoRequest): Promise<ColoresDeProducto>;
 }
@@ -107,14 +109,12 @@ export interface CrearVarianteDatos {
   precio: number;
   /** null → el repositorio genera `P{idProducto}-V{idVariante}` (V3). */
   sku: string | null;
-  existenciaReferencial: number;
   codigoProveedor: string | null;
 }
 
 export interface EditarVarianteDatos {
   precio?: number;
   sku?: string;
-  existenciaReferencial?: number;
   codigoProveedor?: string | null;
 }
 

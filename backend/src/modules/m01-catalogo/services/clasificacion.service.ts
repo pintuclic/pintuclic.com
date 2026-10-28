@@ -45,7 +45,7 @@ export class ClasificacionService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.categorias.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.categorias.contarImpacto(id), { tipo: 'categoria', id }),
       padreActivo: () => this.categorias.padreActivo(id),
       etiquetaPadre: 'el padre',
       cambiar: (estado) => this.categorias.cambiarEstado(id, estado),
@@ -54,7 +54,7 @@ export class ClasificacionService extends ServicioCatalogoBase {
 
   async impacto(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.categorias.obtener(id));
-    return this.categorias.contarImpacto(id);
+    return this.conReglasComerciales(this.categorias.contarImpacto(id), { tipo: 'categoria', id });
   }
 
   /* ─── Subcategorías ─── */
@@ -69,6 +69,7 @@ export class ClasificacionService extends ServicioCatalogoBase {
       this.subcategorias.existeDuplicado({ idCategoria, nombre: datos.nombre }),
       'una subcategoría en esa categoría',
     );
+    await this.exigirCategoriaComplementaria(datos.idCategoriaComplementaria);
     return this.subcategorias.crear({ ...datos, idCategoria });
   }
 
@@ -80,7 +81,20 @@ export class ClasificacionService extends ServicioCatalogoBase {
         'una subcategoría en esa categoría',
       );
     }
+    await this.exigirCategoriaComplementaria(datos.idCategoriaComplementaria);
     return this.subcategorias.editar(id, datos);
+  }
+
+  /** Entrega 3 (D6): la categoría de la que se sugieren complementarios debe existir y estar activa. */
+  private async exigirCategoriaComplementaria(id: number | null | undefined): Promise<void> {
+    if (id === undefined || id === null) return;
+    const categoria = await this.categorias.obtener(id);
+    if (categoria === null || categoria.estado !== 'activo') {
+      throw errores.relacionInvalida(
+        'La categoría complementaria no existe o está inactiva.',
+        'idCategoriaComplementaria',
+      );
+    }
   }
 
   async cambiarEstadoSubcategoria(id: number, peticion: CambiarEstadoRequest): Promise<Subcategoria> {
@@ -88,7 +102,7 @@ export class ClasificacionService extends ServicioCatalogoBase {
     return this.aplicarCambioEstado({
       actual,
       peticion,
-      contarImpacto: () => this.subcategorias.contarImpacto(id),
+      contarImpacto: () => this.conReglasComerciales(this.subcategorias.contarImpacto(id), { tipo: 'subcategoria', id }),
       padreActivo: () => this.subcategorias.padreActivo(id),
       etiquetaPadre: 'la categoría',
       cambiar: (estado) => this.subcategorias.cambiarEstado(id, estado),
@@ -97,6 +111,6 @@ export class ClasificacionService extends ServicioCatalogoBase {
 
   async impactoSubcategoria(id: number): Promise<ImpactoDesactivacion> {
     this.exigir(await this.subcategorias.obtener(id));
-    return this.subcategorias.contarImpacto(id);
+    return this.conReglasComerciales(this.subcategorias.contarImpacto(id), { tipo: 'subcategoria', id });
   }
 }

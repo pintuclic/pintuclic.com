@@ -69,6 +69,18 @@ enum EstadoUsuario {
 }
 
 /// Estado general de entidades de configuración y catálogos (M17)
+/// Estado de una cotización (M21); `borrador` se trata igual que `solicitada`
+enum EstadoCotizacion {
+  solicitada
+  borrador
+  enviada
+  aprobada
+  rechazada
+  vencida
+
+  @@map("enum_estado_cotizacion")
+}
+
 enum EstadoGeneral {
   activo
   inactivo
@@ -128,6 +140,195 @@ enum TipoDatoParametro {
   @@map("enum_tipo_dato_parametro")
 }
 
+/// Catálogo de comunicaciones transaccionales que envía el sistema (M18 · RF-NOT-01-02)
+enum TipoComunicacion {
+  registro_otp
+  recuperacion_password
+  activacion_empleado
+  cambio_correo_otp
+  cambio_correo_confirmado
+  dictamen_empresa
+  /// M03 · I9: el servicio de IA acumuló los fallos consecutivos configurados
+  alerta_servicio_ia
+
+  @@map("enum_tipo_comunicacion")
+}
+
+/// Resultado de un intento de envío transaccional (M18 · RF-NOT-01-03, RF-NOT-01-04)
+enum EstadoEnvioNotificacion {
+  pendiente
+  enviado
+  fallido
+
+  @@map("enum_estado_envio_notificacion")
+}
+
+/// Motivo de un ajuste de existencia referencial (M13)
+enum MotivoAjusteInventario {
+  conteo_fisico
+  ingreso_mercancia
+  salida
+  correccion
+  otro
+  carga_masiva
+  venta
+  devolucion
+
+  @@map("enum_motivo_ajuste_inventario")
+}
+
+/// Origen de un ajuste de existencia referencial (M13); samit queda reservado a la integración futura
+enum OrigenAjusteInventario {
+  manual
+  carga_masiva
+  samit
+  orden
+
+  @@map("enum_origen_ajuste_inventario")
+}
+
+/// Cómo se expresa un descuento: porcentaje o importe fijo (M06; los eventos solo usan porcentaje)
+enum TipoValorDescuento {
+  porcentaje
+  importe_fijo
+
+  @@map("enum_tipo_valor_descuento")
+}
+
+/// A quién va dirigido un cupón (M06)
+enum AudienciaDescuento {
+  todos
+  particular
+  empresa
+
+  @@map("enum_audiencia_descuento")
+}
+
+/// Dónde se ve el patrocinio de productos (M14 · A7)
+enum UbicacionPatrocinio {
+  listado
+  inicio
+  complementarios
+
+  @@map("enum_ubicacion_patrocinio")
+}
+
+/// Qué patrocina una campaña (M14 · A3)
+enum TipoObjetivoPatrocinio {
+  producto
+  linea
+  marca
+
+  @@map("enum_tipo_objetivo_patrocinio")
+}
+
+/// Espacios del sitio donde se muestran anuncios (M14 · B1)
+enum EspacioPublicitario {
+  inicio
+  catalogo
+  ficha
+
+  @@map("enum_espacio_publicitario")
+}
+
+/// Imagen de escritorio o móvil de un anuncio (M14 · B10)
+enum VarianteImagenAnuncio {
+  escritorio
+  movil
+
+  @@map("enum_variante_imagen_anuncio")
+}
+
+/// Original o versión reducida de una imagen de anuncio (M14 · B11)
+enum TamanoImagenAnuncio {
+  original
+  mediano
+  pequeno
+
+  @@map("enum_tamano_imagen_anuncio")
+}
+
+/// A qué se refiere una medición (M14 · M1)
+enum EntidadMedicion {
+  campania
+  anuncio
+
+  @@map("enum_entidad_medicion")
+}
+
+/// Qué se cuenta en una medición (M14 · M1)
+enum EventoMedicion {
+  impresion
+  clic
+
+  @@map("enum_evento_medicion")
+}
+
+/// Qué parte del catálogo cubre una regla de evento (M06 · R5)
+enum TipoObjetivoEvento {
+  marca
+  linea
+  categoria
+  subcategoria
+  producto
+  variante
+
+  @@map("enum_tipo_objetivo_evento")
+}
+
+/// Qué se saca de una regla o de un evento (M06 · R6): lo mismo más color y familia de color
+enum TipoExclusionEvento {
+  marca
+  linea
+  categoria
+  subcategoria
+  producto
+  variante
+  color
+  familia_color
+
+  @@map("enum_tipo_exclusion_evento")
+}
+
+/// Tipo de solicitud del formulario de contacto (M15 · HU-ATC-02); cotizacion es solo intención (RF-ATC-02-07)
+enum TipoSolicitudContacto {
+  consulta
+  cotizacion
+  reclamo
+
+  @@map("enum_tipo_solicitud_contacto")
+}
+
+/// Estado de una solicitud de contacto en la bandeja de atención (M15 · HU-ATC-02, R12)
+enum EstadoSolicitudContacto {
+  en_revision
+  atendida
+  rechazada
+
+  @@map("enum_estado_solicitud_contacto")
+}
+
+/// Rol del autor de un mensaje dentro del hilo de una solicitud de contacto (M15 · R12)
+enum RolAutorMensajeSolicitud {
+  cliente
+  equipo
+
+  @@map("enum_rol_autor_mensaje_solicitud")
+}
+
+/// Día de la semana del horario de atención humana (M15 · HU-ATC-04)
+enum DiaSemana {
+  lunes
+  martes
+  miercoles
+  jueves
+  viernes
+  sabado
+  domingo
+
+  @@map("enum_dia_semana")
+}
+
 /// Estado comercial de una variante (M01 · HU-CAT-03)
 enum EstadoProducto {
   activo
@@ -136,6 +337,15 @@ enum EstadoProducto {
   descontinuado
 
   @@map("enum_estado_producto")
+}
+
+/// Estado editorial de una página institucional (M16 · HU-CON-01 / HU-CON-03)
+enum EstadoContenido {
+  borrador
+  publicado
+  archivado
+
+  @@map("enum_estado_contenido")
 }
 
 // =============================================================================
@@ -177,12 +387,74 @@ model Usuario {
   notasOrden            NotaOrden[]
   contactosOrden        ContactoOrden[]
 
+  // M13 Relaciones
+  ajustesInventario AjusteInventario[]
+
+  // M06 Relaciones
+  eventosDescuentoActualizados EventoDescuento[] @relation("EventoDescuentoUsuarioActualizo")
+  campaniasPatrocinioActualizadas CampaniaPatrocinio[] @relation("CampaniaPatrocinioUsuarioActualizo")
+  anunciosActualizados AnuncioPublicitario[] @relation("AnuncioPublicitarioUsuarioActualizo")
+  cuponesActualizados          Cupon[]           @relation("CuponUsuarioActualizo")
+  usosCupon                    CuponUso[]
+
+  // M15 Relaciones
+  solicitudesContacto        SolicitudContacto[]
+  mensajesSolicitudContacto  MensajeSolicitudContacto[]
+
+  // M16 Relaciones
+  paginasInstitucionales PaginaInstitucional[] @relation("PaginaInstitucionalAutor")
+  entradasFaq            FaqEntrada[]          @relation("FaqEntradaAutor")
+
+  // M05 Relaciones
+  carrito Carrito?
+
+  // M21 Relaciones
+  cotizaciones           Cotizacion[] @relation("CotizacionCliente")
+  cotizacionesRespondidas Cotizacion[] @relation("CotizacionRespondidaPor")
+
+  // M03 Relaciones
+  configuracionAsesoriaActualizada ConfiguracionAsesoria[] @relation("ConfiguracionAsesoriaUsuarioActualizo")
+
+  // M20 Relaciones
+  registrosAuditoria RegistroAuditoria[]
+
   @@map("usuario")
 }
 
 // =============================================================================
 // MÓDULO M17 — ADMINISTRACIÓN, EMPLEADOS Y PERMISOS
 // =============================================================================
+
+/// Política de descuento de un tipo de cliente empresa (M06 · R10, R11)
+model Descuento {
+  idDescuento         Int           @id @default(autoincrement()) @map("id_descuento")
+  /// Monto máximo de ahorro por compra; 0 = sin tope
+  tope                Decimal       @default(0.00) @db.Decimal(12, 2)
+  porcentajeDescuento Decimal       @map("porcentaje_descuento") @db.Decimal(5, 2)
+  estado              EstadoGeneral @default(activo)
+  /// Total del carrito (después de eventos, IVA incluido) desde el que aplica; 0 = sin mínimo
+  montoMinimoCompra   Decimal       @default(0.00) @map("monto_minimo_compra") @db.Decimal(12, 2)
+
+  subRoles SubRolEmpresa[]
+
+  @@map("descuento")
+}
+
+/// Tipo de cliente empresa (Proveedor, Constructora…) con su descuento (M06 · D8). Se asigna en cuenta_empresa.
+model SubRolEmpresa {
+  idSubRolEmpresa Int           @id @default(autoincrement()) @map("id_sub_rol_empresa")
+  nombre          String        @db.VarChar(100)
+  idDescuento     Int?          @map("id_descuento")
+  estado          EstadoGeneral @default(activo)
+
+  descuento Descuento?      @relation(fields: [idDescuento], references: [idDescuento], onDelete: SetNull, map: "fk_subrol_descuento")
+  roles     Rol[]
+  cuentas   CuentaEmpresa[]
+
+  @@index([idDescuento], map: "idx_subrol_descuento")
+  // Índice único funcional lower(btrim(nombre)) solo en el DDL: Prisma no expresa índices sobre expresiones.
+  @@map("sub_rol_empresa")
+}
 
 /// Rol o perfil de asignación relacional (ADR-006)
 model Rol {
@@ -191,9 +463,11 @@ model Rol {
   idSubRolEmpresa  Int?          @map("id_sub_rol_empresa")
   estado           EstadoGeneral @default(activo)
 
+  subRolEmpresa    SubRolEmpresa?      @relation(fields: [idSubRolEmpresa], references: [idSubRolEmpresa], onDelete: SetNull, map: "fk_rol_subrol")
   asignaciones     AsignacionPermiso[]
   usuariosConRol   UsuarioRol[]
   usuariosDirectos Usuario[]     @relation("UsuarioRolDirecto")
+  cotizaciones     Cotizacion[]
 
   @@map("rol")
 }
@@ -341,11 +615,15 @@ model CuentaEmpresa {
   idSolicitudOrigen   String?           @map("id_solicitud_origen") @db.Uuid
   fechaAprobacion     DateTime          @default(now()) @map("fecha_aprobacion") @db.Timestamptz(6)
   fechaActualizacion  DateTime          @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  /// Tipo de cliente empresa que fija su descuento (M06 · D8); null = sin descuento
+  idSubRolEmpresa     Int?     @map("id_sub_rol_empresa")
 
+  subRolEmpresa   SubRolEmpresa?    @relation(fields: [idSubRolEmpresa], references: [idSubRolEmpresa], onDelete: SetNull, map: "fk_cuenta_empresa_sub_rol")
   usuario             Usuario           @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
   solicitudOrigen     SolicitudEmpresa? @relation("CuentaEmpresaSolicitudOrigen", fields: [idSolicitudOrigen], references: [idSolicitud], onDelete: SetNull)
 
   @@index([idSolicitudOrigen], map: "idx_cuenta_empresa_solicitud")
+  @@index([idSubRolEmpresa], map: "idx_cuenta_empresa_sub_rol")
   @@map("cuenta_empresa")
 }
 
@@ -364,7 +642,7 @@ model DocumentoSoporte {
   @@map("documento_soporte")
 }
 
-/// Libreta de direcciones de entrega de los clientes (HU-CUE-07, RFC-M04-001 C-4)
+/// Dirección de entrega del cliente, una sola por cuenta (HU-CUE-07, RFC-M04-001 C-4)
 model DireccionCliente {
   idDireccion        String   @id @default(uuid()) @map("id_direccion") @db.Uuid
   idUsuario          Int      @map("id_usuario")
@@ -381,6 +659,7 @@ model DireccionCliente {
 
   usuario            Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade)
 
+  @@unique([idUsuario], map: "uq_direccion_una_por_usuario")
   @@index([idUsuario], map: "idx_direccion_usuario")
   @@index([idUsuario, esPredeterminada], map: "idx_direccion_predeterminada")
   @@map("direccion_cliente")
@@ -482,6 +761,368 @@ model ControlIntentoAcceso {
 }
 
 // =============================================================================
+// MÓDULO M18 — NOTIFICACIONES Y COMUNICACIONES
+// =============================================================================
+
+/// Contenido editable desde el panel para cada comunicación transaccional (HU-NOT-03)
+model PlantillaNotificacion {
+  idPlantilla        String           @id @default(uuid()) @map("id_plantilla") @db.Uuid
+  tipo               TipoComunicacion @unique
+  asunto             String           @db.VarChar(200)
+  contenidoTexto     String           @map("contenido_texto")
+  fechaActualizacion DateTime         @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?             @map("id_usuario_actualizo")
+
+  @@map("plantilla_notificacion")
+}
+
+/// Registro de envíos transaccionales con su resultado y reintentos (RF-NOT-01-03, RF-NOT-01-04, RT-23)
+model EnvioNotificacion {
+  idEnvio       String                  @id @default(uuid()) @map("id_envio") @db.Uuid
+  tipo          TipoComunicacion
+  destinatario  String                  @db.VarChar(150)
+  estado        EstadoEnvioNotificacion @default(pendiente)
+  intentos      Int                     @default(0)
+  maxIntentos   Int                     @default(3) @map("max_intentos")
+  ultimoError   String?                 @map("ultimo_error")
+  fechaCreacion DateTime                @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaResultado DateTime?              @map("fecha_resultado") @db.Timestamptz(6)
+
+  rebotes RebotesNotificacion[]
+
+  @@index([destinatario, tipo], map: "idx_envio_destinatario_tipo")
+  @@index([estado], map: "idx_envio_estado")
+  @@map("envio_notificacion")
+}
+
+/// Rebotes de entrega de correo para diagnóstico (HU-NOT-04, RF-NOT-04-04)
+model RebotesNotificacion {
+  idRebote      String    @id @default(uuid()) @map("id_rebote") @db.Uuid
+  idEnvio       String?   @map("id_envio") @db.Uuid
+  destinatario  String    @db.VarChar(150)
+  motivo        String?
+  fechaRegistro DateTime  @default(now()) @map("fecha_registro") @db.Timestamptz(6)
+
+  envio EnvioNotificacion? @relation(fields: [idEnvio], references: [idEnvio], onDelete: SetNull)
+
+  @@index([idEnvio], map: "idx_rebote_envio")
+  @@map("rebote_notificacion")
+}
+
+// =============================================================================
+// MÓDULO M13 — INVENTARIO REFERENCIAL (esquema 4.7)
+// =============================================================================
+
+/// Historial inmutable de ajustes de la existencia referencial de una variante (M13)
+model AjusteInventario {
+  idAjuste           Int                    @id @default(autoincrement()) @map("id_ajuste")
+  idVariante         Int                    @map("id_variante")
+  existenciaAnterior Int                    @map("existencia_anterior")
+  existenciaNueva    Int                    @map("existencia_nueva")
+  motivo             MotivoAjusteInventario @default(correccion)
+  nota               String?                @db.VarChar(500)
+  origen             OrigenAjusteInventario @default(manual)
+  /// Agrupa los ajustes de una misma carga masiva; lo genera el cliente, sin tabla propia
+  idCarga            String?                @map("id_carga") @db.Uuid
+  idUsuario          Int?                   @map("id_usuario")
+  /// Orden que movió la existencia de un combo; con el motivo y la variante es única (idempotencia)
+  referencia         String?                @db.VarChar(100)
+  fecha              DateTime               @default(now()) @db.Timestamptz(6)
+
+  variante Variante @relation(fields: [idVariante], references: [idVariante], onDelete: Restrict, map: "fk_ajuste_variante")
+  usuario  Usuario? @relation(fields: [idUsuario], references: [idUsuario], onDelete: SetNull, map: "fk_ajuste_usuario")
+
+  @@index([idVariante, fecha(sort: Desc)], map: "idx_ajuste_variante_fecha")
+  @@index([idCarga], map: "idx_ajuste_carga")
+  @@index([idUsuario], map: "idx_ajuste_usuario")
+  // Índice único parcial (WHERE referencia IS NOT NULL) solo en el DDL: Prisma no expresa índices parciales.
+  @@map("ajuste_inventario")
+}
+
+// =============================================================================
+// MÓDULO M05 — CARRITO DE COMPRAS (esquema 4.15)
+// =============================================================================
+
+/// Carrito vivo (HU-CAR-01, HU-CAR-04): uno por cuenta o uno por token de visitante
+model Carrito {
+  idCarrito            Int      @id @default(autoincrement()) @map("id_carrito")
+  /// SHA-256 del token opaco de la cookie `pc_cart`, nunca el token (M05 · C2)
+  tokenVisitante       String?  @unique(map: "uq_carrito_token_visitante") @map("token_visitante") @db.VarChar(255)
+  idUsuario            Int?     @unique(map: "uq_carrito_usuario") @map("id_usuario")
+  fechaUltimaActividad DateTime @default(now()) @map("fecha_ultima_actividad") @db.Timestamp(6)
+
+  usuario Usuario?       @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade, map: "fk_carrito_usuario")
+  lineas  LineaCarrito[]
+
+  @@map("carrito")
+}
+
+/// Línea viva del carrito (HU-CAR-02): variante + color; agregar la misma suma la cantidad (C3)
+model LineaCarrito {
+  idLineaCarrito Int  @id @default(autoincrement()) @map("id_linea_carrito")
+  idCarrito      Int  @map("id_carrito")
+  idVariante     Int  @map("id_variante")
+  /// Color elegido; null si el producto no lleva color
+  idColor        Int? @map("id_color")
+  /// Referencia viva del carrito (M21)
+  refViva        Int  @default(1) @map("ref_viva")
+  cantidad       Int  @default(1)
+  /// Cotización aceptada de la que viene la línea; null en una línea normal (M05 · C15)
+  idCotizacion   Int?     @map("id_cotizacion")
+  /// Precio unitario pactado en la cotización; M06 lo respeta sin descuentos (R3)
+  precioAcordado Decimal? @map("precio_acordado") @db.Decimal(12, 2)
+
+  carrito    Carrito     @relation(fields: [idCarrito], references: [idCarrito], onDelete: Cascade, map: "fk_lineacarrito_carrito")
+  variante   Variante    @relation(fields: [idVariante], references: [idVariante], onDelete: Cascade, map: "fk_lineacarrito_variante")
+  color      Color?      @relation(fields: [idColor], references: [idColor], onDelete: Restrict, map: "fk_lineacarrito_color")
+  cotizacion Cotizacion? @relation(fields: [idCotizacion], references: [idCotizacion], onDelete: Cascade, map: "fk_lineacarrito_cotizacion")
+
+  // `uq_carrito_variante_color` (UNIQUE NULLS NOT DISTINCT) vive solo en el DDL: Prisma no expresa NULLS NOT DISTINCT.
+  @@map("linea_carrito")
+}
+
+// =============================================================================
+// MÓDULO M21 — COTIZACIONES (esquema 4.18)
+// =============================================================================
+
+/// Cotización pedida por un cliente desde su carrito y respondida por el equipo comercial
+model Cotizacion {
+  idCotizacion       Int              @id @default(autoincrement()) @map("id_cotizacion")
+  idUsuario          Int?             @map("id_usuario")
+  idRol              Int?             @map("id_rol")
+  estado             EstadoCotizacion @default(solicitada)
+  fechaCreacion      DateTime         @default(now()) @map("fecha_creacion") @db.Timestamp(6)
+  /// COT-000123: columna generada por la base a partir del id; nunca se escribe (R13)
+  codigoVisible      String?          @map("codigo_visible") @db.VarChar(20)
+  comentarioCliente  String?          @map("comentario_cliente") @db.VarChar(500)
+  notaParaCliente    String?          @map("nota_para_cliente") @db.VarChar(1000)
+  motivoRechazo      String?          @map("motivo_rechazo") @db.VarChar(500)
+  fechaEnvio         DateTime?        @map("fecha_envio") @db.Timestamptz(6)
+  /// Último día de vigencia, en hora de Colombia
+  fechaVencimiento   DateTime?        @map("fecha_vencimiento") @db.Date
+  fechaRespuesta     DateTime?        @map("fecha_respuesta") @db.Timestamptz(6)
+  idUsuarioResponde  Int?             @map("id_usuario_responde")
+  totalReferencia    Decimal          @default(0) @map("total_referencia") @db.Decimal(14, 2)
+  totalAcordado      Decimal?         @map("total_acordado") @db.Decimal(14, 2)
+  fechaActualizacion DateTime         @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  usuario         Usuario?          @relation("CotizacionCliente", fields: [idUsuario], references: [idUsuario], onDelete: SetNull, map: "fk_cotizacion_usuario")
+  rol             Rol?              @relation(fields: [idRol], references: [idRol], onDelete: SetNull, map: "fk_cotizacion_rol")
+  usuarioResponde Usuario?          @relation("CotizacionRespondidaPor", fields: [idUsuarioResponde], references: [idUsuario], onDelete: SetNull, map: "fk_cotizacion_usuario_responde")
+  lineas          LineaCotizacion[]
+  lineasCarrito   LineaCarrito[]
+
+  @@index([idUsuario, estado], map: "idx_cotizacion_usuario_estado")
+  @@index([estado, fechaCreacion(sort: Desc)], map: "idx_cotizacion_estado_fecha")
+  @@map("cotizacion")
+}
+
+/// Línea de una cotización: copia del carrito al pedirla y precio acordado
+model LineaCotizacion {
+  idLineaCotizacion Int      @id @default(autoincrement()) @map("id_linea_cotizacion")
+  idCotizacion      Int      @map("id_cotizacion")
+  idVariante        Int      @map("id_variante")
+  idColor           Int?     @map("id_color")
+  cantidad          Int
+  precioReferencia  Decimal  @map("precio_referencia") @db.Decimal(12, 2)
+  precioAcordado    Decimal? @map("precio_acordado") @db.Decimal(12, 2)
+  nombreProducto    String   @map("nombre_producto") @db.VarChar(150)
+  marca             String?  @db.VarChar(100)
+  medida            String?  @db.VarChar(100)
+  sku               String?  @db.VarChar(60)
+  colorNombre       String?  @map("color_nombre") @db.VarChar(100)
+  colorHexadecimal  String?  @map("color_hexadecimal") @db.Char(7)
+
+  cotizacion Cotizacion @relation(fields: [idCotizacion], references: [idCotizacion], onDelete: Cascade, map: "fk_lineacotizacion_cotizacion")
+  variante   Variante   @relation(fields: [idVariante], references: [idVariante], onDelete: Restrict, map: "fk_lineacotizacion_variante")
+  color      Color?     @relation(fields: [idColor], references: [idColor], onDelete: Restrict, map: "fk_lineacotizacion_color")
+
+  // `uq_lineacotizacion_variante_color` (UNIQUE NULLS NOT DISTINCT) vive solo en el DDL.
+  @@index([idCotizacion], map: "idx_lineacotizacion_cotizacion")
+  @@map("linea_cotizacion")
+}
+
+// =============================================================================
+// MÓDULO M06 — PRECIOS, EVENTOS DE DESCUENTO Y CUPONES (esquema 4.13)
+// =============================================================================
+
+/// Evento de descuento con calendario (M06 · R4). Fechas y horas son de calendario en hora de Colombia.
+model EventoDescuento {
+  idEvento           Int           @id @default(autoincrement()) @map("id_evento")
+  nombre             String        @db.VarChar(100)
+  descripcion        String?       @db.VarChar(500)
+  estado             EstadoGeneral @default(activo)
+  fechaInicio        DateTime      @map("fecha_inicio") @db.Date
+  fechaFin           DateTime?     @map("fecha_fin") @db.Date
+  /// Días ISO (1 = lunes … 7 = domingo); vacío = todos los días
+  diasSemana         Int[]         @default([]) @map("dias_semana") @db.SmallInt
+  /// "HH:mm" en 24 h; null con horaFin null = todo el día
+  horaInicio         String?       @map("hora_inicio") @db.VarChar(5)
+  horaFin            String?       @map("hora_fin") @db.VarChar(5)
+  fechaCreacion      DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime      @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?          @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario?          @relation("EventoDescuentoUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_evento_usuario")
+  reglas           EventoRegla[]
+  exclusiones      EventoExclusion[]
+
+  @@index([estado, fechaInicio, fechaFin], map: "idx_evento_estado_fechas")
+  @@map("evento_descuento")
+}
+
+/// Regla de un evento: objetivo (null = todo el catálogo) y porcentaje propio (M06 · R5)
+model EventoRegla {
+  idRegla      Int                 @id @default(autoincrement()) @map("id_regla")
+  idEvento     Int                 @map("id_evento")
+  tipoObjetivo TipoObjetivoEvento? @map("tipo_objetivo")
+  /// Sin FK: apunta a seis tablas distintas (M06 · D10)
+  idObjetivo   Int?                @map("id_objetivo")
+  porcentaje   Decimal             @db.Decimal(5, 2)
+  orden        Int                 @default(0) @db.SmallInt
+
+  evento      EventoDescuento   @relation(fields: [idEvento], references: [idEvento], onDelete: Cascade, map: "fk_evento_regla_evento")
+  exclusiones EventoExclusion[]
+
+  @@unique([idRegla, idEvento], map: "uq_evento_regla_evento")
+  @@index([idEvento], map: "idx_evento_regla_evento")
+  @@index([tipoObjetivo, idObjetivo], map: "idx_evento_regla_objetivo")
+  @@map("evento_regla")
+}
+
+/// Excepción de una regla (idRegla informado) o de todo el evento (idRegla null) (M06 · R6)
+model EventoExclusion {
+  idExclusion Int                 @id @default(autoincrement()) @map("id_exclusion")
+  idEvento    Int                 @map("id_evento")
+  idRegla     Int?                @map("id_regla")
+  tipo        TipoExclusionEvento
+  idObjetivo  Int                 @map("id_objetivo")
+
+  evento EventoDescuento @relation(fields: [idEvento], references: [idEvento], onDelete: Cascade, map: "fk_evento_exclusion_evento")
+  regla  EventoRegla?    @relation(fields: [idRegla, idEvento], references: [idRegla, idEvento], onDelete: Cascade, map: "fk_evento_exclusion_regla")
+
+  @@index([idEvento], map: "idx_evento_exclusion_evento")
+  @@index([idRegla], map: "idx_evento_exclusion_regla")
+  // Índices únicos parciales (WHERE id_regla IS NULL / IS NOT NULL) solo en el DDL.
+  @@map("evento_exclusion")
+}
+
+/// Cupón que el cliente escribe en el carrito (M06 · R13, R14). Código en mayúsculas, único.
+model Cupon {
+  idCupon            Int                @id @default(autoincrement()) @map("id_cupon")
+  codigo             String             @unique(map: "uq_cupon_codigo") @db.VarChar(30)
+  nombre             String             @db.VarChar(100)
+  descripcion        String?            @db.VarChar(500)
+  tipoValor          TipoValorDescuento @map("tipo_valor")
+  valor              Decimal            @db.Decimal(12, 2)
+  montoMinimoCompra  Decimal?           @map("monto_minimo_compra") @db.Decimal(12, 2)
+  usosMaximos        Int?               @map("usos_maximos")
+  usosPorUsuario     Int?               @map("usos_por_usuario")
+  audiencia          AudienciaDescuento @default(todos)
+  fechaInicio        DateTime           @map("fecha_inicio") @db.Timestamptz(6)
+  fechaFin           DateTime?          @map("fecha_fin") @db.Timestamptz(6)
+  estado             EstadoGeneral      @default(activo)
+  fechaCreacion      DateTime           @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime           @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?               @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario?   @relation("CuponUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_cupon_usuario")
+  usos             CuponUso[]
+
+  @@index([estado, fechaInicio, fechaFin], map: "idx_cupon_estado_fechas")
+  @@map("cupon")
+}
+
+/// Un uso de cupón por orden; `referencia` única hace idempotente el registro (M06 · R15)
+model CuponUso {
+  idCuponUso       Int       @id @default(autoincrement()) @map("id_cupon_uso")
+  idCupon          Int       @map("id_cupon")
+  idUsuario        Int?      @map("id_usuario")
+  referencia       String    @unique(map: "uq_cupon_uso_referencia") @db.VarChar(100)
+  importeDescuento Decimal   @map("importe_descuento") @db.Decimal(12, 2)
+  fecha            DateTime  @default(now()) @db.Timestamptz(6)
+  /// Se llena al cancelarse la orden; los liberados no cuentan para los límites
+  liberadoEn       DateTime? @map("liberado_en") @db.Timestamptz(6)
+
+  cupon   Cupon    @relation(fields: [idCupon], references: [idCupon], onDelete: Restrict, map: "fk_cupon_uso_cupon")
+  usuario Usuario? @relation(fields: [idUsuario], references: [idUsuario], onDelete: SetNull, map: "fk_cupon_uso_usuario")
+
+  // Índice parcial (idCupon, idUsuario) WHERE liberado_en IS NULL solo en el DDL.
+  @@map("cupon_uso")
+}
+
+// =============================================================================
+// MÓDULO M15 — ATENCIÓN AL CLIENTE (esquema 4.11)
+// Contrato: contracts/m15-atencion.contract.ts
+// Las preguntas frecuentes son de M16 (`faq_entrada`): M15 las consume por puerto.
+// =============================================================================
+
+/// Pregunta frecuente administrable, agrupada por tema y ordenada (M15 · HU-ATC-01)
+/// Solicitud del formulario de contacto dirigida al administrador (M15 · HU-ATC-02).
+/// Los datos de contacto no se guardan: se leen de la cuenta al mostrarla (RF-ATC-02-04).
+model SolicitudContacto {
+  idSolicitud       String                  @id @default(uuid()) @map("id_solicitud") @db.Uuid
+  idUsuario         Int                     @map("id_usuario")
+  tipo              TipoSolicitudContacto
+  descripcion       String                  @db.VarChar(2000)
+  estado            EstadoSolicitudContacto @default(en_revision)
+  calificacion      Int?                    @db.SmallInt
+  fechaCalificacion DateTime?               @map("fecha_calificacion") @db.Timestamptz(6)
+  fechaCreacion     DateTime                @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+
+  usuario  Usuario                    @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade, map: "fk_solicitud_contacto_usuario")
+  mensajes MensajeSolicitudContacto[]
+
+  @@index([idUsuario], map: "idx_solicitud_contacto_usuario")
+  @@index([estado, fechaCreacion(sort: Desc)], map: "idx_solicitud_contacto_estado_fecha")
+  @@map("solicitud_contacto")
+}
+
+/// Mensaje dentro del hilo de conversación de una solicitud de contacto (M15 · R12)
+model MensajeSolicitudContacto {
+  idMensaje     String                   @id @default(uuid()) @map("id_mensaje") @db.Uuid
+  idSolicitud   String                   @map("id_solicitud") @db.Uuid
+  idAutor       Int                      @map("id_autor")
+  rolAutor      RolAutorMensajeSolicitud @map("rol_autor")
+  contenido     String                   @db.VarChar(2000)
+  fechaCreacion DateTime                 @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+
+  solicitud SolicitudContacto @relation(fields: [idSolicitud], references: [idSolicitud], onDelete: Cascade, map: "fk_mensaje_solicitud_contacto")
+  autor     Usuario           @relation(fields: [idAutor], references: [idUsuario], onDelete: Cascade, map: "fk_mensaje_solicitud_autor")
+
+  @@index([idSolicitud, fechaCreacion(sort: Asc)], map: "idx_mensaje_solicitud_fecha")
+  @@index([idAutor], map: "idx_mensaje_solicitud_autor")
+  @@map("mensaje_solicitud_contacto")
+}
+
+/// Franja de atención humana de un día de la semana (M15 · HU-ATC-04).
+/// `abierto = false` cierra el día completo y deja las horas en null.
+model HorarioAtencion {
+  idHorario          Int       @id @default(autoincrement()) @map("id_horario")
+  diaSemana          DiaSemana @unique @map("dia_semana")
+  abierto            Boolean   @default(true)
+  /// Hora local "HH:mm" en 24h; null cuando el día está cerrado
+  horaInicio         String?   @map("hora_inicio") @db.VarChar(5)
+  horaFin            String?   @map("hora_fin") @db.VarChar(5)
+  fechaActualizacion DateTime  @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?      @map("id_usuario_actualizo")
+
+  @@map("horario_atencion")
+}
+
+/// Destino del botón de contacto directo por WhatsApp; fila única (M15 · HU-ATC-03)
+model ConfiguracionAtencionWhatsapp {
+  idConfiguracion    Int      @id @default(1) @map("id_configuracion") @db.SmallInt
+  /// URL completa (hoy el canal de difusión) o número de WhatsApp Business cuando exista
+  destino            String   @db.VarChar(300)
+  mensajeBase        String?  @map("mensaje_base") @db.VarChar(300)
+  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?     @map("id_usuario_actualizo")
+
+  @@map("configuracion_atencion_whatsapp")
+}
+
+// =============================================================================
 // MÓDULO M01 — CATÁLOGO (esquema 4.3)
 // Reglas: docs/02_MODULOS_FUNCIONALES/M01_REGLAS_ADICIONALES.md
 // =============================================================================
@@ -495,6 +1136,7 @@ model Categoria {
 
   subcategorias            Subcategoria[]
   productosComplementarios Producto[]     @relation("CategoriaComplementaria")
+  subcategoriasComplementarias Subcategoria[] @relation("SubcategoriaCategoriaComplementaria")
 
   @@map("categoria")
 }
@@ -506,8 +1148,11 @@ model Subcategoria {
   nombre         String        @db.VarChar(100)
   orden          Int           @default(0)
   estado         EstadoGeneral @default(activo)
+  /// Categoría de la que se sugieren complementarios a sus productos sin una propia (RF-CAT-08-01)
+  idCategoriaComplementaria Int? @map("id_categoria_complementaria")
 
   categoria Categoria  @relation(fields: [idCategoria], references: [idCategoria], onDelete: Restrict, map: "fk_subcategoria_categoria")
+  categoriaComplementaria Categoria? @relation("SubcategoriaCategoriaComplementaria", fields: [idCategoriaComplementaria], references: [idCategoria], onDelete: SetNull, map: "fk_subcategoria_categoria_complementaria")
   productos Producto[]
 
   @@unique([idCategoria, nombre], map: "uq_subcategoria_nombre_categoria")
@@ -630,6 +1275,9 @@ model Medida {
   valor        Decimal       @db.Decimal(12, 3)
   nombre       String        @unique @db.VarChar(60)
   estado       EstadoGeneral @default(activo)
+  /// Imagen opcional de la medida (ej. silueta del envase)
+  imagen         Bytes?
+  imagenMimeType String?       @map("imagen_mime_type") @db.VarChar(50)
 
   tipoMedida TipoMedida @relation(fields: [idTipoMedida], references: [idTipoMedida], onDelete: Restrict, map: "fk_medida_tipo")
   variantes  Variante[]
@@ -660,6 +1308,8 @@ model Color {
   familia   FamiliaColor?   @relation(fields: [idFamiliaColor], references: [idFamiliaColor], onDelete: Restrict, map: "fk_color_familia")
   productos ProductoColor[]
   imagenes  Imagen[]
+  lineasCarrito LineaCarrito[]
+  lineasCotizacion LineaCotizacion[]
 
   @@unique([idMarca, nombre, idAcabado], map: "uq_color_nombre_marca_acabado")
   @@index([idMarca], map: "idx_color_marca")
@@ -681,7 +1331,10 @@ model Producto {
   estado                    EstadoGeneral @default(activo)
   publicado                 Boolean       @default(false)
   idCategoriaComplementaria Int?          @map("id_categoria_complementaria")
-  patrocinado               Boolean       @default(false)
+  /// Combo (HU-CAT-13): paquete a precio propio con una única variante; su venta se limita por existencia
+  esCombo                   Boolean       @default(false) @map("es_combo")
+  /// M06 no le aplica descuentos (RF-CAT-13-01)
+  excluidoDeDescuentos      Boolean       @default(false) @map("excluido_de_descuentos")
   fechaCreacion             DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
 
   marca                   Marca        @relation(fields: [idMarca], references: [idMarca], onDelete: Restrict, map: "fk_producto_marca")
@@ -717,6 +1370,8 @@ model FichaRecubrimiento {
   /// m² por galón
   rendimientoMin Decimal? @map("rendimiento_min") @db.Decimal(8, 2)
   rendimientoMax Decimal? @map("rendimiento_max") @db.Decimal(8, 2)
+  /// Manos con las que se logra el rendimiento
+  manos          Int?     @db.SmallInt
 
   producto   Producto   @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_ficha_producto")
   tipoResina TipoResina @relation(fields: [idTipoResina], references: [idTipoResina], onDelete: Restrict, map: "fk_ficha_resina")
@@ -807,6 +1462,9 @@ model Variante {
   medida   Medida          @relation(fields: [idMedida], references: [idMedida], onDelete: Restrict, map: "fk_variante_medida")
   imagenes Imagen[]
   combos   VarianteCombo[]
+  ajustes  AjusteInventario[]
+  lineasCarrito LineaCarrito[]
+  lineasCotizacion LineaCotizacion[]
 
   @@unique([idProducto, idMedida], map: "uq_variante_producto_medida")
   @@index([idProducto], map: "idx_variante_producto")
@@ -825,6 +1483,10 @@ model Imagen {
   mimeType    String  @map("mime_type") @db.VarChar(50)
   orden       Int     @default(0)
   esPrincipal Boolean @default(false) @map("es_principal")
+  /// Miniatura de 320 px en WebP para los listados; null en imágenes anteriores (RNF-CAT-07-01)
+  miniatura   Bytes?
+  /// Versión de 960 px en WebP para la ficha; null en imágenes anteriores
+  mediana     Bytes?
 
   producto Producto  @relation(fields: [idProducto], references: [idProducto], onDelete: Cascade, map: "fk_imagen_producto")
   variante Variante? @relation(fields: [idVariante], references: [idVariante], onDelete: Cascade, map: "fk_imagen_variante")
@@ -1024,4 +1686,347 @@ model ContactoOrden {
 
   @@index([idOrden])
   @@map("contacto_orden")
+}
+
+// =============================================================================
+// MÓDULO M16 — CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (HU-CON-01 a HU-CON-04)
+// =============================================================================
+
+/// Página institucional administrable (Sobre Nosotros, Términos, Privacidad, Envíos)
+model PaginaInstitucional {
+  idPagina           Int             @id @default(autoincrement()) @map("id_pagina")
+  slug               String          @unique @db.VarChar(120)
+  titulo             String          @db.VarChar(160)
+  resumen            String?         @db.VarChar(300)
+  cuerpoMarkdown     String          @map("cuerpo_markdown")
+  estado             EstadoContenido @default(borrador)
+  idAutor            Int?            @map("id_autor")
+  fechaCreacion      DateTime        @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime        @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  autor Usuario? @relation("PaginaInstitucionalAutor", fields: [idAutor], references: [idUsuario], onDelete: SetNull, map: "fk_pagina_institucional_autor")
+
+  @@index([estado], map: "idx_pagina_institucional_estado")
+  @@index([idAutor], map: "idx_pagina_institucional_autor")
+  @@map("pagina_institucional")
+}
+
+/// Entrada del catálogo de preguntas frecuentes (FAQ) para el Centro de Ayuda y puerto hacia M15
+model FaqEntrada {
+  idFaq              Int           @id @default(autoincrement()) @map("id_faq")
+  pregunta           String        @db.VarChar(240)
+  respuestaMarkdown  String        @map("respuesta_markdown")
+  orden              Int           @default(0)
+  estado             EstadoGeneral @default(activo)
+  idAutor            Int?          @map("id_autor")
+  fechaCreacion      DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime      @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  autor Usuario? @relation("FaqEntradaAutor", fields: [idAutor], references: [idUsuario], onDelete: SetNull, map: "fk_faq_entrada_autor")
+
+  @@index([estado, orden, idFaq], map: "idx_faq_entrada_estado_orden")
+  @@index([idAutor], map: "idx_faq_entrada_autor")
+  @@map("faq_entrada")
+}
+
+// =============================================================================
+// MÓDULO M14 — PATROCINIOS Y PUBLICIDAD (esquema 4.17)
+// =============================================================================
+
+/// Campaña que pone productos por delante en el sitio (M14 · A1-A13). Fechas de calendario en hora de Colombia.
+/// `uq_campania_nombre` (único sin distinguir mayúsculas ni espacios de los bordes) vive solo en el DDL: Prisma no expresa índices sobre funciones.
+model CampaniaPatrocinio {
+  idCampania         Int                   @id @default(autoincrement()) @map("id_campania")
+  nombre             String                @db.VarChar(100)
+  descripcion        String?               @db.VarChar(500)
+  estado             EstadoGeneral         @default(activo)
+  fechaInicio        DateTime              @map("fecha_inicio") @db.Date
+  fechaFin           DateTime              @map("fecha_fin") @db.Date
+  /// 0 a 100; el mayor va primero (M14 · A4)
+  prioridad          Int                   @default(0) @db.SmallInt
+  ubicaciones        UbicacionPatrocinio[]
+  fechaCreacion      DateTime              @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime              @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?                  @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario?           @relation("CampaniaPatrocinioUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_campania_usuario")
+  objetivos        CampaniaObjetivo[]
+
+  @@index([estado, fechaInicio, fechaFin], map: "idx_campania_estado_fechas")
+  @@map("campania_patrocinio")
+}
+
+/// Un producto, una línea o una marca que patrocina una campaña (M14 · A3). `idReferencia` no es FK: apunta a tres tablas según `tipo`.
+model CampaniaObjetivo {
+  idCampaniaObjetivo Int                    @id @default(autoincrement()) @map("id_campania_objetivo")
+  idCampania         Int                    @map("id_campania")
+  tipo               TipoObjetivoPatrocinio
+  idReferencia       Int                    @map("id_referencia")
+
+  campania CampaniaPatrocinio @relation(fields: [idCampania], references: [idCampania], onDelete: Cascade, map: "fk_campania_objetivo_campania")
+
+  @@unique([idCampania, tipo, idReferencia], map: "uq_campania_objetivo")
+  @@index([tipo, idReferencia], map: "idx_campania_objetivo_referencia")
+  @@map("campania_objetivo")
+}
+
+/// Anuncio de un espacio publicitario: imagen y enlace al anunciante (M14 · B1-B9). Las imágenes viven en `AnuncioImagen`.
+model AnuncioPublicitario {
+  idAnuncio          Int                 @id @default(autoincrement()) @map("id_anuncio")
+  nombre             String              @db.VarChar(100)
+  anunciante         String              @db.VarChar(100)
+  espacio            EspacioPublicitario
+  textoAlternativo   String              @map("texto_alternativo") @db.VarChar(150)
+  /// https://… o ruta interna (/…); nunca javascript:, data: ni http:// (M14 · B6)
+  enlace             String?             @db.VarChar(500)
+  estado             EstadoGeneral       @default(activo)
+  fechaInicio        DateTime            @map("fecha_inicio") @db.Date
+  fechaFin           DateTime            @map("fecha_fin") @db.Date
+  /// Posición en el slider: el menor va primero (M14 · B4)
+  orden              Int                 @default(0) @db.SmallInt
+  fechaCreacion      DateTime            @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime            @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?                @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario?        @relation("AnuncioPublicitarioUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_anuncio_usuario")
+  imagenes         AnuncioImagen[]
+
+  @@index([espacio, estado, fechaInicio, fechaFin], map: "idx_anuncio_espacio_vigencia")
+  @@map("anuncio_publicitario")
+}
+
+/// Imagen de escritorio o móvil de un anuncio, original y reducidas (M14 · B7, B11). La sirve Pintu Clic, nunca un tercero.
+model AnuncioImagen {
+  idAnuncio Int                   @map("id_anuncio")
+  variante  VarianteImagenAnuncio
+  tamano    TamanoImagenAnuncio
+  contenido Bytes
+  mimeType  String                @map("mime_type") @db.VarChar(20)
+  ancho     Int
+  alto      Int
+
+  anuncio AnuncioPublicitario @relation(fields: [idAnuncio], references: [idAnuncio], onDelete: Cascade, map: "fk_anuncio_imagen_anuncio")
+
+  @@id([idAnuncio, variante, tamano])
+  @@map("anuncio_imagen")
+}
+
+/// Impresiones y clics por día de una campaña o un anuncio (M14 · M1). Solo totales, sin datos personales.
+/// `lugar` es la ubicación de la campaña o el espacio del anuncio. Sin FK: apunta a dos tablas según `entidad`.
+model MedicionPatrocinio {
+  fecha     DateTime        @db.Date
+  entidad   EntidadMedicion
+  idEntidad Int             @map("id_entidad")
+  lugar     String          @db.VarChar(20)
+  evento    EventoMedicion
+  total     BigInt          @default(0)
+
+  @@id([fecha, entidad, idEntidad, lugar, evento])
+  @@index([entidad, idEntidad, fecha], map: "idx_medicion_entidad_fecha")
+  @@map("medicion_patrocinio")
+}
+
+// =============================================================================
+// MÓDULO M03 — ASESORÍA Y ASISTENCIA (HU-ASE-01, HU-ASE-02, HU-ASE-05, HU-ASE-06)
+// =============================================================================
+
+/// Modo de cuestionario vigente (M03 · D3): se cambia desde el panel, sin despliegue.
+enum ModoCuestionario {
+  fijo
+  asistido
+
+  @@map("enum_modo_cuestionario")
+}
+
+/// De dónde salen las opciones de una pregunta del modo fijo (M03 · F3).
+enum OrigenOpcionesAsesoria {
+  manual
+  familias_color
+
+  @@map("enum_origen_opciones_asesoria")
+}
+
+/// Qué hace elegir una opción (M03 · F2).
+enum TipoEfectoAsesoria {
+  filtrar
+  filtrar_ambiente
+  incluir
+
+  @@map("enum_tipo_efecto_asesoria")
+}
+
+/// Dimensiones que M02 sabe filtrar y que viajan en la URL del catálogo (M03 · V1, V2).
+enum DimensionFiltroAsesoria {
+  categoria
+  subcategoria
+  superficie
+  familia_color
+  tipo_resina
+  linea
+
+  @@map("enum_dimension_filtro_asesoria")
+}
+
+/// Ambiente del producto, derivado de producto.uso_interior / uso_exterior de M01.
+enum AmbienteAsesoria {
+  interior
+  exterior
+
+  @@map("enum_ambiente_asesoria")
+}
+
+enum ServicioIa {
+  gemini
+
+  @@map("enum_servicio_ia")
+}
+
+enum FuncionIa {
+  chat
+  cuestionario
+
+  @@map("enum_funcion_ia")
+}
+
+enum TipoIncidenteIa {
+  tiempo_agotado
+  no_disponible
+  cuota_agotada
+  respuesta_no_procesable
+  error_configuracion
+
+  @@map("enum_tipo_incidente_ia")
+}
+
+enum ResultadoIncidenteIa {
+  recuperado
+  fallido
+  suspendido
+
+  @@map("enum_resultado_incidente_ia")
+}
+
+/// Pregunta del cuestionario guiado administrable (M03 · HU-ASE-01, modo fijo).
+/// No se borra: se desactiva (F5), para no romper un flujo a medias.
+model PreguntaAsesoria {
+  idPregunta Int    @id @default(autoincrement()) @map("id_pregunta")
+  texto      String @db.VarChar(200)
+  orden      Int    @default(0)
+  /// `familias_color` = las opciones son las familias cromáticas activas del catálogo (F3)
+  origenOpciones     OrigenOpcionesAsesoria @default(manual) @map("origen_opciones")
+  estado             EstadoGeneral          @default(activo)
+  fechaCreacion      DateTime               @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime               @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  opciones OpcionAsesoria[]
+
+  @@index([estado, orden], map: "idx_pregunta_asesoria_orden")
+  @@map("pregunta_asesoria")
+}
+
+/// Opción cerrada de una pregunta del cuestionario fijo (M03 · HU-ASE-01).
+model OpcionAsesoria {
+  idOpcion   Int           @id @default(autoincrement()) @map("id_opcion")
+  idPregunta Int           @map("id_pregunta")
+  texto      String        @db.VarChar(100)
+  orden      Int           @default(0)
+  estado     EstadoGeneral @default(activo)
+
+  pregunta PreguntaAsesoria       @relation(fields: [idPregunta], references: [idPregunta], onDelete: Cascade, map: "fk_opcion_asesoria_pregunta")
+  efectos  EfectoOpcionAsesoria[]
+
+  @@index([idPregunta, orden], map: "idx_opcion_asesoria_pregunta")
+  @@map("opcion_asesoria")
+}
+
+/// Correspondencia entre una opción y el filtro que aplica (M03 · RF-ASE-01-02, F2).
+/// `idObjetivo` no es FK: apunta a seis tablas según `dimension`. El servicio comprueba que
+/// exista y esté activo, y si no ignora el efecto sin error (M03 · F4).
+model EfectoOpcionAsesoria {
+  idEfecto   Int                      @id @default(autoincrement()) @map("id_efecto")
+  idOpcion   Int                      @map("id_opcion")
+  tipo       TipoEfectoAsesoria
+  dimension  DimensionFiltroAsesoria?
+  idObjetivo Int?                     @map("id_objetivo")
+  ambiente   AmbienteAsesoria?
+  /// Otras opciones que deben estar elegidas para que el efecto aplique, p. ej. Metal con Deteriorada (F2)
+  requiereOpciones Int[] @default([]) @map("requiere_opciones")
+
+  opcion OpcionAsesoria @relation(fields: [idOpcion], references: [idOpcion], onDelete: Cascade, map: "fk_efecto_asesoria_opcion")
+
+  @@index([idOpcion], map: "idx_efecto_asesoria_opcion")
+  @@map("efecto_opcion_asesoria")
+}
+
+/// Modo de cuestionario, guiones de la IA y parámetros de resiliencia; fila única (M03 · D3, D8).
+model ConfiguracionAsesoria {
+  idConfiguracion  Int              @id @default(1) @map("id_configuracion") @db.SmallInt
+  modoCuestionario ModoCuestionario @default(fijo) @map("modo_cuestionario")
+  /// K9: sugerencia de manos; null = no se sugiere ninguna (RF-ASE-02-06 prohíbe suponerlas)
+  manosPorDefecto            Int?     @map("manos_por_defecto") @db.SmallInt
+  guionCuestionario          String   @default("") @map("guion_cuestionario")
+  guionAsistente             String   @default("") @map("guion_asistente")
+  iaTiempoEsperaMs           Int      @default(8000) @map("ia_tiempo_espera_ms")
+  iaReintentos               Int      @default(2) @map("ia_reintentos") @db.SmallInt
+  iaSuspensionCuotaMinutos   Int      @default(60) @map("ia_suspension_cuota_minutos")
+  iaRetencionIncidentesDias  Int      @default(90) @map("ia_retencion_incidentes_dias")
+  iaFallosConsecutivosAlerta Int      @default(5) @map("ia_fallos_consecutivos_alerta") @db.SmallInt
+  fechaActualizacion         DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo         Int?     @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario? @relation("ConfiguracionAsesoriaUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_config_asesoria_usuario")
+
+  @@map("configuracion_asesoria")
+}
+
+/// Incidentes del servicio de IA, sin datos de la persona ni del contenido (M03 · I7).
+/// Se purgan por retención (I8) y por eso NO viven en `registro_auditoria`, que es inmutable (D10).
+model IncidenteIa {
+  idIncidente Int                  @id @default(autoincrement()) @map("id_incidente")
+  fecha       DateTime             @default(now()) @db.Timestamptz(6)
+  servicio    ServicioIa           @default(gemini)
+  funcion     FuncionIa
+  tipo        TipoIncidenteIa
+  intentos    Int                  @db.SmallInt
+  resultado   ResultadoIncidenteIa
+
+  @@index([fecha(sort: Desc)], map: "idx_incidente_ia_fecha")
+  @@index([tipo, fecha(sort: Desc)], map: "idx_incidente_ia_tipo_fecha")
+  @@map("incidente_ia")
+}
+
+// =============================================================================
+// MÓDULO M20 — REGISTRO DE AUDITORÍA (HU-SEG-04, parte de escritura)
+// =============================================================================
+
+enum ResultadoAuditoria {
+  exito
+  fallo
+
+  @@map("enum_resultado_auditoria")
+}
+
+/// Bitácora INMUTABLE de acciones relevantes (M20 · RF-SEG-04-02, RF-SEG-04-03).
+/// El DDL revoca UPDATE y DELETE y además lo impide con un disparador (RF-SEG-04-04):
+/// Prisma solo inserta y lee.
+model RegistroAuditoria {
+  idRegistro BigInt   @id @default(autoincrement()) @map("id_registro")
+  fecha      DateTime @default(now()) @db.Timestamptz(6)
+  idUsuario  Int?     @map("id_usuario")
+  /// Copia del nombre del actor: el registro sigue siendo legible si la cuenta se elimina
+  actor         String?            @db.VarChar(150)
+  accion        String             @db.VarChar(100)
+  entidad       String             @db.VarChar(60)
+  idEntidad     String?            @map("id_entidad") @db.VarChar(60)
+  valorAnterior String?            @map("valor_anterior")
+  valorNuevo    String?            @map("valor_nuevo")
+  resultado     ResultadoAuditoria @default(exito)
+  ipOrigen      String?            @map("ip_origen") @db.VarChar(45)
+
+  usuario Usuario? @relation(fields: [idUsuario], references: [idUsuario], onDelete: SetNull, map: "fk_auditoria_usuario")
+
+  @@index([fecha(sort: Desc)], map: "idx_auditoria_fecha")
+  @@index([entidad, idEntidad], map: "idx_auditoria_entidad")
+  @@index([idUsuario], map: "idx_auditoria_usuario")
+  @@map("registro_auditoria")
 }

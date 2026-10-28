@@ -31,16 +31,19 @@ const PARES = [
     contrato: 'contracts/m01-catalogo-productos.contract.ts',
     dto: 'dtos/m01-catalogo-productos.dto.ts',
   },
+  {
+    contrato: 'contracts/m01-catalogo-entrega3.contract.ts',
+    dto: 'dtos/m01-catalogo-entrega3.dto.ts',
+  },
 ];
 
 describe('M01 · los DTOs del backend son espejo del contrato', () => {
   for (const par of PARES) {
     it(`${par.dto} coincide con ${par.contrato}`, () => {
       const contrato = readFileSync(resolve(RAIZ, par.contrato), 'utf8');
-      const dto = readFileSync(resolve(__dirname, '..', par.dto), 'utf8').replace(
-        "'./m01-catalogo.dto'",
-        "'./m01-catalogo.contract'",
-      );
+      const dto = readFileSync(resolve(__dirname, '..', par.dto), 'utf8')
+        .replace("'./m01-catalogo.dto'", "'./m01-catalogo.contract'")
+        .replace("'./m01-catalogo-productos.dto'", "'./m01-catalogo-productos.contract'");
       expect(contenidoSinEncabezados(dto)).toBe(contenidoSinEncabezados(contrato));
     });
   }

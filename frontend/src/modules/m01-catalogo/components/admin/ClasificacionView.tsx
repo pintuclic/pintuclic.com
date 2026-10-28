@@ -1,15 +1,18 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Pencil, Plus, Power, RotateCcw } from 'lucide-react';
+import Link from 'next/link';
+import { Package, Pencil, Plus, Power, RotateCcw, Sparkles } from 'lucide-react';
 import { Alert, Button } from '@/core/components';
 import type { Categoria, Subcategoria } from '../../dtos/m01-catalogo.dto';
 import type { FormFamiliaColor } from '../../dtos/formularios.dto';
 import { useCargar } from '../../hooks/useCargar';
 import { categoriasApi, subcategoriasApi } from '../../services/catalogo-api';
+import { enlaceProductos } from '../../services/enlaces';
 import { aCuerpoSimple } from '../../services/formularios';
 import { AvisoAccion, Cargando, EstadoBadge, MensajeVacio, ModalDesactivar, reactivar, type Aviso } from './comunes';
 import { FormularioSimple } from './CatalogoSimpleView';
+import { ComplementariosSubcategoriaModal } from './ComplementariosSubcategoriaModal';
 
 type Objetivo =
   | { tipo: 'categoria'; id: number; nombre: string }
@@ -32,6 +35,7 @@ export const ClasificacionView: React.FC = () => {
   const { datos, cargando, error, recargar } = useCargar(cargador, 'No se pudieron cargar las categorías.');
   const [edicion, setEdicion] = useState<Edicion | null>(null);
   const [aDesactivar, setADesactivar] = useState<Objetivo | null>(null);
+  const [complementarios, setComplementarios] = useState<Subcategoria | null>(null);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const cerrarAviso = useCallback(() => setAviso(null), []);
 
@@ -63,13 +67,40 @@ export const ClasificacionView: React.FC = () => {
       (texto) => setAviso({ tipo: 'error', texto }),
     );
 
+  const nombreDeCategoria = (id: number | null): string | null =>
+    id === null ? null : (datos?.find((c) => c.idCategoria === id)?.nombre ?? null);
+
   const fila = (item: Categoria | Subcategoria, tipo: Objetivo['tipo'], id: number, onEditar: () => void) => (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <span className="flex items-center gap-2 font-sans text-sm text-neutral-black">
+      <span className="flex flex-wrap items-center gap-2 font-sans text-sm text-neutral-black">
         {item.nombre}
         <EstadoBadge estado={item.estado} />
+        {'idCategoriaComplementaria' in item && nombreDeCategoria(item.idCategoriaComplementaria) !== null && (
+          <span className="text-xs text-neutral-medium">
+            Sugiere: {nombreDeCategoria(item.idCategoriaComplementaria)}
+          </span>
+        )}
       </span>
-      <span className="flex gap-1">
+      <span className="flex items-center gap-1">
+        {tipo === 'subcategoria' && (
+          <Link
+            href={enlaceProductos({ subcategoria: id })}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-btn px-3 py-1.5 font-title text-xs font-medium text-action hover:bg-subaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
+          >
+            <Package className="h-4 w-4" aria-hidden="true" />
+            Ver productos
+          </Link>
+        )}
+        {'idCategoriaComplementaria' in item && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Productos complementarios de ${item.nombre}`}
+            onClick={() => setComplementarios(item)}
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        )}
         <Button variant="ghost" size="sm" aria-label={`Editar ${item.nombre}`} onClick={onEditar}>
           <Pencil className="h-4 w-4" aria-hidden="true" />
         </Button>
@@ -166,6 +197,17 @@ export const ClasificacionView: React.FC = () => {
           inicial={edicion.inicial}
           onGuardar={guardar}
           onClose={() => setEdicion(null)}
+        />
+      )}
+      {complementarios !== null && (
+        <ComplementariosSubcategoriaModal
+          subcategoria={complementarios}
+          categorias={(datos ?? []).filter((c) => c.estado === 'activo')}
+          onClose={() => setComplementarios(null)}
+          onGuardado={(texto) => {
+            setAviso({ tipo: 'success', texto });
+            recargar();
+          }}
         />
       )}
       <ModalDesactivar

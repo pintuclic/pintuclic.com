@@ -74,32 +74,76 @@ export const formColorSchema = z.object({
 export type FormColor = z.infer<typeof formColorSchema>;
 
 export const formVarianteSchema = z.object({
+  /** Solo filtra las medidas; no se envía. */
+  idTipoMedida: z.string().min(1, 'Elija el tipo de medida'),
   idMedida: z.string().min(1, 'Elija la medida'),
   precio: numeroTexto('Use un número, por ejemplo 98900').refine((v) => v !== '', {
     message: 'El precio es obligatorio',
   }),
   sku: z.string().trim().max(60, 'Máximo 60 caracteres'),
-  existenciaReferencial: enteroTexto('La existencia es un número entero'),
   codigoProveedor: z.string().trim().max(100, 'Máximo 100 caracteres'),
 });
 export type FormVariante = z.infer<typeof formVarianteSchema>;
 
-export const formProductoSchema = z.object({
-  idMarca: z.string().min(1, 'Elija la marca'),
-  idLinea: z.string(),
-  idSubcategoria: z.string().min(1, 'Elija la subcategoría'),
+/** Combo (entrega 3): un producto con una sola variante. La existencia inicial solo se usa al crear. */
+export const formComboSchema = z.object({
   nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(150, 'Máximo 150 caracteres'),
+  idMarca: z.string().min(1, 'Elija la marca'),
+  idSubcategoria: z.string().min(1, 'Elija la subcategoría'),
+  idMedida: z.string().min(1, 'Elija la unidad del combo'),
+  precio: numeroTexto('Use un número, por ejemplo 59900').refine((v) => v !== '', {
+    message: 'El precio es obligatorio',
+  }),
+  sku: z.string().trim().max(60, 'Máximo 60 caracteres'),
   descripcion: z.string().trim().max(5000, 'Máximo 5000 caracteres'),
-  usoInterior: z.boolean(),
-  usoExterior: z.boolean(),
-  patrocinado: z.boolean(),
+  excluidoDeDescuentos: z.boolean(),
   idCategoriaComplementaria: z.string(),
-  conFicha: z.boolean(),
-  idTipoResina: z.string(),
-  tipoCalidad: z.string(),
-  rendimientoMin: numeroTexto('Use un número'),
-  rendimientoMax: numeroTexto('Use un número'),
+  existenciaInicial: enteroTexto('La existencia es un número entero'),
 });
+export type FormCombo = z.infer<typeof formComboSchema>;
+
+export const formProductoSchema = z
+  .object({
+    idMarca: z.string().min(1, 'Elija la marca'),
+    idLinea: z.string(),
+    /** Solo ayuda a elegir la subcategoría; no se envía. */
+    idCategoria: z.string(),
+    idSubcategoria: z.string(),
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(150, 'Máximo 150 caracteres'),
+    descripcion: z.string().trim().max(5000, 'Máximo 5000 caracteres'),
+    usoInterior: z.boolean(),
+    usoExterior: z.boolean(),
+    idCategoriaComplementaria: z.string(),
+    conFicha: z.boolean(),
+    idTipoResina: z.string(),
+    tipoCalidad: z.string(),
+    rendimientoMin: numeroTexto('Use un número'),
+    rendimientoMax: numeroTexto('Use un número'),
+    manos: enteroTexto('Las manos son un número entero'),
+  })
+  .superRefine((v, ctx) => {
+    const falta = (path: keyof FormProductoCampos, message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
+    if (v.idSubcategoria === '') falta('idSubcategoria', 'Elija la subcategoría');
+    const min = v.rendimientoMin.trim();
+    const max = v.rendimientoMax.trim();
+    if (v.manos.trim() !== '' && (Number(v.manos) < 1 || Number(v.manos) > 10)) falta('manos', 'Las manos van de 1 a 10');
+    if (!v.conFicha) return;
+    if (v.idTipoResina === '') falta('idTipoResina', 'Elija el tipo de resina');
+    if (v.idLinea === '') falta('idLinea', 'Elija la línea: los recubrimientos la exigen');
+    if ((min === '') !== (max === '')) falta(min === '' ? 'rendimientoMin' : 'rendimientoMax', 'Indique el rendimiento mínimo y el máximo');
+    if (min !== '' && max !== '' && Number(min.replace(',', '.')) > Number(max.replace(',', '.'))) {
+      falta('rendimientoMax', 'El máximo no puede ser menor que el mínimo');
+    }
+    if (v.manos.trim() !== '' && min === '') falta('manos', 'Las manos se indican junto con el rendimiento');
+  });
+type FormProductoCampos = {
+  idSubcategoria: string;
+  idTipoResina: string;
+  idLinea: string;
+  rendimientoMin: string;
+  rendimientoMax: string;
+  manos: string;
+};
 export type FormProducto = z.infer<typeof formProductoSchema>;
 
 /** Logotipo: tipos aceptados y tamaño máximo, para validar en el navegador antes de enviar (R9). */

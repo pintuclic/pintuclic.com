@@ -22,6 +22,7 @@ import type {
   ProductosRepositoryPort,
   RelacionesAVerificar,
 } from '../interfaces/productos.interface';
+import { ORDEN_GALERIA, SELECCION_IMAGEN, aImagen } from './imagenes.repository';
 import { impactoVacio } from './prisma-comun';
 
 const igualSinMayusculas = (texto: string): Prisma.StringFilter => ({
@@ -43,7 +44,8 @@ const SELECCION_RESUMEN = {
   usoExterior: true,
   estado: true,
   publicado: true,
-  patrocinado: true,
+  esCombo: true,
+  excluidoDeDescuentos: true,
   marca: { select: { nombre: true } },
   linea: { select: { nombre: true } },
   subcategoria: {
@@ -66,6 +68,7 @@ const INCLUIR_DETALLE = {
   bases: { include: { base: { select: { nombre: true, orden: true } } } },
   coloresFabrica: { include: { color: { select: { nombre: true } } } },
   caracteristicas: { orderBy: [{ orden: 'asc' }, { idCaracteristica: 'asc' }] },
+  imagenes: { select: SELECCION_IMAGEN, orderBy: ORDEN_GALERIA },
   variantes: {
     include: {
       medida: {
@@ -135,7 +138,8 @@ function aResumen(f: FilaResumen, variantesActivas: number): ProductoResumen {
     claseColor: derivarClaseColor(f._count.bases, f._count.coloresFabrica),
     estado: f.estado,
     publicado: f.publicado,
-    patrocinado: f.patrocinado,
+    esCombo: f.esCombo,
+    excluidoDeDescuentos: f.excluidoDeDescuentos,
     variantesActivas,
   };
 }
@@ -163,7 +167,8 @@ function aDetalle(f: FilaDetalle): ProductoDetalle {
     claseColor: derivarClaseColor(f.bases.length, f.coloresFabrica.length),
     estado: f.estado,
     publicado: f.publicado,
-    patrocinado: f.patrocinado,
+    esCombo: f.esCombo,
+    excluidoDeDescuentos: f.excluidoDeDescuentos,
     variantesActivas: variantes.filter((v) => v.estado === 'activo').length,
     descripcion: f.descripcion,
     idCategoriaComplementaria: f.idCategoriaComplementaria,
@@ -176,6 +181,7 @@ function aDetalle(f: FilaDetalle): ProductoDetalle {
             tipoCalidad: f.ficha.tipoCalidad === null ? null : (f.ficha.tipoCalidad as 1 | 2 | 3),
             rendimientoMin: f.ficha.rendimientoMin?.toNumber() ?? null,
             rendimientoMax: f.ficha.rendimientoMax?.toNumber() ?? null,
+            manos: f.ficha.manos,
           },
     superficies: referencias(
       f.superficies.map((r) => ({
@@ -210,6 +216,7 @@ function aDetalle(f: FilaDetalle): ProductoDetalle {
       valor: c.valor,
       orden: c.orden,
     })),
+    imagenes: f.imagenes.map(aImagen),
     variantes,
   };
 }
@@ -219,12 +226,14 @@ function columnasFicha(f: FichaRecubrimientoDatos): {
   tipoCalidad: number | null;
   rendimientoMin: number | null;
   rendimientoMax: number | null;
+  manos: number | null;
 } {
   return {
     idTipoResina: f.idTipoResina,
     tipoCalidad: f.tipoCalidad,
     rendimientoMin: f.rendimientoMin,
     rendimientoMax: f.rendimientoMax,
+    manos: f.manos,
   };
 }
 
@@ -266,6 +275,7 @@ export async function consultarColoresOfrecidos(
     });
   }
   if (query.idAcabado !== undefined) filtros.push({ idAcabado: query.idAcabado });
+  if (query.idColor !== undefined) filtros.push({ idColor: query.idColor });
   // Las familias se calculan sin el filtro de familia para que el selector no se vacíe al elegir una.
   const sinFamilia: Prisma.ColorWhereInput = { AND: filtros };
   const conFamilia: Prisma.ColorWhereInput =
@@ -336,6 +346,7 @@ export class ProductosRepository implements ProductosRepositoryPort {
       ...(query.idSubcategoria !== undefined ? { idSubcategoria: query.idSubcategoria } : {}),
       ...(query.estado !== undefined ? { estado: query.estado } : {}),
       ...(query.publicado !== undefined ? { publicado: query.publicado } : {}),
+      ...(query.esCombo !== undefined ? { esCombo: query.esCombo } : {}),
       ...(busqueda !== undefined && busqueda !== '' ? { nombre: contiene(busqueda) } : {}),
     };
     const [filas, total] = await Promise.all([
@@ -363,6 +374,15 @@ export class ProductosRepository implements ProductosRepositoryPort {
     };
   }
 
+  async colorOfrecido(idProducto: number, idColor: number): Promise<boolean> {
+    const producto = await prisma.producto.findUnique({ where: { idProducto }, select: { idMarca: true } });
+    if (producto === null) return false;
+    const total = await prisma.color.count({
+      where: { AND: [filtroColoresOfrecidos(idProducto, producto.idMarca), { idColor }] },
+    });
+    return total > 0;
+  }
+
   async obtener(id: number): Promise<ProductoDetalle | null> {
     const f = await prisma.producto.findUnique({
       where: { idProducto: id },
@@ -382,7 +402,6 @@ export class ProductosRepository implements ProductosRepositoryPort {
         usoInterior: datos.usoInterior,
         usoExterior: datos.usoExterior,
         idCategoriaComplementaria: datos.idCategoriaComplementaria,
-        patrocinado: datos.patrocinado,
         ...(datos.ficha !== null ? { ficha: { create: columnasFicha(datos.ficha) } } : {}),
         superficies: {
           create: datos.idsSuperficies.map((idSuperficie) => ({
@@ -417,7 +436,6 @@ export class ProductosRepository implements ProductosRepositoryPort {
           ...(datos.idCategoriaComplementaria !== undefined
             ? { idCategoriaComplementaria: datos.idCategoriaComplementaria }
             : {}),
-          ...(datos.patrocinado !== undefined ? { patrocinado: datos.patrocinado } : {}),
         },
       });
       if (datos.ficha === null) {
@@ -500,6 +518,10 @@ export class ProductosRepository implements ProductosRepositoryPort {
   async contarImpacto(id: number): Promise<ImpactoDesactivacion> {
     const variantes = await this.contarVariantesActivas(id);
     return { ...impactoVacio(), variantes };
+  }
+
+  contarImagenes(idProducto: number): Promise<number> {
+    return prisma.imagen.count({ where: { idProducto } });
   }
 
   contarVariantesActivas(idProducto: number): Promise<number> {

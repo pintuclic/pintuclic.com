@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
 import { Container } from '@/core/components';
 import { CategoryExplorer } from './_components/CategoryExplorer';
+import { EmpresaCta } from './_components/EmpresaCta';
 import { FeaturedProducts } from './_components/FeaturedProducts';
 import { HeroSection } from './_components/HeroSection';
+import { EspacioPublicitario } from '@/modules/m14-patrocinios/components/EspacioPublicitario';
+import { ProductosPatrocinados } from '@/modules/m14-patrocinios/components/ProductosPatrocinados';
 import { ToolsBar } from './_components/ToolsBar';
 import { TrustStrip } from './_components/TrustStrip';
 
@@ -17,9 +20,13 @@ export default function HomePage() {
   return (
     <Container className="flex flex-col gap-8 py-6 lg:gap-10">
       <HeroSection />
+      {/* Espacio publicitario bajo el banner principal (M14 · B1): no se pinta si no hay anuncios vigentes */}
+      <EspacioPublicitario espacio="inicio" />
       <TrustStrip />
+      <EmpresaCta />
       <ToolsBar />
       <FeaturedProducts />
+      <ProductosPatrocinados />
       <CategoryExplorer />
     </Container>
   );

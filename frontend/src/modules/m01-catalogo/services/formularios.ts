@@ -7,6 +7,13 @@ import type {
   EditarTipoMedidaRequest,
 } from '../dtos/m01-catalogo.dto';
 import {
+  crearComboRequestSchema,
+  editarComboRequestSchema,
+  type Combo,
+  type CrearComboRequest,
+  type EditarComboRequest,
+} from '../dtos/m01-catalogo-entrega3.dto';
+import {
   crearColorRequestSchema,
   crearProductoRequestSchema,
   crearVarianteRequestSchema,
@@ -24,6 +31,7 @@ import {
 import type {
   FilaCaracteristica,
   FormColor,
+  FormCombo,
   FormFamiliaColor,
   FormLinea,
   FormMedida,
@@ -110,7 +118,6 @@ export function aCuerpoVariante(f: FormVariante): Resultado<CrearVarianteRequest
     idMedida: Number(f.idMedida),
     precio: aNumero(f.precio),
     ...(f.sku.trim() === '' ? {} : { sku: f.sku.trim() }),
-    ...(f.existenciaReferencial.trim() === '' ? {} : { existenciaReferencial: Number(f.existenciaReferencial) }),
     codigoProveedor: textoONulo(f.codigoProveedor),
   });
   return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
@@ -121,7 +128,6 @@ export function aCuerpoVarianteEditada(f: FormVariante): Resultado<EditarVariant
   const r = editarVarianteRequestSchema.safeParse({
     precio: aNumero(f.precio),
     sku: f.sku.trim(),
-    existenciaReferencial: f.existenciaReferencial.trim() === '' ? 0 : Number(f.existenciaReferencial),
     codigoProveedor: textoONulo(f.codigoProveedor),
   });
   return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
@@ -139,11 +145,26 @@ export interface RelacionesProductoForm {
 function fichaDe(f: FormProducto): unknown {
   if (!f.conFicha) return null;
   return {
-    idTipoResina: f.idTipoResina === '' ? Number.NaN : Number(f.idTipoResina),
+    idTipoResina: Number(f.idTipoResina),
     tipoCalidad: f.tipoCalidad === '' ? null : Number(f.tipoCalidad),
     rendimientoMin: aNumeroONulo(f.rendimientoMin),
     rendimientoMax: aNumeroONulo(f.rendimientoMax),
+    manos: f.manos.trim() === '' ? null : Number(f.manos),
   };
+}
+
+/**
+ * Lo que falta por elegir, dicho con claridad, antes de armar el cuerpo: así nunca llega a la API
+ * (ni al usuario) un error genérico de validación.
+ */
+export function faltantesDeProducto(f: FormProducto, rel: RelacionesProductoForm): string | null {
+  if (f.idMarca === '') return 'Elija la marca.';
+  if (f.idSubcategoria === '') return 'Elija la subcategoría.';
+  if (!f.conFicha) return null;
+  if (f.idTipoResina === '') return 'Elija el tipo de resina.';
+  if (f.idLinea === '') return 'Elija la línea: los recubrimientos la exigen.';
+  if (rel.idsSuperficies.length === 0) return 'Elija al menos una superficie donde se aplica.';
+  return null;
 }
 
 const caracteristicasDe = (filas: FilaCaracteristica[]) =>
@@ -152,6 +173,8 @@ const caracteristicasDe = (filas: FilaCaracteristica[]) =>
     .map((c, indice) => ({ nombre: c.nombre.trim(), valor: c.valor.trim(), orden: indice }));
 
 export function aCuerpoProducto(f: FormProducto, rel: RelacionesProductoForm): Resultado<CrearProductoRequest> {
+  const faltante = faltantesDeProducto(f, rel);
+  if (faltante !== null) return { ok: false, mensaje: faltante };
   const r = crearProductoRequestSchema.safeParse({
     idMarca: Number(f.idMarca),
     idLinea: aIdONulo(f.idLinea),
@@ -160,7 +183,6 @@ export function aCuerpoProducto(f: FormProducto, rel: RelacionesProductoForm): R
     descripcion: textoONulo(f.descripcion),
     usoInterior: f.usoInterior,
     usoExterior: f.usoExterior,
-    patrocinado: f.patrocinado,
     idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
     ficha: fichaDe(f),
     idsSuperficies: rel.idsSuperficies,
@@ -174,6 +196,8 @@ export function aCuerpoProducto(f: FormProducto, rel: RelacionesProductoForm): R
 
 /** Al editar se envía todo: las listas reemplazan a las actuales (D11) y la marca no cambia (P1). */
 export function aCuerpoProductoEditado(f: FormProducto, rel: RelacionesProductoForm): Resultado<EditarProductoRequest> {
+  const faltante = faltantesDeProducto(f, rel);
+  if (faltante !== null) return { ok: false, mensaje: faltante };
   const r = editarProductoRequestSchema.safeParse({
     idLinea: aIdONulo(f.idLinea),
     idSubcategoria: Number(f.idSubcategoria),
@@ -181,7 +205,6 @@ export function aCuerpoProductoEditado(f: FormProducto, rel: RelacionesProductoF
     descripcion: textoONulo(f.descripcion),
     usoInterior: f.usoInterior,
     usoExterior: f.usoExterior,
-    patrocinado: f.patrocinado,
     idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
     ficha: fichaDe(f),
     idsSuperficies: rel.idsSuperficies,
@@ -199,18 +222,19 @@ export function formDesdeProducto(p: ProductoDetalle): { form: FormProducto; rel
     form: {
       idMarca: String(p.idMarca),
       idLinea: p.idLinea === null ? '' : String(p.idLinea),
+      idCategoria: '',
       idSubcategoria: String(p.idSubcategoria),
       nombre: p.nombre,
       descripcion: p.descripcion ?? '',
       usoInterior: p.usoInterior,
       usoExterior: p.usoExterior,
-      patrocinado: p.patrocinado,
       idCategoriaComplementaria: p.idCategoriaComplementaria === null ? '' : String(p.idCategoriaComplementaria),
       conFicha: p.ficha !== null,
       idTipoResina: p.ficha === null ? '' : String(p.ficha.idTipoResina),
       tipoCalidad: p.ficha?.tipoCalidad == null ? '' : String(p.ficha.tipoCalidad),
       rendimientoMin: p.ficha?.rendimientoMin == null ? '' : String(p.ficha.rendimientoMin),
       rendimientoMax: p.ficha?.rendimientoMax == null ? '' : String(p.ficha.rendimientoMax),
+      manos: p.ficha?.manos == null ? '' : String(p.ficha.manos),
     },
     relaciones: {
       idsSuperficies: p.superficies.map((r) => r.id),
@@ -220,4 +244,54 @@ export function formDesdeProducto(p: ProductoDetalle): { form: FormProducto; rel
       caracteristicas: p.caracteristicas.map((c) => ({ nombre: c.nombre, valor: c.valor })),
     },
   };
+}
+
+/** Entrega 3: el formulario de un combo, listo para editar. */
+export function formDeCombo(c: Combo): FormCombo {
+  return {
+    nombre: c.nombre,
+    idMarca: String(c.idMarca),
+    idSubcategoria: String(c.idSubcategoria),
+    idMedida: String(c.idMedida),
+    precio: String(c.precio),
+    sku: c.sku,
+    descripcion: c.descripcion ?? '',
+    excluidoDeDescuentos: c.excluidoDeDescuentos,
+    idCategoriaComplementaria: c.idCategoriaComplementaria === null ? '' : String(c.idCategoriaComplementaria),
+    existenciaInicial: '',
+  };
+}
+
+export function aCuerpoCombo(f: FormCombo): Resultado<CrearComboRequest> {
+  const r = crearComboRequestSchema.safeParse({
+    idMarca: Number(f.idMarca),
+    idSubcategoria: Number(f.idSubcategoria),
+    nombre: f.nombre.trim(),
+    descripcion: textoONulo(f.descripcion),
+    idMedida: Number(f.idMedida),
+    precio: aNumero(f.precio),
+    ...(f.sku.trim() === '' ? {} : { sku: f.sku.trim() }),
+    excluidoDeDescuentos: f.excluidoDeDescuentos,
+    idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
+  });
+  return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
+}
+
+/** La marca y la medida de un combo no cambian. */
+export function aCuerpoComboEditado(f: FormCombo): Resultado<EditarComboRequest> {
+  const r = editarComboRequestSchema.safeParse({
+    idSubcategoria: Number(f.idSubcategoria),
+    nombre: f.nombre.trim(),
+    descripcion: textoONulo(f.descripcion),
+    precio: aNumero(f.precio),
+    sku: f.sku.trim(),
+    excluidoDeDescuentos: f.excluidoDeDescuentos,
+    idCategoriaComplementaria: aIdONulo(f.idCategoriaComplementaria),
+  });
+  return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
+}
+
+/** Existencia inicial opcional del formulario de alta: vacío = no fijarla ahora. */
+export function existenciaInicialDe(f: FormCombo): number | null {
+  return f.existenciaInicial.trim() === '' ? null : Number(f.existenciaInicial);
 }

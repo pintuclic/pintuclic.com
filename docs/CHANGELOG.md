@@ -6,6 +6,61 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-26
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🧩 **PR general de M03 (Asesoría y asistencia).** Los archivos compartidos que el módulo necesita, antes de construirlo: base de datos, permisos, el aviso de M18 y el registro de auditoría de M20. Sin código de módulo todavía. Entra como la rama `chore/m03-asesoria-bd`.
+
+### Contrato
+- **`contracts/m03-asesoria.contract.ts`**: la especificación de M03. Cubre HU-ASE-01 (búsqueda asistida), HU-ASE-02 (calculadora), HU-ASE-05 (asistente) y HU-ASE-06 (degradación de la IA). HU-ASE-03, 04 y 07 quedan fuera: las dos primeras están bloqueadas y la tercera se retiró.
+- **El cuestionario se construye en los dos modos** y el Product Owner decide con los dos a la vista: `fijo` (preguntas administrables en la base) y `asistido` (las propone Gemini sobre un vocabulario cerrado del catálogo). Comparten la traducción a filtros, la ruta al catálogo y la pantalla de resultado, así que elegir uno al final no obliga a rehacer nada.
+- **M03 toma el catálogo como está (D11).** No agrega categorías ni atributos: lo que M01 no tiene, M03 no lo pregunta. Por eso se omiten la opción «Zona húmeda» y la pregunta «¿Qué uso tendrá el espacio?», y **CA-ASE-01-04 (pinturas de tráfico) se declara no cumplible**, porque esa subcategoría no existe y no se sustituye por una parecida. Decide el Product Owner.
+
+### Base de datos (esquema 4.18, v3.18 del changelog de BD)
+- **Seis tablas nuevas:** el cuestionario administrable (`pregunta_asesoria`, `opcion_asesoria`, `efecto_opcion_asesoria`), la configuración de fila única (`configuracion_asesoria`), los incidentes de IA (`incidente_ia`) y el registro de auditoría de M20 (`registro_auditoria`).
+- **Seed:** permisos `asesoria.ver` y `asesoria.editar`, la configuración en modo `fijo` y el cuestionario de partida con 5 preguntas, 13 opciones y 13 efectos, todos apuntando a valores que existen en el catálogo.
+
+### Módulo M20 — Seguridad y auditoría
+- **HU-SEG-04 deja de estar aplazada en su parte de escritura:** `registro_auditoria` y `registrarAccion` en `AuditoriaPort`, con adaptador persistente. La consulta por el administrador (RF-SEG-04-05) sigue pendiente y es de M20.
+- **La tabla es inmutable con dos barreras:** la revocación de permisos **y** un disparador. Se comprobó que la revocación sola no basta, porque un superusuario la atraviesa; el disparador rechaza `UPDATE`, `DELETE` y `TRUNCATE` sea quien sea, como pide RF-SEG-04-04 («incluso por parte del administrador»).
+- `registrarAccion` es **opcional** en el puerto, igual que `notificarCambioCorreoConfirmado` de M18: exigirlo obligaría a tocar los dobles de prueba de M13, M14 y M16 sin necesidad.
+
+### Módulo M18 — Notificaciones
+- Tipo de comunicación **`alerta_servicio_ia`** con su plantilla y su previsualización, para avisar al administrador cuando la IA acumula los fallos configurados.
+
+### Módulo M17 — Permisos
+- Permisos **`asesoria.ver`** y **`asesoria.editar`** en el catálogo maestro, con el área funcional `asesoria` y la dependencia `editar → ver` en el backend y en el formulario.
+
+### Verificación
+- Backend **593/593** y frontend **422/422**; contratos **68/68**; ESLint, `tsc --noEmit` y `check:no-any` en verde en los dos lados.
+- Comprobado contra un **PostgreSQL 18 real y desechable**: el DDL y el seed corren limpios dos veces seguidas sobre la misma base y dejan 84 tablas; los 13 efectos resuelven a valores activos del catálogo; las restricciones rechazan lo que deben; y con el cliente de Prisma se lee el cuestionario, se registra y purga un incidente, se escribe en la auditoría y se rechazan el `UPDATE` y el `DELETE` sobre ella.
+- `prisma migrate diff` no reporta ninguna diferencia entre el DDL y Prisma en las tablas nuevas. La deriva que sí reporta en otras tablas es **anterior a este cambio** y queda igual.
+
+---
+
+## [v0.17.3] - 2026-10-25
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🧭 **Una sola página de ayuda.** `/faq` y `/centro-de-ayuda` mostraban la misma vista, así que el contacto con el equipo que aporta M15 quedaba escondido debajo de una pantalla entera de preguntas frecuentes y el ítem "¿Necesitas ayuda?" de la franja superior llevaba a la página que no lo tenía. Entra como la rama `fix/centro-de-ayuda-unificado`.
+
+### Centro de ayuda
+- **`/faq` redirige a `/centro-de-ayuda`** con un 308 permanente (`next.config.ts`); se elimina la ruta duplicada. Los enlaces ya compartidos siguen funcionando.
+- **La página la abre el contacto:** cabecera propia (`<h1>Centro de ayuda</h1>` y ruta de navegación), el formulario, el horario y el botón de WhatsApp de M15, y debajo las preguntas frecuentes de M16 con un atajo `Ver preguntas frecuentes` hacia `#preguntas-frecuentes`.
+- **Navegación:** la franja superior y el pie llevan a `/centro-de-ayuda`; los dos ítems del menú ("Ayuda" y "FAQ") se funden en **"Ayuda y FAQ"**, y "Preguntas frecuentes" del pie apunta al ancla de la sección.
+- **Jerarquía de encabezados:** la página tiene un solo `h1`; cada módulo aporta un `h2` y lo de dentro baja a `h3`. Antes las dos rutas repetían el mismo `h1` "Preguntas Frecuentes (FAQ)".
+
+### Módulo M16 — Contenido
+- `CentroAyudaFaqView` deja de ser una página completa y pasa a ser la sección `#preguntas-frecuentes`: sin ruta de navegación, sin distintivo y sin `min-h-[70vh]`, que era lo que empujaba el contacto fuera de la primera pantalla.
+
+### Módulo M15 — Atención al cliente
+- `ContactoYHorarioView` pone el formulario a todo el ancho y baja el horario y el canal directo a dos tarjetas: sin sesión el formulario se reduce a un aviso y la columna lateral fija dejaba un hueco de media pantalla.
+- Textos al día ahora que la sección va primero: "Escríbenos" en lugar de "¿No encontraste tu respuesta?".
+
+### Verificación
+- Frontend **259/259**, ESLint, `lint:a11y`, `tsc --noEmit` y `check:no-any` en verde; contratos **48/48**.
+- Comprobado en el navegador contra el backend de dev: `/faq` responde **308 → /centro-de-ayuda**, los cuatro `GET` públicos responden 200, el ancla existe, hay un solo `h1` y no hay desborde horizontal a 390 px.
+- **Nota:** este archivo venía sin registrar desde la v0.7.0 (las etiquetas publicadas llegan a la v0.17.2). Aquí solo se documenta este cambio; el hueco de versiones sigue pendiente.
+
+---
+
 ## [v0.7.0] - 2026-10-23
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🛡️ **QA combinado de M20, M17 y M04 y activación de empleados por correo.** Se corrigen los hallazgos de seguridad y de conformidad con los contratos de los tres módulos, y el alta de colaboradores deja de usar una clave temporal visible para el administrador. Entra a `main` como cuatro ramas: `feature/m04-cuentas`, `fix/core-rutas-publicas-y-sesion`, `feature/m17-permisos` y `fix/core-parametros-auth`.

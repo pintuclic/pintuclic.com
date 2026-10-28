@@ -11,6 +11,9 @@ export class PermisosRepository implements PermisosRepositoryPort {
     if (prefijo === 'seguridad') return 'seguridad';
     if (prefijo === 'configuracion') return 'configuracion';
     if (prefijo === 'estadisticas') return 'estadisticas';
+    if (prefijo === 'notificaciones') return 'notificaciones';
+    if (prefijo === 'atencion') return 'atencion';
+    if (prefijo === 'patrocinios') return 'patrocinios';
     return 'personal';
   }
 
