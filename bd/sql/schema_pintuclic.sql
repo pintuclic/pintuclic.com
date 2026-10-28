@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.19 (v4.18 + M03: cuestionario guiado e incidentes de IA; M20: registro de auditoría)
+-- VERSIÓN: 4.20 (v4.19 + M07: solicitudes de compra e intentos de pago)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 85
+-- TOTAL TABLAS: 88
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -1377,6 +1377,155 @@ CREATE TABLE IF NOT EXISTS contacto_orden (
 
 COMMENT ON TABLE contacto_orden IS 'Registro de contactos con el cliente iniciados desde una orden (M08 - HU-ORD-09). Solo inserción';
 COMMENT ON COLUMN contacto_orden.medio IS 'Medio usado (p. ej. telefono, correo, whatsapp); la lista cerrada está pendiente del análisis';
+
+-- ==============================================================================
+-- 5.1 MÓDULO M07 — CHECKOUT Y PAGO (contracts/m07-checkout.contract.ts · P1)
+-- ==============================================================================
+
+DO $$
+BEGIN
+    -- Estado de la solicitud de compra SOL-AAAA-NNNNN (M07 · estados del contrato)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_solicitud_compra') THEN
+        CREATE TYPE enum_estado_solicitud_compra AS ENUM (
+            'en_pago', 'rechazada', 'pagada', 'completada', 'en_revision', 'vencida', 'cancelada'
+        );
+    END IF;
+
+    -- Estado de un intento de pago en la pasarela (Wompi: PENDING, APPROVED, DECLINED, ERROR, VOIDED)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_intento_pago') THEN
+        CREATE TYPE enum_estado_intento_pago AS ENUM ('pendiente', 'aprobado', 'rechazado', 'error', 'anulado');
+    END IF;
+END $$;
+
+-- Tabla: solicitud_compra
+-- La compra congelada en el momento de pagar (RF-CHK-04-13). Sigue existiendo aunque el cobro o la orden fallen
+-- (RF-CHK-04-06). Es también la cola de creación de la orden (M07 · R6): estado `pagada` + próximo intento.
+CREATE TABLE IF NOT EXISTS solicitud_compra (
+    id_solicitud SERIAL PRIMARY KEY,
+    codigo VARCHAR(20) NOT NULL UNIQUE,
+    id_usuario INT NOT NULL,
+    estado enum_estado_solicitud_compra NOT NULL DEFAULT 'en_pago',
+    origen enum_origen_orden NOT NULL DEFAULT 'carrito',
+    id_cotizacion INT,
+    modo_entrega enum_modo_entrega NOT NULL,
+    direccion TEXT,
+    costo_entrega NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    sub_total NUMERIC(12, 2) NOT NULL,
+    descuento NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    descuento_eventos NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    descuento_empresa NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    total_mercancia NUMERIC(12, 2) NOT NULL,
+    total NUMERIC(12, 2) NOT NULL,
+    base_sin_impuesto NUMERIC(12, 2) NOT NULL,
+    importe_iva NUMERIC(12, 2) NOT NULL,
+    tasa_iva NUMERIC(5, 2) NOT NULL,
+    id_cupon INT,
+    importe_cupon NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    cupon_registrado BOOLEAN NOT NULL DEFAULT false,
+    observaciones TEXT,
+    transaccion_pago_id VARCHAR(100) UNIQUE,
+    monto_pagado NUMERIC(12, 2),
+    codigo_orden VARCHAR(50),
+    compra_directa BOOLEAN NOT NULL DEFAULT false,
+    reintentos_orden SMALLINT NOT NULL DEFAULT 0,
+    proximo_intento_orden TIMESTAMPTZ,
+    ultimo_error TEXT,
+    vence_en TIMESTAMPTZ NOT NULL,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_solicitud_compra_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_solicitud_compra_cotizacion FOREIGN KEY (id_cotizacion)
+        REFERENCES cotizacion (id_cotizacion) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT chk_solicitud_compra_codigo CHECK (codigo ~ '^SOL-[0-9]{4}-[0-9]{5,}$'),
+    CONSTRAINT chk_solicitud_compra_origen CHECK (origen <> 'cotizacion' OR id_cotizacion IS NOT NULL),
+    CONSTRAINT chk_solicitud_compra_direccion CHECK (modo_entrega <> 'domicilio' OR direccion IS NOT NULL),
+    CONSTRAINT chk_solicitud_compra_importes CHECK (
+        costo_entrega >= 0 AND sub_total >= 0 AND descuento >= 0 AND descuento_eventos >= 0
+        AND descuento_empresa >= 0 AND total_mercancia >= 0 AND total >= 0
+        AND base_sin_impuesto >= 0 AND importe_iva >= 0 AND importe_cupon >= 0
+        AND tasa_iva >= 0 AND tasa_iva <= 100
+        AND (monto_pagado IS NULL OR monto_pagado >= 0)
+    ),
+    CONSTRAINT chk_solicitud_compra_reintentos CHECK (reintentos_orden >= 0)
+);
+
+-- Bases creadas con la primera versión de esta tabla (v3.21 sin la compra directa).
+ALTER TABLE solicitud_compra ADD COLUMN IF NOT EXISTS compra_directa BOOLEAN NOT NULL DEFAULT false;
+
+COMMENT ON TABLE solicitud_compra IS 'Solicitud de compra SOL-AAAA-NNNNN de M07: la compra congelada al pagar; también la cola de creación de la orden';
+COMMENT ON COLUMN solicitud_compra.descuento IS 'Suma de descuento_eventos, descuento_empresa e importe_cupon (resumen de M06)';
+COMMENT ON COLUMN solicitud_compra.total_mercancia IS 'Total de M06 (mercancía con IVA, sin envío)';
+COMMENT ON COLUMN solicitud_compra.total IS 'Lo que se cobra: total_mercancia + costo_entrega (M07 · R10)';
+COMMENT ON COLUMN solicitud_compra.id_cupon IS 'Cupón aplicado (referencia a cupon, sin FK: esa tabla se crea más adelante en este script)';
+COMMENT ON COLUMN solicitud_compra.cupon_registrado IS 'true mientras el uso del cupón está registrado en M06 con referencia = codigo (M07 · R2 e, R3)';
+COMMENT ON COLUMN solicitud_compra.transaccion_pago_id IS 'Id de la transacción APROBADA en la pasarela; pasa a la orden (M08 · R2)';
+COMMENT ON COLUMN solicitud_compra.compra_directa IS 'Comprada con "Comprar ahora" desde la ficha, sin el carrito: al crear la orden no se toca el carrito (M07 · R17)';
+COMMENT ON COLUMN solicitud_compra.proximo_intento_orden IS 'Cuándo vuelve a intentarse crear la orden en M08; null si no hay nada pendiente (M07 · R6)';
+
+-- Tabla: linea_solicitud
+-- Copia de cada línea del carrito con su precio de M06 y sus descuentos, tal como se cobrarán.
+CREATE TABLE IF NOT EXISTS linea_solicitud (
+    id_linea_solicitud SERIAL PRIMARY KEY,
+    id_solicitud INT NOT NULL,
+    posicion SMALLINT NOT NULL,
+    id_variante INT NOT NULL,
+    id_color INT,
+    id_cotizacion INT,
+    nombre_producto VARCHAR(150) NOT NULL,
+    marca VARCHAR(150),
+    medida VARCHAR(150),
+    sku VARCHAR(100),
+    color_nombre VARCHAR(150),
+    color_hexadecimal VARCHAR(7),
+    cantidad INT NOT NULL,
+    precio_inicial NUMERIC(12, 2) NOT NULL,
+    precio_aplicado NUMERIC(12, 2) NOT NULL,
+    subtotal NUMERIC(12, 2) NOT NULL,
+    descuentos JSONB NOT NULL DEFAULT '[]'::jsonb,
+    CONSTRAINT fk_linea_solicitud_solicitud FOREIGN KEY (id_solicitud)
+        REFERENCES solicitud_compra (id_solicitud) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT uq_linea_solicitud_posicion UNIQUE (id_solicitud, posicion),
+    CONSTRAINT chk_linea_solicitud_cantidad CHECK (cantidad > 0),
+    CONSTRAINT chk_linea_solicitud_importes CHECK (precio_inicial >= 0 AND precio_aplicado >= 0 AND subtotal >= 0),
+    CONSTRAINT chk_linea_solicitud_descuentos CHECK (jsonb_typeof(descuentos) = 'array')
+);
+
+COMMENT ON TABLE linea_solicitud IS 'Líneas congeladas de una solicitud de compra (M07); id_variante e id_color son referencias sin FK, como en linea_orden';
+COMMENT ON COLUMN linea_solicitud.descuentos IS 'Descuentos de M06 de la línea: [{ordenAplicacion, origen, porcentaje, importe}] (pasan a linea_orden_descuento)';
+
+-- Tabla: intento_pago
+-- Cada cobro enviado a la pasarela para una solicitud (M07 · R4, R11). Nunca guarda el celular completo (R12).
+CREATE TABLE IF NOT EXISTS intento_pago (
+    id_intento_pago SERIAL PRIMARY KEY,
+    id_solicitud INT NOT NULL,
+    numero SMALLINT NOT NULL,
+    referencia VARCHAR(100) NOT NULL UNIQUE,
+    id_transaccion VARCHAR(100) UNIQUE,
+    estado enum_estado_intento_pago NOT NULL DEFAULT 'pendiente',
+    monto_centavos BIGINT NOT NULL,
+    celular_enmascarado VARCHAR(20) NOT NULL,
+    mensaje VARCHAR(255),
+    ultima_consulta TIMESTAMPTZ,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_intento_pago_solicitud FOREIGN KEY (id_solicitud)
+        REFERENCES solicitud_compra (id_solicitud) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT uq_intento_pago_numero UNIQUE (id_solicitud, numero),
+    CONSTRAINT chk_intento_pago_numero CHECK (numero > 0),
+    CONSTRAINT chk_intento_pago_monto CHECK (monto_centavos > 0)
+);
+
+COMMENT ON TABLE intento_pago IS 'Intentos de cobro con Nequi por Wompi de una solicitud de compra (M07)';
+COMMENT ON COLUMN intento_pago.referencia IS 'Referencia enviada a la pasarela: <codigo SOL>-<numero> (única, como exige Wompi)';
+COMMENT ON COLUMN intento_pago.ultima_consulta IS 'Última vez que se preguntó su estado a la pasarela (M07 · R5)';
+
+CREATE INDEX IF NOT EXISTS idx_solicitud_compra_usuario ON solicitud_compra (id_usuario, fecha_creacion DESC);
+CREATE INDEX IF NOT EXISTS idx_solicitud_compra_estado ON solicitud_compra (estado, fecha_creacion DESC);
+CREATE INDEX IF NOT EXISTS idx_solicitud_compra_cola ON solicitud_compra (proximo_intento_orden)
+    WHERE proximo_intento_orden IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_linea_solicitud_solicitud ON linea_solicitud (id_solicitud);
+CREATE INDEX IF NOT EXISTS idx_intento_pago_solicitud ON intento_pago (id_solicitud);
 
 -- ==============================================================================
 -- 6. MÓDULO DE PAGOS Y FACTURACIÓN

@@ -166,9 +166,50 @@ export class CarritoService {
 
   /* ── Puerto para M21 (C15, sin ruta HTTP) ─────────────────────────────── */
 
-  /** El carrito calculado de una cuenta. */
-  async carritoDeCuenta(idUsuario: number): Promise<Carrito> {
-    return (await this.consultar({ idUsuario, tokenVisitante: null })).datos;
+  /** El carrito calculado de una cuenta (M21, y M07 con el cupón de la pantalla). */
+  async carritoDeCuenta(idUsuario: number, codigoCupon?: string): Promise<Carrito> {
+    return (await this.consultar({ idUsuario, tokenVisitante: null }, codigoCupon)).datos;
+  }
+
+  /* ── Puerto para M07 (P3 de su contrato, sin ruta HTTP) ───────────────── */
+
+  /** C11 con el dueño ya resuelto: la cuenta que va a pagar. */
+  async revalidarCuenta(idUsuario: number, req: RevalidarRequest): Promise<Revalidacion> {
+    return (await this.revalidar({ idUsuario, tokenVisitante: null }, req)).datos;
+  }
+
+  /** R17 de M07: una línea calculada como carrito (idLinea 1), sin guardarla ni tocar el carrito de la cuenta. */
+  async carritoDirecto(idUsuario: number, linea: LineaNueva): Promise<Carrito> {
+    return this.armar(this.resolucionDirecta(idUsuario, linea), idUsuario);
+  }
+
+  /** R17 de M07: C11 sobre esa línea. */
+  async revalidarDirecta(idUsuario: number, linea: LineaNueva, req: RevalidarRequest): Promise<Revalidacion> {
+    return this.comparar(await this.armar(this.resolucionDirecta(idUsuario, linea), idUsuario), req);
+  }
+
+  /** La compra directa se arma como un carrito de una línea que no existe en la base. */
+  private resolucionDirecta(idUsuario: number, linea: LineaNueva): Resolucion {
+    return {
+      dueno: { tipo: 'cuenta', idUsuario },
+      carrito: {
+        idCarrito: 0,
+        fechaUltimaActividad: this.reloj(),
+        lineas: [{ idLinea: 1, idVariante: linea.idVariante, idColor: linea.idColor, cantidad: linea.cantidad, idCotizacion: null, precioAcordado: null }],
+      },
+      cookie: SIN_COOKIE,
+      union: null,
+      dias: DIAS_VIGENCIA_CARRITO_VISITANTE,
+    };
+  }
+
+  /** R7 de M07: con la orden creada, quita las líneas compradas (misma variante y color); las demás se quedan. */
+  async quitarComprado(idUsuario: number, lineas: readonly { idVariante: number; idColor: number | null }[]): Promise<void> {
+    const r = await this.resolver({ idUsuario, tokenVisitante: null });
+    if (r.carrito === null) return;
+    const compradas = r.carrito.lineas.filter((a) => lineas.some((l) => l.idVariante === a.idVariante && l.idColor === a.idColor));
+    for (const linea of compradas) await this.dep.repo.quitarLinea(r.carrito.idCarrito, linea.idLinea);
+    if (compradas.length > 0) await this.dep.repo.registrarActividad(r.carrito.idCarrito);
   }
 
   /** C15: las líneas de una cotización aceptada entran con su precio fijo; reemplazan a las iguales. */
@@ -189,7 +230,11 @@ export class CarritoService {
   /** C11 (HU-CAR-05): compara lo que el cliente tiene en pantalla con un cálculo nuevo. */
   async revalidar(sol: Solicitante, req: RevalidarRequest): Promise<ConCookie<Revalidacion>> {
     const r = await this.resolver(sol);
-    const carrito = await this.armar(r, sol.idUsuario, req.codigoCupon);
+    return { datos: this.comparar(await this.armar(r, sol.idUsuario, req.codigoCupon), req), cookie: r.cookie };
+  }
+
+  /** C11: lo que cambió entre la pantalla y el carrito recién calculado. */
+  private comparar(carrito: Carrito, req: RevalidarRequest): Revalidacion {
     const cambios: CambioRevalidacion[] = [];
 
     const enPantalla = new Map(req.lineas.map((l) => [l.idLinea, l.subtotal]));
@@ -230,7 +275,7 @@ export class CarritoService {
     }
 
     const puedeContinuar = carrito.lineas.length > 0 && carrito.calculo !== null && cambios.length === 0;
-    return { datos: { carrito, cambios, puedeContinuar }, cookie: r.cookie };
+    return { carrito, cambios, puedeContinuar };
   }
 
   /* ── Dueño y unión (C1, C2, C9, C13) ─────────────────────────────────── */
@@ -294,8 +339,11 @@ export class CarritoService {
     });
   }
 
-  /** C9: une el carrito del visitante al de la cuenta (o se lo pasa si la cuenta no tenía). */
-  private async unir(visitante: CarritoGuardado, cuenta: CarritoGuardado | null, idUsuario: number): Promise<UnionCarrito> {
+  /**
+   * C9: une el carrito del visitante al de la cuenta (o se lo pasa si la cuenta no tenía). Null si otra petición
+   * simultánea ya lo unió: esta solo lee el resultado.
+   */
+  private async unir(visitante: CarritoGuardado, cuenta: CarritoGuardado | null, idUsuario: number): Promise<UnionCarrito | null> {
     if (cuenta === null) {
       await this.dep.repo.pasarACuenta(visitante.idCarrito, idUsuario);
       return { lineasAgregadas: visitante.lineas.length, lineasSumadas: 0, lineasDescartadas: 0, cantidadesAjustadas: 0 };
@@ -320,12 +368,13 @@ export class CarritoService {
         lineasDescartadas += 1;
       }
     }
-    await this.dep.repo.unir({
+    const unido = await this.dep.repo.unir({
       idCarritoVisitante: visitante.idCarrito,
       idCarritoCuenta: cuenta.idCarrito,
       actualizar,
       agregar,
     });
+    if (!unido) return null;
     return { lineasAgregadas: agregar.length, lineasSumadas: actualizar.length, lineasDescartadas, cantidadesAjustadas };
   }
 

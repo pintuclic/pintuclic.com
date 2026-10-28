@@ -141,19 +141,32 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
                 <p className="text-sm text-neutral-medium">Sin otras compras registradas.</p>
               ) : (
                 <ul className="space-y-2 text-sm">
-                  {historialCliente.map((o) => (
-                    <li key={o.codigo} className="flex items-center justify-between gap-2">
-                      <Link
-                        href={`/admin/pedidos/${o.codigo}`}
-                        aria-current={o.codigo === detalle.codigo ? 'page' : undefined}
-                        className="font-title font-semibold text-action hover:underline"
+                  {historialCliente.map((o) => {
+                    const actual = o.codigo === detalle.codigo;
+                    return (
+                      <li
+                        key={o.codigo}
+                        className={`rounded-input border px-3 py-2.5 ${actual ? 'border-action/40 bg-subaction' : 'border-neutral-light'}`}
                       >
-                        {o.codigo}
-                      </Link>
-                      <span className="text-neutral-medium">{formatCOP(o.total)}</span>
-                      <EstadoBadge estado={o.estado} />
-                    </li>
-                  ))}
+                        <div className="flex items-baseline justify-between gap-3">
+                          <Link
+                            href={`/admin/pedidos/${o.codigo}`}
+                            aria-current={actual ? 'page' : undefined}
+                            className="whitespace-nowrap font-title font-semibold text-action hover:underline"
+                          >
+                            {o.codigo}
+                          </Link>
+                          <span className="whitespace-nowrap font-title font-semibold text-neutral-black">{formatCOP(o.total)}</span>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                          <EstadoBadge estado={o.estado} />
+                          <span className="text-xs text-neutral-medium">
+                            {actual ? 'Este pedido' : <time dateTime={o.fecha}>{formatearFecha(o.fecha)}</time>}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </Tarjeta>
