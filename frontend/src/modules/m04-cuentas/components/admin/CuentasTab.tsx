@@ -5,6 +5,7 @@ import { Alert, Badge, Button, Checkbox, Input, Modal, Select, Skeleton } from '
 import type { CuentaEmpresaAdmin, ListaPaginada, TipoClienteOpcion } from '../../interfaces/api.interfaces';
 import { cambiarTipoCliente, listarCuentasEmpresa, listarTiposCliente } from '../../services/admin-empresas.service';
 import { aErrorCuentas, type ErrorCuentas } from '../../services/errores';
+import { TipoClienteModal } from '@/modules/m06-precios/components/TipoClienteModal';
 import { ErrorAdmin, ListaVacia, Paginacion } from './ElementosAdmin';
 
 const LIMITE = 10;
@@ -14,7 +15,7 @@ const porcentaje = (n: number): string => `${new Intl.NumberFormat('es-CO', { ma
 /**
  * M06 · D8 · Cuentas empresa aprobadas y su tipo de cliente. El tipo fija el descuento de la cuenta en sus compras;
  * una cuenta sin tipo (las anteriores a M06) no recibe descuento hasta que se le asigne uno. Los tipos y sus
- * porcentajes se administran en Promociones → Clientes empresa.
+ * porcentajes se administran en la pestaña «Tipos de cliente» de este mismo panel.
  */
 export function CuentasTab() {
   const [pagina, setPagina] = useState(1);
@@ -188,7 +189,10 @@ function CambiarTipo({
   );
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [creando, setCreando] = useState(false);
+  const [version, setVersion] = useState(0);
 
+  // Se vuelve a leer cuando se crea un tipo desde aquí mismo (`version`).
   useEffect(() => {
     let vigente = true;
     listarTiposCliente()
@@ -197,7 +201,7 @@ function CambiarTipo({
     return () => {
       vigente = false;
     };
-  }, []);
+  }, [version]);
 
   const guardar = async () => {
     setError(null);
@@ -221,7 +225,7 @@ function CambiarTipo({
       )}
       {tipos !== null && tipos.length === 0 && (
         <Alert variant="warning">
-          No hay tipos de cliente empresa activos. Créalos en Promociones → Clientes empresa.
+          No hay tipos de cliente empresa activos. Crea el primero aquí abajo.
         </Alert>
       )}
       {tipos !== null && tipos.length > 0 && (
@@ -238,6 +242,23 @@ function CambiarTipo({
               label: `${t.nombre} · ${porcentaje(t.porcentaje)} de descuento`,
             })),
           ]}
+        />
+      )}
+      {tipos !== null && (
+        <div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setCreando(true)}>
+            Crear un tipo nuevo
+          </Button>
+          <p className="mt-1 font-sans text-xs text-neutral-medium">
+            ¿No está el tipo que necesitas? Créalo con su descuento y elígelo aquí.
+          </p>
+        </div>
+      )}
+      {creando && (
+        <TipoClienteModal
+          tipo={null}
+          onClose={() => setCreando(false)}
+          onGuardado={() => setVersion((v) => v + 1)}
         />
       )}
       <div className="flex flex-wrap justify-end gap-3">

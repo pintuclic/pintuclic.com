@@ -46,7 +46,7 @@ describe('presentación de la orden (HU-ORD-03, HU-ORD-07)', () => {
     it('muestra cuántos esperan en cada estado, sin listar los que no tienen ninguno', () => {
       expect(conteosNavegacion(resumen)).toEqual([
         { etiqueta: 'Confirmado', cantidad: 4 },
-        { etiqueta: 'En preparación', cantidad: 2 },
+        { etiqueta: 'En alistamiento', cantidad: 2 },
       ]);
     });
 
