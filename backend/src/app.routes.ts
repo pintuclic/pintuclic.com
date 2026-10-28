@@ -11,6 +11,8 @@ import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-fi
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
 import { construirModuloM05 } from './modules/m05-carrito/m05.routes';
 import { construirModuloM06 } from './modules/m06-precios/m06.routes';
+import { OrdenesM08Adapter } from './modules/m07-checkout/adapters/ordenes-m08.adapter';
+import { construirModuloM07 } from './modules/m07-checkout/m07.routes';
 import { construirModuloM08 } from './modules/m08-ordenes/m08.routes';
 import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
 import { construirModuloM15 } from './modules/m15-atencion/m15.routes';
@@ -229,6 +231,31 @@ export function construirAppRoutes(): Router {
   // exigen sesión; el permiso `ventas.*` se resuelve en servidor dentro del módulo.
   const m08 = construirModuloM08(m17.autorizacionService, { auditoria: m20.auditoria });
   router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
+
+  // M07: checkout y pago con Nequi por Wompi. El cliente paga con sesión; Wompi avisa sin sesión a
+  // `/checkout/wompi/eventos` (lo protege la firma, por eso se monta antes). El panel exige sesión de personal y
+  // `ventas.*`. Congela el carrito de M05 con los precios de M06 y, con el pago aprobado, crea la orden en M08.
+  const m07 = construirModuloM07(m17.autorizacionService, {
+    carrito: {
+      carritoDeCuenta: (idUsuario, codigoCupon) => m05.carrito.carritoDeCuenta(idUsuario, codigoCupon),
+      revalidar: (idUsuario, pantalla) => m05.carrito.revalidarCuenta(idUsuario, pantalla),
+      quitarComprado: (idUsuario, lineas) => m05.carrito.quitarComprado(idUsuario, lineas),
+    },
+    precios: m06.precios,
+    ordenes: new OrdenesM08Adapter(m08.creacion),
+    parametros: {
+      obtenerNumero: async (clave) => {
+        const { parametros } = await m17.configService.obtenerCatalogo();
+        const valor = parametros.find((p) => p.clave === clave)?.valor;
+        return typeof valor === 'number' ? valor : null;
+      },
+    },
+    auditoria: m20.auditoria,
+    tareaPeriodica: process.env.VITEST === undefined,
+  });
+  router.use('/checkout/wompi', m07.wompiRouter);
+  router.use('/checkout', exigirSesionSalvo(auth, []), m07.clienteRouter);
+  router.use('/admin/pagos', exigirSesionSalvo(auth, []), m07.adminRouter);
 
   // M17: la confirmación del cambio de correo del admin llega desde un enlace y es
   // pública (HU-ADM-06); el resto de endpoints administrativos exige sesión.
