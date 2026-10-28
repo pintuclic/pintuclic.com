@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, KeyRound, LogOut, MapPin, MessageSquare, UserRound } from 'lucide-react';
+import { Building2, KeyRound, LogOut, MapPin, MessageSquare, Package, UserRound } from 'lucide-react';
 import { Alert, ButtonLink, Container, SectionNav, Skeleton, type SectionNavItem } from '@/core/components';
 import { useAuthStore } from '@/core/store/authStore';
 import type { PerfilUsuario } from '../../interfaces/api.interfaces';
@@ -16,11 +16,19 @@ import { EmpresaSection } from './EmpresaSection';
 import type { SeccionPerfilId } from './secciones';
 import { SeguridadSection } from './SeguridadSection';
 
-const SECCIONES: ReadonlyArray<SectionNavItem<SeccionPerfilId>> = [
+/**
+ * `pedidos` no es una sección de esta vista: «Mis pedidos» (M08) vive en su propia página, así que
+ * elegirla navega a `RUTA_PEDIDOS` en vez de cambiar el contenido de la derecha.
+ */
+type ItemMenu = SeccionPerfilId | 'pedidos';
+const RUTA_PEDIDOS = '/perfil/pedidos';
+
+const SECCIONES: ReadonlyArray<SectionNavItem<ItemMenu>> = [
   { id: 'datos', label: 'Mis datos', icon: UserRound },
   { id: 'solicitudes', label: 'Mis solicitudes', icon: MessageSquare },
   { id: 'seguridad', label: 'Seguridad', icon: KeyRound },
   { id: 'direcciones', label: 'Dirección', icon: MapPin },
+  { id: 'pedidos', label: 'Mis pedidos', icon: Package },
   { id: 'empresa', label: 'Cuenta empresa', icon: Building2 },
   { id: 'cuenta', label: 'Sesión y cuenta', icon: LogOut },
 ];
@@ -136,7 +144,7 @@ export function PerfilView({
             <SectionNav
               items={SECCIONES}
               value={seccion}
-              onChange={setSeccion}
+              onChange={(id) => (id === 'pedidos' ? router.push(RUTA_PEDIDOS) : setSeccion(id))}
               ariaLabel="Secciones de mi cuenta"
               controlsId="perfil-seccion"
               className="lg:sticky lg:top-6"

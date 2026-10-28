@@ -39,6 +39,7 @@ Todos los usuarios de prueba comparten la misma contraseña para facilitar las p
 | **2** | Cliente Activo | `cliente@pintuclic.co` | `cliente` (2) | `normal` | `activo` | Pruebas de e-commerce B2C, compras, carritos, reservaciones y consentimientos. |
 | **3** | Cliente De Baja | `baja@pintuclic.co` | `cliente` (2) | `normal` | `inactivo` | Pruebas de rechazo de autenticación por cuenta desactivada y solicitudes de supresión de datos. |
 | **4** | Pinturas del Valle S.A.S. | `contacto@pinturasvalle.co` | `empresa_vip` (3) | `empresa` | `activo` | Pruebas de cliente corporativo B2B con políticas de descuento y facturación empresarial. |
+| **5** | Laura Martínez | `laura@pintuclic.co` | `cliente` (2) | `normal` | `activo` | Pruebas de M08 (órdenes): seis pedidos `PC-2026-00001` a `00006`, uno en cada estado del ciclo (confirmado, revisando disponibilidad, en preparación, preparado, enviado y entregado), con entregas a domicilio y recogida en almacén. |
 
 ---
 

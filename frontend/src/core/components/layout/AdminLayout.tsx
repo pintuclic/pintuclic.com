@@ -41,9 +41,20 @@ export interface AdminNavItem {
   exact?: boolean;
 }
 
+/** Cuántos elementos esperan por cada estado o categoría de un ítem del menú. */
+export interface AdminNavConteo {
+  etiqueta: string;
+  cantidad: number;
+}
+
 export interface AdminLayoutProps {
   children: React.ReactNode;
   navItems?: ReadonlyArray<AdminNavItem>;
+  /**
+   * Conteos que se dibujan bajo un ítem del menú, por su `href` (p. ej. pedidos esperando en cada estado).
+   * Los aporta quien monta el layout: el núcleo no conoce ningún módulo.
+   */
+  navConteos?: Readonly<Record<string, ReadonlyArray<AdminNavConteo>>>;
 }
 
 const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
@@ -75,6 +86,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Patrocinios',
     href: '/admin/patrocinios',
     icon: <Megaphone className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Pedidos',
+    href: '/admin/pedidos',
+    icon: <ClipboardList className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
@@ -148,6 +165,7 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   children,
   navItems = DEFAULT_NAV_ITEMS,
+  navConteos,
 }) => {
   const pathname = usePathname();
   const usuario = useAuthStore((s) => s.usuario);
@@ -301,25 +319,46 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         <nav aria-label="Navegación administrativa" className="px-4 py-2 space-y-1.5 flex-1 overflow-y-auto">
           {navItems.map((item) => {
             const active = isNavActive(item);
+            const conteos = navConteos?.[item.href] ?? [];
+            const total = conteos.reduce((suma, c) => suma + c.cantidad, 0);
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                aria-current={active ? 'page' : undefined}
-                className={`
-                  w-full flex items-center gap-3.5 px-4 py-3 rounded-card text-sm font-title transition-all duration-150
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50
-                  ${
-                    active
-                      ? 'bg-action text-neutral-white shadow-xs font-semibold'
-                      : 'text-corporate font-medium hover:bg-neutral-lightest hover:text-action'
-                  }
-                `}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </Link>
+              <div key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  aria-current={active ? 'page' : undefined}
+                  className={`
+                    w-full flex items-center gap-3.5 px-4 py-3 rounded-card text-sm font-title transition-all duration-150
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50
+                    ${
+                      active
+                        ? 'bg-action text-neutral-white shadow-xs font-semibold'
+                        : 'text-corporate font-medium hover:bg-neutral-lightest hover:text-action'
+                    }
+                  `}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                  {total > 0 && (
+                    <span
+                      className="ml-auto rounded-full bg-offer px-2 py-0.5 text-xs font-semibold leading-4 text-neutral-white"
+                      aria-label={`${total} esperando`}
+                    >
+                      {total}
+                    </span>
+                  )}
+                </Link>
+                {total > 0 && (
+                  <ul aria-label={`${item.label} esperando por estado`} className="mb-1 mt-0.5 space-y-0.5 pl-12 pr-4">
+                    {conteos.map((c) => (
+                      <li key={c.etiqueta} className="flex justify-between font-sans text-xs text-neutral-medium">
+                        <span>{c.etiqueta}</span>
+                        <span className="font-semibold text-corporate">{c.cantidad}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             );
           })}
         </nav>

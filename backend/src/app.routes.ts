@@ -11,6 +11,7 @@ import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-fi
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
 import { construirModuloM05 } from './modules/m05-carrito/m05.routes';
 import { construirModuloM06 } from './modules/m06-precios/m06.routes';
+import { construirModuloM08 } from './modules/m08-ordenes/m08.routes';
 import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
 import { construirModuloM15 } from './modules/m15-atencion/m15.routes';
 import { construirModuloM16 } from './modules/m16-contenido/m16.routes';
@@ -224,6 +225,10 @@ export function construirAppRoutes(): Router {
   });
   router.use('/admin/asesoria', exigirSesionSalvo(auth, []), m03.adminRouter);
   router.use('/asesoria', m03.publicRouter);
+  // M08: órdenes de venta. Cliente (`/ordenes/mis-pedidos`) y personal (`/ordenes/gestion`)
+  // exigen sesión; el permiso `ventas.*` se resuelve en servidor dentro del módulo.
+  const m08 = construirModuloM08(m17.autorizacionService, { auditoria: m20.auditoria });
+  router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
 
   // M17: la confirmación del cambio de correo del admin llega desde un enlace y es
   // pública (HU-ADM-06); el resto de endpoints administrativos exige sesión.

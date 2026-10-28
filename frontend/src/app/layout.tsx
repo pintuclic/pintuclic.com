@@ -1,11 +1,20 @@
 import type { Metadata } from 'next';
-import { Inter, Poppins } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const poppins = Poppins({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'], // 500: texto de botones y badges (UI Spec §2.2)
+// Fuentes propias (subconjunto latin): el build no depende de que el servidor llegue a Google Fonts.
+const inter = localFont({
+  src: './fonts/Inter-Variable.woff2',
+  weight: '100 900',
+  variable: '--font-inter',
+});
+const poppins = localFont({
+  src: [
+    { path: './fonts/Poppins-400.woff2', weight: '400' },
+    { path: './fonts/Poppins-500.woff2', weight: '500' }, // texto de botones y badges (UI Spec §2.2)
+    { path: './fonts/Poppins-600.woff2', weight: '600' },
+    { path: './fonts/Poppins-700.woff2', weight: '700' },
+  ],
   variable: '--font-poppins',
 });
 
