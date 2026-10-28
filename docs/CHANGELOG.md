@@ -6,6 +6,17 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-28 (b)
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** ✂️ **La calculadora se queda con una sola cosa que hacer.** Decisiones del Product Owner tras revisar la pantalla. Entra como la rama `feature/m03-calculadora-ajustes`.
+
+### Módulo M03 — Calculadora (HU-ASE-02)
+- **El resultado deja de decir «(Para N manos)» (K9).** Las manos son una característica del producto y su sitio es la ficha técnica, que es donde el PO está cargando el dato. El supuesto **se sigue aplicando** igual —ficha, configuración del panel y 2 por defecto—, pero se enuncia una sola vez y en su sitio, en lugar de repetirlo en dos lugares de la misma página con cifras que no coincidían.
+- **Se retira la pestaña «Cuánto rinde» (K16).** No aparece en el mockup (pág. 10), que enseña una sola calculadora. **El cálculo no se borra:** la regla K4, el endpoint y `calcularCobertura` siguen ahí, así que devolver la pestaña es volver a pintarla, no rehacer el camino. Se deja escrito en el contrato en vez de borrar K4, porque la regla sigue siendo correcta: cambió qué se enseña, no cómo se calcula.
+
+### Core
+- **`Modal` se dibuja con un portal** (va en su propio PR, `chore/core-modal-portal`). Dentro de un ancestro `position: sticky` el modal quedaba encerrado en su contexto de apilamiento y se pintaba bajo la cabecera fija: el velo gris se cortaba, el header no se oscurecía y el diálogo salía recortado. Afecta a todos los modales del sitio.
+
 ## [No publicado] - 2026-10-28
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 💬 **El asistente pasa a ser una burbuja flotante.** Deja de vivir dentro de una pestaña de `/asesoria` y acompaña a la persona por toda la tienda. Entra como la rama `feature/m03-asistente-flotante`.

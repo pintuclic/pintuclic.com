@@ -243,7 +243,16 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *      El servidor resuelve `manosAplicadas` —nunca nulo— en este orden: la ficha del
  *      producto, la configuración del panel (Q1-Q2) y, si no hay ninguna, 2. Lo decide el
  *      servidor y no la pantalla para que haya un solo sitio donde cambiarlo. La pantalla
- *      lo MUESTRA junto al resultado («Para N manos»): el supuesto se ve, no se esconde.
+ *      YA NO lo muestra: el Product Owner lo retiró el 2026-10-28 porque las manos son una
+ *      característica del producto y su sitio es la ficha técnica, no el resultado de la
+ *      calculadora. Dicho de otro modo, el supuesto se sigue aplicando, pero se enuncia una
+ *      sola vez y en el lugar donde M01 está cargando el dato.
+ *  K16 El sentido `cobertura` (K4) NO se expone en pantalla. El Product Owner retiró la
+ *      pestaña «Cuánto rinde» el 2026-10-28: no aparece en el mockup (pág. 10), que enseña
+ *      una sola calculadora. El cálculo del servidor y `calcularCobertura` se conservan a
+ *      propósito, para que devolver la pestaña sea volver a pintarla y no rehacer el camino.
+ *      Se deja escrito, y no se borra K4, porque la regla sigue siendo correcta: lo que
+ *      cambió es qué se enseña, no cómo se calcula.
  *  K15 En la ficha de producto la calculadora va en un DIÁLOGO, detrás del botón «Calcula
  *      cuánta pintura necesitas» que se coloca bajo las presentaciones (mockup pág. 10).
  *      Lo monta M01 con un solo componente de M03 y sin condición alguna: **quien decide si
