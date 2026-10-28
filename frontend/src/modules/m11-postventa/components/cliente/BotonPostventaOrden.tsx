@@ -28,13 +28,14 @@ export function BotonPostventaOrden({
   const [modalCancelacionAbierto, setModalCancelacionAbierto] = useState(false);
   const [modalDevolucionAbierto, setModalDevolucionAbierto] = useState(false);
 
+  const estado = (estadoOrden ?? '').trim().toLowerCase();
   const esCancelable = [
     'orden_confirmada',
     'revision_disponibilidad',
     'en_preparacion',
-  ].includes(estadoOrden);
+  ].includes(estado);
 
-  const esDevolvible = estadoOrden === 'entregado';
+  const esDevolvible = estado === 'entregado';
 
   const manejarExito = (solicitud: SolicitudPostventaDetalle) => {
     if (onSolicitudCreada) {
