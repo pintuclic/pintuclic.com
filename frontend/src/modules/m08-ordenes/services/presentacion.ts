@@ -8,7 +8,7 @@ export const ESTADOS_EN_CURSO: readonly EstadoOrden[] = ESTADOS_ORDEN.filter((e)
 export const ETIQUETA_ESTADO: Record<EstadoOrden, string> = {
   orden_confirmada: 'Confirmado',
   revision_disponibilidad: 'Revisando disponibilidad',
-  en_preparacion: 'En preparación',
+  en_preparacion: 'En alistamiento',
   preparada: 'Preparado',
   despachado: 'Enviado',
   entregado: 'Entregado',
