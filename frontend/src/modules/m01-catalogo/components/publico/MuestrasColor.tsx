@@ -78,6 +78,12 @@ export const MuestrasColor: React.FC<MuestrasColorProps> = ({ idProducto, elegid
           {total > colores.length ? `Ver los ${total} colores` : 'Buscar en la carta de colores'}
         </Button>
       )}
+
+      {datos !== null && (
+        <p className="font-sans text-xs text-neutral-medium">
+          El color puede variar según la pantalla de tu dispositivo y en la vida real.
+        </p>
+      )}
     </fieldset>
   );
 };
