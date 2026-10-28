@@ -9,6 +9,7 @@ import { construirModuloM14 } from './modules/m14-patrocinios/m14.routes';
 import { construirModuloM02 } from './modules/m02-busqueda/m02.routes';
 import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-final-m06.adapter';
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
+import { construirModuloM08 } from './modules/m08-ordenes/m08.routes';
 import { construirModuloM05 } from './modules/m05-carrito/m05.routes';
 import { construirModuloM06 } from './modules/m06-precios/m06.routes';
 import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
@@ -111,6 +112,10 @@ export function construirAppRoutes(): Router {
   router.use('/admin/catalogo', exigirSesionSalvo(auth, []), m01.adminRouter);
   router.use('/catalogo', m01.publicRouter);
 
+  // M08: órdenes de venta. Cliente (`/ordenes/mis-pedidos`) y personal (`/ordenes/gestion`)
+  // exigen sesión; el permiso `ventas.*` se resuelve en servidor dentro del módulo.
+  const m08 = construirModuloM08(m17.autorizacionService, { auditoria: m20.auditoria });
+  router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
   // M02: búsqueda, filtros y descubrimiento (público) y analítica de búsquedas sin resultado (admin).
   // El precio final y las ofertas los da M06 (se pide de forma diferida: se construye después, por M01).
   const m02 = construirModuloM02(m17.autorizacionService, {
