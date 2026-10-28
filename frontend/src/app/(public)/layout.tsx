@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { EncabezadoFijo, Footer, Header, Topbar } from '@/core/components';
+import { EncabezadoFijo, Header, Topbar } from '@/core/components';
+import { PieDePagina } from '@/modules/m16-contenido/components/publico/PieDePagina';
 import { AsistenteFlotante } from '@/modules/m03-asesoria/components/publico/AsistenteFlotante';
 import { SesionBootstrap } from '@/modules/m04-cuentas/components/sesion/SesionBootstrap';
 import { CarritoLateral } from '@/modules/m05-carrito/components/CarritoLateral';
@@ -27,7 +28,7 @@ export default function PublicLayout({ children, modal }: { children: ReactNode;
       <main id="contenido" tabIndex={-1} className="focus:outline-none">
         {children}
       </main>
-      <Footer {...footer} />
+      <PieDePagina {...footer} />
       {modal}
       <CarritoLateral />
       {/*

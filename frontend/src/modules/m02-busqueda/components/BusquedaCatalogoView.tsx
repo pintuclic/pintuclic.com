@@ -27,6 +27,7 @@ const ORDENES: ReadonlyArray<{ value: FiltrosBusqueda['ordenar']; label: string 
   { value: 'precio_asc', label: 'Precio: menor a mayor' },
   { value: 'precio_desc', label: 'Precio: mayor a menor' },
   { value: 'novedad', label: 'Novedades' },
+  { value: 'mas_vendidos', label: 'Más vendidos' },
 ];
 
 export const BusquedaCatalogoView: React.FC = () => {
