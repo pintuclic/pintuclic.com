@@ -166,9 +166,25 @@ export class CarritoService {
 
   /* ── Puerto para M21 (C15, sin ruta HTTP) ─────────────────────────────── */
 
-  /** El carrito calculado de una cuenta. */
-  async carritoDeCuenta(idUsuario: number): Promise<Carrito> {
-    return (await this.consultar({ idUsuario, tokenVisitante: null })).datos;
+  /** El carrito calculado de una cuenta (M21, y M07 con el cupón de la pantalla). */
+  async carritoDeCuenta(idUsuario: number, codigoCupon?: string): Promise<Carrito> {
+    return (await this.consultar({ idUsuario, tokenVisitante: null }, codigoCupon)).datos;
+  }
+
+  /* ── Puerto para M07 (P3 de su contrato, sin ruta HTTP) ───────────────── */
+
+  /** C11 con el dueño ya resuelto: la cuenta que va a pagar. */
+  async revalidarCuenta(idUsuario: number, req: RevalidarRequest): Promise<Revalidacion> {
+    return (await this.revalidar({ idUsuario, tokenVisitante: null }, req)).datos;
+  }
+
+  /** R7 de M07: con la orden creada, quita las líneas compradas (misma variante y color); las demás se quedan. */
+  async quitarComprado(idUsuario: number, lineas: readonly { idVariante: number; idColor: number | null }[]): Promise<void> {
+    const r = await this.resolver({ idUsuario, tokenVisitante: null });
+    if (r.carrito === null) return;
+    const compradas = r.carrito.lineas.filter((a) => lineas.some((l) => l.idVariante === a.idVariante && l.idColor === a.idColor));
+    for (const linea of compradas) await this.dep.repo.quitarLinea(r.carrito.idCarrito, linea.idLinea);
+    if (compradas.length > 0) await this.dep.repo.registrarActividad(r.carrito.idCarrito);
   }
 
   /** C15: las líneas de una cotización aceptada entran con su precio fijo; reemplazan a las iguales. */
