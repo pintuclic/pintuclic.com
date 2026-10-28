@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Genera los scripts SQL de los datos de DEMOSTRACIÓN del catálogo:
- *   bd/sql/datos_demo_catalogo.sql  → carga (aditiva e idempotente: no borra ni modifica nada existente)
- *   bd/sql/retirar_datos_demo.sql   → retira lo que cargó el anterior
+ *   bd/sql/demo/datos_demo_catalogo.sql  → carga (aditiva e idempotente: no borra ni modifica nada existente)
+ *   bd/sql/demo/retirar_datos_demo.sql   → retira lo que cargó el anterior
  *
  * Uso (desde la raíz del repositorio):  node bd/script/datos-demo/generar.mjs
  * Necesita `backend/node_modules` (usa `sharp`, ya instalado, para dibujar las imágenes).
@@ -15,7 +15,7 @@ import { COLORES, COLORES_FABRICA, COLORES_MATE, LINEAS, MARCAS, MEDIDAS, POPULA
 import { ilustracion, logotipo } from './ilustraciones.mjs';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
-const salida = path.resolve(aqui, '../../sql');
+const salida = path.resolve(aqui, '../../sql/demo');
 
 const q = (v) => (v === null || v === undefined ? 'NULL' : `'${String(v).replaceAll("'", "''")}'`);
 const num = (v) => (v === null || v === undefined ? 'NULL' : String(v));
@@ -361,7 +361,7 @@ writeFileSync(
   path.join(salida, 'retirar_datos_demo.sql'),
   `-- =============================================================================
 -- RETIRO DE LOS DATOS DE DEMOSTRACIÓN · Pintu Clic
--- Generado por bd/script/datos-demo/generar.mjs. Deshace bd/sql/datos_demo_catalogo.sql:
+-- Generado por bd/script/datos-demo/generar.mjs. Deshace bd/sql/demo/datos_demo_catalogo.sql:
 --   · las órdenes DEMO-xxxx con sus líneas e historial,
 --   · los productos de demostración (con sus imágenes, variantes y relaciones),
 --   · los colores de demostración y las marcas y líneas que solo ellos usaban.

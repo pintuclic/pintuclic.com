@@ -72,6 +72,10 @@ jobs:
             echo "Compilando y levantando contenedores en produccion..."
             docker compose -f docker-compose.yml up -d --build --remove-orphans
 
+            # 5.1. Migracion automatica: Aplicar esquema incremental sin destruir datos
+            echo "Aplicando cambios incrementales al esquema de base de datos..."
+            docker compose -f docker-compose.yml exec -T db psql -U pintuclic -d pintuclic -v ON_ERROR_STOP=1 < bd/sql/schema_pintuclic.sql
+
             # 6. Verificacion de servicios
             echo "Estado de los servicios activos:"
             docker compose -f docker-compose.yml ps

@@ -39,17 +39,17 @@ docker exec CONTENEDOR pg_dump -U USUARIO -Fc BASE > respaldo_antes_demo_$(date 
 
 ## Paso 1 · Cargar
 
-Desde una copia del repositorio (o copiando solo `bd/sql/datos_demo_catalogo.sql` al servidor):
+Desde una copia del repositorio (o copiando solo `bd/sql/demo/datos_demo_catalogo.sql` al servidor):
 
 ```bash
 # Base en un contenedor Docker (el archivo se pasa por la entrada estándar; no hace falta copiarlo adentro)
-docker exec -i CONTENEDOR psql -U USUARIO -d BASE -v ON_ERROR_STOP=1 < bd/sql/datos_demo_catalogo.sql
+docker exec -i CONTENEDOR psql -U USUARIO -d BASE -v ON_ERROR_STOP=1 < bd/sql/demo/datos_demo_catalogo.sql
 ```
 
 Si la base **no** está en Docker:
 
 ```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f bd/sql/datos_demo_catalogo.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f bd/sql/demo/datos_demo_catalogo.sql
 ```
 
 (`DATABASE_URL` sin el parámetro `?schema=public`, que `psql` no entiende.)
@@ -76,7 +76,7 @@ Luego abrir la tienda: en el inicio deben verse «Los más vendidos» y «Herram
 Si no se quieren las órdenes `DEMO-xxxx` (por ejemplo, en producción), cargar y luego retirar solo las órdenes:
 
 ```bash
-docker exec -i CONTENEDOR psql -U USUARIO -d BASE -v ON_ERROR_STOP=1 < bd/sql/datos_demo_catalogo.sql
+docker exec -i CONTENEDOR psql -U USUARIO -d BASE -v ON_ERROR_STOP=1 < bd/sql/demo/datos_demo_catalogo.sql
 docker exec -i CONTENEDOR psql -U USUARIO -d BASE -c "
   BEGIN;
   DELETE FROM historial_estado_orden WHERE id_orden IN (SELECT id_orden FROM orden WHERE codigo_visible LIKE 'DEMO-%');
@@ -90,7 +90,7 @@ Sin ventas, «Los más vendidos» no se muestra en el inicio (es lo esperado).
 ## Retirar todo (volver al estado anterior)
 
 ```bash
-docker exec -i CONTENEDOR psql -U USUARIO -d BASE -v ON_ERROR_STOP=1 < bd/sql/retirar_datos_demo.sql
+docker exec -i CONTENEDOR psql -U USUARIO -d BASE -v ON_ERROR_STOP=1 < bd/sql/demo/retirar_datos_demo.sql
 ```
 
 Borra únicamente lo que cargó el script de demostración (órdenes `DEMO-xxxx`, productos, colores, imágenes y las tres marcas ficticias). No toca nada anterior. Si algún producto de demostración ya se usó de verdad (quedó en un carrito o en una cotización), el retiro **falla sin borrar nada** y hay que resolverlo a mano.
@@ -100,7 +100,7 @@ Borra únicamente lo que cargó el script de demostración (órdenes `DEMO-xxxx`
 Los dos `.sql` son **generados**; no se editan a mano. Los datos viven en `bd/script/datos-demo/catalogo.mjs` y las ilustraciones en `ilustraciones.mjs`. Para cambiarlos:
 
 ```bash
-node bd/script/datos-demo/generar.mjs   # regenera bd/sql/datos_demo_catalogo.sql y retirar_datos_demo.sql
+node bd/script/datos-demo/generar.mjs   # regenera bd/sql/demo/datos_demo_catalogo.sql y retirar_datos_demo.sql
 ```
 
 El generador usa `sharp` de `backend/node_modules` (hay que haber corrido `npm install` en `backend`). La salida es determinista: con los mismos datos produce los mismos archivos.
