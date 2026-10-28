@@ -30,11 +30,15 @@ function Reintento({ solicitud, onListo }: { solicitud: Solicitud; onListo: (s: 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<ReintentoFormEntrada, unknown, ReintentoFormData>({
     resolver: zodResolver(reintentoFormSchema),
     defaultValues: { celularNequi: '', aceptaReglamento: false, aceptaDatos: false },
   });
+  // La casilla del Core Kit dibuja la marca con `checked`.
+  const aceptaReglamento = watch('aceptaReglamento');
+  const aceptaDatos = watch('aceptaDatos');
 
   useEffect(() => {
     let vigente = true;
@@ -88,6 +92,7 @@ function Reintento({ solicitud, onListo }: { solicitud: Solicitud; onListo: (s: 
               </>
             }
             error={errors.aceptaReglamento?.message}
+            checked={aceptaReglamento}
             {...register('aceptaReglamento')}
           />
           <Checkbox
@@ -102,6 +107,7 @@ function Reintento({ solicitud, onListo }: { solicitud: Solicitud; onListo: (s: 
               </>
             }
             error={errors.aceptaDatos?.message}
+            checked={aceptaDatos}
             {...register('aceptaDatos')}
           />
         </>

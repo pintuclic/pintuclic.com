@@ -63,6 +63,9 @@ export function CheckoutView() {
     formState: { errors, isSubmitting },
   } = useForm<PagoFormEntrada, unknown, PagoFormData>({ resolver: zodResolver(pagoFormSchema), defaultValues: VACIO });
   const modo = watch('modoEntrega');
+  // La casilla del Core Kit dibuja la marca con `checked`.
+  const aceptaReglamento = watch('aceptaReglamento');
+  const aceptaDatos = watch('aceptaDatos');
 
   const cargar = useCallback(async (): Promise<void> => {
     try {
@@ -290,6 +293,7 @@ export function CheckoutView() {
                     </>
                   }
                   error={errors.aceptaReglamento?.message}
+                  checked={aceptaReglamento}
                   {...register('aceptaReglamento')}
                 />
                 <Checkbox
@@ -304,6 +308,7 @@ export function CheckoutView() {
                     </>
                   }
                   error={errors.aceptaDatos?.message}
+                  checked={aceptaDatos}
                   {...register('aceptaDatos')}
                 />
               </div>
