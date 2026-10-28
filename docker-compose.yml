@@ -65,6 +65,11 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODELO: ${GEMINI_MODELO:-}
       GEMINI_API_URL: ${GEMINI_API_URL:-}
+      WOMPI_API_URL: ${WOMPI_API_URL:-https://sandbox.wompi.co/v1}
+      WOMPI_PUBLIC_KEY: ${WOMPI_PUBLIC_KEY:-}
+      WOMPI_PRIVATE_KEY: ${WOMPI_PRIVATE_KEY:-}
+      WOMPI_EVENTS_SECRET: ${WOMPI_EVENTS_SECRET:-}
+      WOMPI_INTEGRITY_SECRET: ${WOMPI_INTEGRITY_SECRET:-}
     depends_on:
       db:
         condition: service_healthy
