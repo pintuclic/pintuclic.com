@@ -2,13 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { Alert, ButtonLink, Container, Skeleton } from '@/core/components';
 import { obtenerMiSolicitud } from '../../services/postventa-api';
 import {
   ETIQUETA_ESTADO_POSTVENTA,
   ETIQUETA_METODO_REEMBOLSO,
-  ETIQUETA_MOTIVO_RECHAZO,
   ETIQUETA_TIPO_POSTVENTA,
   formatearFecha,
   formatearMoneda,

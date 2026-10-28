@@ -108,7 +108,9 @@ export function ModalSolicitarCancelacion({
         <div className="pt-2 border-t border-neutral-light">
           <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-neutral-dark">
             <input
+              id="cancelacion-incluir-banco"
               type="checkbox"
+              aria-label="Registrar cuenta bancaria para consignación del reembolso"
               checked={incluirDatosBancarios}
               onChange={(e) => setIncluirDatosBancarios(e.target.checked)}
               className="h-4 w-4 rounded border-neutral-medium text-action focus:ring-action"

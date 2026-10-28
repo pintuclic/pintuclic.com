@@ -116,6 +116,43 @@ describe('postventa-api (M11 Frontend)', () => {
     expect(res.paginacion.total).toBe(1);
   });
 
+  it('obtenerMiSolicitud llama a GET /postventa/mis-solicitudes/:codigo', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { success: true, data: detalleMock },
+    });
+
+    const res = await obtenerMiSolicitud('DEV-2026-00001');
+    expect(apiClient.get).toHaveBeenCalledWith('/postventa/mis-solicitudes/DEV-2026-00001');
+    expect(res.codigo).toBe('DEV-2026-00001');
+  });
+
+  it('listarGestion llama a GET /postventa/gestion con query params', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: [detalleMock],
+        pagination: { pagina: 1, limite: 20, total: 1, totalPaginas: 1 },
+      },
+    });
+
+    const res = await listarGestion({ estado: 'solicitada' });
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/postventa/gestion',
+      expect.objectContaining({ params: expect.objectContaining({ estado: 'solicitada' }) })
+    );
+    expect(res.items.length).toBe(1);
+  });
+
+  it('obtenerResumenGestion llama a GET /postventa/gestion/resumen', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { success: true, data: [{ estado: 'solicitada', cantidad: 3 }] },
+    });
+
+    const res = await obtenerResumenGestion();
+    expect(apiClient.get).toHaveBeenCalledWith('/postventa/gestion/resumen');
+    expect(res[0]?.estado).toBe('solicitada');
+  });
+
   it('resolverSolicitud llama a PATCH /postventa/gestion/:codigo/resolver', async () => {
     vi.mocked(apiClient.patch).mockResolvedValueOnce({
       data: { success: true, data: { ...detalleMock, estado: 'aprobada' } },

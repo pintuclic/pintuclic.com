@@ -1,7 +1,6 @@
 import {
   CODIGOS_ERROR_M11,
   type EstadoPostventa,
-  type TipoPostventa,
 } from '../dtos/m11-postventa.dto';
 
 export class ErrorPostventa extends Error {

@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, ShieldCheck, Wallet } from 'lucide-react';
 import {
-  AdminPageHeader,
   Alert,
   Button,
   ButtonLink,
@@ -31,7 +30,7 @@ export function DetallePostventaAdminView({ codigo }: { codigo: string }) {
   const [modalResolverAbierto, setModalResolverAbierto] = useState(false);
   const [modalReembolsoAbierto, setModalReembolsoAbierto] = useState(false);
 
-  const cargar = () => {
+  const cargar = useCallback(() => {
     setCargando(true);
     setError(null);
     obtenerGestionPorCodigo(codigo)
@@ -47,11 +46,11 @@ export function DetallePostventaAdminView({ codigo }: { codigo: string }) {
         );
         setCargando(false);
       });
-  };
+  }, [codigo]);
 
   useEffect(() => {
     cargar();
-  }, [codigo]);
+  }, [cargar]);
 
   return (
     <div className="space-y-6">

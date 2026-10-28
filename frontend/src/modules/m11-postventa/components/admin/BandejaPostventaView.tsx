@@ -1,17 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useTransition } from 'react';
-import Link from 'next/link';
-import {
-  Clock,
-  Filter,
-  RotateCcw,
-  Search,
-  CheckCircle2,
-  XCircle,
-  FileCheck,
-  AlertCircle,
-} from 'lucide-react';
+import { Search } from 'lucide-react';
 import {
   AdminPageHeader,
   Alert,
@@ -103,6 +93,7 @@ export function BandejaPostventaView() {
 
   useEffect(() => {
     cargarDatos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoFiltro, tipoFiltro]);
 
   const manejarBuscar = (e: React.FormEvent) => {

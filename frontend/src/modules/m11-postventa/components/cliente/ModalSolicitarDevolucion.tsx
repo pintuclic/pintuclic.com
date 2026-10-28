@@ -202,6 +202,7 @@ export function ModalSolicitarDevolucion({
                     <label className="flex items-start gap-2 cursor-pointer flex-1">
                       <input
                         type="checkbox"
+                        aria-label={`Seleccionar producto ${l.nombreProducto}`}
                         checked={estaSeleccionada}
                         onChange={() => toggleSeleccion(l.idLineaOrden, l.cantidad)}
                         className="mt-1 h-4 w-4 rounded border-neutral-medium text-action focus:ring-action"
@@ -223,8 +224,10 @@ export function ModalSolicitarDevolucion({
 
                     {estaSeleccionada && (
                       <div className="flex items-center gap-2">
-                        <label className="text-xs text-neutral-medium">Cant:</label>
+                        <label htmlFor={`cant-${l.idLineaOrden}`} className="text-xs text-neutral-medium">Cant:</label>
                         <input
+                          id={`cant-${l.idLineaOrden}`}
+                          aria-label={`Cantidad a devolver de ${l.nombreProducto}`}
                           type="number"
                           min={1}
                           max={l.cantidad}
@@ -244,6 +247,8 @@ export function ModalSolicitarDevolucion({
 
                   {estaSeleccionada && (
                     <input
+                      id={`obs-${l.idLineaOrden}`}
+                      aria-label={`Observación de ${l.nombreProducto}`}
                       type="text"
                       placeholder="Observación específica de esta línea (opcional)..."
                       value={motivosLinea[l.idLineaOrden] ?? ''}
@@ -289,6 +294,8 @@ export function ModalSolicitarDevolucion({
         <div className="pt-2 border-t border-neutral-light">
           <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-neutral-dark">
             <input
+              id="devolucion-incluir-banco"
+              aria-label="Registrar cuenta bancaria para pago de reembolso"
               type="checkbox"
               checked={incluirDatosBancarios}
               onChange={(e) => setIncluirDatosBancarios(e.target.checked)}
