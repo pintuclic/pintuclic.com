@@ -381,6 +381,15 @@ model Usuario {
   solicitudesNitRevisadas     SolicitudActualizacionNit[] @relation("SolicitudesNitRevisadas")
   identidadesExternas         UsuarioIdentidadExterna[]
 
+  // M07 Relaciones
+  solicitudesCompra SolicitudCompra[]
+
+  // M08 Relaciones
+  ordenes               Orden[]
+  historialEstadosOrden HistorialEstadoOrden[]
+  notasOrden            NotaOrden[]
+  contactosOrden        ContactoOrden[]
+
   // M13 Relaciones
   ajustesInventario AjusteInventario[]
 
@@ -411,14 +420,6 @@ model Usuario {
 
   // M20 Relaciones
   registrosAuditoria RegistroAuditoria[]
-  // M07 Relaciones
-  solicitudesCompra SolicitudCompra[]
-
-  // M08 Relaciones
-  ordenes               Orden[]
-  historialEstadosOrden HistorialEstadoOrden[]
-  notasOrden            NotaOrden[]
-  contactosOrden        ContactoOrden[]
 
   @@map("usuario")
 }
@@ -1529,6 +1530,169 @@ model VarianteCombo {
 }
 
 // =============================================================================
+// MÓDULO M08 — ORDEN DE VENTA (histórico inmutable)
+// =============================================================================
+
+/// Ciclo de vida de la orden (M08 · HU-ORD-03). La base nueva no incluye el valor legado `pendiente`.
+enum EstadoOrden {
+  orden_confirmada
+  revision_disponibilidad
+  en_preparacion
+  preparada
+  despachado
+  entregado
+  cancelado
+  devuelto
+
+  @@map("enum_estado_orden")
+}
+
+/// Modo de entrega congelado en la orden (M08 · RF-ORD-03-06)
+enum ModoEntrega {
+  domicilio
+  recogida
+
+  @@map("enum_modo_entrega")
+}
+
+/// Procedencia de la orden (M08 · RF-ORD-01-03)
+enum OrigenOrden {
+  carrito
+  cotizacion
+
+  @@map("enum_origen_orden")
+}
+
+/// Cabecera de la orden. `idCotizacion` no lleva relación Prisma: M21 aún no tiene modelo (la FK existe en el DDL).
+model Orden {
+  idOrden            Int          @id @default(autoincrement()) @map("id_orden")
+  codigoVisible      String       @unique @map("codigo_visible") @db.VarChar(50)
+  idUsuario          Int          @map("id_usuario")
+  origen             OrigenOrden  @default(carrito)
+  idCotizacion       Int?         @map("id_cotizacion")
+  carritoOCotizacion String?      @map("carrito_o_cotizacion") @db.VarChar(50)
+  estado             EstadoOrden  @default(orden_confirmada)
+  transaccionPagoId  String?      @unique @map("transaccion_pago_id") @db.VarChar(100)
+  codigoSolicitud    String?      @unique(map: "uq_orden_codigo_solicitud") @map("codigo_solicitud") @db.VarChar(20)
+  modoEntrega        ModoEntrega? @map("modo_entrega")
+  costoEntrega       Decimal      @default(0) @map("costo_entrega") @db.Decimal(12, 2)
+  direccion          String?
+  subTotal           Decimal      @default(0) @map("sub_total") @db.Decimal(12, 2)
+  descuento          Decimal      @default(0) @db.Decimal(12, 2)
+  total              Decimal      @default(0) @db.Decimal(12, 2)
+  baseSinImpuesto    Decimal?     @map("base_sin_impuesto") @db.Decimal(12, 2)
+  importeIva         Decimal?     @map("importe_iva") @db.Decimal(12, 2)
+  tasaIva            Decimal?     @map("tasa_iva") @db.Decimal(5, 2)
+  observaciones      String?
+  fecha              DateTime     @default(dbgenerated("CURRENT_DATE")) @db.Date
+
+  usuario   Usuario                @relation(fields: [idUsuario], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_orden_usuario")
+  lineas    LineaOrden[]
+  historial HistorialEstadoOrden[]
+  notas     NotaOrden[]
+  contactos ContactoOrden[]
+
+  @@index([idUsuario])
+  @@index([estado])
+  @@map("orden")
+}
+
+/// Copia congelada de lo comprado. `idVarianteRef` sin FK a propósito (ADR-05 de M08).
+model LineaOrden {
+  idLineaOrden    Int      @id @default(autoincrement()) @map("id_linea_orden")
+  idOrden         Int      @map("id_orden")
+  nombreProducto  String   @map("nombre_producto") @db.VarChar(150)
+  varianteCopia   String   @map("variante_copia") @db.VarChar(150)
+  precioAplicado  Decimal  @map("precio_aplicado") @db.Decimal(12, 2)
+  cantidad        Int      @default(1)
+  colorSolicitado String?  @map("color_solicitado") @db.VarChar(150)
+  precioInicial   Decimal? @map("precio_inicial") @db.Decimal(12, 2)
+  idVarianteRef   Int?     @map("id_variante_ref")
+  esEntonado      Boolean  @default(false) @map("es_entonado")
+  baseConsumida   String?  @map("base_consumida") @db.VarChar(150)
+  skuVendido      String?  @map("sku_vendido") @db.VarChar(100)
+
+  orden      Orden                 @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_lineaorden_orden")
+  descuentos LineaOrdenDescuento[]
+
+  @@index([idOrden])
+  @@map("linea_orden")
+}
+
+/// Desglose de descuentos de una línea; solo inserción (RF-ORD-02-02).
+model LineaOrdenDescuento {
+  idLineaOrdenDescuento Int      @id @default(autoincrement()) @map("id_linea_orden_descuento")
+  idLineaOrden          Int      @map("id_linea_orden")
+  ordenAplicacion       Int      @map("orden_aplicacion") @db.SmallInt
+  origen                String   @db.VarChar(150)
+  porcentaje            Decimal? @db.Decimal(5, 2)
+  importe               Decimal  @db.Decimal(12, 2)
+
+  linea LineaOrden @relation(fields: [idLineaOrden], references: [idLineaOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_lod_linea_orden")
+
+  @@unique([idLineaOrden, ordenAplicacion], map: "uq_lod_orden_aplicacion")
+  @@map("linea_orden_descuento")
+}
+
+/// Consecutivos corridos sin huecos por tipo de documento (`orden` → PC-AAAA-NNNNN).
+model Consecutivo {
+  idConsecutivo Int    @id @default(autoincrement()) @map("id_consecutivo")
+  nombre        String @unique @db.VarChar(30)
+  ultimoValor   BigInt @default(0) @map("ultimo_valor")
+
+  @@map("consecutivo")
+}
+
+/// Historia inmutable de transiciones; `idUsuarioAutor` null = transición automática del sistema.
+model HistorialEstadoOrden {
+  idHistorialEstadoOrden Int          @id @default(autoincrement()) @map("id_historial_estado_orden")
+  idOrden                Int          @map("id_orden")
+  estadoAnterior         EstadoOrden? @map("estado_anterior")
+  estadoNuevo            EstadoOrden  @map("estado_nuevo")
+  idUsuarioAutor         Int?         @map("id_usuario_autor")
+  motivo                 String?
+  referenciaExterna      String?      @map("referencia_externa") @db.VarChar(150)
+  fecha                  DateTime     @default(now()) @db.Timestamptz(6)
+
+  orden Orden    @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_historial_estado_orden")
+  autor Usuario? @relation(fields: [idUsuarioAutor], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_historial_estado_autor")
+
+  @@index([idOrden])
+  @@map("historial_estado_orden")
+}
+
+/// Notas internas del personal; solo inserción, nunca visibles al cliente (RF-ORD-10).
+model NotaOrden {
+  idNotaOrden    Int      @id @default(autoincrement()) @map("id_nota_orden")
+  idOrden        Int      @map("id_orden")
+  idUsuarioAutor Int      @map("id_usuario_autor")
+  texto          String
+  fecha          DateTime @default(now()) @db.Timestamptz(6)
+
+  orden Orden   @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_nota_orden_orden")
+  autor Usuario @relation(fields: [idUsuarioAutor], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_nota_orden_autor")
+
+  @@index([idOrden])
+  @@map("nota_orden")
+}
+
+/// Contactos con el cliente iniciados desde la orden; solo inserción (RF-ORD-09-02).
+model ContactoOrden {
+  idContactoOrden Int      @id @default(autoincrement()) @map("id_contacto_orden")
+  idOrden         Int      @map("id_orden")
+  idUsuarioAutor  Int      @map("id_usuario_autor")
+  medio           String   @db.VarChar(30)
+  detalle         String?
+  fecha           DateTime @default(now()) @db.Timestamptz(6)
+
+  orden Orden   @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_contacto_orden_orden")
+  autor Usuario @relation(fields: [idUsuarioAutor], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_contacto_orden_autor")
+
+  @@index([idOrden])
+  @@map("contacto_orden")
+}
+
+// =============================================================================
 // MÓDULO M16 — CONTENIDO INSTITUCIONAL Y CENTRO DE AYUDA (HU-CON-01 a HU-CON-04)
 // =============================================================================
 
@@ -1869,169 +2033,6 @@ model RegistroAuditoria {
   @@index([entidad, idEntidad], map: "idx_auditoria_entidad")
   @@index([idUsuario], map: "idx_auditoria_usuario")
   @@map("registro_auditoria")
-}
-
-// =============================================================================
-// MÓDULO M08 — ORDEN DE VENTA (histórico inmutable)
-// =============================================================================
-
-/// Ciclo de vida de la orden (M08 · HU-ORD-03). La base nueva no incluye el valor legado `pendiente`.
-enum EstadoOrden {
-  orden_confirmada
-  revision_disponibilidad
-  en_preparacion
-  preparada
-  despachado
-  entregado
-  cancelado
-  devuelto
-
-  @@map("enum_estado_orden")
-}
-
-/// Modo de entrega congelado en la orden (M08 · RF-ORD-03-06)
-enum ModoEntrega {
-  domicilio
-  recogida
-
-  @@map("enum_modo_entrega")
-}
-
-/// Procedencia de la orden (M08 · RF-ORD-01-03)
-enum OrigenOrden {
-  carrito
-  cotizacion
-
-  @@map("enum_origen_orden")
-}
-
-/// Cabecera de la orden. `idCotizacion` no lleva relación Prisma: M21 aún no tiene modelo (la FK existe en el DDL).
-model Orden {
-  idOrden            Int          @id @default(autoincrement()) @map("id_orden")
-  codigoVisible      String       @unique @map("codigo_visible") @db.VarChar(50)
-  idUsuario          Int          @map("id_usuario")
-  origen             OrigenOrden  @default(carrito)
-  idCotizacion       Int?         @map("id_cotizacion")
-  carritoOCotizacion String?      @map("carrito_o_cotizacion") @db.VarChar(50)
-  estado             EstadoOrden  @default(orden_confirmada)
-  transaccionPagoId  String?      @unique @map("transaccion_pago_id") @db.VarChar(100)
-  codigoSolicitud    String?      @unique(map: "uq_orden_codigo_solicitud") @map("codigo_solicitud") @db.VarChar(20)
-  modoEntrega        ModoEntrega? @map("modo_entrega")
-  costoEntrega       Decimal      @default(0) @map("costo_entrega") @db.Decimal(12, 2)
-  direccion          String?
-  subTotal           Decimal      @default(0) @map("sub_total") @db.Decimal(12, 2)
-  descuento          Decimal      @default(0) @db.Decimal(12, 2)
-  total              Decimal      @default(0) @db.Decimal(12, 2)
-  baseSinImpuesto    Decimal?     @map("base_sin_impuesto") @db.Decimal(12, 2)
-  importeIva         Decimal?     @map("importe_iva") @db.Decimal(12, 2)
-  tasaIva            Decimal?     @map("tasa_iva") @db.Decimal(5, 2)
-  observaciones      String?
-  fecha              DateTime     @default(dbgenerated("CURRENT_DATE")) @db.Date
-
-  usuario   Usuario                @relation(fields: [idUsuario], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_orden_usuario")
-  lineas    LineaOrden[]
-  historial HistorialEstadoOrden[]
-  notas     NotaOrden[]
-  contactos ContactoOrden[]
-
-  @@index([idUsuario])
-  @@index([estado])
-  @@map("orden")
-}
-
-/// Copia congelada de lo comprado. `idVarianteRef` sin FK a propósito (ADR-05 de M08).
-model LineaOrden {
-  idLineaOrden    Int      @id @default(autoincrement()) @map("id_linea_orden")
-  idOrden         Int      @map("id_orden")
-  nombreProducto  String   @map("nombre_producto") @db.VarChar(150)
-  varianteCopia   String   @map("variante_copia") @db.VarChar(150)
-  precioAplicado  Decimal  @map("precio_aplicado") @db.Decimal(12, 2)
-  cantidad        Int      @default(1)
-  colorSolicitado String?  @map("color_solicitado") @db.VarChar(150)
-  precioInicial   Decimal? @map("precio_inicial") @db.Decimal(12, 2)
-  idVarianteRef   Int?     @map("id_variante_ref")
-  esEntonado      Boolean  @default(false) @map("es_entonado")
-  baseConsumida   String?  @map("base_consumida") @db.VarChar(150)
-  skuVendido      String?  @map("sku_vendido") @db.VarChar(100)
-
-  orden      Orden                 @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_lineaorden_orden")
-  descuentos LineaOrdenDescuento[]
-
-  @@index([idOrden])
-  @@map("linea_orden")
-}
-
-/// Desglose de descuentos de una línea; solo inserción (RF-ORD-02-02).
-model LineaOrdenDescuento {
-  idLineaOrdenDescuento Int      @id @default(autoincrement()) @map("id_linea_orden_descuento")
-  idLineaOrden          Int      @map("id_linea_orden")
-  ordenAplicacion       Int      @map("orden_aplicacion") @db.SmallInt
-  origen                String   @db.VarChar(150)
-  porcentaje            Decimal? @db.Decimal(5, 2)
-  importe               Decimal  @db.Decimal(12, 2)
-
-  linea LineaOrden @relation(fields: [idLineaOrden], references: [idLineaOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_lod_linea_orden")
-
-  @@unique([idLineaOrden, ordenAplicacion], map: "uq_lod_orden_aplicacion")
-  @@map("linea_orden_descuento")
-}
-
-/// Consecutivos corridos sin huecos por tipo de documento (`orden` → PC-AAAA-NNNNN).
-model Consecutivo {
-  idConsecutivo Int    @id @default(autoincrement()) @map("id_consecutivo")
-  nombre        String @unique @db.VarChar(30)
-  ultimoValor   BigInt @default(0) @map("ultimo_valor")
-
-  @@map("consecutivo")
-}
-
-/// Historia inmutable de transiciones; `idUsuarioAutor` null = transición automática del sistema.
-model HistorialEstadoOrden {
-  idHistorialEstadoOrden Int          @id @default(autoincrement()) @map("id_historial_estado_orden")
-  idOrden                Int          @map("id_orden")
-  estadoAnterior         EstadoOrden? @map("estado_anterior")
-  estadoNuevo            EstadoOrden  @map("estado_nuevo")
-  idUsuarioAutor         Int?         @map("id_usuario_autor")
-  motivo                 String?
-  referenciaExterna      String?      @map("referencia_externa") @db.VarChar(150)
-  fecha                  DateTime     @default(now()) @db.Timestamptz(6)
-
-  orden Orden    @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_historial_estado_orden")
-  autor Usuario? @relation(fields: [idUsuarioAutor], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_historial_estado_autor")
-
-  @@index([idOrden])
-  @@map("historial_estado_orden")
-}
-
-/// Notas internas del personal; solo inserción, nunca visibles al cliente (RF-ORD-10).
-model NotaOrden {
-  idNotaOrden    Int      @id @default(autoincrement()) @map("id_nota_orden")
-  idOrden        Int      @map("id_orden")
-  idUsuarioAutor Int      @map("id_usuario_autor")
-  texto          String
-  fecha          DateTime @default(now()) @db.Timestamptz(6)
-
-  orden Orden   @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_nota_orden_orden")
-  autor Usuario @relation(fields: [idUsuarioAutor], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_nota_orden_autor")
-
-  @@index([idOrden])
-  @@map("nota_orden")
-}
-
-/// Contactos con el cliente iniciados desde la orden; solo inserción (RF-ORD-09-02).
-model ContactoOrden {
-  idContactoOrden Int      @id @default(autoincrement()) @map("id_contacto_orden")
-  idOrden         Int      @map("id_orden")
-  idUsuarioAutor  Int      @map("id_usuario_autor")
-  medio           String   @db.VarChar(30)
-  detalle         String?
-  fecha           DateTime @default(now()) @db.Timestamptz(6)
-
-  orden Orden   @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_contacto_orden_orden")
-  autor Usuario @relation(fields: [idUsuarioAutor], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_contacto_orden_autor")
-
-  @@index([idOrden])
-  @@map("contacto_orden")
 }
 
 // =============================================================================

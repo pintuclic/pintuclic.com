@@ -73,6 +73,18 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     exact: false,
   },
   {
+    label: 'Pedidos',
+    href: '/admin/pedidos',
+    icon: <ClipboardList className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Pagos',
+    href: '/admin/pagos',
+    icon: <Wallet className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
     label: 'Inventario',
     href: '/admin/inventario',
     icon: <Boxes className="w-5 h-5 shrink-0" aria-hidden="true" />,
@@ -88,18 +100,6 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Patrocinios',
     href: '/admin/patrocinios',
     icon: <Megaphone className="w-5 h-5 shrink-0" aria-hidden="true" />,
-    exact: false,
-  },
-  {
-    label: 'Pedidos',
-    href: '/admin/pedidos',
-    icon: <ClipboardList className="w-5 h-5 shrink-0" aria-hidden="true" />,
-    exact: false,
-  },
-  {
-    label: 'Pagos',
-    href: '/admin/pagos',
-    icon: <Wallet className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {

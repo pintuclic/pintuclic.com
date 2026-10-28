@@ -27,7 +27,7 @@ const SECCIONES: ReadonlyArray<SectionNavItem<ItemMenu>> = [
   { id: 'datos', label: 'Mis datos', icon: UserRound },
   { id: 'solicitudes', label: 'Mis solicitudes', icon: MessageSquare },
   { id: 'seguridad', label: 'Seguridad', icon: KeyRound },
-  { id: 'direcciones', label: 'Dirección', icon: MapPin },
+  { id: 'direcciones', label: 'Direcciones', icon: MapPin },
   { id: 'pedidos', label: 'Mis pedidos', icon: Package },
   { id: 'empresa', label: 'Cuenta empresa', icon: Building2 },
   { id: 'cuenta', label: 'Sesión y cuenta', icon: LogOut },

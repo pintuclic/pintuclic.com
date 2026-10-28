@@ -81,7 +81,8 @@ INSERT INTO asignacion_permiso (id_rol, id_permiso) VALUES
     (1, 11), (1, 12), (1, 13), (1, 14), (1, 15),
     (1, 16), (1, 17), (1, 18), (1, 19), (1, 20),
     (1, 21), (1, 22), (1, 23), (1, 24), (1, 25), (1, 26),
-    (1, 27), (1, 28), (1, 29), (1, 30)
+    (1, 27), (1, 28), (1, 29), (1, 30),
+    (3, 4), (3, 10)
 ON CONFLICT (id_rol, id_permiso) DO NOTHING;
 
 -- El rol de cliente empresa (3) NO tiene permisos del personal. El seed le daba `ordenes.ver` (4) y
