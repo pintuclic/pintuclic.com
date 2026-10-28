@@ -6,6 +6,22 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-28
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 💬 **El asistente pasa a ser una burbuja flotante.** Deja de vivir dentro de una pestaña de `/asesoria` y acompaña a la persona por toda la tienda. Entra como la rama `feature/m03-asistente-flotante`.
+
+### Módulo M03 — Asistente (HU-ASE-05)
+- **El botón redondo queda fijo en pantalla (H9).** El panel se monta en el armazón público, no en una página, así que sigue ahí al cambiar de vista y **la conversación sobrevive a la navegación**: se puede preguntar por un producto, ir a verlo y seguir la charla. Recargar sí la borra, que es lo que manda H1 —no se guarda en ninguna parte.
+- **Pantalla según el mockup `VISTAS.pdf` (pág. 11):** cabecera azul con el estado «En línea», burbujas grises para el asistente y azules para la persona, hora en cada una, atajos en pastilla, y la barra de escribir abajo.
+- **No es un diálogo modal a propósito.** No atrapa el foco ni bloquea el fondo: la gracia es poder mirar un producto mientras se pregunta por él. Escape lo cierra y el foco vuelve al botón.
+- **Dos atajos del mockup no mandan nada al chat (H10).** «Consultar mi pedido» y «Ver promociones» piden justo lo que H4 le prohíbe al modelo —datos de órdenes, precios y descuentos—, así que **enlazan** a `/perfil/pedidos` y a `/ofertas`, que es donde ese dato sí está. Ofrecer un atajo que la IA tendría que rechazar es enseñar un botón roto. Los otros tres sí escriben en el chat.
+- **Se quita el segundo chat.** La pestaña «Preguntar al asistente» de `/asesoria` ya no dibuja su propia conversación: abre la flotante. Dos implementaciones del mismo chat acaban separándose, y además la conversación se perdía al salir de la pestaña. `AsistenteView.tsx` desaparece.
+- **El botón lleva un aro blanco** porque el pie de página es del mismo azul marino y sin él el círculo se fundía con el fondo. Se vio probando en navegador, no lo reportó nadie.
+- **Adjuntar archivos no se implementa.** El clip del mockup no tiene respaldo en el contrato: no hay subida de archivos en M03.
+
+### Archivos compartidos
+- **`src/app/(public)/layout.tsx`**: monta `<AsistenteFlotante />` junto al panel del carrito. Una línea; es la única forma de que el botón sobreviva al cambio de vista.
+
 ## [No publicado] - 2026-10-27
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 📐 **La calculadora deja de pedir los metros cuadrados.** Ahora se eligen la superficie y sus medidas, y el área se calcula sola. Entra como la rama `feature/m03-calculadora-medidas`.
