@@ -14,8 +14,9 @@ bd/
 ├── sql/                           # Scripts DDL ejecutables en PostgreSQL
 │   ├── schema_pintuclic.sql       # Script DDL oficial vigente (PostgreSQL 15+ / 18, 49 tablas)
 │   ├── seed_pintuclic.sql         # Script de carga inicial de mocks idempotentes
-│   ├── datos_demo_catalogo.sql    # Datos de DEMOSTRACIÓN del catálogo (aditivo e idempotente; lo genera script/datos-demo)
-│   └── retirar_datos_demo.sql     # Deshace datos_demo_catalogo.sql
+│   └── demo/                      # Scripts opcionales de demostración (no se corren en initdb)
+│       ├── datos_demo_catalogo.sql# Datos de DEMOSTRACIÓN del catálogo (aditivo e idempotente; lo genera script/datos-demo)
+│       └── retirar_datos_demo.sql # Deshace datos_demo_catalogo.sql
 │
 ├── docs/                          # Documentación viva, manuales y walkthroughs
 │   ├── DOCUMENTACION_BASE_DATOS.md# Especificación activa, ER Mermaid, diccionarios y changelog
