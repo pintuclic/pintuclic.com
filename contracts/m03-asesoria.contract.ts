@@ -244,6 +244,14 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *      producto, la configuración del panel (Q1-Q2) y, si no hay ninguna, 2. Lo decide el
  *      servidor y no la pantalla para que haya un solo sitio donde cambiarlo. La pantalla
  *      lo MUESTRA junto al resultado («Para N manos»): el supuesto se ve, no se esconde.
+ *  K15 En la ficha de producto la calculadora va en un DIÁLOGO, detrás del botón «Calcula
+ *      cuánta pintura necesitas» que se coloca bajo las presentaciones (mockup pág. 10).
+ *      Lo monta M01 con un solo componente de M03 y sin condición alguna: **quien decide si
+ *      el producto tiene calculadora es K1, y K1 es de M03**. Si M01 reprodujera esa regla
+ *      para saber si pinta el botón habría dos copias que acabarían separándose. Cuando el
+ *      producto no cumple, no se dibuja nada: ni el botón, ni un aviso de error.
+ *      El diálogo abre con la presentación que la persona ya eligió en la ficha; si ese id
+ *      no es de este producto, abre con la primera.
  *  K10 Entradas: en la ficha se fija el producto y el usuario elige presentación y sentido.
  *      En la general, primero se elige el producto en un selector con buscador (AGENTS.md)
  *      sobre `GET /asesoria/calculadora/productos`, que solo lista productos con calculadora.

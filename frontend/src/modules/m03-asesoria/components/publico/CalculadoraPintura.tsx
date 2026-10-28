@@ -46,6 +46,7 @@ import {
   mensajeDeError,
   unidadesDe,
 } from '../../services/mensaje-error';
+import { presentacionDeArranque } from '../../services/presentaciones';
 import {
   SUPERFICIES,
   SUPERFICIE_POR_DEFECTO,
@@ -250,21 +251,6 @@ export function CalculadoraPintura({
 /* ───────────────────────────────────────────────────────────────────────────
  * CUÁNTO COMPRAR — tres columnas: superficie, medidas y resultado.
  * ─────────────────────────────────────────────────────────────────────────── */
-
-/**
- * Con qué presentación abrir: la que venga de fuera si el producto la tiene, y si no, la
- * primera. `idVarianteInicial` puede apuntar a una variante que este producto no ofrece
- * (una dirección vieja, por ejemplo), así que se comprueba antes de usarla.
- */
-function presentacionDeArranque(
-  datos: CalculadoraProducto,
-  idVarianteInicial: number | null,
-): string {
-  const pedida = datos.presentaciones.find((p) => p.idVariante === idVarianteInicial);
-  if (pedida !== undefined) return String(pedida.idVariante);
-  const primera = datos.presentaciones[0];
-  return primera === undefined ? '' : String(primera.idVariante);
-}
 
 interface PropsMedidas {
   datos: CalculadoraProducto;

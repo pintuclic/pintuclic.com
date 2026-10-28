@@ -11,7 +11,9 @@ import {
   unidadesCampoSchema,
 } from '../dtos/m03-asesoria.dto';
 import { formatearIntervalo, unidadesDe } from '../services/mensaje-error';
+import { presentacionDeArranque } from '../services/presentaciones';
 import { SUPERFICIES, superficiePorId } from '../services/superficies';
+import type { CalculadoraProducto } from '../interfaces/asesoria.interface';
 
 /** El primer mensaje de error, que es el que muestra el campo. */
 function mensaje(resultado: { success: boolean; error?: { issues: Array<{ message: string }> } }): string {
@@ -235,5 +237,41 @@ describe('Vocabulario de las superficies', () => {
     for (const s of SUPERFICIES) {
       expect(s.contador.startsWith('Cantidad de')).toBe(true);
     }
+  });
+});
+
+describe('Presentación con la que abre la calculadora', () => {
+  const producto = (ids: number[]): CalculadoraProducto => ({
+    idProducto: 1,
+    nombre: 'Viniltex Ultralavable',
+    rendimientoMin: 10,
+    rendimientoMax: 11.25,
+    manosAplicadas: 2,
+    presentaciones: ids.map((idVariante) => ({
+      idVariante,
+      presentacion: `${idVariante} galón`,
+      volumenGalones: 1,
+      rendimientoMin: 10,
+      rendimientoMax: 11.25,
+    })),
+    advertencia: 'La cantidad es aproximada.',
+  });
+
+  it('abre en la presentación que la ficha ya tenía elegida', () => {
+    expect(presentacionDeArranque(producto([7, 8, 9]), 8)).toBe('8');
+  });
+
+  it('sin presentación pedida abre en la primera', () => {
+    expect(presentacionDeArranque(producto([7, 8, 9]), null)).toBe('7');
+  });
+
+  it('una presentación que no es de este producto no se usa', () => {
+    // Pasa con una dirección vieja, o si la variante se desactivó entre la carga de la
+    // ficha y la de la calculadora. Abrir con un id ajeno daría un 404 al calcular.
+    expect(presentacionDeArranque(producto([7, 8, 9]), 999)).toBe('7');
+  });
+
+  it('un producto sin presentaciones no revienta', () => {
+    expect(presentacionDeArranque(producto([]), 8)).toBe('');
   });
 });
