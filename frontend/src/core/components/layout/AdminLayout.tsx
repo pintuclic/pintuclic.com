@@ -26,6 +26,7 @@ import {
   Store,
   UserCheck,
   Users,
+  Wallet,
   X,
 } from 'lucide-react';
 import { apiClient } from '../../api/apiClient';
@@ -92,6 +93,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Pedidos',
     href: '/admin/pedidos',
     icon: <ClipboardList className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Pagos',
+    href: '/admin/pagos',
+    icon: <Wallet className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
