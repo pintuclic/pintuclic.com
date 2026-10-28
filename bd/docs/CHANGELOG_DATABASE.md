@@ -10,6 +10,17 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.22] - 2026-10-27
+### Esquema 4.21 (91 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
+- **Alcance General:** pedido por el contrato `contracts/m11-postventa.contract.ts`. Cambio aditivo: tres tablas y cuatro ENUMs nuevos; no altera tablas existentes.
+  - **`solicitud_postventa`**: cabecera del trámite con código `DEV-AAAA-NNNNN`, orden asociada, cliente titular, tipo (`cancelacion`, `devolucion`, `garantia`), estado (`solicitada`, `en_revision`, `aprobada`, `rechazada`, `reembolsada`), motivo general, observaciones de resolución, motivo de rechazo tipificado, empleado que resuelve, total a reembolsar, método de reembolso, referencia/comprobante, datos bancarios (JSONB) y evidencia (JSONB).
+  - **`linea_solicitud_postventa`**: desglose por línea de orden de los productos devueltos con cantidad, precio unitario congelado y motivo específico (soporta devoluciones parciales y totales; excluye entonados para retracto).
+  - **`historial_estado_postventa`**: trazabilidad inmutable de cada transición de estado con autor, motivo y fecha.
+  - **ENUMs nuevos (4):** `enum_tipo_postventa`, `enum_estado_postventa`, `enum_metodo_reembolso` y `enum_motivo_rechazo_postventa`.
+  - **Prisma:** modelos `SolicitudPostventa`, `LineaSolicitudPostventa` e `HistorialEstadoPostventa` con sus relaciones en `Orden`, `LineaOrden` y `Usuario`.
+
+---
+
 ## [v3.21] - 2026-10-27
 ### Esquema 4.20 (88 Tablas) - M07: solicitudes de compra e intentos de pago
 - **Alcance General:** pedido por el contrato `contracts/m07-checkout.contract.ts` (P1). Cambio aditivo: tres tablas y dos ENUMs nuevos; no se toca nada de lo que existía. La tabla `pagos` (que exige una orden) no se usa: en M07 el pago ocurre antes de que exista la orden.

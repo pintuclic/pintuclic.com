@@ -19,6 +19,7 @@ import {
   Megaphone,
   Menu,
   Package,
+  RotateCcw,
   Settings,
   Shield,
   ShieldAlert,
@@ -82,6 +83,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Pagos',
     href: '/admin/pagos',
     icon: <Wallet className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Postventa',
+    href: '/admin/postventa',
+    icon: <RotateCcw className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {

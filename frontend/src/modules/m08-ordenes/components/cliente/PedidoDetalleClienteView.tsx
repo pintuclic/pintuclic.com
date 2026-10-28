@@ -11,6 +11,7 @@ import { EstadoBadge } from '../EstadoBadge';
 import { HistorialEstados } from '../HistorialEstados';
 import { LineasOrdenLista } from '../LineasOrdenLista';
 import { TotalesOrden } from '../TotalesOrden';
+import { BotonPostventaOrden } from '@/modules/m11-postventa/components/cliente/BotonPostventaOrden';
 
 /** HU-ORD-04 · Detalle de un pedido del cliente titular: qué compró, cuánto pagó y en qué estado está. */
 export function PedidoDetalleClienteView({ codigo }: { codigo: string }) {
@@ -54,6 +55,17 @@ export function PedidoDetalleClienteView({ codigo }: { codigo: string }) {
                     <time dateTime={orden.fecha}>{formatearFecha(orden.fecha)}</time>
                     {orden.modoEntrega ? ` · ${ETIQUETA_MODO_ENTREGA[orden.modoEntrega]}` : ''}
                   </p>
+                  <BotonPostventaOrden
+                    codigoOrden={orden.codigo}
+                    estadoOrden={orden.estado}
+                    lineas={orden.lineas.map((l) => ({
+                      nombreProducto: l.nombreProducto,
+                      varianteCopia: l.varianteCopia,
+                      cantidad: l.cantidad,
+                      precioAplicado: l.precioAplicado,
+                      esEntonado: Boolean(l.colorSolicitado),
+                    }))}
+                  />
                 </div>
                 <EstadoBadge estado={orden.estado} />
               </header>
