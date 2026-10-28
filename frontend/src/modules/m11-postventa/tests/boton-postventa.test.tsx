@@ -7,8 +7,15 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+vi.mock('../../services/postventa-api', () => ({
+  listarMisSolicitudes: vi.fn().mockResolvedValue({
+    items: [],
+    paginacion: { pagina: 1, limite: 20, total: 0, totalPaginas: 0 },
+  }),
+}));
+
 describe('BotonPostventaOrden', () => {
-  it('renderiza el boton de cancelacion para orden_confirmada', () => {
+  it('renderiza el boton de cancelacion para orden_confirmada sin solicitud previa', () => {
     const html = renderToStaticMarkup(
       <BotonPostventaOrden
         codigoOrden="PC-2026-00005"
