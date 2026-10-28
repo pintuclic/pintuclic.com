@@ -303,6 +303,17 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *  H8  Límite por origen: CHAT_MENSAJES_POR_MINUTO mensajes y TURNOS_CUESTIONARIO_POR_MINUTO
  *      turnos de cuestionario asistido por minuto, contados solo en memoria y sin guardar la
  *      IP (mismo criterio que M14 · M6). Al pasarlo, 429 LIMITE_MENSAJES_EXCEDIDO.
+ *  H9  Presentación (mockup VISTAS.pdf, pág. 11): el asistente es una burbuja flotante
+ *      montada en el armazón público, no una página. El botón redondo queda fijo en pantalla
+ *      al cambiar de vista y la conversación sobrevive a la navegación; recargar la borra,
+ *      como manda H1. No es un diálogo modal: no atrapa el foco ni bloquea el fondo, porque
+ *      la gracia es poder mirar un producto mientras se pregunta por él. Escape lo cierra y
+ *      el foco vuelve al botón. La sección «Preguntar al asistente» de /asesoria no dibuja
+ *      un segundo chat: abre este.
+ *  H10 Atajos de apertura: los que preguntan escriben su texto en el chat; los que piden un
+ *      dato que H4 le prohíbe al modelo —el pedido (órdenes) y las promociones (precios y
+ *      descuentos)— NO van al chat, navegan a la pantalla que sí tiene ese dato. Un atajo que
+ *      la IA tendría que rechazar no se ofrece como si fuera a funcionar.
  *
  * ── Reglas de resiliencia (HU-ASE-06) ───────────────────────────────────────
  *  I1  Cada llamada a Gemini tiene el tiempo máximo `iaTiempoEsperaMs` y se reintenta hasta

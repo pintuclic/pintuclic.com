@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { Container, SegmentedTabs } from '@/core/components';
-import { AsistenteView } from './AsistenteView';
 import { CalculadoraGeneralView } from './CalculadoraGeneralView';
 import { CuestionarioGuiadoView } from './CuestionarioGuiadoView';
+import { InvitacionAsistente } from './InvitacionAsistente';
 
 type Seccion = 'asistida' | 'calculadora' | 'asistente';
 
@@ -51,7 +51,7 @@ export function AsesoriaView() {
         <div id="panel-asesoria" role="tabpanel">
           {seccion === 'asistida' && <CuestionarioGuiadoView />}
           {seccion === 'calculadora' && <CalculadoraGeneralView />}
-          {seccion === 'asistente' && <AsistenteView />}
+          {seccion === 'asistente' && <InvitacionAsistente />}
         </div>
       </div>
     </Container>

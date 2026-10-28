@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { EncabezadoFijo, Footer, Header, Topbar } from '@/core/components';
+import { AsistenteFlotante } from '@/modules/m03-asesoria/components/publico/AsistenteFlotante';
 import { SesionBootstrap } from '@/modules/m04-cuentas/components/sesion/SesionBootstrap';
 import { CarritoLateral } from '@/modules/m05-carrito/components/CarritoLateral';
 import { footer, header, topbarItems } from './_data/shell.content';
@@ -29,6 +30,12 @@ export default function PublicLayout({ children, modal }: { children: ReactNode;
       <Footer {...footer} />
       {modal}
       <CarritoLateral />
+      {/*
+        M03 · HU-ASE-05: el asistente vive aquí, no en una página, para que el botón redondo
+        siga en pantalla al navegar y la conversación no se pierda entre vistas. Es M03 quien
+        decide si se dibuja: sin servicio de IA, no pinta nada.
+      */}
+      <AsistenteFlotante />
       <SesionBootstrap />
     </>
   );
