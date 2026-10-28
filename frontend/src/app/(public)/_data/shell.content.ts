@@ -13,16 +13,7 @@ import type {
   FooterProps,
   HeaderProps,
   MegaMenuTab,
-  TopbarItem,
 } from '@/core/components';
-
-export const topbarItems: ReadonlyArray<TopbarItem> = [
-  { icon: 'envio', label: 'Envíos a toda Colombia', href: '/politicas-de-envio' },
-  { icon: 'calidad', label: 'Productos de calidad', href: '/productos' },
-  { icon: 'asesoria', label: 'Asesoría experta', href: '/centro-de-ayuda' },
-  { icon: 'ayuda', label: '¿Necesitas ayuda?', href: '/centro-de-ayuda' },
-  { icon: 'telefono', label: '322 123 4567', href: 'tel:+573221234567' },
-];
 
 export const megaMenuTabs: ReadonlyArray<MegaMenuTab> = [
   {

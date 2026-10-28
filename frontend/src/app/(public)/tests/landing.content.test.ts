@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { categoryTiles, featuredProducts, heroSlides, trustItems } from '../_data/home.content';
-import { footer, header, topbarItems } from '../_data/shell.content';
+import { footer, header } from '../_data/shell.content';
 
 /**
  * Integridad del contenido estático de la landing (FP-01). Mientras los datos no
@@ -63,11 +63,6 @@ describe('Landing · todas las imágenes referenciadas existen en public/', () =
 });
 
 describe('Landing · cabecera y pie (UI Spec §3.1)', () => {
-  it('el teléfono de la franja superior es un enlace tel:', () => {
-    const telefono = topbarItems.find((item) => item.icon === 'telefono');
-    expect(telefono?.href).toMatch(/^tel:\+57\d{10}$/);
-  });
-
   it('el carrito de la cabecera lleva a /carrito (M05)', () => {
     expect(header.cart.href).toBe('/carrito');
   });

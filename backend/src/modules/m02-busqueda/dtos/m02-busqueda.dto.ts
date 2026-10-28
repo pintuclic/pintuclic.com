@@ -114,6 +114,13 @@ const listaIdsSchema = z.preprocess((valor) => {
   return lista.flatMap((v) => (typeof v === 'string' ? v.split(',') : [v])).filter((v) => v !== '');
 }, z.array(z.coerce.number().int().positive()).max(VALORES_MAXIMOS_POR_FILTRO).optional());
 
+/** Los productos pedidos por identificador (F11): hasta una página completa. */
+const listaIdsProductoSchema = z.preprocess((valor) => {
+  if (valor === undefined || valor === '') return undefined;
+  const lista = Array.isArray(valor) ? valor : [valor];
+  return lista.flatMap((v) => (typeof v === 'string' ? v.split(',') : [v])).filter((v) => v !== '');
+}, z.array(z.coerce.number().int().positive()).max(LIMITE_MAXIMO).optional());
+
 const precioSchema = z.coerce.number().min(0).max(PRECIO_MAXIMO);
 
 const booleanoQuerySchema = z.enum(['true', 'false']).transform((v) => v === 'true');
@@ -141,6 +148,8 @@ export const filtrosBusquedaBaseSchema = z.object({
   enOferta: booleanoQuerySchema.optional(),
   /** Solo productos con unidades vendidas en la ventana de «más vendidos» (F10). */
   conVentas: booleanoQuerySchema.optional(),
+  /** Solo estos productos (F11): la lista de favoritos. Se combina con el resto de filtros y del orden. */
+  ids: listaIdsProductoSchema,
 });
 export type FiltrosBusquedaBase = z.infer<typeof filtrosBusquedaBaseSchema>;
 

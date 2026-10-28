@@ -124,6 +124,16 @@ describe.skipIf(URL_BD === undefined)('M02 · más vendidos (HTTP + PostgreSQL)'
     }
   });
 
+  it('F11: ids deja solo esos productos y respeta el resto de filtros; uno que no existe no devuelve nada', async () => {
+    expect(await nombres(`ids=${p.b},${p.d}`)).toEqual(['B', 'D']);
+    expect(await nombres(`ids=${p.b},${p.d}&conVentas=true`)).toEqual(['B']);
+    expect(await nombres('ids=999999999')).toEqual([]);
+  });
+
+  it('F11: ids rechaza valores que no son enteros positivos', async () => {
+    expect((await servidor.publica('/productos?ids=abc')).status).toBe(400);
+  });
+
   it('rechaza un orden que no existe', async () => {
     const r = await servidor.publica('/productos?ordenar=popular');
     expect(r.status).toBe(400);

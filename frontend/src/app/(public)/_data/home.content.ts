@@ -141,6 +141,8 @@ export interface CategoryTileContent {
   subtitle: string;
   href: string;
   imageSrc: string;
+  /** Punto de enfoque de la imagen subida por el personal; sin él, `imageSrc` es la ilustración del sitio. */
+  foco?: { x: number; y: number };
 }
 
 export const categoryTiles: ReadonlyArray<CategoryTileContent> = [

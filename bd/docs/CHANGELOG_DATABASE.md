@@ -10,6 +10,15 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.23] - 2026-10-28
+### Esquema 4.22 (90 Tablas) - FP-01: imagen editable de las tarjetas de categorías del inicio
+- **Alcance General:** cambio aditivo pedido por la remasterización del inicio. No se toca ni se borra nada de lo que existía.
+  - **`imagen_categoria_inicio`**: una fila por categoría (`id_categoria` PK y FK con borrado en cascada) con la imagen (`contenido` BYTEA, `mime_type` jpeg/png/webp) y su punto de enfoque `foco_x/y` (SMALLINT 0 a 100, 50 = centro). Sin fila, la tarjeta del inicio usa su ilustración de respaldo. Sin datos sembrados.
+  - **Prisma:** modelo `ImagenCategoriaInicio` y su relación con `Categoria` y `Usuario`.
+  - **Bases existentes en 4.21:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente).
+
+---
+
 ## [v3.22] - 2026-10-28
 ### Esquema 4.21 (89 Tablas) - M14: punto de enfoque de las imágenes de anuncios · M16: contacto del sitio
 - **Alcance General:** cambio aditivo pedido por la remasterización del inicio. No se toca ni se borra nada de lo que existía.

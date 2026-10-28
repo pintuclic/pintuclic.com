@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { Container, ProductCard, ScrollRow, SeccionOnda } from '@/core/components';
+import { CategoryCard, Container, ProductCard, ScrollRow, SeccionOnda } from '@/core/components';
 import { TrustStrip } from '../_components/TrustStrip';
 
 describe('secciones del inicio', () => {
@@ -38,5 +38,19 @@ describe('secciones del inicio', () => {
     expect(html).toContain('aria-label="Productos destacados"');
     expect(html).toContain('overflow-x-auto');
     expect(html).not.toContain('flex-wrap');
+  });
+
+  it('ProductCard: estrella de favoritos para un producto del catálogo, sin ella si el id no es numérico', () => {
+    const conEstrella = renderToStaticMarkup(<ProductCard id="7" name="Viniltex" price={1000} />);
+    expect(conEstrella).toContain('aria-pressed="false"');
+    expect(conEstrella).toContain('Guardar Viniltex en favoritos');
+    expect(renderToStaticMarkup(<ProductCard id="abc" name="Viniltex" price={1000} />)).not.toContain('favoritos');
+    expect(renderToStaticMarkup(<ProductCard id="7" name="Viniltex" price={1000} showFavorite={false} />)).not.toContain('favoritos');
+  });
+
+  it('CategoryCard: con un punto de enfoque pinta la imagen subida recortada alrededor de él', () => {
+    const html = renderToStaticMarkup(<CategoryCard title="Pinturas" href="/productos?categoria=1" imageSrc="/api/v1/landing/categorias/1/imagen?v=1" imageFocus={{ x: 20, y: 80 }} />);
+    expect(html).toContain('object-position:20% 80%');
+    expect(html).toContain('/api/v1/landing/categorias/1/imagen?v=1');
   });
 });

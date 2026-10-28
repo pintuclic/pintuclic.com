@@ -18,6 +18,8 @@ export interface FiltrosBusqueda {
   enOferta: boolean;
   /** Solo productos con ventas recientes (inicio: «Los más vendidos»); no viaja en la dirección de la página. */
   conVentas?: boolean;
+  /** Solo estos productos (la lista de favoritos); no viaja en la dirección de la página. */
+  ids?: number[];
   ordenar: OrdenResultados;
   pagina: number;
   limite: number;

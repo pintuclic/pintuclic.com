@@ -419,6 +419,7 @@ export class BusquedaRepository implements BusquedaRepositoryPort {
   }
 
   private cumpleFiltrosBase(p: ProductoCrudo, f: OpcionesFiltroRequest, omitirGrupo?: string): boolean {
+    if (omitirGrupo !== 'ids' && f.ids && f.ids.length > 0 && !f.ids.includes(p.idProducto)) return false;
     if (omitirGrupo !== 'idCategoria' && f.idCategoria && f.idCategoria.length > 0) {
       if (!f.idCategoria.includes(p.idCategoria)) return false;
     }

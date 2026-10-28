@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
-import { EncabezadoFijo, Header, Topbar } from '@/core/components';
+import { EncabezadoFijo, Header } from '@/core/components';
 import { PieDePagina } from '@/modules/m16-contenido/components/publico/PieDePagina';
 import { AsistenteFlotante } from '@/modules/m03-asesoria/components/publico/AsistenteFlotante';
 import { SesionBootstrap } from '@/modules/m04-cuentas/components/sesion/SesionBootstrap';
 import { CarritoLateral } from '@/modules/m05-carrito/components/CarritoLateral';
-import { footer, header, topbarItems } from './_data/shell.content';
+import { BarraSuperior } from './_components/BarraSuperior';
+import { FavoritosBootstrap } from './_components/FavoritosBootstrap';
+import { footer, header } from './_data/shell.content';
 
 /**
  * Estructura común de las páginas públicas: cabecera fija (franja informativa que se esconde al bajar y vuelve al subir),
@@ -22,7 +24,7 @@ export default function PublicLayout({ children, modal }: { children: ReactNode;
       >
         Saltar al contenido
       </a>
-      <EncabezadoFijo franja={<Topbar items={topbarItems} />}>
+      <EncabezadoFijo franja={<BarraSuperior />}>
         <Header {...header} />
       </EncabezadoFijo>
       <main id="contenido" tabIndex={-1} className="focus:outline-none">
@@ -38,6 +40,7 @@ export default function PublicLayout({ children, modal }: { children: ReactNode;
       */}
       <AsistenteFlotante />
       <SesionBootstrap />
+      <FavoritosBootstrap />
     </>
   );
 }

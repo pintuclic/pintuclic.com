@@ -266,3 +266,75 @@ export const errorLandingEnvelopeSchema = z.object({
 });
 
 export type ErrorLandingEnvelope = z.infer<typeof errorLandingEnvelopeSchema>;
+
+// ============================================================================
+// 5. IMÁGENES DE LAS TARJETAS DE CATEGORÍAS DEL INICIO
+// ============================================================================
+// «Explora nuestras categorías» (inicio) muestra una tarjeta por categoría del catálogo (M01). Su imagen la edita el personal.
+//
+//  C1  Una imagen por categoría, con su punto de enfoque (0 a 100, 50 = centro). Sin imagen, la tarjeta usa su ilustración
+//      de respaldo: nunca queda un hueco.
+//  C2  `PUT /admin/landing/categorias/:idCategoria/imagen` guarda la imagen (PNG, JPG o WEBP, hasta 5 MB, validada por su
+//      firma real y no por la que dice el navegador) y/o el punto de enfoque. Sin `imagenBase64` solo cambia el enfoque y la
+//      categoría debe tener ya una imagen. No se exige un tamaño ni una proporción.
+//  C3  `DELETE /admin/landing/categorias/:idCategoria/imagen` la quita y la tarjeta vuelve a su ilustración. Idempotente.
+//  C4  `GET /admin/landing/categorias` lista TODAS las categorías (con o sin imagen) para el panel.
+//  C5  Público: `GET /landing/categorias` lista solo las categorías que tienen imagen, con su enfoque y una `version` (la fecha
+//      de la última edición) para que el navegador no reutilice una imagen vieja; `GET /landing/categorias/:idCategoria/imagen`
+//      entrega la imagen. Una categoría sin imagen responde 404 genérico.
+//  C6  Permisos: los mismos de los banners (`configuracion.ver` para consultar, `configuracion.editar` para guardar o quitar).
+
+export const guardarImagenCategoriaInicioRequestSchema = z
+  .object({
+    imagenBase64: z.string().min(1, 'La imagen no puede estar vacía').optional(),
+    imagenMimeType: tipoMimeBannerInicioSchema.optional(),
+    focoX: focoBannerInicioSchema.optional(),
+    focoY: focoBannerInicioSchema.optional(),
+  })
+  .refine((v) => (v.imagenBase64 === undefined) === (v.imagenMimeType === undefined), {
+    message: 'La imagen y su tipo se envían juntos',
+    path: ['imagenMimeType'],
+  });
+
+export type GuardarImagenCategoriaInicioRequest = z.infer<
+  typeof guardarImagenCategoriaInicioRequestSchema
+>;
+
+export const categoriaInicioPublicaItemSchema = z.object({
+  idCategoria: z.number().int().positive(),
+  focoX: focoBannerInicioSchema,
+  focoY: focoBannerInicioSchema,
+  version: z.string(),
+});
+
+export type CategoriaInicioPublicaItem = z.infer<
+  typeof categoriaInicioPublicaItemSchema
+>;
+
+export const listarCategoriasInicioPublicasResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: z.array(categoriaInicioPublicaItemSchema),
+});
+
+export const categoriaInicioAdminEntitySchema = z.object({
+  idCategoria: z.number().int().positive(),
+  nombre: z.string(),
+  tieneImagen: z.boolean(),
+  focoX: focoBannerInicioSchema,
+  focoY: focoBannerInicioSchema,
+  fechaActualizacion: z.string().nullable(),
+});
+
+export type CategoriaInicioAdminEntity = z.infer<
+  typeof categoriaInicioAdminEntitySchema
+>;
+
+export const categoriaInicioAdminResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: categoriaInicioAdminEntitySchema,
+});
+
+export const listarCategoriasInicioAdminResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: z.array(categoriaInicioAdminEntitySchema),
+});

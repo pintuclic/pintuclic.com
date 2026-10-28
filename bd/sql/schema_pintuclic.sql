@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.21 (v4.20 + M14: punto de enfoque de las imágenes de anuncios · M16: contacto del sitio)
+-- VERSIÓN: 4.22 (v4.21 + FP-01: imagen editable de las tarjetas de categorías del inicio)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 89
@@ -2112,6 +2112,27 @@ CREATE TABLE IF NOT EXISTS contacto_institucional (
 
 COMMENT ON TABLE contacto_institucional IS 'Datos de contacto y redes del sitio para el pie de página; una sola fila (id = 1), todo opcional (M16)';
 COMMENT ON COLUMN contacto_institucional.facebook IS 'Enlace https:// al perfil; nunca javascript: ni http:// (M16)';
+
+-- Tabla: imagen_categoria_inicio
+-- Imagen de la tarjeta de cada categoría en «Explora nuestras categorías» del inicio (FP-01). Una por categoría, con su punto de
+-- enfoque (0 a 100, 50 = centro). Sin fila, la tarjeta usa la ilustración de respaldo.
+CREATE TABLE IF NOT EXISTS imagen_categoria_inicio (
+    id_categoria INT PRIMARY KEY,
+    contenido BYTEA NOT NULL,
+    mime_type VARCHAR(20) NOT NULL,
+    foco_x SMALLINT NOT NULL DEFAULT 50,
+    foco_y SMALLINT NOT NULL DEFAULT 50,
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_imagen_categoria_inicio_categoria FOREIGN KEY (id_categoria)
+        REFERENCES categoria (id_categoria) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_imagen_categoria_inicio_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_imagen_categoria_inicio_mime CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+    CONSTRAINT ck_imagen_categoria_inicio_foco CHECK (foco_x BETWEEN 0 AND 100 AND foco_y BETWEEN 0 AND 100)
+);
+
+COMMENT ON TABLE imagen_categoria_inicio IS 'Imagen de la tarjeta de categoría del inicio, editable por el personal, con su punto de enfoque (FP-01)';
 COMMENT ON COLUMN pagina_institucional.slug IS 'Identificador URL único en formato kebab-case (ej. sobre-nosotros, terminos-y-condiciones)';
 COMMENT ON COLUMN pagina_institucional.estado IS 'Ciclo de vida editorial: borrador, publicado o archivado. Solo publicado es visible en rutas públicas';
 COMMENT ON COLUMN pagina_institucional.id_autor IS 'Último usuario administrador/empleado que creó o editó la página';
@@ -2921,5 +2942,5 @@ CREATE INDEX IF NOT EXISTS idx_lineacotizacion_cotizacion ON linea_cotizacion(id
 CREATE INDEX IF NOT EXISTS idx_lineacarrito_cotizacion ON linea_carrito(id_cotizacion) WHERE id_cotizacion IS NOT NULL;
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (89 TABLAS - v4.21)
+-- FIN DEL SCRIPT DDL (90 TABLAS - v4.22)
 -- ==============================================================================

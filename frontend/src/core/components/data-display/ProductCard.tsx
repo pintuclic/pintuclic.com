@@ -2,9 +2,11 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Ban, ShoppingCart } from 'lucide-react';
+import { Ban, ShoppingCart, Star } from 'lucide-react';
 import { Button } from '../buttons/Button';
 import { ButtonLink } from '../buttons/ButtonLink';
+import { IconButton } from '../buttons/IconButton';
+import { useFavoritosStore } from '../../store/favoritosStore';
 import { esColorMuyClaro, esHexadecimal } from '../../utils/color-muestra';
 import { formatCOP } from '../../utils/moneda';
 import { Badge } from './Badge';
@@ -36,6 +38,8 @@ export interface ProductCardProps {
    * ficha. Por defecto se muestra, como en el resto de pantallas.
    */
   showViewDetails?: boolean;
+  /** Con `false` no se pinta la estrella de favoritos (solo aplica si `id` es el identificador numérico del producto). */
+  showFavorite?: boolean;
   className?: string;
 }
 
@@ -56,8 +60,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   swatchColor,
   swatchLabel,
   showViewDetails = true,
+  showFavorite = true,
   className = '',
 }) => {
+  const idProducto = Number(id);
+  const conFavorito = showFavorite && Number.isInteger(idProducto) && idProducto > 0;
+  const esFavorito = useFavoritosStore((estado) => conFavorito && estado.ids.includes(idProducto));
+  const alternarFavorito = useFavoritosStore((estado) => estado.alternar);
+
   // UI Spec §4.1.1: "$ 98.900 COP".
   const formatCurrency = (amount: number) => `${formatCOP(amount)} COP`;
   const muestra = swatchColor !== undefined && esHexadecimal(swatchColor) ? swatchColor : null;
@@ -118,6 +128,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             lector de pantalla usan el enlace del nombre, por eso este no recibe foco ni se anuncia. */}
         {href && !showViewDetails && (
           <Link href={href} tabIndex={-1} aria-hidden="true" className="absolute inset-0 z-[15]" />
+        )}
+
+        {/* Estrella de favoritos: guarda el producto en la lista del encabezado. Va sobre el enlace de la imagen. */}
+        {conFavorito && (
+          <IconButton
+            size="sm"
+            variant="light"
+            aria-pressed={esFavorito}
+            aria-label={esFavorito ? `Quitar ${name} de favoritos` : `Guardar ${name} en favoritos`}
+            onClick={() => alternarFavorito(idProducto)}
+            className="absolute right-2.5 top-2.5 z-30 max-sm:h-11 max-sm:w-11"
+          >
+            <Star
+              className={`h-5 w-5 ${esFavorito ? 'fill-highlight text-highlight' : 'text-neutral-medium'}`}
+              aria-hidden="true"
+            />
+          </IconButton>
         )}
 
         {/* Badges superpuestos en esquina superior izquierda */}
