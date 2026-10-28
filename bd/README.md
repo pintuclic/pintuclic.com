@@ -13,12 +13,15 @@ bd/
 │
 ├── sql/                           # Scripts DDL ejecutables en PostgreSQL
 │   ├── schema_pintuclic.sql       # Script DDL oficial vigente (PostgreSQL 15+ / 18, 49 tablas)
-│   └── seed_pintuclic.sql         # Script de carga inicial de mocks idempotentes
+│   ├── seed_pintuclic.sql         # Script de carga inicial de mocks idempotentes
+│   ├── datos_demo_catalogo.sql    # Datos de DEMOSTRACIÓN del catálogo (aditivo e idempotente; lo genera script/datos-demo)
+│   └── retirar_datos_demo.sql     # Deshace datos_demo_catalogo.sql
 │
 ├── docs/                          # Documentación viva, manuales y walkthroughs
 │   ├── DOCUMENTACION_BASE_DATOS.md# Especificación activa, ER Mermaid, diccionarios y changelog
 │   ├── WALKTHROUGH_DATABASE.md    # Registro cronológico detallado de cada migración y cambio
-│   └── GUIA_REFACTORIZACION_BD.md # Guía, protocolo y plantilla oficial para IAs y desarrolladores
+│   ├── GUIA_REFACTORIZACION_BD.md # Guía, protocolo y plantilla oficial para IAs y desarrolladores
+│   └── GUIA_DATOS_DEMO.md         # Cómo cargar (y retirar) los datos de demostración en un servidor
 │
 └── assets/                        # Recursos visuales y diagramas fuente
     ├── ER Pintuclic-Final 1.2.drawio.png # Imagen de referencia del diagrama Entidad-Relación
