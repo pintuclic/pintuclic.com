@@ -18,7 +18,13 @@ export function AsesoriaView() {
 
   return (
     <Container>
-      <div className="mx-auto max-w-3xl space-y-6">
+      {/*
+        La calculadora reparte superficie, medidas y resultado en tres columnas y necesita
+        más ancho; el cuestionario y el chat se leen mejor en una columna estrecha.
+      */}
+      <div
+        className={`mx-auto space-y-6 ${seccion === 'calculadora' ? 'max-w-5xl' : 'max-w-3xl'}`}
+      >
         <header className="space-y-2">
           <h1 className="font-title text-2xl font-semibold text-neutral-dark sm:text-3xl">
             Te ayudamos a elegir

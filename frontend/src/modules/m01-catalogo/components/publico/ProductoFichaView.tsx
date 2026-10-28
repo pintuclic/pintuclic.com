@@ -18,6 +18,7 @@ import {
 import { Alert, Badge, Container, Skeleton } from '@/core/components';
 import { BotonContactoDirecto } from '@/modules/m15-atencion/components/publico/BotonContactoDirecto';
 import { EspacioPublicitario } from '@/modules/m14-patrocinios/components/EspacioPublicitario';
+import { CalculadoraDeFicha } from '@/modules/m03-asesoria/components/publico/CalculadoraDeFicha';
 import type { ColorOfrecido } from '../../dtos/m01-catalogo-productos.dto';
 import { useFichaPublica } from '../../hooks/useFichaPublica';
 import { catalogoPublicoApi } from '../../services/consulta-publica-api';
@@ -244,6 +245,15 @@ export const ProductoFichaView: React.FC<ProductoFichaViewProps> = ({ idProducto
             )}
 
             {variante !== null && <PrecioPresentacion variante={variante} oferta={oferta} rendimiento={rendimiento} />}
+
+            {/*
+              M03 · HU-ASE-02: la calculadora de este producto. Se monta siempre; es M03
+              quien decide si el producto la tiene (contrato K1) y, si no, no dibuja nada.
+            */}
+            <CalculadoraDeFicha
+              idProducto={p.idProducto}
+              idVarianteElegida={variante?.idVariante ?? null}
+            />
 
             {/* M05 · P3: agregar la presentación y el color elegidos al carrito. */}
             <div className="border-t border-neutral-light pt-4">

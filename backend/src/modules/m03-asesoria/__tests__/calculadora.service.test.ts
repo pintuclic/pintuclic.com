@@ -246,25 +246,27 @@ describe('CalculadoraService (HU-ASE-02)', () => {
     });
   });
 
-  describe('K9 — las manos no se suponen', () => {
-    it('sugiere las de la ficha del producto cuando existen', async () => {
+  describe('K9 — las manos las resuelve el servidor', () => {
+    // El Product Owner decidió el 2026-10-27 quitar el campo de la pantalla, así que el
+    // servidor SIEMPRE tiene que entregar un número: no hay nadie a quien preguntárselo.
+    it('manda la ficha del producto cuando la trae', async () => {
       const ficha = await servicio(esmalte(), 3).obtenerDeProducto(2);
-      expect(ficha.manosSugeridas).toBe(2);
+      expect(ficha.manosAplicadas).toBe(2);
     });
 
-    it('si la ficha no las trae, usa la sugerencia del panel', async () => {
+    it('si la ficha no las trae, usa la configuración del panel', async () => {
       const ficha = await servicio(vinilo(), 3).obtenerDeProducto(1);
-      expect(ficha.manosSugeridas).toBe(3);
+      expect(ficha.manosAplicadas).toBe(3);
     });
 
-    it('sin ninguna de las dos no sugiere nada', async () => {
+    it('sin ficha ni configuración aplica dos, nunca se queda sin número', async () => {
       const ficha = await servicio(vinilo(), null).obtenerDeProducto(1);
-      expect(ficha.manosSugeridas).toBeNull();
+      expect(ficha.manosAplicadas).toBe(2);
     });
 
-    it('descarta una sugerencia fuera de rango en vez de ofrecerla', async () => {
+    it('una configuración fuera de rango no se usa: vuelve a dos', async () => {
       const ficha = await servicio(vinilo(), 99).obtenerDeProducto(1);
-      expect(ficha.manosSugeridas).toBeNull();
+      expect(ficha.manosAplicadas).toBe(2);
     });
   });
 });

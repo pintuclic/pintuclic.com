@@ -28,8 +28,9 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *                sin montarla a mano producto por producto.
  *              · General: en la landing; el usuario escoge cualquier producto con
  *                rendimiento y su presentación.
- *            Las dos calculan en los dos sentidos: cuánto comprar para un área
- *            (`cantidad`) y cuánta área cubre una cantidad (`cobertura`).
+ *            Las dos calculan en los dos sentidos: cuánto comprar (`cantidad`) y cuánta
+ *            área cubre una cantidad (`cobertura`). En `cantidad` el área no se escribe:
+ *            se toman las medidas de la superficie y se calcula (K12-K14).
  *  HU-ASE-05 Asistente virtual: responde las necesidades del cliente sobre pintura,
  *            preparación de superficies, aplicación y productos del catálogo, y sugiere
  *            productos. Siempre ofrece el botón «¿Quieres comunicarte con un asesor?» hacia
@@ -234,14 +235,44 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *  K8  Área: mayor que 0, hasta 100 000 m² y dos decimales. Manos: entero de 1 a 10.
  *      Unidades: entero de 1 a 1000. Si falta o no cumple, 400 y no se calcula; el
  *      formulario lo dice antes de enviar (RF-ASE-02-08, CA-ASE-02-06, CA-ASE-02-08).
- *  K9  Las manos NUNCA se suponen (RF-ASE-02-06). El campo empieza vacío; si hay
- *      `manosSugeridas` (la de la ficha del producto o, si no, la de configuración, Q1-Q2),
- *      la pantalla la ofrece como sugerencia que el usuario toca para aplicarla.
+ *  K9  Las manos NO se preguntan. **Esto incumple RF-ASE-02-06 a propósito**: el Product
+ *      Owner lo decidió el 2026-10-27, después de ver la calculadora funcionando, y el
+ *      mockup (pág. 10) tampoco las pedía. Queda escrito aquí, y no borrado, porque el
+ *      requisito sigue existiendo en la spec y alguien va a preguntar por qué no se cumple.
+ *      Efecto conocido: quien dé una sola mano verá el doble de pintura de la que necesita.
+ *      El servidor resuelve `manosAplicadas` —nunca nulo— en este orden: la ficha del
+ *      producto, la configuración del panel (Q1-Q2) y, si no hay ninguna, 2. Lo decide el
+ *      servidor y no la pantalla para que haya un solo sitio donde cambiarlo. La pantalla
+ *      lo MUESTRA junto al resultado («Para N manos»): el supuesto se ve, no se esconde.
+ *  K15 En la ficha de producto la calculadora va en un DIÁLOGO, detrás del botón «Calcula
+ *      cuánta pintura necesitas» que se coloca bajo las presentaciones (mockup pág. 10).
+ *      Lo monta M01 con un solo componente de M03 y sin condición alguna: **quien decide si
+ *      el producto tiene calculadora es K1, y K1 es de M03**. Si M01 reprodujera esa regla
+ *      para saber si pinta el botón habría dos copias que acabarían separándose. Cuando el
+ *      producto no cumple, no se dibuja nada: ni el botón, ni un aviso de error.
+ *      El diálogo abre con la presentación que la persona ya eligió en la ficha; si ese id
+ *      no es de este producto, abre con la primera.
  *  K10 Entradas: en la ficha se fija el producto y el usuario elige presentación y sentido.
  *      En la general, primero se elige el producto en un selector con buscador (AGENTS.md)
  *      sobre `GET /asesoria/calculadora/productos`, que solo lista productos con calculadora.
  *  K11 Público, sin sesión (CA-ASE-02-09). La calculadora NO usa IA: funciona aunque Gemini
  *      esté caído (I6) y se entrega antes que cualquier pieza de IA (E2).
+ *  K12 En `cantidad` el ÁREA NO SE PIDE: se pide la superficie y sus medidas, y el área sale
+ *      de ellas (mockup VISTAS.pdf, pág. 10). Quien calcula sabe que su pared mide 5 × 2,5,
+ *      no que son 25 m²; pedirle el área le obligaba a hacer a mano la multiplicación que
+ *      venía a buscar. La pantalla pide, en tres bloques: (1) qué va a pintar —paredes,
+ *      techos, puertas o muebles—, (2) ancho, el otro lado y cuántas piezas iguales, y
+ *      (3) presentación y resultado. El área total se muestra en vivo mientras se escribe.
+ *  K13 El tipo de superficie SOLO cambia el vocabulario, nunca el cálculo: un techo se mide
+ *      de ancho y «largo» y una pared de ancho y «alto», y el contador se nombra según la
+ *      pieza. No hay coeficientes por superficie (ni «la puerta se pinta por las dos caras»,
+ *      ni mermas por textura): el catálogo no registra ese dato y no se inventan cifras.
+ *      Área = ancho × ladoMayor × piezas, con un único redondeo final a dos decimales para
+ *      cumplir K8 sin arrastrar el error de la coma flotante (misma regla que K5).
+ *  K14 El resultado en pantalla corresponde SIEMPRE a los datos que se están viendo. Si se
+ *      cambia una medida después de calcular, la cifra se retira hasta volver a calcular:
+ *      una cifra que ya no corresponde a lo escrito engaña más que no mostrar ninguna.
+ *      La API no cambia: sigue recibiendo `area` en m² (K8), que calcula el cliente.
  *
  * ── Reglas del asistente (HU-ASE-05) ────────────────────────────────────────
  *  H1  Público, sin sesión. El servidor no guarda la conversación: el frontend envía el
@@ -764,8 +795,8 @@ export const calculadoraProductoSchema = z.object({
   /** m² por galón y por mano. */
   rendimientoMin: z.number().positive(),
   rendimientoMax: z.number().positive(),
-  /** K9: sugerencia; null si no hay ninguna. */
-  manosSugeridas: z.number().int().min(1).max(10).nullable(),
+  /** K9: las manos que aplica la calculadora. Nunca nulo; la pantalla las muestra. */
+  manosAplicadas: z.number().int().min(1).max(10),
   presentaciones: z.array(presentacionCalculableSchema).min(1),
   advertencia: z.string(),
 });

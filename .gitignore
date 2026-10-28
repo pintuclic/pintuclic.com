@@ -38,3 +38,6 @@ memory/
 
 # Reportes generados por tooling/ (no se versionan)
 docs/qa/
+# Mismo caso bajo otra raíz: los audits reescriben estos JSON en cada corrida y
+# ensucian el árbol. Se coló al repo porque la regla de arriba no lo alcanzaba.
+.sdlc/
