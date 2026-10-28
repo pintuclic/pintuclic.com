@@ -6,13 +6,15 @@ import { z } from 'zod';
  * Viven aquí y nunca dentro de un `.tsx` (AGENTS.md). Son los mismos límites que valida el
  * servidor, para que el formulario avise antes de enviar y nunca llegue un error genérico.
  *
- * El área y las manos se escriben en campos de texto: un `<input type="number">` vacío
- * entrega `NaN` y no se puede distinguir de un cero. Así se puede exigir las manos sin
- * suponerlas (RF-ASE-02-06) y decir qué falta.
+ * Las medidas se escriben en campos de texto y no en `<input type="number">`: uno vacío
+ * entrega `NaN`, que no se distingue de un cero, y entonces no hay forma de decir si falta
+ * el dato o si escribieron un cero.
+ *
+ * Las manos NO se piden (K9, decisión del Product Owner del 2026-10-27). Las resuelve el
+ * servidor y la pantalla las muestra junto al resultado.
  */
 
 const AREA_MAXIMA = 100_000;
-const MANOS_MAXIMAS = 10;
 const UNIDADES_MAXIMAS = 1000;
 
 /** Acepta coma o punto como separador decimal: la gente escribe «12,5». */
@@ -38,14 +40,6 @@ export const areaCampoSchema = z
   .refine((t) => (aNumero(t) ?? 0) <= AREA_MAXIMA, `El área no puede pasar de ${AREA_MAXIMA} m²`)
   .refine((t) => decimales(t) <= 2, 'Usa como máximo dos decimales');
 
-export const manosCampoSchema = z
-  .string()
-  .trim()
-  .min(1, 'Indica cuántas manos vas a dar')
-  .refine((t) => /^\d+$/.test(t), 'Las manos deben ser un número entero')
-  .refine((t) => Number(t) >= 1, 'Indica al menos una mano')
-  .refine((t) => Number(t) <= MANOS_MAXIMAS, `Como máximo ${MANOS_MAXIMAS} manos`);
-
 export const unidadesCampoSchema = z
   .string()
   .trim()
@@ -60,7 +54,6 @@ export const presentacionCampoSchema = z.string().min(1, 'Elige la presentación
 export const formularioCantidadSchema = z.object({
   idVariante: presentacionCampoSchema,
   area: areaCampoSchema,
-  manos: manosCampoSchema,
 });
 export type FormularioCantidad = z.infer<typeof formularioCantidadSchema>;
 
@@ -68,7 +61,6 @@ export type FormularioCantidad = z.infer<typeof formularioCantidadSchema>;
 export const formularioCoberturaSchema = z.object({
   idVariante: presentacionCampoSchema,
   unidades: unidadesCampoSchema,
-  manos: manosCampoSchema,
 });
 export type FormularioCobertura = z.infer<typeof formularioCoberturaSchema>;
 
@@ -123,7 +115,6 @@ export function formularioMedidasSchema(ladoB: string) {
     ancho: medidaCampoSchema('el ancho'),
     ladoMayor: medidaCampoSchema(ladoB),
     repeticiones: repeticionesCampoSchema,
-    manos: manosCampoSchema,
   });
 }
 
@@ -132,7 +123,6 @@ export interface FormularioMedidas {
   ancho: string;
   ladoMayor: string;
   repeticiones: string;
-  manos: string;
 }
 
 /** El número escrito con dos decimales, como entero de centésimas. */

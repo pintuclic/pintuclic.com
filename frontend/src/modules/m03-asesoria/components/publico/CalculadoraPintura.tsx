@@ -233,7 +233,6 @@ function CalculoPorMedidas({ datos, idProducto, enlaceAlProducto }: PropsMedidas
   const idGrupo = useId();
   const [tipo, setTipo] = useState<TipoSuperficie>(SUPERFICIE_POR_DEFECTO);
   const [resultado, setResultado] = useState<ResultadoCalculo | null>(null);
-  const [manosDelResultado, setManosDelResultado] = useState<number | null>(null);
   const [errorApi, setErrorApi] = useState<string | null>(null);
   /**
    * Con qué datos se obtuvo el resultado que hay en pantalla. Si la persona cambia una
@@ -266,21 +265,18 @@ function CalculoPorMedidas({ datos, idProducto, enlaceAlProducto }: PropsMedidas
       ancho: '',
       ladoMayor: '',
       repeticiones: '1',
-      // K9: vacío a propósito. RF-ASE-02-06 prohíbe suponer las manos.
-      manos: '',
     },
   });
 
-  const [idVariante, ancho, ladoMayor, repeticiones, manos] = watch([
+  const [idVariante, ancho, ladoMayor, repeticiones] = watch([
     'idVariante',
     'ancho',
     'ladoMayor',
     'repeticiones',
-    'manos',
   ]);
   const area = areaDeMedidas(ancho, ladoMayor, repeticiones);
 
-  const firmaActual = JSON.stringify([tipo, idVariante, ancho, ladoMayor, repeticiones, manos]);
+  const firmaActual = JSON.stringify([tipo, idVariante, ancho, ladoMayor, repeticiones]);
   const resultadoVigente = resultado !== null && datosDelResultado === firmaActual;
 
   const paso = resultadoVigente ? 2 : ancho !== '' || ladoMayor !== '' ? 1 : 0;
@@ -301,10 +297,9 @@ function CalculoPorMedidas({ datos, idProducto, enlaceAlProducto }: PropsMedidas
         idProducto,
         idVariante: Number(valores.idVariante),
         area: areaDeMedidas(valores.ancho, valores.ladoMayor, valores.repeticiones),
-        manos: Number(valores.manos),
+        manos: datos.manosAplicadas,
       });
       setResultado(calculado);
-      setManosDelResultado(Number(valores.manos));
       setDatosDelResultado(
         JSON.stringify([
           tipo,
@@ -312,7 +307,6 @@ function CalculoPorMedidas({ datos, idProducto, enlaceAlProducto }: PropsMedidas
           valores.ancho,
           valores.ladoMayor,
           valores.repeticiones,
-          valores.manos,
         ]),
       );
     } catch (err: unknown) {
@@ -379,20 +373,6 @@ function CalculoPorMedidas({ datos, idProducto, enlaceAlProducto }: PropsMedidas
             />
           </div>
 
-          <div className="mt-4">
-            <Input
-              label="Número de manos"
-              inputMode="numeric"
-              placeholder="Por ejemplo, 2"
-              error={errors.manos?.message}
-              {...register('manos')}
-            />
-            <SugerenciaManos
-              manosSugeridas={datos.manosSugeridas}
-              alAplicar={(manos) => setValue('manos', manos, { shouldValidate: true })}
-            />
-          </div>
-
           <AreaTotal area={area} />
         </div>
 
@@ -425,13 +405,13 @@ function CalculoPorMedidas({ datos, idProducto, enlaceAlProducto }: PropsMedidas
           {!resultadoVigente || resultado === null ? (
             errorApi === null && (
               <p className="mt-4 rounded-md border border-dashed border-neutral-light p-4 text-center font-sans text-sm text-neutral-medium">
-                Completa las medidas y las manos para ver cuánta pintura necesitas.
+                Completa las medidas para ver cuánta pintura necesitas.
               </p>
             )
           ) : (
             <ResultadoCantidad
               resultado={resultado}
-              manos={manosDelResultado}
+              manos={datos.manosAplicadas}
               idProducto={idProducto}
               nombreProducto={datos.nombre}
               enlaceAlProducto={enlaceAlProducto}
@@ -572,7 +552,7 @@ function ResultadoCantidad({
   enlaceAlProducto,
 }: {
   resultado: ResultadoCalculo;
-  manos: number | null;
+  manos: number;
   idProducto: number;
   nombreProducto: string;
   enlaceAlProducto: boolean;
@@ -586,11 +566,9 @@ function ResultadoCantidad({
       <p className="font-sans text-2xl font-semibold text-action">
         {formatearIntervalo(minimo, maximo, unidadesDe(minimo, maximo))} de {presentacion}
       </p>
-      {manos !== null && (
-        <p className="font-sans text-sm text-neutral-medium">
-          (Para {manos} {manos === 1 ? 'mano' : 'manos'})
-        </p>
-      )}
+      <p className="font-sans text-sm text-neutral-medium">
+        (Para {manos} {manos === 1 ? 'mano' : 'manos'})
+      </p>
 
       {resultado.equivalencias.length > 0 && (
         <div className="mt-4 border-t border-action/20 pt-3">
@@ -634,14 +612,12 @@ function CalculoPorUnidades({
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormularioCobertura>({
     resolver: zodResolver(formularioCoberturaSchema),
     defaultValues: {
       idVariante: primera === undefined ? '' : String(primera.idVariante),
       unidades: '',
-      manos: '',
     },
   });
 
@@ -652,7 +628,7 @@ function CalculoPorUnidades({
         idProducto,
         idVariante: Number(valores.idVariante),
         unidades: Number(valores.unidades),
-        manos: Number(valores.manos),
+        manos: datos.manosAplicadas,
       });
       setResultado(calculado);
     } catch (err: unknown) {
@@ -668,7 +644,7 @@ function CalculoPorUnidades({
         cada mano.
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Select
           label="Presentación"
           options={datos.presentaciones.map((p) => ({
@@ -685,19 +661,12 @@ function CalculoPorUnidades({
           error={errors.unidades?.message}
           {...register('unidades')}
         />
-        <Input
-          label="Número de manos"
-          inputMode="numeric"
-          placeholder="Por ejemplo, 2"
-          error={errors.manos?.message}
-          {...register('manos')}
-        />
       </div>
 
-      <SugerenciaManos
-        manosSugeridas={datos.manosSugeridas}
-        alAplicar={(manos) => setValue('manos', manos, { shouldValidate: true })}
-      />
+      <p className="font-sans text-xs text-neutral-medium">
+        El cálculo supone {datos.manosAplicadas}{' '}
+        {datos.manosAplicadas === 1 ? 'mano' : 'manos'}.
+      </p>
 
       <Button type="submit" isLoading={isSubmitting}>
         Calcular cuánto rinde
@@ -721,28 +690,5 @@ function CalculoPorUnidades({
         </div>
       )}
     </form>
-  );
-}
-
-/** La sugerencia de manos se ofrece como botón: la persona decide aplicarla (K9). */
-function SugerenciaManos({
-  manosSugeridas,
-  alAplicar,
-}: {
-  manosSugeridas: number | null;
-  alAplicar: (manos: string) => void;
-}) {
-  if (manosSugeridas === null) return null;
-  return (
-    <p className="mt-1.5 font-sans text-xs text-neutral-medium">
-      Para este producto se suelen dar {manosSugeridas} manos.{' '}
-      <button
-        type="button"
-        onClick={() => alAplicar(String(manosSugeridas))}
-        className="rounded-xs font-medium text-action underline transition-colors hover:text-action-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50"
-      >
-        Usar {manosSugeridas}
-      </button>
-    </p>
   );
 }

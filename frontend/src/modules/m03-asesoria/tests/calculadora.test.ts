@@ -5,7 +5,6 @@ import {
   formularioCantidadSchema,
   formularioCoberturaSchema,
   formularioMedidasSchema,
-  manosCampoSchema,
   medidaCampoSchema,
   numeroDeCampo,
   repeticionesCampoSchema,
@@ -52,25 +51,6 @@ describe('Formulario de la calculadora (M03 · K8)', () => {
     });
   });
 
-  describe('número de manos', () => {
-    it('CA-ASE-02-06: sin manos el formulario lo exige, no supone ninguna', () => {
-      const resultado = manosCampoSchema.safeParse('');
-      expect(resultado.success).toBe(false);
-      expect(mensaje(resultado)).toBe('Indica cuántas manos vas a dar');
-    });
-
-    it('CA-ASE-02-08: rechaza el cero y los decimales', () => {
-      expect(mensaje(manosCampoSchema.safeParse('0'))).toBe('Indica al menos una mano');
-      expect(mensaje(manosCampoSchema.safeParse('1.5'))).toBe('Las manos deben ser un número entero');
-    });
-
-    it('acepta de 1 a 10 manos', () => {
-      expect(manosCampoSchema.safeParse('1').success).toBe(true);
-      expect(manosCampoSchema.safeParse('10').success).toBe(true);
-      expect(manosCampoSchema.safeParse('11').success).toBe(false);
-    });
-  });
-
   describe('unidades que ya se tienen', () => {
     it('exige el dato y rechaza lo que no es un entero positivo', () => {
       expect(mensaje(unidadesCampoSchema.safeParse(''))).toBe('Indica cuántas unidades tienes');
@@ -81,22 +61,30 @@ describe('Formulario de la calculadora (M03 · K8)', () => {
   });
 
   describe('formularios completos', () => {
-    it('cuánto comprar: pide presentación, área y manos', () => {
-      expect(
-        formularioCantidadSchema.safeParse({ idVariante: '10', area: '50', manos: '2' }).success,
-      ).toBe(true);
-      expect(
-        formularioCantidadSchema.safeParse({ idVariante: '', area: '50', manos: '2' }).success,
-      ).toBe(false);
+    it('cuánto comprar: pide presentación y área', () => {
+      expect(formularioCantidadSchema.safeParse({ idVariante: '10', area: '50' }).success).toBe(
+        true,
+      );
+      expect(formularioCantidadSchema.safeParse({ idVariante: '', area: '50' }).success).toBe(
+        false,
+      );
     });
 
-    it('cuánto rinde: pide presentación, unidades y manos', () => {
+    it('cuánto rinde: pide presentación y unidades', () => {
       expect(
-        formularioCoberturaSchema.safeParse({ idVariante: '10', unidades: '2', manos: '2' }).success,
+        formularioCoberturaSchema.safeParse({ idVariante: '10', unidades: '2' }).success,
       ).toBe(true);
-      expect(
-        formularioCoberturaSchema.safeParse({ idVariante: '10', unidades: '2', manos: '' }).success,
-      ).toBe(false);
+      expect(formularioCoberturaSchema.safeParse({ idVariante: '10', unidades: '' }).success).toBe(
+        false,
+      );
+    });
+
+    it('K9: las manos ya no son un campo del formulario', () => {
+      // Decisión del Product Owner del 2026-10-27. Las resuelve el servidor, así que un
+      // formulario sin ellas tiene que ser válido.
+      expect(formularioCantidadSchema.safeParse({ idVariante: '10', area: '50' }).success).toBe(
+        true,
+      );
     });
   });
 
@@ -218,15 +206,15 @@ describe('Medidas de la superficie (mockup pág. 10)', () => {
       ancho: '5.0',
       ladoMayor: '2.5',
       repeticiones: '2',
-      manos: '2',
     };
 
     it('acepta el caso del mockup', () => {
       expect(schema.safeParse(valido).success).toBe(true);
     });
 
-    it('CA-ASE-02-06: sigue exigiendo las manos, no las supone en 2', () => {
-      expect(schema.safeParse({ ...valido, manos: '' }).success).toBe(false);
+    it('no pide las manos: las resuelve el servidor (K9)', () => {
+      expect(schema.safeParse(valido).success).toBe(true);
+      expect(schema.safeParse({ ...valido, ancho: '' }).success).toBe(false);
     });
   });
 });

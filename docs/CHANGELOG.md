@@ -15,8 +15,12 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 - **Cuatro superficies: paredes, techos, puertas y muebles (K13).** Solo cambian el vocabulario, nunca el cálculo: un techo se mide de ancho y **largo**, una pared de ancho y **alto**, y el contador se nombra según la pieza («Cantidad de techos iguales»). **No se inventaron coeficientes** por superficie —ni «la puerta se pinta por las dos caras», ni mermas por textura—: el catálogo no registra ese dato.
 - **El área se calcula con enteros escalados**, igual que el backend (K5): multiplicar en coma flotante hacía que 1,1 × 2,2 diera 2,4200000000000004, que el servidor habría rechazado por tener más de dos decimales. Un solo redondeo al final.
 - **El resultado se retira si cambian los datos (K14).** Antes, al cambiar una medida después de calcular, la cifra de al lado se quedaba en pantalla sin corresponder a lo escrito. Una cifra que ya no corresponde engaña más que no mostrar ninguna.
-- **Las manos se siguen pidiendo (K9, RF-ASE-02-06).** El mockup las da por supuestas en 2; el contrato prohíbe suponerlas, así que el campo se mantiene y el resultado dice «(Para N manos)», como en el mockup. Pendiente de confirmar con el Product Owner.
-- La API **no cambia**: sigue recibiendo `area` en m².
+- **Las manos dejan de preguntarse (K9).** Decisión del Product Owner, que **incumple RF-ASE-02-06 a propósito**; queda escrito en el contrato y no borrado, porque el requisito sigue en la spec. Las resuelve el servidor en `manosAplicadas` —ficha del producto, configuración del panel y, si no hay ninguna, 2— y la pantalla las muestra junto al resultado («Para 2 manos»), igual que el mockup: el supuesto se ve, no se esconde. **Efecto conocido:** quien dé una sola mano verá el doble de pintura de la que necesita.
+- La API **no cambia** su forma de entrada: sigue recibiendo `area` en m² y `manos`. Lo que cambia es que las manos las pone el servidor, no la persona.
+
+### Base de datos (seed)
+- **`configuracion_asesoria.manos_por_defecto` pasa de NULL a 2.** Nació en NULL justamente porque la regla prohibía suponer las manos; al quitarlas de la pantalla tiene que haber un número que aplicar. Se añade un `UPDATE ... WHERE manos_por_defecto IS NULL` para las instalaciones ya sembradas, condicionado a propósito: si alguien eligió un valor en el panel, se respeta.
+- **Aviso:** hoy, en el catálogo real, **ningún producto tiene `ficha_recubrimiento.manos`** y la configuración está en NULL, así que los cinco productos calculables caen en el valor por defecto. Llenar las manos por producto es de M01.
 
 ## [No publicado] - 2026-10-26
 - **Autor:** DanExl24 (@DanExl24)

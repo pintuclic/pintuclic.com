@@ -235,9 +235,15 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *  K8  Área: mayor que 0, hasta 100 000 m² y dos decimales. Manos: entero de 1 a 10.
  *      Unidades: entero de 1 a 1000. Si falta o no cumple, 400 y no se calcula; el
  *      formulario lo dice antes de enviar (RF-ASE-02-08, CA-ASE-02-06, CA-ASE-02-08).
- *  K9  Las manos NUNCA se suponen (RF-ASE-02-06). El campo empieza vacío; si hay
- *      `manosSugeridas` (la de la ficha del producto o, si no, la de configuración, Q1-Q2),
- *      la pantalla la ofrece como sugerencia que el usuario toca para aplicarla.
+ *  K9  Las manos NO se preguntan. **Esto incumple RF-ASE-02-06 a propósito**: el Product
+ *      Owner lo decidió el 2026-10-27, después de ver la calculadora funcionando, y el
+ *      mockup (pág. 10) tampoco las pedía. Queda escrito aquí, y no borrado, porque el
+ *      requisito sigue existiendo en la spec y alguien va a preguntar por qué no se cumple.
+ *      Efecto conocido: quien dé una sola mano verá el doble de pintura de la que necesita.
+ *      El servidor resuelve `manosAplicadas` —nunca nulo— en este orden: la ficha del
+ *      producto, la configuración del panel (Q1-Q2) y, si no hay ninguna, 2. Lo decide el
+ *      servidor y no la pantalla para que haya un solo sitio donde cambiarlo. La pantalla
+ *      lo MUESTRA junto al resultado («Para N manos»): el supuesto se ve, no se esconde.
  *  K10 Entradas: en la ficha se fija el producto y el usuario elige presentación y sentido.
  *      En la general, primero se elige el producto en un selector con buscador (AGENTS.md)
  *      sobre `GET /asesoria/calculadora/productos`, que solo lista productos con calculadora.
@@ -781,8 +787,8 @@ export const calculadoraProductoSchema = z.object({
   /** m² por galón y por mano. */
   rendimientoMin: z.number().positive(),
   rendimientoMax: z.number().positive(),
-  /** K9: sugerencia; null si no hay ninguna. */
-  manosSugeridas: z.number().int().min(1).max(10).nullable(),
+  /** K9: las manos que aplica la calculadora. Nunca nulo; la pantalla las muestra. */
+  manosAplicadas: z.number().int().min(1).max(10),
   presentaciones: z.array(presentacionCalculableSchema).min(1),
   advertencia: z.string(),
 });

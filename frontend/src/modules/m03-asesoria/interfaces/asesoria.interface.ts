@@ -24,8 +24,8 @@ export interface CalculadoraProducto {
   /** m² por galón y por mano, tal como lo registró el catálogo. */
   rendimientoMin: number;
   rendimientoMax: number;
-  /** Sugerencia que la persona aplica con un clic; nunca se rellena sola (K9). */
-  manosSugeridas: number | null;
+  /** Manos que aplica la calculadora (K9). La resuelve el servidor; la pantalla la muestra. */
+  manosAplicadas: number;
   presentaciones: PresentacionCalculable[];
   advertencia: string;
 }

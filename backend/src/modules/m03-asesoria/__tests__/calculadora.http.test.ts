@@ -174,14 +174,14 @@ describe('Calculadora por HTTP (HU-ASE-02)', () => {
       const cuerpo = (await respuesta.json()) as {
         data: {
           rendimientoMin: number;
-          manosSugeridas: number | null;
+          manosAplicadas: number;
           presentaciones: Array<{ idVariante: number; rendimientoMin: number }>;
           advertencia: string;
         };
       };
 
       expect(cuerpo.data.rendimientoMin).toBe(25);
-      expect(cuerpo.data.manosSugeridas).toBe(2);
+      expect(cuerpo.data.manosAplicadas).toBe(2);
       expect(cuerpo.data.presentaciones).toHaveLength(2);
       expect(cuerpo.data.advertencia).toContain('aproximada');
     });
