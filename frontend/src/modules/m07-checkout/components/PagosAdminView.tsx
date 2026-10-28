@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
-import { AdminPageHeader, Alert, Button, Input, Skeleton } from '@/core/components';
+import { AdminPageHeader, Alert, Button, ButtonLink, Input, Skeleton } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
 import type { EstadoSolicitud } from '../dtos/m07-checkout.dto';
 import { checkoutApi, mensajeDeError, type PaginaSolicitudes } from '../services/checkout-api';
@@ -101,6 +101,7 @@ export function PagosAdminView() {
                     <th scope="col" className="px-4 py-3 font-semibold">Estado</th>
                     <th scope="col" className="px-4 py-3 font-semibold">Pedido</th>
                     <th scope="col" className="px-4 py-3 text-right font-semibold">Total</th>
+                    <th scope="col" className="px-4 py-3 text-right font-semibold">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-light">
@@ -121,6 +122,11 @@ export function PagosAdminView() {
                       </td>
                       <td className="px-4 py-3 text-neutral-dark">{s.codigoOrden ?? '—'}</td>
                       <td className="px-4 py-3 text-right font-title font-semibold text-neutral-black">{formatCOP(s.totalACobrar)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <ButtonLink href={`/admin/pagos/${s.codigo}`} variant="outline" size="sm">
+                          Ver detalle
+                        </ButtonLink>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
