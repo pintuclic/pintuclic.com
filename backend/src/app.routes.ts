@@ -13,6 +13,7 @@ import { OrdenesM08Adapter } from './modules/m07-checkout/adapters/ordenes-m08.a
 import { construirModuloM07 } from './modules/m07-checkout/m07.routes';
 import { construirModuloM12 } from './modules/m12-facturacion/m12.routes';
 import { construirModuloM08 } from './modules/m08-ordenes/m08.routes';
+import { construirModuloM09 } from './modules/m09-cumplimiento/m09.routes';
 import { construirModuloM11 } from './modules/m11-postventa/m11.routes';
 import { construirModuloM05 } from './modules/m05-carrito/m05.routes';
 import { construirModuloM06 } from './modules/m06-precios/m06.routes';
@@ -129,6 +130,10 @@ export function construirAppRoutes(): Router {
     estados: { notificaciones: m12.alCrearOrden },
   });
   router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
+
+  // M09: cumplimiento y preparación (lista de chequeo por línea, retenidas y hoja de preparación). Solo personal.
+  const m09 = construirModuloM09(m17.autorizacionService, { auditoria: m20.auditoria });
+  router.use('/cumplimiento', exigirSesionSalvo(auth, []), m09.router);
 
   // M11: postventa (cancelaciones, devoluciones y reembolsos)
   const m11 = construirModuloM11(m17.autorizacionService, { auditoria: m20.auditoria });

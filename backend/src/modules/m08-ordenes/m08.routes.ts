@@ -40,7 +40,7 @@ export const PERMISOS_ORDENES = { ver: 'ventas.ver', gestionar: 'ventas.gestiona
  * `ventas.ver` o `ventas.gestionar` (el seed se los daba al rol `empresa_vip`, y los permisos se
  * resuelven por rol). Responde el mismo 404 opaco que un recurso inexistente y deja rastro (M20).
  */
-function exigirSesionDePersonal(auditoria?: AuditoriaPort): RequestHandler {
+export function exigirSesionDePersonal(auditoria?: AuditoriaPort): RequestHandler {
   return async (req, res, next) => {
     const actor = req.actor;
     if (actor?.tipoSesion === 'admin') {
