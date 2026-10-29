@@ -53,6 +53,12 @@ function renderizarMuestra(
         contenidoHtml: plantillasHtml.htmlAlertaServicioIa(intro, 'Gemini', 5),
         contenidoTexto: plantillasHtml.textoAlertaServicioIa(intro, 'Gemini', 5),
       };
+    case 'comprobante_venta':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlComprobanteVenta(intro, 'Cliente de ejemplo', 'CV-000123', '$ 171.800', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001/comprobante'),
+        contenidoTexto: plantillasHtml.textoComprobanteVenta(intro, 'Cliente de ejemplo', 'CV-000123', '$ 171.800', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001/comprobante'),
+      };
   }
 }
 

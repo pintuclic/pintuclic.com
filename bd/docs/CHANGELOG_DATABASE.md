@@ -11,13 +11,24 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 ---
 
 ## [v3.24] - 2026-10-28
-### Esquema 4.23 (93 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
+### Esquema 4.23 (96 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
 - **Alcance General:** pedido por el contrato `contracts/m11-postventa.contract.ts`. Cambio aditivo: tres tablas y cuatro ENUMs nuevos; no altera tablas existentes.
   - **`solicitud_postventa`**: cabecera del trámite con código `DEV-AAAA-NNNNN`, orden asociada, cliente titular, tipo (`cancelacion`, `devolucion`, `garantia`), estado (`solicitada`, `en_revision`, `aprobada`, `rechazada`, `reembolsada`), motivo general, observaciones de resolución, motivo de rechazo tipificado, empleado que resuelve, total a reembolsar, método de reembolso, referencia/comprobante, datos bancarios (JSONB) y evidencia (JSONB).
   - **`linea_solicitud_postventa`**: desglose por línea de orden de los productos devueltos con cantidad, precio unitario congelado y motivo específico (soporta devoluciones parciales y totales; excluye entonados para retracto).
   - **`historial_estado_postventa`**: trazabilidad inmutable de cada transición de estado con autor, motivo y fecha.
   - **ENUMs nuevos (4):** `enum_tipo_postventa`, `enum_estado_postventa`, `enum_metodo_reembolso` y `enum_motivo_rechazo_postventa`.
   - **Prisma:** modelos `SolicitudPostventa`, `LineaSolicitudPostventa` e `HistorialEstadoPostventa` con sus relaciones en `Orden`, `LineaOrden` y `Usuario`.
+
+---
+
+## [v3.24] - 2026-10-29
+### Esquema 4.23 (96 Tablas) - M12: comprobante de venta imprimible · M18: tipo `comprobante_venta`
+- **Alcance General:** PR general de M12 (contrato `contracts/m12-facturacion.contract.ts`). Cambio aditivo; no se toca nada de lo que existía.
+  - **`datos_facturacion`**: ficha única (`id_datos = 1`) con los datos del vendedor que edita el personal. Sin datos sembrados: los carga el cliente.
+  - **`comprobante_venta`** y **`linea_comprobante_venta`**: copia congelada de una venta, uno por orden (`id_orden` UNIQUE), con `numero` `CV-NNNNNN` único (sale de `consecutivo`, fila `comprobante`, que el módulo crea la primera vez como hace M08 con `orden`). Un disparador (`fn_comprobante_inmutable`) rechaza UPDATE y DELETE sobre ambas tablas, sea quien sea.
+  - **M18:** valor `comprobante_venta` en `enum_tipo_comunicacion` y su plantilla en el seed (editable desde el panel).
+  - **Prisma:** modelos `DatosFacturacion`, `ComprobanteVenta` y `LineaComprobanteVenta`, y el valor del enum.
+  - **Bases existentes en 4.22:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente); el seed solo agrega la plantilla si falta.
 
 ---
 

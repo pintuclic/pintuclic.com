@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.22 (v4.21 + FP-01: imagen editable de las tarjetas de categorías del inicio)
+-- VERSIÓN: 4.23 (v4.22 + M12: comprobante de venta imprimible y datos de facturación · M18: tipo comprobante_venta)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 89
@@ -327,6 +327,9 @@ ALTER TYPE enum_estado_solicitud_contacto ADD VALUE IF NOT EXISTS 'rechazada' AF
 
 -- M18 (v4.18): aviso al administrador cuando el servicio de IA acumula fallos (M03 · I9, M18 HU-NOT-01)
 ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'alerta_servicio_ia';
+
+-- M18 (v4.23): aviso al cliente con el enlace a su comprobante de venta (M12 · R9)
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'comprobante_venta';
 
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS
@@ -3042,5 +3045,112 @@ CREATE INDEX IF NOT EXISTS idx_lineacotizacion_cotizacion ON linea_cotizacion(id
 CREATE INDEX IF NOT EXISTS idx_lineacarrito_cotizacion ON linea_carrito(id_cotizacion) WHERE id_cotizacion IS NOT NULL;
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (90 TABLAS - v4.22)
+-- M12. FACTURACIÓN — comprobante de venta imprimible (v4.23)
+-- ==============================================================================
+
+-- Tabla: datos_facturacion
+-- Ficha única (id = 1) con los datos del VENDEDOR que salen en el comprobante. La edita el personal; sin razón social, NIT
+-- y dirección no se emite ningún comprobante (M12 · R6). Sin datos sembrados a propósito: los carga el cliente.
+CREATE TABLE IF NOT EXISTS datos_facturacion (
+    id_datos SMALLINT PRIMARY KEY DEFAULT 1,
+    razon_social VARCHAR(150),
+    nit VARCHAR(30),
+    regimen VARCHAR(150),
+    direccion VARCHAR(200),
+    ciudad VARCHAR(100),
+    telefono VARCHAR(30),
+    correo VARCHAR(150),
+    pie_legal VARCHAR(500),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_datos_facturacion_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_datos_facturacion_unico CHECK (id_datos = 1)
+);
+
+COMMENT ON TABLE datos_facturacion IS 'Datos del vendedor para el comprobante de venta; una sola fila (id = 1) que edita el personal (M12 · R6)';
+
+-- Tabla: comprobante_venta
+-- Copia CONGELADA de una venta (M12 · R3): vendedor, comprador e importes tal como estaban al emitir. Uno por orden (R1).
+CREATE TABLE IF NOT EXISTS comprobante_venta (
+    id_comprobante SERIAL PRIMARY KEY,
+    numero VARCHAR(20) NOT NULL UNIQUE,
+    id_orden INT NOT NULL UNIQUE,
+    fecha_emision TIMESTAMPTZ NOT NULL DEFAULT now(),
+    vendedor_razon_social VARCHAR(150) NOT NULL,
+    vendedor_nit VARCHAR(30) NOT NULL,
+    vendedor_regimen VARCHAR(150),
+    vendedor_direccion VARCHAR(200) NOT NULL,
+    vendedor_ciudad VARCHAR(100),
+    vendedor_telefono VARCHAR(30),
+    vendedor_correo VARCHAR(150),
+    comprador_nombre VARCHAR(150) NOT NULL,
+    comprador_documento VARCHAR(30),
+    comprador_correo VARCHAR(150) NOT NULL,
+    comprador_telefono VARCHAR(30),
+    comprador_direccion TEXT NOT NULL,
+    subtotal NUMERIC(12, 2) NOT NULL,
+    descuento NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    envio NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    base_sin_iva NUMERIC(12, 2) NOT NULL,
+    tasa_iva NUMERIC(5, 2) NOT NULL,
+    iva NUMERIC(12, 2) NOT NULL,
+    total NUMERIC(12, 2) NOT NULL,
+    pie_legal VARCHAR(500),
+    CONSTRAINT fk_comprobante_orden FOREIGN KEY (id_orden)
+        REFERENCES orden (id_orden) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT ck_comprobante_numero CHECK (numero ~ '^CV-[0-9]{6,}$'),
+    CONSTRAINT ck_comprobante_importes CHECK (
+        subtotal >= 0 AND descuento >= 0 AND envio >= 0 AND base_sin_iva >= 0 AND iva >= 0 AND total >= 0
+        AND tasa_iva >= 0 AND tasa_iva <= 100
+    )
+);
+
+COMMENT ON TABLE comprobante_venta IS 'Comprobante de venta imprimible, uno por orden y congelado (M12). No es factura electrónica DIAN';
+COMMENT ON COLUMN comprobante_venta.numero IS 'CV-NNNNNN, continuo, sin saltos y sin reutilizar; sale de consecutivo (nombre = comprobante) en la misma transacción (M12 · R4)';
+
+-- Tabla: linea_comprobante_venta
+CREATE TABLE IF NOT EXISTS linea_comprobante_venta (
+    id_linea_comprobante SERIAL PRIMARY KEY,
+    id_comprobante INT NOT NULL,
+    orden SMALLINT NOT NULL,
+    descripcion VARCHAR(150) NOT NULL,
+    presentacion VARCHAR(150) NOT NULL,
+    color VARCHAR(150),
+    cantidad INT NOT NULL,
+    precio_unitario NUMERIC(12, 2) NOT NULL,
+    descuento_unitario NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    total_linea NUMERIC(12, 2) NOT NULL,
+    CONSTRAINT fk_linea_comprobante FOREIGN KEY (id_comprobante)
+        REFERENCES comprobante_venta (id_comprobante) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT uq_linea_comprobante_orden UNIQUE (id_comprobante, orden),
+    CONSTRAINT ck_linea_comprobante CHECK (
+        cantidad > 0 AND precio_unitario >= 0 AND descuento_unitario >= 0 AND total_linea >= 0
+    )
+);
+
+COMMENT ON TABLE linea_comprobante_venta IS 'Líneas congeladas de un comprobante de venta (M12 · R3)';
+
+-- Un comprobante emitido no se modifica ni se borra (M12 · R3): un disparador lo rechaza sea quien sea, igual que la auditoría.
+CREATE OR REPLACE FUNCTION fn_comprobante_inmutable() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'Un comprobante de venta emitido es inmutable: no se permite % (M12 · R3)', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END $$;
+
+COMMENT ON FUNCTION fn_comprobante_inmutable() IS 'Rechaza UPDATE y DELETE sobre comprobante_venta y linea_comprobante_venta (M12 · R3)';
+
+DROP TRIGGER IF EXISTS trg_comprobante_sin_cambios ON comprobante_venta;
+CREATE TRIGGER trg_comprobante_sin_cambios
+    BEFORE UPDATE OR DELETE ON comprobante_venta
+    FOR EACH ROW EXECUTE FUNCTION fn_comprobante_inmutable();
+
+DROP TRIGGER IF EXISTS trg_linea_comprobante_sin_cambios ON linea_comprobante_venta;
+CREATE TRIGGER trg_linea_comprobante_sin_cambios
+    BEFORE UPDATE OR DELETE ON linea_comprobante_venta
+    FOR EACH ROW EXECUTE FUNCTION fn_comprobante_inmutable();
+
+-- ==============================================================================
+-- FIN DEL SCRIPT DDL (96 TABLAS - v4.23)
 -- ==============================================================================
