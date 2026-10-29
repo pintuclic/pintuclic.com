@@ -2,9 +2,11 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Mail, MapPin, Phone, Receipt } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Mail, MapPin, Phone, Receipt } from 'lucide-react';
 import { AdminPageHeader, Alert, ButtonLink, Skeleton } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
+import { PanelDisponibilidad } from '@/modules/m09-cumplimiento/components/PanelDisponibilidad';
+import { ESTADOS_CUMPLIMIENTO } from '@/modules/m09-cumplimiento/dtos/m09-cumplimiento.dto';
 import { useGestionStore } from '../../store/gestionStore';
 import { ETIQUETA_MODO_ENTREGA, formatearFecha } from '../../services/presentacion';
 import { EstadoBadge } from '../EstadoBadge';
@@ -33,6 +35,8 @@ function Tarjeta({ id, titulo, children }: { id: string; titulo: string; childre
 export function DetallePedidoView({ codigo }: { codigo: string }) {
   const { detalle, historialCliente, historialClienteError, cargandoDetalle, operando, error, aviso } = useGestionStore();
   const { abrirDetalle, cerrarDetalle, cambiarEstado, agregarNota } = useGestionStore.getState();
+  // M09: la revisión de disponibilidad y la hoja de preparación existen mientras el pedido está en revisión o en preparación.
+  const enCumplimiento = detalle !== null && (ESTADOS_CUMPLIMIENTO as readonly string[]).includes(detalle.estado);
 
   useEffect(() => {
     void abrirDetalle(codigo);
@@ -46,6 +50,11 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
         subtitle="Detalle completo para atender el pedido."
         actions={
           <div className="flex flex-wrap gap-2">
+            {enCumplimiento && (
+              <ButtonLink href={`/admin/pedidos/${encodeURIComponent(codigo)}/hoja`} variant="outline" size="sm" leftIcon={<ClipboardList className="h-4 w-4" />}>
+                Hoja de preparación
+              </ButtonLink>
+            )}
             <ButtonLink href={`/admin/pedidos/${encodeURIComponent(codigo)}/comprobante`} variant="outline" size="sm" leftIcon={<Receipt className="h-4 w-4" />}>
               Ver comprobante
             </ButtonLink>
@@ -79,6 +88,12 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
               </div>
               {detalle.observaciones && <p className="mt-2 text-sm text-neutral-dark">{detalle.observaciones}</p>}
             </Tarjeta>
+
+            {enCumplimiento && (
+              <Tarjeta id="disponibilidad" titulo="Revisión de disponibilidad">
+                <PanelDisponibilidad codigo={codigo} onAvanzo={() => void abrirDetalle(codigo, { silencioso: true })} />
+              </Tarjeta>
+            )}
 
             <Tarjeta id="productos" titulo="Productos">
               <LineasOrdenLista lineas={detalle.lineas} />
