@@ -38,6 +38,7 @@ services:
         max-file: "5"
 
   backend:
+    image: ghcr.io/pintuclic/pintuclic.com/backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -103,6 +104,7 @@ services:
         max-file: "5"
 
   frontend:
+    image: ghcr.io/pintuclic/pintuclic.com/frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
