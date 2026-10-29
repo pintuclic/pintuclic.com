@@ -33,3 +33,5 @@ export * from './layout/AdminLayout';
 export * from './layout/AdminPageHeader';
 export * from './navigation/Carousel';
 export * from './navigation/ScrollRow';
+export * from './forms/PuntoEnfoque';
+export * from './layout/SeccionOnda';

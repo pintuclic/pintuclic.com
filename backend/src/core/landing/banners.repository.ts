@@ -25,6 +25,8 @@ export interface CrearBannerRepositorioInput {
   orden: number;
   estado: EstadoBannerInicio;
   idAutor: number;
+  focoX: number;
+  focoY: number;
 }
 
 export interface EditarBannerRepositorioInput {
@@ -39,6 +41,8 @@ export interface EditarBannerRepositorioInput {
   imagenMimeType?: TipoMimeBannerInicio | null;
   orden?: number;
   idAutor: number;
+  focoX?: number;
+  focoY?: number;
 }
 
 export interface BannersInicioRepositoryPort {
@@ -64,6 +68,9 @@ interface RegistroBannerPersistencia {
   imagenBase64: string | null;
   imagenMimeType: TipoMimeBannerInicio | null;
   orden: number;
+  /** Punto de enfoque de la imagen (0 a 100); los registros anteriores no lo traen y valen el centro. */
+  focoX?: number;
+  focoY?: number;
   estado: EstadoBannerInicio;
   idAutor: number | null;
   fechaCreacion: string;
@@ -143,6 +150,8 @@ function mapearPublico(f: RegistroBannerPersistencia): BannerInicioPublicoItem {
     enlaceBotonSecundario: f.enlaceBotonSecundario,
     tieneImagenPersonalizada: f.imagenMimeType !== null && f.imagenBase64 !== null,
     orden: f.orden,
+    focoX: f.focoX ?? 50,
+    focoY: f.focoY ?? 50,
   };
 }
 
@@ -245,6 +254,8 @@ export class PrismaBannersInicioRepository implements BannersInicioRepositoryPor
       imagenBase64: datos.imagen ? datos.imagen.toString('base64') : null,
       imagenMimeType: datos.imagenMimeType,
       orden: datos.orden,
+      focoX: datos.focoX,
+      focoY: datos.focoY,
       estado: datos.estado,
       idAutor: datos.idAutor,
       fechaCreacion: ahora,
@@ -271,6 +282,8 @@ export class PrismaBannersInicioRepository implements BannersInicioRepositoryPor
       ...(datos.textoBotonSecundario !== undefined ? { textoBotonSecundario: datos.textoBotonSecundario } : {}),
       ...(datos.enlaceBotonSecundario !== undefined ? { enlaceBotonSecundario: datos.enlaceBotonSecundario } : {}),
       ...(datos.orden !== undefined ? { orden: datos.orden } : {}),
+      ...(datos.focoX !== undefined ? { focoX: datos.focoX } : {}),
+      ...(datos.focoY !== undefined ? { focoY: datos.focoY } : {}),
       ...(datos.imagen !== undefined
         ? {
             imagenBase64: datos.imagen !== null ? datos.imagen.toString('base64') : null,

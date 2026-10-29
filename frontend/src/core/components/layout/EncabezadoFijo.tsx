@@ -4,15 +4,16 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { franjaVisible } from '../../utils/encabezado';
 
 export interface EncabezadoFijoProps {
-  /** La franja azul con la información básica: se esconde al bajar y reaparece al subir. */
+  /** La franja azul con la información básica: solo se ve con la página arriba de todo. */
   franja: ReactNode;
   /** La cabecera principal: queda siempre arriba. */
   children: ReactNode;
 }
 
 /**
- * Cabecera fija de las páginas públicas: todo queda pegado arriba (`position: fixed`). La franja de información se esconde
- * cuando la persona baja y vuelve a aparecer cuando sube; la cabecera principal no se mueve. Se reserva el alto de ambas
+ * Cabecera fija de las páginas públicas: todo queda pegado arriba (`position: fixed`). La franja de información solo se
+ * ve con la página arriba de todo: al bajar se pliega y no vuelve hasta regresar al inicio (que reaparezca al subir un poco
+ * movía la cabecera bajo el puntero justo al ir a hacer clic). La cabecera principal no se mueve. Se reserva el alto de ambas
  * para que el contenido no salte, y la franja se esconde plegándose (no con `transform`, que rompería los menús y modales
  * que la cabecera abre con `position: fixed`). Con `prefers-reduced-motion` el cambio es inmediato.
  */
@@ -22,7 +23,7 @@ export function EncabezadoFijo({ franja, children }: EncabezadoFijoProps) {
   const [alturas, setAlturas] = useState({ franja: 0, cabecera: 0 });
   const [visible, setVisible] = useState(true);
   const [menosMovimiento, setMenosMovimiento] = useState(false);
-  const estado = useRef({ visible: true, anterior: 0, esperando: false });
+  const estado = useRef({ visible: true, esperando: false });
 
   useEffect(() => {
     const consulta = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -44,20 +45,20 @@ export function EncabezadoFijo({ franja, children }: EncabezadoFijoProps) {
 
   useEffect(() => {
     const e = estado.current;
-    e.anterior = window.scrollY;
+    const actualizar = (): void => {
+      const siguiente = franjaVisible(window.scrollY);
+      if (siguiente !== e.visible) {
+        e.visible = siguiente;
+        setVisible(siguiente);
+      }
+    };
+    actualizar();
     const alMover = (): void => {
       if (e.esperando) return;
       e.esperando = true;
       window.requestAnimationFrame(() => {
         e.esperando = false;
-        const y = Math.max(0, window.scrollY);
-        const siguiente = franjaVisible(e.visible, y, e.anterior, franjaRef.current?.offsetHeight ?? 0);
-        // El scroll de referencia solo avanza cuando hubo un cambio de sentido real o de estado.
-        if (Math.abs(y - e.anterior) > 8 || siguiente !== e.visible) e.anterior = y;
-        if (siguiente !== e.visible) {
-          e.visible = siguiente;
-          setVisible(siguiente);
-        }
+        actualizar();
       });
     };
     window.addEventListener('scroll', alMover, { passive: true });
@@ -71,11 +72,6 @@ export function EncabezadoFijo({ franja, children }: EncabezadoFijoProps) {
       <div
         data-testid="encabezado-fijo"
         className="fixed inset-x-0 top-0 z-50"
-        // Con el foco dentro (teclado) la franja vuelve: no se esconde lo que se está usando.
-        onFocusCapture={() => {
-          estado.current.visible = true;
-          setVisible(true);
-        }}
       >
         <div
           data-testid="franja-superior"
@@ -86,7 +82,10 @@ export function EncabezadoFijo({ franja, children }: EncabezadoFijoProps) {
             transition: menosMovimiento ? 'none' : 'height 240ms ease',
           }}
         >
-          <div ref={franjaRef}>{franja}</div>
+          {/* Plegada no se puede enfocar ni leer: la misma información está en el pie y en el Centro de ayuda. */}
+          <div ref={franjaRef} inert={!visible} aria-hidden={!visible}>
+            {franja}
+          </div>
         </div>
         <div ref={cabeceraRef}>{children}</div>
       </div>

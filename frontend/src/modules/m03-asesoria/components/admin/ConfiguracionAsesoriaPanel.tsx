@@ -168,17 +168,17 @@ function ManosPorDefecto({
 
   return (
     <Seccion
-      titulo="Manos sugeridas en la calculadora"
-      descripcion="Es solo una sugerencia que el cliente aplica con un clic: la calculadora nunca rellena las manos por su cuenta. Déjalo vacío para no sugerir ninguna."
+      titulo="Manos que aplica la calculadora"
+      descripcion="El cliente ya no las escribe: la calculadora usa este número y lo muestra junto al resultado. Manda siempre la ficha del producto si trae las suyas; esto vale para los que no. Si lo dejas vacío se aplican 2."
     >
       <div className="flex flex-wrap items-end gap-3">
         <Input
-          label="Manos sugeridas"
+          label="Manos"
           inputMode="numeric"
           value={valor}
           onChange={(e) => setValor(e.target.value)}
           error={error ?? undefined}
-          placeholder="Sin sugerencia"
+          placeholder="2"
         />
         <Button isLoading={guardando} onClick={guardar}>
           Guardar

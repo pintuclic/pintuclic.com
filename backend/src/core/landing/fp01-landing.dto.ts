@@ -31,6 +31,13 @@ export const TIPOS_MIME_BANNER_INICIO = [
 
 export type TipoMimeBannerInicio = (typeof TIPOS_MIME_BANNER_INICIO)[number];
 
+/** Punto de enfoque de la imagen del banner: porcentajes de 0 a 100 (50 = centro). Decide qué parte se ve cuando se recorta. */
+export const focoBannerInicioSchema = z
+  .number()
+  .int('El punto de enfoque debe ser un número entero')
+  .min(0, 'El punto de enfoque no puede ser menor que 0')
+  .max(100, 'El punto de enfoque no puede ser mayor que 100');
+
 export const BANNER_INICIO_MAXIMO_BYTES = 5 * 1024 * 1024;
 
 export const CODIGOS_ERROR_LANDING = {
@@ -99,6 +106,9 @@ export const crearBannerInicioRequestSchema = z.object({
     .max(9999, 'El orden no puede superar 9999')
     .default(0),
   estado: estadoBannerInicioSchema.default('activo'),
+  /** La imagen puede ser de cualquier forma y tamaño: el punto de enfoque dice qué parte conservar al recortarla. */
+  focoX: focoBannerInicioSchema.default(50),
+  focoY: focoBannerInicioSchema.default(50),
 });
 
 export type CrearBannerInicioRequest = z.infer<
@@ -146,6 +156,8 @@ export const editarBannerInicioRequestSchema = z.object({
     .min(0, 'El orden no puede ser negativo')
     .max(9999, 'El orden no puede superar 9999')
     .optional(),
+  focoX: focoBannerInicioSchema.optional(),
+  focoY: focoBannerInicioSchema.optional(),
 });
 
 export type EditarBannerInicioRequest = z.infer<
@@ -175,6 +187,8 @@ export const bannerInicioPublicoItemSchema = z.object({
   enlaceBotonSecundario: z.string().nullable(),
   tieneImagenPersonalizada: z.boolean(),
   orden: z.number().int().nonnegative(),
+  focoX: focoBannerInicioSchema,
+  focoY: focoBannerInicioSchema,
 });
 
 export type BannerInicioPublicoItem = z.infer<
@@ -201,6 +215,8 @@ export const bannerInicioAdminEntitySchema = z.object({
   enlaceBotonSecundario: z.string().nullable(),
   tieneImagenPersonalizada: z.boolean(),
   orden: z.number().int().nonnegative(),
+  focoX: focoBannerInicioSchema,
+  focoY: focoBannerInicioSchema,
   estado: estadoBannerInicioSchema,
   idAutor: z.number().int().positive().nullable(),
   nombreAutor: z.string().nullable(),
@@ -243,3 +259,75 @@ export const errorLandingEnvelopeSchema = z.object({
 });
 
 export type ErrorLandingEnvelope = z.infer<typeof errorLandingEnvelopeSchema>;
+
+// ============================================================================
+// 5. IMÁGENES DE LAS TARJETAS DE CATEGORÍAS DEL INICIO
+// ============================================================================
+// «Explora nuestras categorías» (inicio) muestra una tarjeta por categoría del catálogo (M01). Su imagen la edita el personal.
+//
+//  C1  Una imagen por categoría, con su punto de enfoque (0 a 100, 50 = centro). Sin imagen, la tarjeta usa su ilustración
+//      de respaldo: nunca queda un hueco.
+//  C2  `PUT /admin/landing/categorias/:idCategoria/imagen` guarda la imagen (PNG, JPG o WEBP, hasta 5 MB, validada por su
+//      firma real y no por la que dice el navegador) y/o el punto de enfoque. Sin `imagenBase64` solo cambia el enfoque y la
+//      categoría debe tener ya una imagen. No se exige un tamaño ni una proporción.
+//  C3  `DELETE /admin/landing/categorias/:idCategoria/imagen` la quita y la tarjeta vuelve a su ilustración. Idempotente.
+//  C4  `GET /admin/landing/categorias` lista TODAS las categorías (con o sin imagen) para el panel.
+//  C5  Público: `GET /landing/categorias` lista solo las categorías que tienen imagen, con su enfoque y una `version` (la fecha
+//      de la última edición) para que el navegador no reutilice una imagen vieja; `GET /landing/categorias/:idCategoria/imagen`
+//      entrega la imagen. Una categoría sin imagen responde 404 genérico.
+//  C6  Permisos: los mismos de los banners (`configuracion.ver` para consultar, `configuracion.editar` para guardar o quitar).
+
+export const guardarImagenCategoriaInicioRequestSchema = z
+  .object({
+    imagenBase64: z.string().min(1, 'La imagen no puede estar vacía').optional(),
+    imagenMimeType: tipoMimeBannerInicioSchema.optional(),
+    focoX: focoBannerInicioSchema.optional(),
+    focoY: focoBannerInicioSchema.optional(),
+  })
+  .refine((v) => (v.imagenBase64 === undefined) === (v.imagenMimeType === undefined), {
+    message: 'La imagen y su tipo se envían juntos',
+    path: ['imagenMimeType'],
+  });
+
+export type GuardarImagenCategoriaInicioRequest = z.infer<
+  typeof guardarImagenCategoriaInicioRequestSchema
+>;
+
+export const categoriaInicioPublicaItemSchema = z.object({
+  idCategoria: z.number().int().positive(),
+  focoX: focoBannerInicioSchema,
+  focoY: focoBannerInicioSchema,
+  version: z.string(),
+});
+
+export type CategoriaInicioPublicaItem = z.infer<
+  typeof categoriaInicioPublicaItemSchema
+>;
+
+export const listarCategoriasInicioPublicasResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: z.array(categoriaInicioPublicaItemSchema),
+});
+
+export const categoriaInicioAdminEntitySchema = z.object({
+  idCategoria: z.number().int().positive(),
+  nombre: z.string(),
+  tieneImagen: z.boolean(),
+  focoX: focoBannerInicioSchema,
+  focoY: focoBannerInicioSchema,
+  fechaActualizacion: z.string().nullable(),
+});
+
+export type CategoriaInicioAdminEntity = z.infer<
+  typeof categoriaInicioAdminEntitySchema
+>;
+
+export const categoriaInicioAdminResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: categoriaInicioAdminEntitySchema,
+});
+
+export const listarCategoriasInicioAdminResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: z.array(categoriaInicioAdminEntitySchema),
+});

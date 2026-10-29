@@ -2,9 +2,11 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { PaintBucket, ShoppingCart } from 'lucide-react';
+import { Ban, ShoppingCart, Star } from 'lucide-react';
 import { Button } from '../buttons/Button';
 import { ButtonLink } from '../buttons/ButtonLink';
+import { IconButton } from '../buttons/IconButton';
+import { useFavoritosStore } from '../../store/favoritosStore';
 import { esColorMuyClaro, esHexadecimal } from '../../utils/color-muestra';
 import { formatCOP } from '../../utils/moneda';
 import { Badge } from './Badge';
@@ -25,8 +27,8 @@ export interface ProductCardProps {
   onViewDetails?: (id: string) => void;
   onAddToCart?: (id: string) => void;
   /**
-   * Color `#RRGGBB` del producto: la imagen va sobre un panel de ese color, como una muestra de pintura.
-   * Sin él (o si no es válido) se ve el fondo neutro de siempre.
+   * Color `#RRGGBB` del producto: la imagen va sobre una muestra de ese color que ocupa la mayor parte de la tarjeta,
+   * con el borde de arriba en una ola suave. Sin él (o si no es válido) se ve el fondo neutro de siempre.
    */
   swatchColor?: string;
   /** Texto del color bajo el nombre (por ejemplo "Azul Cielo · y 45 colores más"), con un punto de ese color. */
@@ -36,21 +38,9 @@ export interface ProductCardProps {
    * ficha. Por defecto se muestra, como en el resto de pantallas.
    */
   showViewDetails?: boolean;
+  /** Con `false` no se pinta la estrella de favoritos (solo aplica si `id` es el identificador numérico del producto). */
+  showFavorite?: boolean;
   className?: string;
-}
-
-function resolverImagenPorDefecto(name: string, imageUrl?: string): string | undefined {
-  if (imageUrl) return imageUrl;
-  const n = name.toLowerCase();
-  if (n.includes('viniltex')) return '/images/landing/catalogo-viniltex.png';
-  if (n.includes('koraza')) return '/images/landing/catalogo-koraza.png';
-  if (n.includes('pintulux')) return '/images/landing/catalogo-pintulux.png';
-  if (n.includes('ico') || n.includes('esmalte')) return '/images/landing/catalogo-esmalte-ico.png';
-  if (n.includes('barniz') || n.includes('madera')) return '/images/landing/catalogo-barniz.png';
-  if (n.includes('brocha')) return '/images/landing/producto-brocha.png';
-  if (n.includes('rodillo')) return '/images/landing/producto-rodillo.png';
-  if (n.includes('cinta')) return '/images/landing/producto-cinta.png';
-  return undefined;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -70,11 +60,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   swatchColor,
   swatchLabel,
   showViewDetails = true,
+  showFavorite = true,
   className = '',
 }) => {
+  const idProducto = Number(id);
+  const conFavorito = showFavorite && Number.isInteger(idProducto) && idProducto > 0;
+  const esFavorito = useFavoritosStore((estado) => conFavorito && estado.ids.includes(idProducto));
+  const alternarFavorito = useFavoritosStore((estado) => estado.alternar);
+
   // UI Spec §4.1.1: "$ 98.900 COP".
   const formatCurrency = (amount: number) => `${formatCOP(amount)} COP`;
-  const imagenEfectiva = resolverImagenPorDefecto(name, imageUrl);
   const muestra = swatchColor !== undefined && esHexadecimal(swatchColor) ? swatchColor : null;
 
   // Precios (Destacado Poppins Bold 20px #002855)
@@ -125,7 +120,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     >
       {/* Contenedor de Imagen de Producto (UI Spec sección 4.1.1) */}
       <div
-        className={`relative w-full h-52 flex items-center justify-center p-4 overflow-hidden ${
+        className={`relative w-full h-56 flex items-center justify-center p-4 overflow-hidden ${
           muestra === null ? 'bg-neutral-lightest' : 'bg-neutral-white'
         }`}
       >
@@ -135,30 +130,53 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <Link href={href} tabIndex={-1} aria-hidden="true" className="absolute inset-0 z-[15]" />
         )}
 
+        {/* Estrella de favoritos: guarda el producto en la lista del encabezado. Va sobre el enlace de la imagen. */}
+        {conFavorito && (
+          <IconButton
+            size="sm"
+            variant="light"
+            aria-pressed={esFavorito}
+            aria-label={esFavorito ? `Quitar ${name} de favoritos` : `Guardar ${name} en favoritos`}
+            onClick={() => alternarFavorito(idProducto)}
+            className="absolute right-2.5 top-2.5 z-30 max-sm:h-11 max-sm:w-11"
+          >
+            <Star
+              className={`h-5 w-5 ${esFavorito ? 'fill-highlight text-highlight' : 'text-neutral-medium'}`}
+              aria-hidden="true"
+            />
+          </IconButton>
+        )}
+
         {/* Badges superpuestos en esquina superior izquierda */}
         <div className="absolute top-2.5 left-2.5 z-20 flex flex-col gap-1 items-start">
           {isSponsored && <Badge variant="sponsored">Patrocinado</Badge>}
           {isOffer && <Badge variant="offer">{offerBadgeText}</Badge>}
         </div>
 
-        {/* Muestra de pintura proporcionada a la silueta del envase (ancho controlado y centrado).
-            El color es un dato del catálogo, no del tema: por eso va en `style`. Es decorativo:
-            no se lee en voz alta. */}
+        {/* Muestra de pintura: el color llena la parte baja de la tarjeta de lado a lado, con una ola suave arriba. El color
+            es un dato del catálogo, no del tema: por eso va en `fill`. Es decorativa: no se lee en voz alta. */}
         {muestra !== null && (
           <div
             aria-hidden="true"
             data-muestra-color={muestra}
-            className={`absolute inset-x-0 mx-auto w-44 top-[38%] bottom-2.5 rounded-2xl transition-transform duration-300 group-hover:scale-[1.02] ${
-              esColorMuyClaro(muestra) ? 'ring-1 ring-inset ring-neutral-light' : ''
-            }`}
-            style={{ backgroundColor: muestra }}
-          />
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[76%] transition-transform duration-300 group-hover:scale-y-[1.03] origin-bottom"
+          >
+            <svg viewBox="0 0 400 170" preserveAspectRatio="none" className="h-full w-full" focusable="false">
+              <path
+                d="M0 20 C 55 6, 120 34, 200 20 S 335 4, 400 18 L400 170 L0 170 Z"
+                fill={muestra}
+                className={esColorMuyClaro(muestra) ? 'stroke-neutral-light' : 'stroke-transparent'}
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
         )}
 
-        {imagenEfectiva ? (
+        {imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={imagenEfectiva}
+            src={imageUrl}
             alt={name}
             width={400}
             height={300}
@@ -170,13 +188,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             loading="lazy"
           />
         ) : (
-          <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-2 rounded-card bg-linear-to-br from-subaction/60 via-neutral-lightest to-subaction/30 p-4 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-white shadow-sm transition-transform duration-300 group-hover:scale-105">
-              <PaintBucket className="h-8 w-8 text-action" strokeWidth={1.75} aria-hidden="true" />
-            </div>
-            <span className="font-title text-xs font-medium text-corporate/80">
-              {brand || 'Pintu Clic'}
-            </span>
+          /* Sin imagen todavía: un círculo tachado, para que se note que falta y no se confunda con otro producto. */
+          <div
+            role="img"
+            aria-label="Sin imagen disponible"
+            className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full border-2 border-neutral-medium/40 bg-neutral-white/90 text-neutral-medium shadow-xs"
+          >
+            <Ban className="h-10 w-10" strokeWidth={1.5} aria-hidden="true" />
           </div>
         )}
       </div>

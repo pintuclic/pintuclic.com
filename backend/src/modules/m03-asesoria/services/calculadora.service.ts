@@ -36,6 +36,13 @@ const DECIMALES_MOSTRADOS = 2;
 const DECIMALES_VOLUMEN = 4;
 /** K4: la cobertura se publica con un decimal, recortado hacia abajo. */
 const DECIMALES_COBERTURA = 1;
+/**
+ * K9 — último recurso para las manos, cuando ni la ficha del producto ni la configuración
+ * del panel traen una. Dos manos es lo que indica la mayoría de fichas técnicas y lo que
+ * asume el mockup. Existe para que la calculadora nunca se quede sin número que aplicar:
+ * lo normal es que mande la ficha, y si no, la configuración, que el panel puede cambiar.
+ */
+const MANOS_ULTIMO_RECURSO = 2;
 
 /** El rendimiento de una presentación, exacto y sin redondear (M03 · K2). */
 interface PresentacionResuelta {
@@ -81,14 +88,14 @@ export class CalculadoraService {
     if (producto === null) throw recursoNoDisponible();
 
     const presentaciones = this.resolverPresentaciones(producto);
-    const manosSugeridas = await this.resolverManosSugeridas(producto.manosFicha);
+    const manosAplicadas = await this.resolverManosAplicadas(producto.manosFicha);
 
     return {
       idProducto: producto.idProducto,
       nombre: producto.nombre,
       rendimientoMin: this.aMostrado(exacto(producto.rendimientoMinTexto)),
       rendimientoMax: this.aMostrado(exacto(producto.rendimientoMaxTexto)),
-      manosSugeridas,
+      manosAplicadas,
       presentaciones: presentaciones.map((p) => this.publicarPresentacion(p)),
       advertencia: ADVERTENCIA_CALCULO,
     };
@@ -208,14 +215,18 @@ export class CalculadoraService {
   }
 
   /**
-   * K9 — las manos NUNCA se suponen: esto es solo una sugerencia que la pantalla ofrece y la
-   * persona toca para aplicar. Primero la de la ficha del producto y, si no hay, la de la
-   * configuración del panel. Si ninguna existe, no se sugiere nada.
+   * K9 — las manos que aplica la calculadora, en orden: la de la ficha del producto, la de
+   * la configuración del panel y, si no hay ninguna, `MANOS_ULTIMO_RECURSO`.
+   *
+   * El valor se resuelve AQUÍ y no en la pantalla para que haya un solo sitio que lo decida:
+   * la pantalla solo lo muestra y lo devuelve al calcular.
    */
-  private async resolverManosSugeridas(manosFicha: number | null): Promise<number | null> {
-    const sugerida = manosFicha ?? (await this.configuracion.obtenerManosPorDefecto());
-    if (sugerida === null) return null;
-    return Number.isInteger(sugerida) && sugerida >= 1 && sugerida <= 10 ? sugerida : null;
+  private async resolverManosAplicadas(manosFicha: number | null): Promise<number> {
+    const candidata = manosFicha ?? (await this.configuracion.obtenerManosPorDefecto());
+    if (candidata === null) return MANOS_ULTIMO_RECURSO;
+    return Number.isInteger(candidata) && candidata >= 1 && candidata <= 10
+      ? candidata
+      : MANOS_ULTIMO_RECURSO;
   }
 
   private publicarPresentacion(p: PresentacionResuelta): PresentacionCalculable {

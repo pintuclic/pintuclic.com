@@ -16,6 +16,10 @@ export interface FiltrosBusqueda {
   precioMax?: number;
   /** Solo productos con un evento de M06 en curso (menú «Ofertas»). */
   enOferta: boolean;
+  /** Solo productos con ventas recientes (inicio: «Los más vendidos»); no viaja en la dirección de la página. */
+  conVentas?: boolean;
+  /** Solo estos productos (la lista de favoritos); no viaja en la dirección de la página. */
+  ids?: number[];
   ordenar: OrdenResultados;
   pagina: number;
   limite: number;
@@ -76,7 +80,7 @@ export function filtrosDesdeUrl(params: URLSearchParams): FiltrosBusqueda {
 
   const rawOrdenar = params.get('ordenar');
   const ordenar: OrdenResultados =
-    rawOrdenar === 'precio_asc' || rawOrdenar === 'precio_desc' || rawOrdenar === 'novedad'
+    rawOrdenar === 'precio_asc' || rawOrdenar === 'precio_desc' || rawOrdenar === 'novedad' || rawOrdenar === 'mas_vendidos'
       ? rawOrdenar
       : 'relevancia';
 

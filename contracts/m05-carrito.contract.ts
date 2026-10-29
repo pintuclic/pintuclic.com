@@ -114,8 +114,8 @@ import type { PreciosPort } from './m06-precios.contract';
  *  <tipo>" y la invitación a pedir cuenta empresa (enlace a la sección Empresa de /perfil). Botón
  *  "Continuar con la compra": revalida (C11); sin sesión lleva a iniciar sesión (RF-CAR-01-02) y vuelve
  *  al carrito. Carrito vacío: mensaje y enlace a /productos. Botón de WhatsApp de M15 con la referencia
- *  "Tengo dudas sobre mi carrito de N productos." Mientras M07 no exista, "Continuar" termina en la
- *  revalidación y un aviso de que el pago aún no está disponible.
+ *  "Tengo dudas sobre mi carrito de N productos." Si la revalidación no encuentra cambios, "Continuar" lleva
+ *  a /checkout (M07) con el cupón en la dirección.
  *
  * ── Panel lateral del carrito (UI §4.7 · Variante A) ────────────────────────
  *  L1  SE ABRE al agregar desde el botón del carrito de una tarjeta del listado o del inicio (V3 del

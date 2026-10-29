@@ -150,8 +150,12 @@ export class CarritoRepository implements CarritoRepositoryPort {
     return r.count;
   }
 
-  async unir(plan: PlanUnion): Promise<void> {
-    await prisma.$transaction(async (tx) => {
+  async unir(plan: PlanUnion): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      // Se borra primero: si otra petición lo está uniendo, esta espera su bloqueo, no encuentra nada y no duplica
+      // las líneas. Las líneas del visitante caen en cascada; el plan ya las trae.
+      const borrado = await tx.carrito.deleteMany({ where: { idCarrito: plan.idCarritoVisitante, idUsuario: null } });
+      if (borrado.count === 0) return false;
       for (const l of plan.actualizar) {
         await tx.lineaCarrito.updateMany({
           where: { idLineaCarrito: l.idLinea, idCarrito: plan.idCarritoCuenta },
@@ -168,12 +172,11 @@ export class CarritoRepository implements CarritoRepositoryPort {
           })),
         });
       }
-      // Las líneas del visitante caen en cascada.
-      await tx.carrito.deleteMany({ where: { idCarrito: plan.idCarritoVisitante } });
       await tx.carrito.update({
         where: { idCarrito: plan.idCarritoCuenta },
         data: { fechaUltimaActividad: new Date() },
       });
+      return true;
     });
   }
 }

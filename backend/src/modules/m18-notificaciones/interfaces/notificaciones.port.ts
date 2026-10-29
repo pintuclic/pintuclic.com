@@ -15,7 +15,8 @@ export interface EventoNotificacion {
     | 'cambio_correo_otp'
     | 'cambio_correo_confirmado'
     | 'dictamen_empresa'
-    | 'alerta_servicio_ia';
+    | 'alerta_servicio_ia'
+    | 'comprobante_venta';
   destinatario: string;
   timestamp: Date;
   metadatos: Record<string, string | number | boolean>;
@@ -42,6 +43,14 @@ export interface NotificacionesPort {
     correo: string,
     servicio: string,
     fallosConsecutivos: number,
+  ): Promise<void>;
+  /**
+   * M12 · R9: avisa al cliente que su comprobante de venta está listo, con el número, el total ya formateado y el enlace
+   * a su página (que exige sesión). Opcional por la misma razón que el aviso de IA; sin adjuntos ni datos del pedido.
+   */
+  notificarComprobanteVenta?(
+    correo: string,
+    datos: { nombre: string; numero: string; total: string; codigoOrden: string },
   ): Promise<void>;
 }
 

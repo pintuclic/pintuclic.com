@@ -39,8 +39,6 @@ export interface EstadoCarrito {
   codigoCupon: string | null;
   /** C11: lo que cambió al revalidar. */
   cambios: readonly CambioRevalidacion[];
-  /** Aviso cuando el carrito está listo pero el pago en línea aún no existe (M07). */
-  listoParaPagar: boolean;
 }
 
 export function useCarrito() {
@@ -53,13 +51,12 @@ export function useCarrito() {
     error: null,
     codigoCupon: null,
     cambios: [],
-    listoParaPagar: false,
   });
   const cupon = useRef<string | null>(null);
 
   const ejecutar = useCallback(
     async (ocupado: Ocupado, accion: () => Promise<Carrito>, respaldo: string): Promise<void> => {
-      setEstado((e) => ({ ...e, ocupado, error: null, cambios: [], listoParaPagar: false }));
+      setEstado((e) => ({ ...e, ocupado, error: null, cambios: [] }));
       try {
         const carrito = await accion();
         setEstado((e) => ({ ...e, carrito, ocupado: null, cargando: false }));
@@ -105,11 +102,11 @@ export function useCarrito() {
     [ejecutar],
   );
 
-  /** HU-CAR-05: revalida; sin sesión pide iniciarla y vuelve al carrito (RF-CAR-01-02). */
+  /** HU-CAR-05: revalida; sin sesión pide iniciarla y vuelve al carrito (RF-CAR-01-02). Si todo sigue igual, al pago (M07). */
   const continuar = useCallback(async (): Promise<void> => {
     const actual = estado.carrito;
     if (actual === null) return;
-    setEstado((e) => ({ ...e, ocupado: { tipo: 'continuar' }, error: null, cambios: [], listoParaPagar: false }));
+    setEstado((e) => ({ ...e, ocupado: { tipo: 'continuar' }, error: null, cambios: [] }));
     try {
       const r = await carritoApi.revalidar(pantallaDe(actual, cupon.current));
       if (!r.puedeContinuar) {
@@ -121,7 +118,9 @@ export function useCarrito() {
         router.push(`/login?destino=${encodeURIComponent('/carrito')}`);
         return;
       }
-      setEstado((e) => ({ ...e, carrito: r.carrito, ocupado: null, listoParaPagar: true }));
+      setEstado((e) => ({ ...e, carrito: r.carrito, ocupado: null }));
+      // El cupón viaja en la dirección: el checkout vuelve a pedir el carrito con él (C8).
+      router.push(cupon.current === null ? '/checkout' : `/checkout?cupon=${encodeURIComponent(cupon.current)}`);
     } catch (err: unknown) {
       setEstado((e) => ({ ...e, ocupado: null, error: mensajeDeError(err, 'No fue posible revisar tu carrito.') }));
     }

@@ -132,6 +132,27 @@ describe('SmtpNotificacionesAdapter · Envío de correos transaccionales por SMT
     expect(args.html).toContain('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
   });
 
+  it('M12 · R9: el aviso del comprobante lleva número, total y enlace a la página, y escapa el nombre', async () => {
+    const { transporter, sendMailMock } = crearTransporteMock();
+    const adapter = new SmtpNotificacionesAdapter(configBase, transporter);
+
+    await adapter.notificarComprobanteVenta('cliente@gmail.com', {
+      nombre: '<b>Laura</b>',
+      numero: 'CV-000007',
+      total: '$ 171.800',
+      codigoOrden: 'PC-2026-00001',
+    });
+
+    expect(sendMailMock).toHaveBeenCalledOnce();
+    const args = sendMailMock.mock.calls[0]?.[0];
+    expect(args.to).toBe('cliente@gmail.com');
+    expect(args.text).toContain('CV-000007');
+    expect(args.text).toContain('$ 171.800');
+    expect(args.text).toContain('/perfil/pedidos/PC-2026-00001/comprobante');
+    expect(args.html).toContain('&lt;b&gt;Laura&lt;/b&gt;');
+    expect(args.html).not.toContain('<b>Laura</b>');
+  });
+
   it('selecciona el adaptador correcto según las variables de entorno', () => {
     const { transporter } = crearTransporteMock();
 

@@ -151,6 +151,13 @@ export class MemoriaNotificacionesAdapter implements NotificacionesPort {
     });
   }
 
+  async notificarComprobanteVenta(
+    correo: string,
+    datos: { nombre: string; numero: string; total: string; codigoOrden: string },
+  ): Promise<void> {
+    this.eventos.push({ tipo: 'comprobante_venta', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
+  }
+
   obtenerEventos(): EventoNotificacion[] {
     return [...this.eventos];
   }
@@ -190,6 +197,10 @@ export class NoOpNotificacionesAdapter implements NotificacionesPort {
   }
 
   async notificarDictamenEmpresa(): Promise<void> {
+    // No-op
+  }
+
+  async notificarComprobanteVenta(): Promise<void> {
     // No-op
   }
 }
@@ -387,6 +398,22 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
       subject,
       text: plantillasHtml.textoDictamenEmpresa(intro, aprobada, motivoRechazo),
       html: plantillasHtml.htmlDictamenEmpresa(intro, aprobada, motivoRechazo),
+    });
+  }
+
+  async notificarComprobanteVenta(
+    correo: string,
+    datos: { nombre: string; numero: string; total: string; codigoOrden: string },
+  ): Promise<void> {
+    const enlace = `${this.frontendBaseUrl}/perfil/pedidos/${encodeURIComponent(datos.codigoOrden)}/comprobante`;
+    const { subject, intro } = await this.resolverIntroYAsunto('comprobante_venta', {
+      subject: 'Tu comprobante de compra · Pintu Clic',
+      intro: 'Gracias por tu compra en Pintu Clic. Ya está listo el comprobante de tu pedido: puedes verlo, imprimirlo o guardarlo como PDF desde el enlace.',
+    });
+    await this.enviarConRegistro('comprobante_venta', correo, {
+      subject,
+      text: plantillasHtml.textoComprobanteVenta(intro, datos.nombre, datos.numero, datos.total, enlace),
+      html: plantillasHtml.htmlComprobanteVenta(intro, datos.nombre, datos.numero, datos.total, enlace),
     });
   }
 }

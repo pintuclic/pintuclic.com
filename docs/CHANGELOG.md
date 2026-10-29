@@ -6,6 +6,49 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-28 (b)
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** ✂️ **La calculadora se queda con una sola cosa que hacer.** Decisiones del Product Owner tras revisar la pantalla. Entra como la rama `feature/m03-calculadora-ajustes`.
+
+### Módulo M03 — Calculadora (HU-ASE-02)
+- **El resultado deja de decir «(Para N manos)» (K9).** Las manos son una característica del producto y su sitio es la ficha técnica, que es donde el PO está cargando el dato. El supuesto **se sigue aplicando** igual —ficha, configuración del panel y 2 por defecto—, pero se enuncia una sola vez y en su sitio, en lugar de repetirlo en dos lugares de la misma página con cifras que no coincidían.
+- **Se retira la pestaña «Cuánto rinde» (K16).** No aparece en el mockup (pág. 10), que enseña una sola calculadora. **El cálculo no se borra:** la regla K4, el endpoint y `calcularCobertura` siguen ahí, así que devolver la pestaña es volver a pintarla, no rehacer el camino. Se deja escrito en el contrato en vez de borrar K4, porque la regla sigue siendo correcta: cambió qué se enseña, no cómo se calcula.
+
+### Core
+- **`Modal` se dibuja con un portal** (va en su propio PR, `chore/core-modal-portal`). Dentro de un ancestro `position: sticky` el modal quedaba encerrado en su contexto de apilamiento y se pintaba bajo la cabecera fija: el velo gris se cortaba, el header no se oscurecía y el diálogo salía recortado. Afecta a todos los modales del sitio.
+
+## [No publicado] - 2026-10-28
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 💬 **El asistente pasa a ser una burbuja flotante.** Deja de vivir dentro de una pestaña de `/asesoria` y acompaña a la persona por toda la tienda. Entra como la rama `feature/m03-asistente-flotante`.
+
+### Módulo M03 — Asistente (HU-ASE-05)
+- **El botón redondo queda fijo en pantalla (H9).** El panel se monta en el armazón público, no en una página, así que sigue ahí al cambiar de vista y **la conversación sobrevive a la navegación**: se puede preguntar por un producto, ir a verlo y seguir la charla. Recargar sí la borra, que es lo que manda H1 —no se guarda en ninguna parte.
+- **Pantalla según el mockup `VISTAS.pdf` (pág. 11):** cabecera azul con el estado «En línea», burbujas grises para el asistente y azules para la persona, hora en cada una, atajos en pastilla, y la barra de escribir abajo.
+- **No es un diálogo modal a propósito.** No atrapa el foco ni bloquea el fondo: la gracia es poder mirar un producto mientras se pregunta por él. Escape lo cierra y el foco vuelve al botón.
+- **Dos atajos del mockup no mandan nada al chat (H10).** «Consultar mi pedido» y «Ver promociones» piden justo lo que H4 le prohíbe al modelo —datos de órdenes, precios y descuentos—, así que **enlazan** a `/perfil/pedidos` y a `/ofertas`, que es donde ese dato sí está. Ofrecer un atajo que la IA tendría que rechazar es enseñar un botón roto. Los otros tres sí escriben en el chat.
+- **Se quita el segundo chat.** La pestaña «Preguntar al asistente» de `/asesoria` ya no dibuja su propia conversación: abre la flotante. Dos implementaciones del mismo chat acaban separándose, y además la conversación se perdía al salir de la pestaña. `AsistenteView.tsx` desaparece.
+- **El botón lleva un aro blanco** porque el pie de página es del mismo azul marino y sin él el círculo se fundía con el fondo. Se vio probando en navegador, no lo reportó nadie.
+- **Adjuntar archivos no se implementa.** El clip del mockup no tiene respaldo en el contrato: no hay subida de archivos en M03.
+
+### Archivos compartidos
+- **`src/app/(public)/layout.tsx`**: monta `<AsistenteFlotante />` junto al panel del carrito. Una línea; es la única forma de que el botón sobreviva al cambio de vista.
+
+## [No publicado] - 2026-10-27
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 📐 **La calculadora deja de pedir los metros cuadrados.** Ahora se eligen la superficie y sus medidas, y el área se calcula sola. Entra como la rama `feature/m03-calculadora-medidas`.
+
+### Módulo M03 — Calculadora (HU-ASE-02)
+- **El área ya no se escribe (K12).** Quien llega a la calculadora sabe que su pared mide 5 × 2,5, no que son 25 m²: pedirle el área le obligaba a hacer a mano justo la multiplicación que venía a buscar. La pantalla sigue el mockup de `VISTAS.pdf` (pág. 10) y reparte el trabajo en tres bloques: qué vas a pintar, las medidas, y el resultado. El área total se actualiza mientras se escribe.
+- **Cuatro superficies: paredes, techos, puertas y muebles (K13).** Solo cambian el vocabulario, nunca el cálculo: un techo se mide de ancho y **largo**, una pared de ancho y **alto**, y el contador se nombra según la pieza («Cantidad de techos iguales»). **No se inventaron coeficientes** por superficie —ni «la puerta se pinta por las dos caras», ni mermas por textura—: el catálogo no registra ese dato.
+- **El área se calcula con enteros escalados**, igual que el backend (K5): multiplicar en coma flotante hacía que 1,1 × 2,2 diera 2,4200000000000004, que el servidor habría rechazado por tener más de dos decimales. Un solo redondeo al final.
+- **El resultado se retira si cambian los datos (K14).** Antes, al cambiar una medida después de calcular, la cifra de al lado se quedaba en pantalla sin corresponder a lo escrito. Una cifra que ya no corresponde engaña más que no mostrar ninguna.
+- **Las manos dejan de preguntarse (K9).** Decisión del Product Owner, que **incumple RF-ASE-02-06 a propósito**; queda escrito en el contrato y no borrado, porque el requisito sigue en la spec. Las resuelve el servidor en `manosAplicadas` —ficha del producto, configuración del panel y, si no hay ninguna, 2— y la pantalla las muestra junto al resultado («Para 2 manos»), igual que el mockup: el supuesto se ve, no se esconde. **Efecto conocido:** quien dé una sola mano verá el doble de pintura de la que necesita.
+- La API **no cambia** su forma de entrada: sigue recibiendo `area` en m² y `manos`. Lo que cambia es que las manos las pone el servidor, no la persona.
+
+### Base de datos (seed)
+- **`configuracion_asesoria.manos_por_defecto` pasa de NULL a 2.** Nació en NULL justamente porque la regla prohibía suponer las manos; al quitarlas de la pantalla tiene que haber un número que aplicar. Se añade un `UPDATE ... WHERE manos_por_defecto IS NULL` para las instalaciones ya sembradas, condicionado a propósito: si alguien eligió un valor en el panel, se respeta.
+- **Aviso:** hoy, en el catálogo real, **ningún producto tiene `ficha_recubrimiento.manos`** y la configuración está en NULL, así que los cinco productos calculables caen en el valor por defecto. Llenar las manos por producto es de M01.
+
 ## [No publicado] - 2026-10-26
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🧩 **PR general de M03 (Asesoría y asistencia).** Los archivos compartidos que el módulo necesita, antes de construirlo: base de datos, permisos, el aviso de M18 y el registro de auditoría de M20. Sin código de módulo todavía. Entra como la rama `chore/m03-asesoria-bd`.

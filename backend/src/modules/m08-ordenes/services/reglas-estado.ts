@@ -35,6 +35,19 @@ export function evaluarTransicion(desde: EstadoOrden, hacia: EstadoOrden, modo: 
   return { ok: true };
 }
 
+/**
+ * M11 (RN-POS-01, RF-POS-05-03 y RF-POS-05-04): cancelado y devuelto solo llegan por una solicitud de postventa
+ * aprobada, nunca desde el panel de pedidos (por eso `evaluarTransicion` los sigue rechazando).
+ */
+const ORIGENES_POSTVENTA: Readonly<Record<'cancelado' | 'devuelto', readonly EstadoOrden[]>> = {
+  cancelado: ['orden_confirmada', 'revision_disponibilidad', 'en_preparacion'],
+  devuelto: ['despachado', 'entregado'],
+};
+
+export function permitidaPorPostventa(desde: EstadoOrden, hacia: 'cancelado' | 'devuelto'): boolean {
+  return ORIGENES_POSTVENTA[hacia].includes(desde);
+}
+
 /** RF-CUM-05-05: retroceder de preparada a en preparación deja constancia del motivo. */
 export function exigeMotivo(desde: EstadoOrden, hacia: EstadoOrden): boolean {
   return desde === 'preparada' && hacia === 'en_preparacion';

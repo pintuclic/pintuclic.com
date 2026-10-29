@@ -3,13 +3,14 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, Menu, Palette, ShoppingCart, User } from 'lucide-react';
+import { ChevronDown, Menu, Palette, ShoppingCart, Star, User } from 'lucide-react';
 import { Button } from '../buttons/Button';
 import { IconButton } from '../buttons/IconButton';
 import { Badge } from '../data-display/Badge';
 import { Modal } from '../overlays/Modal';
 import { useResumenCarrito } from '../../hooks/useResumenCarrito';
 import { useAuthStore } from '../../store/authStore';
+import { useFavoritosStore } from '../../store/favoritosStore';
 import type { UsuarioAutenticado } from '../../types/usuario.type';
 import { formatCOP } from '../../utils/moneda';
 import {
@@ -18,7 +19,6 @@ import {
   type MegaMenuGroup,
   type MegaMenuTab,
 } from './CategoriesMegaMenu';
-import { Container } from './Container';
 import { Logo, type LogoProps } from './Logo';
 
 export interface HeaderNavItem {
@@ -100,6 +100,8 @@ export function Header({
   const esActivo = (href: string): boolean =>
     href === '/' ? pathname === '/' : pathname === href || Boolean(pathname?.startsWith(`${href}/`));
 
+  const totalFavoritos = useFavoritosStore((estado) => estado.ids.length);
+
   // El carrito real (M05) manda sobre los valores por defecto de `cart`.
   const resumen = useResumenCarrito();
   const cantidad = resumen?.cantidadItems ?? cart.count;
@@ -108,7 +110,8 @@ export function Header({
 
   return (
     <header className="border-b border-neutral-light bg-neutral-white">
-      <Container className="flex h-16 items-center gap-4 lg:h-[88px] xl:gap-6 2xl:gap-10">
+      {/* Sin la columna central del sitio: el logo y el carrito van casi pegados a los bordes de la pantalla. */}
+      <div className="flex h-16 w-full items-center gap-4 px-2 sm:px-3 lg:h-[88px] xl:gap-6 2xl:gap-10 2xl:px-4">
         <IconButton
           variant="ghost"
           aria-label="Abrir menú"
@@ -186,9 +189,27 @@ export function Header({
           </Link>
 
           <Link
+            href="/favoritos"
+            aria-label={`Favoritos, ${totalFavoritos} ${totalFavoritos === 1 ? 'producto guardado' : 'productos guardados'}`}
+            className={`flex min-h-[44px] shrink-0 items-center rounded-btn p-2 ${FOCO}`}
+          >
+            <span className="relative shrink-0">
+              <Star className="h-6 w-6 text-neutral-dark" aria-hidden="true" />
+              {totalFavoritos > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-corporate px-1 text-[11px] font-bold text-neutral-white"
+                >
+                  {totalFavoritos}
+                </span>
+              )}
+            </span>
+          </Link>
+
+          <Link
             href={cart.href}
             aria-label={etiquetaCarrito}
-            className={`flex min-h-[44px] shrink-0 items-center gap-3 whitespace-nowrap rounded-btn p-2 ${FOCO}`}
+            className={`flex min-h-[44px] shrink-0 items-center gap-3 whitespace-nowrap rounded-btn py-2 pl-2 pr-1 ${FOCO}`}
           >
             <span className="relative shrink-0">
               <ShoppingCart className="h-6 w-6 text-neutral-dark" aria-hidden="true" />
@@ -207,7 +228,7 @@ export function Header({
             </span>
           </Link>
         </div>
-      </Container>
+      </div>
 
       <CategoriesMegaMenu
         isOpen={megaAbierto}

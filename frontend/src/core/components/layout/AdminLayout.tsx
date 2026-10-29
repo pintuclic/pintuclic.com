@@ -19,6 +19,7 @@ import {
   Megaphone,
   Menu,
   Package,
+  RotateCcw,
   Settings,
   Shield,
   ShieldAlert,
@@ -26,7 +27,9 @@ import {
   Store,
   UserCheck,
   Users,
+  Wallet,
   X,
+  Receipt,
 } from 'lucide-react';
 import { apiClient } from '../../api/apiClient';
 import { useAuthStore } from '../../store/authStore';
@@ -51,8 +54,9 @@ export interface AdminLayoutProps {
   children: React.ReactNode;
   navItems?: ReadonlyArray<AdminNavItem>;
   /**
-   * Conteos que se dibujan bajo un ítem del menú, por su `href` (p. ej. pedidos esperando en cada estado).
-   * Los aporta quien monta el layout: el núcleo no conoce ningún módulo.
+   * Conteos de un ítem del menú, por su `href` (p. ej. pedidos esperando en cada estado). El menú muestra solo
+   * su suma junto al ítem; el desglose se ve dentro del módulo. Los aporta quien monta el layout: el núcleo no
+   * conoce ningún módulo.
    */
   navConteos?: Readonly<Record<string, ReadonlyArray<AdminNavConteo>>>;
 }
@@ -74,6 +78,24 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Pedidos',
     href: '/admin/pedidos',
     icon: <ClipboardList className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Pagos',
+    href: '/admin/pagos',
+    icon: <Wallet className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Facturación',
+    href: '/admin/facturacion',
+    icon: <Receipt className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Postventa',
+    href: '/admin/postventa',
+    icon: <RotateCcw className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {
@@ -348,16 +370,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     </span>
                   )}
                 </Link>
-                {total > 0 && (
-                  <ul aria-label={`${item.label} esperando por estado`} className="mb-1 mt-0.5 space-y-0.5 pl-12 pr-4">
-                    {conteos.map((c) => (
-                      <li key={c.etiqueta} className="flex justify-between font-sans text-xs text-neutral-medium">
-                        <span>{c.etiqueta}</span>
-                        <span className="font-semibold text-corporate">{c.cantidad}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             );
           })}

@@ -4,8 +4,10 @@ import {
   type CambiarEstadoFaqRequest,
   type CambiarEstadoPaginaRequest,
   type CambiarOrdenFaqRequest,
+  type ContactoAdminEntity,
   type CrearFaqRequest,
   type CrearPaginaRequest,
+  type EditarContactoRequest,
   type EditarFaqRequest,
   type EditarPaginaRequest,
   type FaqAdminEntity,
@@ -14,6 +16,7 @@ import {
   type PaginaAdminEntity,
 } from '../dtos/m16-contenido.dto';
 import type {
+  ContactoRepositoryPort,
   FaqRepositoryPort,
   PaginasRepositoryPort,
 } from '../interfaces/contenido.interface';
@@ -26,7 +29,18 @@ export class ContenidoAdminService {
   constructor(
     private readonly paginasRepo: PaginasRepositoryPort,
     private readonly faqRepo: FaqRepositoryPort,
+    private readonly contactoRepo: ContactoRepositoryPort,
   ) {}
+
+  /* ─── Contacto del sitio (HU-CON-05) ─────────────────────────────────────── */
+
+  async obtenerContacto(): Promise<ContactoAdminEntity> {
+    return this.contactoRepo.obtener();
+  }
+
+  async editarContacto(datos: EditarContactoRequest, idAutor: number | null): Promise<ContactoAdminEntity> {
+    return this.contactoRepo.guardar(datos, idAutor);
+  }
 
   /* ─── Páginas Institucionales (HU-CON-01) ────────────────────────────────── */
 

@@ -61,8 +61,11 @@ export interface CarritoRepositoryPort {
   registrarActividad(idCarrito: number): Promise<void>;
   /** C9: la cuenta no tenía carrito; el del visitante pasa a ser suyo. */
   pasarACuenta(idCarritoVisitante: number, idUsuario: number): Promise<void>;
-  /** C9: en una transacción aplica el plan y borra el carrito del visitante. */
-  unir(plan: PlanUnion): Promise<void>;
+  /**
+   * C9: en una transacción borra el carrito del visitante y aplica el plan. Devuelve false, sin escribir nada, si
+   * otra petición ya lo unió (la página y la cabecera piden el carrito a la vez justo después de iniciar sesión).
+   */
+  unir(plan: PlanUnion): Promise<boolean>;
   /** C15: agrega o reemplaza (misma variante y color) las líneas de una cotización, en una transacción. */
   guardarLineasAcordadas(idCarrito: number, idCotizacion: number, lineas: readonly LineaAcordadaNueva[]): Promise<void>;
   /** C13: borra los carritos de VISITANTE sin actividad desde `antesDe` (con sus líneas). Devuelve cuántos. */

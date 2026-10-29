@@ -148,6 +148,28 @@ export function htmlAlertaServicioIa(intro: string, servicio: string, fallosCons
   `.trim();
 }
 
+/** M12 · R9: aviso de que el comprobante de venta está listo. Solo número, total y enlace: nada más del pedido. */
+export function textoComprobanteVenta(intro: string, nombre: string, numero: string, total: string, enlace: string): string {
+  return [`Hola, ${nombre}.`, '', intro, '', `Comprobante: ${numero}`, `Total: ${total}`, '', `Verlo o imprimirlo (requiere iniciar sesión): ${enlace}`].join('\n');
+}
+
+export function htmlComprobanteVenta(intro: string, nombre: string, numero: string, total: string, enlace: string): string {
+  const enlaceSeguro = escaparHtml(enlace);
+  return `
+    <div style="${CAJA_ESTILO}">
+      <h2 style="color: #0B2D6B; margin-top: 0;">Tu comprobante de compra</h2>
+      <p>Hola, ${escaparHtml(nombre)}.</p>
+      ${introAHtml(intro)}
+      <p style="font-size: 13px; color: #4B5563;">Comprobante: <strong>${escaparHtml(numero)}</strong></p>
+      <p style="font-size: 13px; color: #4B5563;">Total: <strong>${escaparHtml(total)}</strong></p>
+      <p style="margin: 24px 0;">
+        <a href="${enlaceSeguro}" style="${BOTON_ESTILO}">Ver comprobante</a>
+      </p>
+      <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Para verlo debes iniciar sesión. Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
+    </div>
+  `.trim();
+}
+
 export function textoDictamenEmpresa(intro: string, aprobada: boolean, motivo?: string): string {
   const motivoLimpio = motivo?.trim();
   return [

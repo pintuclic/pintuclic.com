@@ -76,7 +76,7 @@ export function DictamenPanel({ motivoObligatorio, onDictaminar, tiposCliente }:
           )}
           {tiposCliente !== null && tiposCliente.length === 0 && (
             <Alert variant="warning">
-              No hay tipos de cliente empresa activos. Créalos en Promociones → Clientes empresa para poder aprobar.
+              No hay tipos de cliente empresa activos. Créalos en la pestaña «Tipos de cliente» para poder aprobar.
             </Alert>
           )}
           {tiposCliente !== null && tiposCliente.length > 0 && (

@@ -2,7 +2,8 @@
 
 import { useId, useState } from 'react';
 import Link from 'next/link';
-import { Minus, Plus, ShoppingCart } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Minus, Plus, ShoppingBag, ShoppingCart } from 'lucide-react';
 import { Alert, Button, IconButton, Input } from '@/core/components';
 import { agregarAlCarrito, mensajeErrorCarrito } from '../../services/carrito-publico';
 
@@ -17,8 +18,12 @@ export interface AgregarAlCarritoProps {
   bloqueado: boolean;
 }
 
-/** Cantidad y "Agregar al carrito" de la ficha (M05 · P3) y de la compra rápida (U8). */
+/**
+ * Cantidad, "Comprar ahora" y "Agregar al carrito" de la ficha (M05 · P3, M07 · R17) y de la compra rápida (U8).
+ * "Comprar ahora" paga solo esta presentación, color y cantidad, sin tocar el carrito (UI §4.4).
+ */
 export function AgregarAlCarrito({ idVariante, idColor, requiereColor, bloqueado }: AgregarAlCarritoProps) {
+  const router = useRouter();
   // La ficha y la compra rápida pueden convivir en la misma página: el id del campo no se repite.
   const idCantidad = useId();
   const [cantidad, setCantidad] = useState(1);
@@ -31,6 +36,13 @@ export function AgregarAlCarrito({ idVariante, idColor, requiereColor, bloqueado
   const cambiar = (valor: number): void => {
     setResultado(null);
     setCantidad(Math.min(CANTIDAD_MAXIMA, Math.max(1, Number.isFinite(valor) ? Math.trunc(valor) : 1)));
+  };
+
+  const comprarAhora = (): void => {
+    if (idVariante === null) return;
+    const q = new URLSearchParams({ idVariante: String(idVariante), cantidad: String(cantidad) });
+    if (idColor !== null) q.set('idColor', String(idColor));
+    router.push(`/checkout?${q.toString()}`);
   };
 
   const agregar = async (): Promise<void> => {
@@ -83,6 +95,14 @@ export function AgregarAlCarrito({ idVariante, idColor, requiereColor, bloqueado
         </div>
         <Button
           variant="primary-conversion"
+          leftIcon={<ShoppingBag aria-hidden className="h-5 w-5" />}
+          disabled={deshabilitado}
+          onClick={comprarAhora}
+        >
+          Comprar ahora
+        </Button>
+        <Button
+          variant="outline"
           leftIcon={<ShoppingCart aria-hidden className="h-5 w-5" />}
           isLoading={enviando}
           disabled={deshabilitado}
@@ -92,7 +112,7 @@ export function AgregarAlCarrito({ idVariante, idColor, requiereColor, bloqueado
         </Button>
       </div>
 
-      {faltaColor && !bloqueado && <p className="text-sm text-neutral-medium">Elige un color para agregarlo al carrito.</p>}
+      {faltaColor && !bloqueado && <p className="text-sm text-neutral-medium">Elige un color para comprarlo o agregarlo al carrito.</p>}
 
       {resultado !== null &&
         (resultado.ok ? (

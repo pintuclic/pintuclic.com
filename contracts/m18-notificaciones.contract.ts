@@ -36,6 +36,8 @@ export const TIPOS_COMUNICACION = [
   'dictamen_empresa',
   /** M03 · I9: el servicio de IA acumuló los fallos consecutivos configurados. */
   'alerta_servicio_ia',
+  /** M12 · R9: el comprobante de venta está listo (número, total y enlace). */
+  'comprobante_venta',
 ] as const;
 export const tipoComunicacionSchema = z.enum(TIPOS_COMUNICACION);
 export type TipoComunicacion = z.infer<typeof tipoComunicacionSchema>;

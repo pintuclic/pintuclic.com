@@ -686,6 +686,11 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
     'alerta_servicio_ia',
     'El asistente de la tienda no está respondiendo · Pintu Clic',
     'El servicio de inteligencia artificial que atiende el asistente y la búsqueda asistida acumuló varios fallos seguidos y dejó de responder. El resto del sitio sigue funcionando con normalidad. Revisa el detalle en el panel, en Asesoría.'
+),
+(
+    'comprobante_venta',
+    'Tu comprobante de compra · Pintu Clic',
+    'Gracias por tu compra en Pintu Clic. Ya está listo el comprobante de tu pedido: puedes verlo, imprimirlo o guardarlo como PDF desde el enlace.'
 )
 ON CONFLICT (tipo) DO NOTHING;
 
@@ -902,7 +907,10 @@ ON CONFLICT (id_cupon) DO NOTHING;
 
 -- 9F.1 Configuración (fila única, M03 · D8). Arranca en modo `fijo` a propósito: no necesita
 -- la clave de Gemini, así que el cuestionario se puede probar sin servicio externo (M03 · Q3).
--- `manos_por_defecto` queda en NULL porque RF-ASE-02-06 prohíbe suponer las manos (M03 · K9).
+-- `manos_por_defecto` arranca en 2. Nació en NULL porque RF-ASE-02-06 prohibía suponer las
+-- manos, pero el Product Owner decidió el 2026-10-27 quitar el campo de la calculadora
+-- (M03 · K9): ya no se preguntan, así que tiene que haber un número que aplicar. Manda
+-- siempre la ficha del producto si la trae; esto es el valor para los que no la tienen.
 -- Los valores de IA son los supuestos del contrato mientras no llegue el anexo B (M03 · Q1).
 INSERT INTO configuracion_asesoria (
     id_configuracion, modo_cuestionario, manos_por_defecto,
@@ -910,11 +918,20 @@ INSERT INTO configuracion_asesoria (
     ia_tiempo_espera_ms, ia_reintentos, ia_suspension_cuota_minutos,
     ia_retencion_incidentes_dias, ia_fallos_consecutivos_alerta
 ) VALUES (
-    1, 'fijo', NULL,
+    1, 'fijo', 2,
     'Ayuda a quien no sabe qué pintura necesita. Haz una pregunta por turno, siempre con opciones cerradas, y usa como máximo seis. Pregunta primero por la superficie, luego por el ambiente, el color deseado, el estado de la superficie y con qué se va a aplicar. Cuando ya tengas con qué filtrar, termina. No prometas resultados ni hables de precios.',
     'Eres el asesor de pintura de Pintu Clic. Responde en español, breve y claro, como alguien que atiende en el mostrador. Hablas de pintura, preparación de superficies, aplicación y de los productos de la tienda. No das precios, descuentos, existencias ni plazos de entrega: para eso remites al catálogo o al carrito. Para calcular cuánta pintura se necesita, remites a la calculadora. No inventas productos ni rendimientos. Si te preguntan algo ajeno a la pintura, lo dices con amabilidad y ofreces hablar con un asesor.',
     8000, 2, 60, 90, 5
 ) ON CONFLICT (id_configuracion) DO NOTHING;
+
+-- La fila ya existe en las instalaciones sembradas antes del 2026-10-27, y allí
+-- `manos_por_defecto` quedó en NULL: el INSERT de arriba no las toca. Esto rellena solo ese
+-- hueco. La condición `IS NULL` es deliberada: si alguien eligió un valor en el panel, se
+-- respeta.
+UPDATE configuracion_asesoria
+   SET manos_por_defecto = 2
+ WHERE id_configuracion = 1
+   AND manos_por_defecto IS NULL;
 
 -- 9F.2 Cuestionario de partida (M03 · F6, V3). Es el de la spec CONTRASTADO con lo que M01
 -- tiene de verdad: se omiten la opción «Zona húmeda» y la pregunta «¿Qué uso tendrá el

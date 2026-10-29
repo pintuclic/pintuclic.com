@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.19 (v4.18 + M03: cuestionario guiado e incidentes de IA; M20: registro de auditoría)
+-- VERSIÓN: 4.23 (v4.22 + M12: comprobante de venta imprimible y datos de facturación · M18: tipo comprobante_venta)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 85
+-- TOTAL TABLAS: 89
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -258,6 +258,23 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_resultado_auditoria') THEN
         CREATE TYPE enum_resultado_auditoria AS ENUM ('exito', 'fallo');
     END IF;
+
+    -- M11: postventa (cancelaciones, devoluciones y garantías)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_tipo_postventa') THEN
+        CREATE TYPE enum_tipo_postventa AS ENUM ('cancelacion', 'devolucion', 'garantia');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_postventa') THEN
+        CREATE TYPE enum_estado_postventa AS ENUM ('solicitada', 'en_revision', 'aprobada', 'rechazada', 'reembolsada');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_metodo_reembolso') THEN
+        CREATE TYPE enum_metodo_reembolso AS ENUM ('transferencia_bancaria', 'reverso_pasarela', 'saldo_tienda', 'efectivo');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_motivo_rechazo_postventa') THEN
+        CREATE TYPE enum_motivo_rechazo_postventa AS ENUM (
+            'fuera_de_plazo', 'producto_entonado', 'producto_abierto_o_danado',
+            'evidencia_insuficiente', 'politica_no_cumplida', 'otro'
+        );
+    END IF;
 END $$;
 
 -- ------------------------------------------------------------------------------
@@ -310,6 +327,9 @@ ALTER TYPE enum_estado_solicitud_contacto ADD VALUE IF NOT EXISTS 'rechazada' AF
 
 -- M18 (v4.18): aviso al administrador cuando el servicio de IA acumula fallos (M03 · I9, M18 HU-NOT-01)
 ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'alerta_servicio_ia';
+
+-- M18 (v4.23): aviso al cliente con el enlace a su comprobante de venta (M12 · R9)
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'comprobante_venta';
 
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS
@@ -1379,6 +1399,155 @@ COMMENT ON TABLE contacto_orden IS 'Registro de contactos con el cliente iniciad
 COMMENT ON COLUMN contacto_orden.medio IS 'Medio usado (p. ej. telefono, correo, whatsapp); la lista cerrada está pendiente del análisis';
 
 -- ==============================================================================
+-- 5.1 MÓDULO M07 — CHECKOUT Y PAGO (contracts/m07-checkout.contract.ts · P1)
+-- ==============================================================================
+
+DO $$
+BEGIN
+    -- Estado de la solicitud de compra SOL-AAAA-NNNNN (M07 · estados del contrato)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_solicitud_compra') THEN
+        CREATE TYPE enum_estado_solicitud_compra AS ENUM (
+            'en_pago', 'rechazada', 'pagada', 'completada', 'en_revision', 'vencida', 'cancelada'
+        );
+    END IF;
+
+    -- Estado de un intento de pago en la pasarela (Wompi: PENDING, APPROVED, DECLINED, ERROR, VOIDED)
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_intento_pago') THEN
+        CREATE TYPE enum_estado_intento_pago AS ENUM ('pendiente', 'aprobado', 'rechazado', 'error', 'anulado');
+    END IF;
+END $$;
+
+-- Tabla: solicitud_compra
+-- La compra congelada en el momento de pagar (RF-CHK-04-13). Sigue existiendo aunque el cobro o la orden fallen
+-- (RF-CHK-04-06). Es también la cola de creación de la orden (M07 · R6): estado `pagada` + próximo intento.
+CREATE TABLE IF NOT EXISTS solicitud_compra (
+    id_solicitud SERIAL PRIMARY KEY,
+    codigo VARCHAR(20) NOT NULL UNIQUE,
+    id_usuario INT NOT NULL,
+    estado enum_estado_solicitud_compra NOT NULL DEFAULT 'en_pago',
+    origen enum_origen_orden NOT NULL DEFAULT 'carrito',
+    id_cotizacion INT,
+    modo_entrega enum_modo_entrega NOT NULL,
+    direccion TEXT,
+    costo_entrega NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    sub_total NUMERIC(12, 2) NOT NULL,
+    descuento NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    descuento_eventos NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    descuento_empresa NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    total_mercancia NUMERIC(12, 2) NOT NULL,
+    total NUMERIC(12, 2) NOT NULL,
+    base_sin_impuesto NUMERIC(12, 2) NOT NULL,
+    importe_iva NUMERIC(12, 2) NOT NULL,
+    tasa_iva NUMERIC(5, 2) NOT NULL,
+    id_cupon INT,
+    importe_cupon NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    cupon_registrado BOOLEAN NOT NULL DEFAULT false,
+    observaciones TEXT,
+    transaccion_pago_id VARCHAR(100) UNIQUE,
+    monto_pagado NUMERIC(12, 2),
+    codigo_orden VARCHAR(50),
+    compra_directa BOOLEAN NOT NULL DEFAULT false,
+    reintentos_orden SMALLINT NOT NULL DEFAULT 0,
+    proximo_intento_orden TIMESTAMPTZ,
+    ultimo_error TEXT,
+    vence_en TIMESTAMPTZ NOT NULL,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_solicitud_compra_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_solicitud_compra_cotizacion FOREIGN KEY (id_cotizacion)
+        REFERENCES cotizacion (id_cotizacion) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT chk_solicitud_compra_codigo CHECK (codigo ~ '^SOL-[0-9]{4}-[0-9]{5,}$'),
+    CONSTRAINT chk_solicitud_compra_origen CHECK (origen <> 'cotizacion' OR id_cotizacion IS NOT NULL),
+    CONSTRAINT chk_solicitud_compra_direccion CHECK (modo_entrega <> 'domicilio' OR direccion IS NOT NULL),
+    CONSTRAINT chk_solicitud_compra_importes CHECK (
+        costo_entrega >= 0 AND sub_total >= 0 AND descuento >= 0 AND descuento_eventos >= 0
+        AND descuento_empresa >= 0 AND total_mercancia >= 0 AND total >= 0
+        AND base_sin_impuesto >= 0 AND importe_iva >= 0 AND importe_cupon >= 0
+        AND tasa_iva >= 0 AND tasa_iva <= 100
+        AND (monto_pagado IS NULL OR monto_pagado >= 0)
+    ),
+    CONSTRAINT chk_solicitud_compra_reintentos CHECK (reintentos_orden >= 0)
+);
+
+-- Bases creadas con la primera versión de esta tabla (v3.21 sin la compra directa).
+ALTER TABLE solicitud_compra ADD COLUMN IF NOT EXISTS compra_directa BOOLEAN NOT NULL DEFAULT false;
+
+COMMENT ON TABLE solicitud_compra IS 'Solicitud de compra SOL-AAAA-NNNNN de M07: la compra congelada al pagar; también la cola de creación de la orden';
+COMMENT ON COLUMN solicitud_compra.descuento IS 'Suma de descuento_eventos, descuento_empresa e importe_cupon (resumen de M06)';
+COMMENT ON COLUMN solicitud_compra.total_mercancia IS 'Total de M06 (mercancía con IVA, sin envío)';
+COMMENT ON COLUMN solicitud_compra.total IS 'Lo que se cobra: total_mercancia + costo_entrega (M07 · R10)';
+COMMENT ON COLUMN solicitud_compra.id_cupon IS 'Cupón aplicado (referencia a cupon, sin FK: esa tabla se crea más adelante en este script)';
+COMMENT ON COLUMN solicitud_compra.cupon_registrado IS 'true mientras el uso del cupón está registrado en M06 con referencia = codigo (M07 · R2 e, R3)';
+COMMENT ON COLUMN solicitud_compra.transaccion_pago_id IS 'Id de la transacción APROBADA en la pasarela; pasa a la orden (M08 · R2)';
+COMMENT ON COLUMN solicitud_compra.compra_directa IS 'Comprada con "Comprar ahora" desde la ficha, sin el carrito: al crear la orden no se toca el carrito (M07 · R17)';
+COMMENT ON COLUMN solicitud_compra.proximo_intento_orden IS 'Cuándo vuelve a intentarse crear la orden en M08; null si no hay nada pendiente (M07 · R6)';
+
+-- Tabla: linea_solicitud
+-- Copia de cada línea del carrito con su precio de M06 y sus descuentos, tal como se cobrarán.
+CREATE TABLE IF NOT EXISTS linea_solicitud (
+    id_linea_solicitud SERIAL PRIMARY KEY,
+    id_solicitud INT NOT NULL,
+    posicion SMALLINT NOT NULL,
+    id_variante INT NOT NULL,
+    id_color INT,
+    id_cotizacion INT,
+    nombre_producto VARCHAR(150) NOT NULL,
+    marca VARCHAR(150),
+    medida VARCHAR(150),
+    sku VARCHAR(100),
+    color_nombre VARCHAR(150),
+    color_hexadecimal VARCHAR(7),
+    cantidad INT NOT NULL,
+    precio_inicial NUMERIC(12, 2) NOT NULL,
+    precio_aplicado NUMERIC(12, 2) NOT NULL,
+    subtotal NUMERIC(12, 2) NOT NULL,
+    descuentos JSONB NOT NULL DEFAULT '[]'::jsonb,
+    CONSTRAINT fk_linea_solicitud_solicitud FOREIGN KEY (id_solicitud)
+        REFERENCES solicitud_compra (id_solicitud) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT uq_linea_solicitud_posicion UNIQUE (id_solicitud, posicion),
+    CONSTRAINT chk_linea_solicitud_cantidad CHECK (cantidad > 0),
+    CONSTRAINT chk_linea_solicitud_importes CHECK (precio_inicial >= 0 AND precio_aplicado >= 0 AND subtotal >= 0),
+    CONSTRAINT chk_linea_solicitud_descuentos CHECK (jsonb_typeof(descuentos) = 'array')
+);
+
+COMMENT ON TABLE linea_solicitud IS 'Líneas congeladas de una solicitud de compra (M07); id_variante e id_color son referencias sin FK, como en linea_orden';
+COMMENT ON COLUMN linea_solicitud.descuentos IS 'Descuentos de M06 de la línea: [{ordenAplicacion, origen, porcentaje, importe}] (pasan a linea_orden_descuento)';
+
+-- Tabla: intento_pago
+-- Cada cobro enviado a la pasarela para una solicitud (M07 · R4, R11). Nunca guarda el celular completo (R12).
+CREATE TABLE IF NOT EXISTS intento_pago (
+    id_intento_pago SERIAL PRIMARY KEY,
+    id_solicitud INT NOT NULL,
+    numero SMALLINT NOT NULL,
+    referencia VARCHAR(100) NOT NULL UNIQUE,
+    id_transaccion VARCHAR(100) UNIQUE,
+    estado enum_estado_intento_pago NOT NULL DEFAULT 'pendiente',
+    monto_centavos BIGINT NOT NULL,
+    celular_enmascarado VARCHAR(20) NOT NULL,
+    mensaje VARCHAR(255),
+    ultima_consulta TIMESTAMPTZ,
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_intento_pago_solicitud FOREIGN KEY (id_solicitud)
+        REFERENCES solicitud_compra (id_solicitud) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT uq_intento_pago_numero UNIQUE (id_solicitud, numero),
+    CONSTRAINT chk_intento_pago_numero CHECK (numero > 0),
+    CONSTRAINT chk_intento_pago_monto CHECK (monto_centavos > 0)
+);
+
+COMMENT ON TABLE intento_pago IS 'Intentos de cobro con Nequi por Wompi de una solicitud de compra (M07)';
+COMMENT ON COLUMN intento_pago.referencia IS 'Referencia enviada a la pasarela: <codigo SOL>-<numero> (única, como exige Wompi)';
+COMMENT ON COLUMN intento_pago.ultima_consulta IS 'Última vez que se preguntó su estado a la pasarela (M07 · R5)';
+
+CREATE INDEX IF NOT EXISTS idx_solicitud_compra_usuario ON solicitud_compra (id_usuario, fecha_creacion DESC);
+CREATE INDEX IF NOT EXISTS idx_solicitud_compra_estado ON solicitud_compra (estado, fecha_creacion DESC);
+CREATE INDEX IF NOT EXISTS idx_solicitud_compra_cola ON solicitud_compra (proximo_intento_orden)
+    WHERE proximo_intento_orden IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_linea_solicitud_solicitud ON linea_solicitud (id_solicitud);
+CREATE INDEX IF NOT EXISTS idx_intento_pago_solicitud ON intento_pago (id_solicitud);
+
+-- ==============================================================================
 -- 6. MÓDULO DE PAGOS Y FACTURACIÓN
 -- ==============================================================================
 
@@ -1419,6 +1588,89 @@ CREATE TABLE IF NOT EXISTS factura (
 );
 
 COMMENT ON TABLE factura IS 'Factura electrónica o física vinculada a una orden';
+
+-- ==============================================================================
+-- 6.x MÓDULO M11 — POSTVENTA (DEVOLUCIONES, REEMBOLSOS Y CANCELACIONES)
+-- ==============================================================================
+
+-- Tabla: solicitud_postventa
+-- Cabecera del trámite de postventa: cancelaciones, devoluciones y garantías (M11 · HU-POS-01 a HU-POS-06).
+CREATE TABLE IF NOT EXISTS solicitud_postventa (
+    id_solicitud_postventa SERIAL PRIMARY KEY,
+    codigo_visible VARCHAR(50) NOT NULL UNIQUE,
+    id_orden INT NOT NULL,
+    id_usuario INT NOT NULL,
+    tipo enum_tipo_postventa NOT NULL,
+    estado enum_estado_postventa NOT NULL DEFAULT 'solicitada',
+    motivo_general TEXT NOT NULL,
+    observaciones_resolucion TEXT,
+    motivo_rechazo enum_motivo_rechazo_postventa,
+    id_empleado_resuelve INT,
+    total_reembolso NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    metodo_reembolso enum_metodo_reembolso,
+    referencia_reembolso VARCHAR(100),
+    comprobante_url VARCHAR(255),
+    datos_bancarios JSONB,
+    evidencia_urls JSONB,
+    fecha_solicitud TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_resolucion TIMESTAMPTZ,
+    fecha_reembolso TIMESTAMPTZ,
+    CONSTRAINT fk_postventa_orden FOREIGN KEY (id_orden)
+        REFERENCES orden (id_orden) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_postventa_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_postventa_empleado FOREIGN KEY (id_empleado_resuelve)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_postventa_total_reembolso CHECK (total_reembolso >= 0)
+);
+
+COMMENT ON TABLE solicitud_postventa IS 'Cabecera de trámites de postventa: cancelaciones, devoluciones y garantías (M11)';
+COMMENT ON COLUMN solicitud_postventa.codigo_visible IS 'DEV-AAAA-NNNNN: código público generado con consecutivo corrido (M11)';
+COMMENT ON COLUMN solicitud_postventa.total_reembolso IS 'Monto económico total a restituir por la cancelación o devolución';
+
+-- Tabla: linea_solicitud_postventa
+-- Desglose de variantes y cantidades devueltas por el cliente (M11 · HU-POS-02).
+CREATE TABLE IF NOT EXISTS linea_solicitud_postventa (
+    id_linea_solicitud_postventa SERIAL PRIMARY KEY,
+    id_solicitud_postventa INT NOT NULL,
+    id_linea_orden INT NOT NULL,
+    cantidad INT NOT NULL DEFAULT 1,
+    precio_unitario NUMERIC(12, 2) NOT NULL,
+    subtotal NUMERIC(12, 2) NOT NULL,
+    motivo_especifico VARCHAR(300),
+    CONSTRAINT fk_lsp_solicitud FOREIGN KEY (id_solicitud_postventa)
+        REFERENCES solicitud_postventa (id_solicitud_postventa) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_lsp_linea_orden FOREIGN KEY (id_linea_orden)
+        REFERENCES linea_orden (id_linea_orden) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT ck_lsp_cantidad CHECK (cantidad > 0)
+);
+
+COMMENT ON TABLE linea_solicitud_postventa IS 'Desglose de líneas afectadas en la solicitud de postventa (M11)';
+
+-- Tabla: historial_estado_postventa
+-- Trazabilidad inmutable de los cambios de estado del trámite postventa (M11 · HU-POS-05).
+CREATE TABLE IF NOT EXISTS historial_estado_postventa (
+    id_historial_estado_postventa SERIAL PRIMARY KEY,
+    id_solicitud_postventa INT NOT NULL,
+    estado_anterior enum_estado_postventa,
+    estado_nuevo enum_estado_postventa NOT NULL,
+    id_usuario_autor INT,
+    motivo TEXT,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_hep_solicitud FOREIGN KEY (id_solicitud_postventa)
+        REFERENCES solicitud_postventa (id_solicitud_postventa) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_hep_autor FOREIGN KEY (id_usuario_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+COMMENT ON TABLE historial_estado_postventa IS 'Trazabilidad inmutable de cambios de estado en solicitudes de postventa (M11)';
+
+CREATE INDEX IF NOT EXISTS idx_postventa_orden ON solicitud_postventa (id_orden);
+CREATE INDEX IF NOT EXISTS idx_postventa_usuario ON solicitud_postventa (id_usuario, fecha_solicitud DESC);
+CREATE INDEX IF NOT EXISTS idx_postventa_estado ON solicitud_postventa (estado, fecha_solicitud DESC);
+CREATE INDEX IF NOT EXISTS idx_postventa_tipo ON solicitud_postventa (tipo);
+CREATE INDEX IF NOT EXISTS idx_linea_postventa_solicitud ON linea_solicitud_postventa (id_solicitud_postventa);
+CREATE INDEX IF NOT EXISTS idx_historial_postventa_solicitud ON historial_estado_postventa (id_solicitud_postventa, fecha ASC);
 
 -- ==============================================================================
 -- 7. MÓDULO DE SERVICIOS Y RESERVACIONES
@@ -1935,6 +2187,55 @@ CREATE TABLE IF NOT EXISTS pagina_institucional (
 );
 
 COMMENT ON TABLE pagina_institucional IS 'Páginas de contenido institucional y políticas informativas de vitrina (M16 - HU-CON-01, HU-CON-03)';
+
+-- Tabla: contacto_institucional
+-- Datos de contacto del sitio (pie de página): una sola fila, id = 1, que edita el personal desde el panel (M16 · HU-CON-05).
+-- Cada dato es opcional: el sitio no muestra lo que esté vacío.
+CREATE TABLE IF NOT EXISTS contacto_institucional (
+    id_contacto SMALLINT PRIMARY KEY DEFAULT 1,
+    direccion VARCHAR(200),
+    telefono VARCHAR(30),
+    correo VARCHAR(150),
+    facebook VARCHAR(300),
+    instagram VARCHAR(300),
+    youtube VARCHAR(300),
+    tiktok VARCHAR(300),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_contacto_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_contacto_unico CHECK (id_contacto = 1),
+    CONSTRAINT ck_contacto_redes CHECK (
+        (facebook IS NULL OR facebook ~* '^https://[^[:space:]]+$')
+        AND (instagram IS NULL OR instagram ~* '^https://[^[:space:]]+$')
+        AND (youtube IS NULL OR youtube ~* '^https://[^[:space:]]+$')
+        AND (tiktok IS NULL OR tiktok ~* '^https://[^[:space:]]+$')
+    )
+);
+
+COMMENT ON TABLE contacto_institucional IS 'Datos de contacto y redes del sitio para el pie de página; una sola fila (id = 1), todo opcional (M16)';
+COMMENT ON COLUMN contacto_institucional.facebook IS 'Enlace https:// al perfil; nunca javascript: ni http:// (M16)';
+
+-- Tabla: imagen_categoria_inicio
+-- Imagen de la tarjeta de cada categoría en «Explora nuestras categorías» del inicio (FP-01). Una por categoría, con su punto de
+-- enfoque (0 a 100, 50 = centro). Sin fila, la tarjeta usa la ilustración de respaldo.
+CREATE TABLE IF NOT EXISTS imagen_categoria_inicio (
+    id_categoria INT PRIMARY KEY,
+    contenido BYTEA NOT NULL,
+    mime_type VARCHAR(20) NOT NULL,
+    foco_x SMALLINT NOT NULL DEFAULT 50,
+    foco_y SMALLINT NOT NULL DEFAULT 50,
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_imagen_categoria_inicio_categoria FOREIGN KEY (id_categoria)
+        REFERENCES categoria (id_categoria) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_imagen_categoria_inicio_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_imagen_categoria_inicio_mime CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+    CONSTRAINT ck_imagen_categoria_inicio_foco CHECK (foco_x BETWEEN 0 AND 100 AND foco_y BETWEEN 0 AND 100)
+);
+
+COMMENT ON TABLE imagen_categoria_inicio IS 'Imagen de la tarjeta de categoría del inicio, editable por el personal, con su punto de enfoque (FP-01)';
 COMMENT ON COLUMN pagina_institucional.slug IS 'Identificador URL único en formato kebab-case (ej. sobre-nosotros, terminos-y-condiciones)';
 COMMENT ON COLUMN pagina_institucional.estado IS 'Ciclo de vida editorial: borrador, publicado o archivado. Solo publicado es visible en rutas públicas';
 COMMENT ON COLUMN pagina_institucional.id_autor IS 'Último usuario administrador/empleado que creó o editó la página';
@@ -2265,6 +2566,10 @@ CREATE TABLE IF NOT EXISTS anuncio_publicitario (
     fecha_inicio DATE NOT NULL,
     fecha_fin DATE NOT NULL,
     orden SMALLINT NOT NULL DEFAULT 0,
+    foco_escritorio_x SMALLINT NOT NULL DEFAULT 50,
+    foco_escritorio_y SMALLINT NOT NULL DEFAULT 50,
+    foco_movil_x SMALLINT NOT NULL DEFAULT 50,
+    foco_movil_y SMALLINT NOT NULL DEFAULT 50,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
     id_usuario_actualizo INT,
@@ -2275,6 +2580,10 @@ CREATE TABLE IF NOT EXISTS anuncio_publicitario (
     CONSTRAINT ck_anuncio_texto_alternativo CHECK (length(btrim(texto_alternativo)) >= 3),
     CONSTRAINT ck_anuncio_fechas CHECK (fecha_fin >= fecha_inicio),
     CONSTRAINT ck_anuncio_orden CHECK (orden BETWEEN 0 AND 999),
+    CONSTRAINT ck_anuncio_foco CHECK (
+        foco_escritorio_x BETWEEN 0 AND 100 AND foco_escritorio_y BETWEEN 0 AND 100
+        AND foco_movil_x BETWEEN 0 AND 100 AND foco_movil_y BETWEEN 0 AND 100
+    ),
     CONSTRAINT ck_anuncio_enlace CHECK (
         enlace IS NULL
         OR enlace ~* '^https://[^[:space:]]+$'
@@ -2282,7 +2591,26 @@ CREATE TABLE IF NOT EXISTS anuncio_publicitario (
     )
 );
 
+-- Bases creadas antes del punto de enfoque (v4.20 o anteriores).
+ALTER TABLE anuncio_publicitario ADD COLUMN IF NOT EXISTS foco_escritorio_x SMALLINT NOT NULL DEFAULT 50;
+ALTER TABLE anuncio_publicitario ADD COLUMN IF NOT EXISTS foco_escritorio_y SMALLINT NOT NULL DEFAULT 50;
+ALTER TABLE anuncio_publicitario ADD COLUMN IF NOT EXISTS foco_movil_x SMALLINT NOT NULL DEFAULT 50;
+ALTER TABLE anuncio_publicitario ADD COLUMN IF NOT EXISTS foco_movil_y SMALLINT NOT NULL DEFAULT 50;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_anuncio_foco') THEN
+        ALTER TABLE anuncio_publicitario ADD CONSTRAINT ck_anuncio_foco CHECK (
+            foco_escritorio_x BETWEEN 0 AND 100 AND foco_escritorio_y BETWEEN 0 AND 100
+            AND foco_movil_x BETWEEN 0 AND 100 AND foco_movil_y BETWEEN 0 AND 100
+        );
+    END IF;
+END $$;
+
 COMMENT ON TABLE anuncio_publicitario IS 'Anuncios (imagen y enlace) de los espacios publicitarios del sitio, con vigencia y orden (M14 · B1-B9)';
+COMMENT ON COLUMN anuncio_publicitario.foco_escritorio_x IS 'Punto de enfoque de la imagen de escritorio, % desde la izquierda (0-100); decide qué parte se ve cuando el espacio la recorta (M14 · B8)';
+COMMENT ON COLUMN anuncio_publicitario.foco_escritorio_y IS 'Punto de enfoque de la imagen de escritorio, % desde arriba (0-100)';
+COMMENT ON COLUMN anuncio_publicitario.foco_movil_x IS 'Punto de enfoque de la imagen móvil, % desde la izquierda (0-100)';
+COMMENT ON COLUMN anuncio_publicitario.foco_movil_y IS 'Punto de enfoque de la imagen móvil, % desde arriba (0-100)';
 COMMENT ON COLUMN anuncio_publicitario.enlace IS 'https://… o ruta interna (/…); nunca javascript:, data: ni http:// (M14 · B6)';
 
 -- Tabla: anuncio_imagen
@@ -2717,5 +3045,112 @@ CREATE INDEX IF NOT EXISTS idx_lineacotizacion_cotizacion ON linea_cotizacion(id
 CREATE INDEX IF NOT EXISTS idx_lineacarrito_cotizacion ON linea_carrito(id_cotizacion) WHERE id_cotizacion IS NOT NULL;
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (85 TABLAS - v4.19)
+-- M12. FACTURACIÓN — comprobante de venta imprimible (v4.23)
+-- ==============================================================================
+
+-- Tabla: datos_facturacion
+-- Ficha única (id = 1) con los datos del VENDEDOR que salen en el comprobante. La edita el personal; sin razón social, NIT
+-- y dirección no se emite ningún comprobante (M12 · R6). Sin datos sembrados a propósito: los carga el cliente.
+CREATE TABLE IF NOT EXISTS datos_facturacion (
+    id_datos SMALLINT PRIMARY KEY DEFAULT 1,
+    razon_social VARCHAR(150),
+    nit VARCHAR(30),
+    regimen VARCHAR(150),
+    direccion VARCHAR(200),
+    ciudad VARCHAR(100),
+    telefono VARCHAR(30),
+    correo VARCHAR(150),
+    pie_legal VARCHAR(500),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    id_usuario_actualizo INT,
+    CONSTRAINT fk_datos_facturacion_usuario FOREIGN KEY (id_usuario_actualizo)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT ck_datos_facturacion_unico CHECK (id_datos = 1)
+);
+
+COMMENT ON TABLE datos_facturacion IS 'Datos del vendedor para el comprobante de venta; una sola fila (id = 1) que edita el personal (M12 · R6)';
+
+-- Tabla: comprobante_venta
+-- Copia CONGELADA de una venta (M12 · R3): vendedor, comprador e importes tal como estaban al emitir. Uno por orden (R1).
+CREATE TABLE IF NOT EXISTS comprobante_venta (
+    id_comprobante SERIAL PRIMARY KEY,
+    numero VARCHAR(20) NOT NULL UNIQUE,
+    id_orden INT NOT NULL UNIQUE,
+    fecha_emision TIMESTAMPTZ NOT NULL DEFAULT now(),
+    vendedor_razon_social VARCHAR(150) NOT NULL,
+    vendedor_nit VARCHAR(30) NOT NULL,
+    vendedor_regimen VARCHAR(150),
+    vendedor_direccion VARCHAR(200) NOT NULL,
+    vendedor_ciudad VARCHAR(100),
+    vendedor_telefono VARCHAR(30),
+    vendedor_correo VARCHAR(150),
+    comprador_nombre VARCHAR(150) NOT NULL,
+    comprador_documento VARCHAR(30),
+    comprador_correo VARCHAR(150) NOT NULL,
+    comprador_telefono VARCHAR(30),
+    comprador_direccion TEXT NOT NULL,
+    subtotal NUMERIC(12, 2) NOT NULL,
+    descuento NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    envio NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    base_sin_iva NUMERIC(12, 2) NOT NULL,
+    tasa_iva NUMERIC(5, 2) NOT NULL,
+    iva NUMERIC(12, 2) NOT NULL,
+    total NUMERIC(12, 2) NOT NULL,
+    pie_legal VARCHAR(500),
+    CONSTRAINT fk_comprobante_orden FOREIGN KEY (id_orden)
+        REFERENCES orden (id_orden) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT ck_comprobante_numero CHECK (numero ~ '^CV-[0-9]{6,}$'),
+    CONSTRAINT ck_comprobante_importes CHECK (
+        subtotal >= 0 AND descuento >= 0 AND envio >= 0 AND base_sin_iva >= 0 AND iva >= 0 AND total >= 0
+        AND tasa_iva >= 0 AND tasa_iva <= 100
+    )
+);
+
+COMMENT ON TABLE comprobante_venta IS 'Comprobante de venta imprimible, uno por orden y congelado (M12). No es factura electrónica DIAN';
+COMMENT ON COLUMN comprobante_venta.numero IS 'CV-NNNNNN, continuo, sin saltos y sin reutilizar; sale de consecutivo (nombre = comprobante) en la misma transacción (M12 · R4)';
+
+-- Tabla: linea_comprobante_venta
+CREATE TABLE IF NOT EXISTS linea_comprobante_venta (
+    id_linea_comprobante SERIAL PRIMARY KEY,
+    id_comprobante INT NOT NULL,
+    orden SMALLINT NOT NULL,
+    descripcion VARCHAR(150) NOT NULL,
+    presentacion VARCHAR(150) NOT NULL,
+    color VARCHAR(150),
+    cantidad INT NOT NULL,
+    precio_unitario NUMERIC(12, 2) NOT NULL,
+    descuento_unitario NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    total_linea NUMERIC(12, 2) NOT NULL,
+    CONSTRAINT fk_linea_comprobante FOREIGN KEY (id_comprobante)
+        REFERENCES comprobante_venta (id_comprobante) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT uq_linea_comprobante_orden UNIQUE (id_comprobante, orden),
+    CONSTRAINT ck_linea_comprobante CHECK (
+        cantidad > 0 AND precio_unitario >= 0 AND descuento_unitario >= 0 AND total_linea >= 0
+    )
+);
+
+COMMENT ON TABLE linea_comprobante_venta IS 'Líneas congeladas de un comprobante de venta (M12 · R3)';
+
+-- Un comprobante emitido no se modifica ni se borra (M12 · R3): un disparador lo rechaza sea quien sea, igual que la auditoría.
+CREATE OR REPLACE FUNCTION fn_comprobante_inmutable() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'Un comprobante de venta emitido es inmutable: no se permite % (M12 · R3)', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END $$;
+
+COMMENT ON FUNCTION fn_comprobante_inmutable() IS 'Rechaza UPDATE y DELETE sobre comprobante_venta y linea_comprobante_venta (M12 · R3)';
+
+DROP TRIGGER IF EXISTS trg_comprobante_sin_cambios ON comprobante_venta;
+CREATE TRIGGER trg_comprobante_sin_cambios
+    BEFORE UPDATE OR DELETE ON comprobante_venta
+    FOR EACH ROW EXECUTE FUNCTION fn_comprobante_inmutable();
+
+DROP TRIGGER IF EXISTS trg_linea_comprobante_sin_cambios ON linea_comprobante_venta;
+CREATE TRIGGER trg_linea_comprobante_sin_cambios
+    BEFORE UPDATE OR DELETE ON linea_comprobante_venta
+    FOR EACH ROW EXECUTE FUNCTION fn_comprobante_inmutable();
+
+-- ==============================================================================
+-- FIN DEL SCRIPT DDL (96 TABLAS - v4.23)
 -- ==============================================================================

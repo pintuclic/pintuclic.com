@@ -2,13 +2,14 @@
 
 import { useId, useState } from 'react';
 import { Building2, FileText, UsersRound } from 'lucide-react';
+import { ClientesEmpresaView } from '@/modules/m06-precios/components/ClientesEmpresaView';
 import { SegmentedTabs, Select } from '@/core/components';
 import { estadoSolicitudEmpresaSchema, type EstadoSolicitudEmpresa } from '../../dtos/m04-cuentas.dto';
 import { CuentasTab } from './CuentasTab';
 import { RenovacionesTab } from './RenovacionesTab';
 import { SolicitudesTab } from './SolicitudesTab';
 
-type Pestana = 'solicitudes' | 'renovaciones' | 'cuentas';
+type Pestana = 'solicitudes' | 'renovaciones' | 'cuentas' | 'tipos';
 
 const OPCIONES_ESTADO = [
   { value: 'pendiente', label: 'Pendientes' },
@@ -35,17 +36,18 @@ export function EmpresasAdminView() {
         </h1>
         <p className="mt-1 font-sans text-xs text-neutral-medium sm:text-sm">
           Revisa los registros de empresa, los ascensos de cuentas personales y las renovaciones de NIT (HU-CUE-09,
-          HU-CUE-10).
+          HU-CUE-10), y define los tipos de cliente empresa (con su descuento) que se asignan a cada cuenta.
         </p>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="sm:w-[600px]">
+        <div className="sm:w-[780px]">
           <SegmentedTabs
             options={[
               { value: 'solicitudes', label: 'Solicitudes de empresa' },
               { value: 'renovaciones', label: 'Renovaciones de NIT' },
               { value: 'cuentas', label: 'Cuentas y descuentos' },
+              { value: 'tipos', label: 'Tipos de cliente' },
             ]}
             value={pestana}
             onChange={setPestana}
@@ -54,7 +56,7 @@ export function EmpresasAdminView() {
             panelId={`${idPestanas}-panel`}
           />
         </div>
-        {pestana !== 'cuentas' && (
+        {(pestana === 'solicitudes' || pestana === 'renovaciones') && (
           <div className="sm:w-56">
             <Select
               id="filtro-estado-empresas"
@@ -76,6 +78,7 @@ export function EmpresasAdminView() {
         aria-labelledby={`${idPestanas}-tab-${pestana}`}
         className="overflow-hidden rounded-card border border-neutral-light/70 bg-neutral-white shadow-card"
       >
+        {pestana !== 'tipos' && (
         <div className="flex items-center gap-2 border-b border-neutral-light/60 px-6 py-4">
           {pestana === 'solicitudes' && <Building2 className="h-5 w-5 text-action" aria-hidden="true" />}
           {pestana === 'renovaciones' && <FileText className="h-5 w-5 text-action" aria-hidden="true" />}
@@ -86,10 +89,17 @@ export function EmpresasAdminView() {
             {pestana === 'cuentas' && 'Cuentas empresa y su descuento'}
           </h2>
         </div>
+        )}
         {/* `key` reinicia la paginación al cambiar de filtro o de pestaña. */}
         {pestana === 'solicitudes' && <SolicitudesTab key={`s-${estado ?? 'todas'}`} estado={estado} />}
         {pestana === 'renovaciones' && <RenovacionesTab key={`r-${estado ?? 'todas'}`} estado={estado} />}
         {pestana === 'cuentas' && <CuentasTab />}
+        {/* Los tipos (sub-roles con su descuento) se crean y editan aquí mismo; la cuenta elige uno en «Cuentas y descuentos». */}
+        {pestana === 'tipos' && (
+          <div className="p-6">
+            <ClientesEmpresaView />
+          </div>
+        )}
       </section>
     </div>
   );

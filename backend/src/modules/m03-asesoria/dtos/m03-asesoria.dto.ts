@@ -126,8 +126,12 @@ export const calculadoraProductoSchema = z.object({
   /** m² por galón y por mano, tal como lo registró M01. */
   rendimientoMin: z.number().positive(),
   rendimientoMax: z.number().positive(),
-  /** K9: sugerencia; null si no hay ninguna. El campo del formulario nace vacío igual. */
-  manosSugeridas: z.number().int().min(1).max(10).nullable(),
+  /**
+   * K9: las manos que aplica la calculadora. Nunca es null: la pantalla ya no las pregunta,
+   * así que el servidor siempre resuelve un número y la pantalla lo muestra junto al
+   * resultado («Para N manos») para que el supuesto quede a la vista.
+   */
+  manosAplicadas: z.number().int().min(1).max(10),
   presentaciones: z.array(presentacionCalculableSchema).min(1),
   advertencia: z.string(),
 });

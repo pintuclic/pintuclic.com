@@ -46,6 +46,11 @@ describe('formularios de M08', () => {
       expect(filtrosBandejaFormSchema.parse({ ...FILTROS_BANDEJA_VACIOS, codigo: '  PC-2026  ' }).codigo).toBe('PC-2026');
       expect(filtrosBandejaFormSchema.safeParse({ ...FILTROS_BANDEJA_VACIOS, telefono: '1'.repeat(21) }).success).toBe(false);
     });
+
+    it('elimina el prefijo # si el usuario lo incluye al buscar código', () => {
+      const valores = { ...FILTROS_BANDEJA_VACIOS, codigo: '#PC-2026-00005' };
+      expect(aFiltrosBandeja(valores)).toEqual({ codigo: 'PC-2026-00005' });
+    });
   });
 
   describe('cambio de estado (HU-ORD-03)', () => {

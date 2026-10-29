@@ -52,6 +52,13 @@ export async function calcularCantidad(peticion: {
   return data.data;
 }
 
+/**
+ * K4 — cuánta área cubre una cantidad.
+ *
+ * Hoy ninguna pantalla lo llama: el Product Owner retiró la pestaña «Cuánto rinde» el
+ * 28/10/2026 porque no está en el mockup. Se conserva, junto al cálculo del servidor, para
+ * que devolverla sea volver a pintar la pestaña y no rehacer el camino entero.
+ */
 export async function calcularCobertura(peticion: {
   idProducto: number;
   idVariante: number;

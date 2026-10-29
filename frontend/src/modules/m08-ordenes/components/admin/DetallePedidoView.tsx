@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Mail, MapPin, Phone } from 'lucide-react';
+import { ArrowLeft, Mail, MapPin, Phone, Receipt } from 'lucide-react';
 import { AdminPageHeader, Alert, ButtonLink, Skeleton } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
 import { useGestionStore } from '../../store/gestionStore';
@@ -45,9 +45,14 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
         title={`Pedido ${codigo}`}
         subtitle="Detalle completo para atender el pedido."
         actions={
-          <ButtonLink href="/admin/pedidos" variant="ghost" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />}>
-            Volver a pedidos
-          </ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href={`/admin/pedidos/${encodeURIComponent(codigo)}/comprobante`} variant="outline" size="sm" leftIcon={<Receipt className="h-4 w-4" />}>
+              Ver comprobante
+            </ButtonLink>
+            <ButtonLink href="/admin/pedidos" variant="ghost" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />}>
+              Volver a pedidos
+            </ButtonLink>
+          </div>
         }
       />
 
@@ -141,19 +146,32 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
                 <p className="text-sm text-neutral-medium">Sin otras compras registradas.</p>
               ) : (
                 <ul className="space-y-2 text-sm">
-                  {historialCliente.map((o) => (
-                    <li key={o.codigo} className="flex items-center justify-between gap-2">
-                      <Link
-                        href={`/admin/pedidos/${o.codigo}`}
-                        aria-current={o.codigo === detalle.codigo ? 'page' : undefined}
-                        className="font-title font-semibold text-action hover:underline"
+                  {historialCliente.map((o) => {
+                    const actual = o.codigo === detalle.codigo;
+                    return (
+                      <li
+                        key={o.codigo}
+                        className={`rounded-input border px-3 py-2.5 ${actual ? 'border-action/40 bg-subaction' : 'border-neutral-light'}`}
                       >
-                        {o.codigo}
-                      </Link>
-                      <span className="text-neutral-medium">{formatCOP(o.total)}</span>
-                      <EstadoBadge estado={o.estado} />
-                    </li>
-                  ))}
+                        <div className="flex items-baseline justify-between gap-3">
+                          <Link
+                            href={`/admin/pedidos/${o.codigo}`}
+                            aria-current={actual ? 'page' : undefined}
+                            className="whitespace-nowrap font-title font-semibold text-action hover:underline"
+                          >
+                            {o.codigo}
+                          </Link>
+                          <span className="whitespace-nowrap font-title font-semibold text-neutral-black">{formatCOP(o.total)}</span>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                          <EstadoBadge estado={o.estado} />
+                          <span className="text-xs text-neutral-medium">
+                            {actual ? 'Este pedido' : <time dateTime={o.fecha}>{formatearFecha(o.fecha)}</time>}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </Tarjeta>

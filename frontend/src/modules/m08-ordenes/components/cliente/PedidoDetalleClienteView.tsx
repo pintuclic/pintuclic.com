@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Receipt } from 'lucide-react';
 import { Alert, ButtonLink, Container, Skeleton } from '@/core/components';
 import type { OrdenDetalleCliente } from '../../dtos/m08-ordenes.dto';
 import { mensajeDeError } from '../../services/mensaje-error';
@@ -11,6 +11,7 @@ import { EstadoBadge } from '../EstadoBadge';
 import { HistorialEstados } from '../HistorialEstados';
 import { LineasOrdenLista } from '../LineasOrdenLista';
 import { TotalesOrden } from '../TotalesOrden';
+import { BotonPostventaOrden } from '@/modules/m11-postventa/components/cliente/BotonPostventaOrden';
 
 /** HU-ORD-04 · Detalle de un pedido del cliente titular: qué compró, cuánto pagó y en qué estado está. */
 export function PedidoDetalleClienteView({ codigo }: { codigo: string }) {
@@ -54,6 +55,20 @@ export function PedidoDetalleClienteView({ codigo }: { codigo: string }) {
                     <time dateTime={orden.fecha}>{formatearFecha(orden.fecha)}</time>
                     {orden.modoEntrega ? ` · ${ETIQUETA_MODO_ENTREGA[orden.modoEntrega]}` : ''}
                   </p>
+                  <BotonPostventaOrden
+                    codigoOrden={orden.codigo}
+                    estadoOrden={orden.estado}
+                    lineas={orden.lineas.map((l) => ({
+                      nombreProducto: l.nombreProducto,
+                      varianteCopia: l.varianteCopia,
+                      cantidad: l.cantidad,
+                      precioAplicado: l.precioAplicado,
+                      esEntonado: Boolean(l.colorSolicitado),
+                    }))}
+                  />
+                  <ButtonLink href={`/perfil/pedidos/${encodeURIComponent(orden.codigo)}/comprobante`} variant="outline" size="sm" leftIcon={<Receipt className="h-4 w-4" />} className="mt-3">
+                    Ver comprobante
+                  </ButtonLink>
                 </div>
                 <EstadoBadge estado={orden.estado} />
               </header>

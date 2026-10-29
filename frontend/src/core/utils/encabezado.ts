@@ -1,15 +1,11 @@
-/** Cuántos píxeles hay que mover el scroll en un sentido para que la franja superior cambie (evita parpadeos por temblores). */
-export const UMBRAL_SCROLL_PX = 8;
+/** Hasta cuántos píxeles de scroll se considera que la página sigue «arriba de todo» (un temblor del dedo o del trackpad no cuenta). */
+export const MARGEN_ARRIBA_PX = 2;
 
 /**
- * Decide si la franja azul de información (Topbar) debe verse. Se esconde al BAJAR y reaparece al SUBIR; arriba de todo
- * siempre se ve. `y` es el scroll actual, `anterior` el de la medición pasada y `alturaFranja` lo que mide la franja (mientras
- * el scroll no la supere no tiene sentido esconderla). Si el cambio es menor al umbral, queda como estaba.
+ * Decide si la franja azul de información (Topbar) debe verse: solo cuando la página está de verdad arriba de todo.
+ * En cuanto se baja se pliega y no vuelve hasta regresar al inicio. No reaparece al subir un poco: eso movía la cabecera
+ * (y el botón que la persona acababa de tocar) justo cuando iba a hacer clic.
  */
-export function franjaVisible(visibleAhora: boolean, y: number, anterior: number, alturaFranja: number): boolean {
-  if (y <= alturaFranja) return true;
-  const delta = y - anterior;
-  if (delta > UMBRAL_SCROLL_PX) return false;
-  if (delta < -UMBRAL_SCROLL_PX) return true;
-  return visibleAhora;
+export function franjaVisible(scrollY: number): boolean {
+  return scrollY <= MARGEN_ARRIBA_PX;
 }

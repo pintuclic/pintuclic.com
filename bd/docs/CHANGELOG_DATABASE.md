@@ -10,6 +10,62 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.24] - 2026-10-28
+### Esquema 4.23 (96 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
+- **Alcance General:** pedido por el contrato `contracts/m11-postventa.contract.ts`. Cambio aditivo: tres tablas y cuatro ENUMs nuevos; no altera tablas existentes.
+  - **`solicitud_postventa`**: cabecera del trámite con código `DEV-AAAA-NNNNN`, orden asociada, cliente titular, tipo (`cancelacion`, `devolucion`, `garantia`), estado (`solicitada`, `en_revision`, `aprobada`, `rechazada`, `reembolsada`), motivo general, observaciones de resolución, motivo de rechazo tipificado, empleado que resuelve, total a reembolsar, método de reembolso, referencia/comprobante, datos bancarios (JSONB) y evidencia (JSONB).
+  - **`linea_solicitud_postventa`**: desglose por línea de orden de los productos devueltos con cantidad, precio unitario congelado y motivo específico (soporta devoluciones parciales y totales; excluye entonados para retracto).
+  - **`historial_estado_postventa`**: trazabilidad inmutable de cada transición de estado con autor, motivo y fecha.
+  - **ENUMs nuevos (4):** `enum_tipo_postventa`, `enum_estado_postventa`, `enum_metodo_reembolso` y `enum_motivo_rechazo_postventa`.
+  - **Prisma:** modelos `SolicitudPostventa`, `LineaSolicitudPostventa` e `HistorialEstadoPostventa` con sus relaciones en `Orden`, `LineaOrden` y `Usuario`.
+
+---
+
+## [v3.24] - 2026-10-29
+### Esquema 4.23 (96 Tablas) - M12: comprobante de venta imprimible · M18: tipo `comprobante_venta`
+- **Alcance General:** PR general de M12 (contrato `contracts/m12-facturacion.contract.ts`). Cambio aditivo; no se toca nada de lo que existía.
+  - **`datos_facturacion`**: ficha única (`id_datos = 1`) con los datos del vendedor que edita el personal. Sin datos sembrados: los carga el cliente.
+  - **`comprobante_venta`** y **`linea_comprobante_venta`**: copia congelada de una venta, uno por orden (`id_orden` UNIQUE), con `numero` `CV-NNNNNN` único (sale de `consecutivo`, fila `comprobante`, que el módulo crea la primera vez como hace M08 con `orden`). Un disparador (`fn_comprobante_inmutable`) rechaza UPDATE y DELETE sobre ambas tablas, sea quien sea.
+  - **M18:** valor `comprobante_venta` en `enum_tipo_comunicacion` y su plantilla en el seed (editable desde el panel).
+  - **Prisma:** modelos `DatosFacturacion`, `ComprobanteVenta` y `LineaComprobanteVenta`, y el valor del enum.
+  - **Bases existentes en 4.22:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente); el seed solo agrega la plantilla si falta.
+
+---
+
+## [v3.23] - 2026-10-28
+### Esquema 4.22 (90 Tablas) - FP-01: imagen editable de las tarjetas de categorías del inicio
+- **Alcance General:** cambio aditivo pedido por la remasterización del inicio. No se toca ni se borra nada de lo que existía.
+  - **`imagen_categoria_inicio`**: una fila por categoría (`id_categoria` PK y FK con borrado en cascada) con la imagen (`contenido` BYTEA, `mime_type` jpeg/png/webp) y su punto de enfoque `foco_x/y` (SMALLINT 0 a 100, 50 = centro). Sin fila, la tarjeta del inicio usa su ilustración de respaldo. Sin datos sembrados.
+  - **Prisma:** modelo `ImagenCategoriaInicio` y su relación con `Categoria` y `Usuario`.
+  - **Bases existentes en 4.21:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente).
+
+---
+
+## [v3.22] - 2026-10-28
+### Esquema 4.21 (89 Tablas) - M14: punto de enfoque de las imágenes de anuncios · M16: contacto del sitio
+- **Alcance General:** cambio aditivo pedido por la remasterización del inicio. No se toca ni se borra nada de lo que existía.
+  - **`anuncio_publicitario`**: cuatro columnas `foco_escritorio_x/y` y `foco_movil_x/y` (SMALLINT, 0 a 100, por defecto 50 = centro) con `ck_anuncio_foco`. Reemplazan la regla de subir la imagen con proporción y tamaño exactos: el personal sube cualquier imagen y marca qué parte debe verse cuando el espacio la recorta (M14 · B8). Va también como `ALTER TABLE … ADD COLUMN IF NOT EXISTS` para las bases que ya tenían la tabla.
+  - **`contacto_institucional`**: fila única (`id_contacto = 1`) con dirección, teléfono, correo y cuatro redes (https:// o vacío) que edita el personal y lee el pie de página (M16). Todo es opcional: el sitio no muestra lo que esté vacío. Sin datos sembrados a propósito: los reales los carga el cliente.
+  - **Prisma:** campos nuevos en `AnuncioPublicitario` y modelo `ContactoInstitucional`.
+  - **Bases existentes en 4.20:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente).
+
+---
+
+## [v3.21] - 2026-10-27
+### Esquema 4.20 (88 Tablas) - M07: solicitudes de compra e intentos de pago
+- **Alcance General:** pedido por el contrato `contracts/m07-checkout.contract.ts` (P1). Cambio aditivo: tres tablas y dos ENUMs nuevos; no se toca nada de lo que existía. La tabla `pagos` (que exige una orden) no se usa: en M07 el pago ocurre antes de que exista la orden.
+  - **`solicitud_compra`**: la compra congelada al pagar con su código `SOL-AAAA-NNNNN` (RF-CHK-04-13): origen y cotización, modo de entrega y dirección, subtotal, descuentos, total de la mercancía, envío, total a cobrar, IVA, cupón y si su uso está registrado en M06, la transacción aprobada, el monto pagado y el código de la orden. Sigue existiendo aunque el cobro o la orden fallen (RF-CHK-04-06). Es también la **cola** de creación de la orden (M07 · R6): estado `pagada` + `proximo_intento_orden`, escrito en la misma transacción que el pago.
+  - **Compra directa (M07 · R17):** `solicitud_compra.compra_directa` marca la compra hecha con «Comprar ahora» desde la ficha, que no pasa por el carrito ni lo cambia. Va también como `ALTER TABLE … ADD COLUMN IF NOT EXISTS` para las bases que ya tenían la tabla.
+  - **`linea_solicitud`**: copia de cada línea con su precio de M06 y sus descuentos en JSONB (pasan tal cual a `linea_orden_descuento`). Sin FK al catálogo, como `linea_orden`.
+  - **`intento_pago`**: cada cobro con Nequi enviado a Wompi, con su referencia única `<SOL>-<n>`, el id de la transacción, su estado, el monto en centavos y el celular **enmascarado** (nunca el número completo, HU-SEG-06).
+  - **ENUMs nuevos:** `enum_estado_solicitud_compra` y `enum_estado_intento_pago`.
+  - **Consecutivo:** las solicitudes usan la fila `solicitud` de `consecutivo`, que M07 crea la primera vez (como hace M08 con `orden`).
+  - **Prisma:** modelos `SolicitudCompra`, `LineaSolicitud` e `IntentoPago` y sus dos enums. `prisma migrate diff` contra una base creada con este DDL no reporta diferencias en estas tablas.
+  - **Verificado el 2026-10-27** en PostgreSQL 18 sobre una base nueva: DDL y seed corren limpios dos veces seguidas y dejan 88 tablas.
+  - **Bases existentes en 4.19:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente).
+
+---
+
 ## [v3.20] - 2026-10-27
 ### Esquema 4.19 (85 Tablas) - M03: asesoría y asistencia · M20: registro de auditoría (HU-SEG-04, escritura)
 - **Alcance General:** seis tablas nuevas pedidas por el contrato `contracts/m03-asesoria.contract.ts` (sección «Fuera del módulo»). Cambio puramente aditivo: no se toca ni se borra nada de lo que ya existía. Es el PR general de M03; el módulo llega después.

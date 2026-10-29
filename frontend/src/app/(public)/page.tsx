@@ -4,6 +4,8 @@ import { CategoryExplorer } from './_components/CategoryExplorer';
 import { EmpresaCta } from './_components/EmpresaCta';
 import { FeaturedProducts } from './_components/FeaturedProducts';
 import { HeroSection } from './_components/HeroSection';
+import { MasVendidos } from './_components/MasVendidos';
+import { OtrosProductos } from './_components/OtrosProductos';
 import { EspacioPublicitario } from '@/modules/m14-patrocinios/components/EspacioPublicitario';
 import { ProductosPatrocinados } from '@/modules/m14-patrocinios/components/ProductosPatrocinados';
 import { ToolsBar } from './_components/ToolsBar';
@@ -15,19 +17,29 @@ export const metadata: Metadata = {
     'Pinturas, herramientas y accesorios de las mejores marcas. Calidad, asesoría y envío rápido a toda Colombia.',
 };
 
-/** Página de inicio (UI Spec §4.1). Frente propio FP-01: datos estáticos temporales. */
+/**
+ * Página de inicio (UI Spec §4.1). El banner llega de borde a borde; luego, en la columna del sitio, la franja de
+ * confianza y los destacados (blanco); una banda azul con olas con los más vendidos; y de nuevo blanco con herramientas
+ * y más. Frente propio FP-01: los datos de respaldo son estáticos.
+ */
 export default function HomePage() {
   return (
-    <Container className="flex flex-col gap-8 py-6 lg:gap-10">
+    <>
       <HeroSection />
-      {/* Espacio publicitario bajo el banner principal (M14 · B1): no se pinta si no hay anuncios vigentes */}
-      <EspacioPublicitario espacio="inicio" />
-      <TrustStrip />
-      <EmpresaCta />
-      <ToolsBar />
-      <FeaturedProducts />
-      <ProductosPatrocinados />
-      <CategoryExplorer />
-    </Container>
+      <Container className="flex flex-col gap-5 pb-8 pt-4 lg:gap-6">
+        <TrustStrip />
+        {/* Espacio publicitario (M14 · B1): no se pinta si no hay anuncios vigentes */}
+        <EspacioPublicitario espacio="inicio" />
+        <EmpresaCta />
+        <ToolsBar />
+        <FeaturedProducts />
+      </Container>
+      <MasVendidos />
+      <Container className="flex flex-col gap-8 pb-10 pt-6 lg:gap-10">
+        <OtrosProductos />
+        <ProductosPatrocinados />
+        <CategoryExplorer />
+      </Container>
+    </>
   );
 }

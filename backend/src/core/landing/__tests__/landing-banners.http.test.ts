@@ -51,6 +51,8 @@ class InMemoryBannersRepository implements BannersInicioRepositoryPort {
         imagenBytes: null,
         imagenMimeType: null,
         orden: 1,
+        focoX: 50,
+        focoY: 50,
         estado: 'activo',
         idAutor: 1,
         nombreAutor: 'Carlos Mendoza',
@@ -70,6 +72,8 @@ class InMemoryBannersRepository implements BannersInicioRepositoryPort {
         imagenBytes: null,
         imagenMimeType: null,
         orden: 2,
+        focoX: 50,
+        focoY: 50,
         estado: 'inactivo',
         idAutor: 1,
         nombreAutor: 'Carlos Mendoza',
@@ -94,6 +98,8 @@ class InMemoryBannersRepository implements BannersInicioRepositoryPort {
         enlaceBotonSecundario: f.enlaceBotonSecundario,
         tieneImagenPersonalizada: f.tieneImagenPersonalizada,
         orden: f.orden,
+        focoX: f.focoX,
+        focoY: f.focoY,
       }));
   }
 
@@ -126,6 +132,8 @@ class InMemoryBannersRepository implements BannersInicioRepositoryPort {
       imagenBytes: datos.imagen,
       imagenMimeType: datos.imagenMimeType,
       orden: datos.orden,
+      focoX: datos.focoX,
+      focoY: datos.focoY,
       estado: datos.estado,
       idAutor: datos.idAutor,
       nombreAutor: 'Carlos Mendoza',
@@ -155,6 +163,8 @@ class InMemoryBannersRepository implements BannersInicioRepositoryPort {
     if (datos.imagenMimeType !== undefined) f.imagenMimeType = datos.imagenMimeType;
     f.tieneImagenPersonalizada = f.imagenBytes !== null && f.imagenMimeType !== null;
     if (datos.orden !== undefined) f.orden = datos.orden;
+    if (datos.focoX !== undefined) f.focoX = datos.focoX;
+    if (datos.focoY !== undefined) f.focoY = datos.focoY;
     f.idAutor = datos.idAutor;
     f.fechaActualizacion = new Date().toISOString();
     return f;
@@ -299,6 +309,41 @@ describe('FP-01 · Banners de Inicio (Contrato espejo y HTTP)', () => {
     const pubRes = await fetch(`${baseUrl}/api/v1/landing/banners`);
     const pubJson = (await pubRes.json()) as { data: Array<{ idBanner: number }> };
     expect(pubJson.data.map((b) => b.idBanner)).toEqual([creado.data.idBanner, 1]);
+  });
+
+  it('el punto de enfoque se guarda, se publica, vale el centro por defecto y se puede mover al editar', async () => {
+    const cuerpo = {
+      tituloLinea1: 'Banner con enfoque',
+      descripcion: 'Una imagen de cualquier forma con su punto de enfoque.',
+      textoBotonPrimario: 'Ver más',
+      enlaceBotonPrimario: '/productos',
+      imagenBase64: PNG_1X1.toString('base64'),
+      imagenMimeType: 'image/png',
+    };
+    const enviar = async (metodo: string, ruta: string, extra: object) =>
+      fetch(`${baseUrl}/api/v1/admin/landing/banners${ruta}`, {
+        method: metodo,
+        headers: { 'Content-Type': 'application/json', 'x-test-user': '1' },
+        body: JSON.stringify({ ...(metodo === 'POST' ? cuerpo : {}), ...extra }),
+      });
+    const sin = (await (await enviar('POST', '', {})).json()) as { data: { idBanner: number; focoX: number; focoY: number } };
+    expect([sin.data.focoX, sin.data.focoY]).toEqual([50, 50]);
+
+    const con = await enviar('POST', '', { focoX: 20, focoY: 80 });
+    expect(con.status).toBe(201);
+    const creado = (await con.json()) as { data: { idBanner: number; focoX: number; focoY: number } };
+    expect([creado.data.focoX, creado.data.focoY]).toEqual([20, 80]);
+
+    const pub = (await (await fetch(`${baseUrl}/api/v1/landing/banners`)).json()) as { data: Array<{ idBanner: number; focoX: number; focoY: number }> };
+    expect(pub.data.find((b) => b.idBanner === creado.data.idBanner)).toMatchObject({ focoX: 20, focoY: 80 });
+
+    const editado = await enviar('PUT', `/${String(creado.data.idBanner)}`, { focoX: 0, focoY: 100 });
+    expect(editado.status).toBe(200);
+    expect(((await editado.json()) as { data: { focoX: number; focoY: number } }).data).toMatchObject({ focoX: 0, focoY: 100 });
+
+    for (const foco of [{ focoX: -1 }, { focoY: 101 }, { focoX: 10.5 }, { focoX: 'a' }]) {
+      expect((await enviar('POST', '', foco)).status, JSON.stringify(foco)).toBe(400);
+    }
   });
 
   it('rechaza imágenes corruptas y bloquea accesos sin permiso con 404 opaco', async () => {

@@ -18,6 +18,9 @@ export interface HeroSlideContent {
   primaryCta: { label: string; href: string };
   secondaryCta: { label: string; href: string };
   customImageUrl?: string | null;
+  /** Punto de enfoque de la foto subida (0 a 100): qué parte se ve al recortarla. */
+  focoX?: number;
+  focoY?: number;
 }
 
 export const heroSlides: ReadonlyArray<HeroSlideContent> = [
@@ -138,6 +141,8 @@ export interface CategoryTileContent {
   subtitle: string;
   href: string;
   imageSrc: string;
+  /** Punto de enfoque de la imagen subida por el personal; sin él, `imageSrc` es la ilustración del sitio. */
+  foco?: { x: number; y: number };
 }
 
 export const categoryTiles: ReadonlyArray<CategoryTileContent> = [
