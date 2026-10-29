@@ -31,6 +31,10 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *            Las dos calculan en los dos sentidos: cuánto comprar (`cantidad`) y cuánta
  *            área cubre una cantidad (`cobertura`). En `cantidad` el área no se escribe:
  *            se toman las medidas de la superficie y se calcula (K12-K14).
+ *  HU-ASE-03 Simulador virtual de color: el color elegido en el abanico, aplicado a las
+ *            paredes de unos ambientes ilustrados que trae el propio sitio, en varios
+ *            puntos de vista. NUNCA recibe fotos del usuario (HU-ASE-07 sigue retirada).
+ *            Ocupa la pestaña «En tu espacio» que M01 dejó reservada (M01 · P6).
  *  HU-ASE-05 Asistente virtual: responde las necesidades del cliente sobre pintura,
  *            preparación de superficies, aplicación y productos del catálogo, y sugiere
  *            productos. Siempre ofrece el botón «¿Quieres comunicarte con un asesor?» hacia
@@ -46,13 +50,22 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *  E4  Modo `asistido` y asistente virtual, los dos sobre el cliente de Gemini y la
  *      resiliencia de HU-ASE-06. Va al final a propósito: si la IA se cae o el PO cambia de
  *      idea, E1-E3 ya están entregados y funcionando.
+ *  E5  Simulador de color (HU-ASE-03), acordado con el Tech Lead el 2026-10-29, después de
+ *      E1-E4. Entra entero en el frontend: no añade endpoints, ni tablas, ni llamadas a la
+ *      IA, y no depende de fotos ni de contenido externo, porque los ambientes se dibujan
+ *      por código (S3).
  *
  * ── Qué NO hace ─────────────────────────────────────────────────────────────
  *  · No implementa `EscalamientoConsultasPort` de M15, ni cola, ni criterio de escalamiento,
  *    ni pantalla de consultas escaladas (D1). El paso a una persona es solo el botón hacia el
  *    formulario de contacto de M15, que sigue siendo de M15.
- *  · No construye HU-ASE-03 (simulador de color), HU-ASE-04 (correspondencia de color) ni
- *    HU-ASE-07 (imágenes cargadas). Ninguna función de M03 recibe imágenes.
+ *  · No construye HU-ASE-07 (imágenes cargadas): ninguna función de M03 recibe imágenes del
+ *    usuario, tampoco el simulador. Se confirmó con Pintuco el 2026-10-12.
+ *  · No construye HU-ASE-04 (correspondencia entre color simulado y catálogo): queda fuera
+ *    de este contrato, tal como estaba.
+ *  · El simulador no repinta muebles, pisos, techos ni carpintería: solo las paredes. Todo
+ *    lo demás de la ilustración son tonos fijos (S3). No hay fotografías, ni propias ni del
+ *    usuario.
  *  · No filtra ni pagina el catálogo por su cuenta: el botón del cuestionario lleva al
  *    catálogo de M02, que ya resuelve filtros, orden y páginas.
  *  · No crea ni edita productos, variantes, medidas ni rendimientos: eso es de M01. M03
@@ -283,6 +296,69 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *      una cifra que ya no corresponde a lo escrito engaña más que no mostrar ninguna.
  *      La API no cambia: sigue recibiendo `area` en m² (K8), que calcula el cliente.
  *
+ * ── Reglas del simulador de color (HU-ASE-03) ───────────────────────────────
+ *  S1  QUÉ ES. Una vista del color YA ELEGIDO en el abanico, pintado sobre las paredes de
+ *      unos ambientes ilustrados que vienen con el sitio. No es una herramienta de
+ *      diseño: no se eligen colores libres, no se suben fotos y no se pinta a mano.
+ *      La entrada es un `ColorPaleta` de M01; no hay ninguna otra.
+ *  S2  DÓNDE VIVE. Reemplaza el componente `AmbientesColor` de la pestaña «En tu espacio»
+ *      de `/paleta-de-color`, tal como M01 · P6 lo dejó previsto: M01 monta UN componente
+ *      de M03 y le pasa el color, sin tocar nada más de su página. Mismo trato que la
+ *      calculadora en la ficha de producto (K15). Sin color elegido, el simulador dibuja la
+ *      invitación a elegir uno y nada más.
+ *  S3  CÓMO SE DIBUJA. Cada ambiente es una ILUSTRACIÓN SVG hecha por código, un componente
+ *      de React, y se pinta en el navegador. La pared es una forma con `fill` igual al color
+ *      elegido; encima van capas de luz y sombra (degradados semitransparentes) para que no
+ *      se vea plana; el piso, los muebles y las ventanas son tonos neutros fijos que NO
+ *      cambian con el color. Cambiar de color es cambiar un atributo: sin red, sin
+ *      imágenes que descargar y sin servidor.
+ *      **Por qué SVG y no canvas:** el SVG es declarativo, escala sin perder nitidez, lleva
+ *      su propio texto accesible (`role="img"` y `aria-label`) y se puede comprobar en las
+ *      pruebas como cualquier otro componente. El canvas es un lienzo mudo: habría que
+ *      redibujarlo a mano en cada cambio y sin nada que un lector de pantalla pueda leer.
+ *      **Por qué en el navegador y no en el servidor**, habiendo `sharp`: la gracia es ir
+ *      saltando de color en color y ver el cambio al instante. Una petición por color pone
+ *      una espera en el único momento que importa.
+ *  S4  CONSECUENCIA CONOCIDA, Y SE DICE: es una ilustración, no una fotografía. El mockup de
+ *      Pintuco muestra una foto real; esto se verá como un dibujo limpio de una habitación.
+ *      Es el precio de no depender de fotos ni de nadie que las produzca. La luz se modela
+ *      con capas blancas y negras de poca opacidad —no con mezclas que oscurezcan el
+ *      color—, de modo que un tono claro sigue viéndose claro y uno oscuro, oscuro. El PO
+ *      valida el aspecto cuando lo vea (Q12), igual que valida los guiones del asistente.
+ *  S5  LOS AMBIENTES. Lista fija y ordenada, declarada en el módulo (`services/ambientes.ts`),
+ *      igual que las superficies de la calculadora (K13): contenido sin regla de negocio que
+ *      no merece tabla ni endpoint. Cada ambiente lleva `id`, nombre visible, `tipo`
+ *      (`interior` | `exterior`) y texto alternativo; el dibujo es un componente asociado a
+ *      ese `id`. Son PUNTOS DE VISTA de espacios de una casa: una misma sala vista de frente
+ *      y desde una esquina cuenta como dos. Añadir uno es una entrada en la lista y un
+ *      componente, nada más (Q11).
+ *  S6  EL SELECTOR DE PUNTO DE VISTA. Bajo la imagen, una fila de miniaturas con el rótulo
+ *      «Selecciona el ambiente:». Cada miniatura es el MISMO dibujo en pequeño, ya pintado con
+ *      el color elegido, de modo que se ve cómo quedaría en cada vista antes de entrar en
+ *      ella. Es un GRUPO DE RADIO de verdad: `<input type="radio">` ocultos con `sr-only`
+ *      dentro de etiquetas con estilo, como las tarjetas de superficie de la calculadora. El
+ *      ambiente activo se distingue por algo más que el color del borde, para que se vea
+ *      sin distinguir colores.
+ *  S7  QUÉ NO PROMETE. El color simulado es una REFERENCIA, no una garantía: las pantallas
+ *      no están calibradas y el resultado real depende de la luz, de las manos aplicadas y
+ *      de la superficie. Toda vista va acompañada de un aviso fijo (`ADVERTENCIA_SIMULADOR`),
+ *      igual que el cálculo lleva el suyo (K7). Los textos dicen «así se vería,
+ *      aproximadamente», nunca «así se verá».
+ *  S8  EL COLOR SIEMPRE IDENTIFICADO. En una esquina de la imagen, el nombre y el código del
+ *      color («Sol De La Tarde · NRO96T»), para que no haya duda de qué se está mirando. El
+ *      rótulo se lee sobre su propio color con el contraste del core (S11).
+ *  S9  ACCESIBILIDAD Y MOVIMIENTO. Cada dibujo es `role="img"` con un `aria-label` que dice
+ *      el espacio y el color («Sala de frente, pintada en Sol De La Tarde»). El cambio de
+ *      color se anima con una transición corta que se apaga con `prefers-reduced-motion`.
+ *      Si el color no fuera un `#RRGGBB` válido no se pinta nada y se muestra la invitación
+ *      a elegir uno (S2): la paleta tiene que seguir funcionando pase lo que pase.
+ *  S10 SIN IA Y SIN SERVIDOR. El simulador no llama a Gemini ni a ningún endpoint: sigue
+ *      funcionando con el servicio de IA caído, igual que la calculadora (I6). No añade
+ *      endpoints, tablas ni permisos.
+ *  S11 LO ÚNICO QUE NECESITA DE FUERA. El ayudante de contraste del core (`colorDeTexto`),
+ *      para que el rótulo de S8 se lea sobre cualquier color. Hoy vive en M01 y M03 no puede
+ *      importarlo (ver «Fuera del módulo»).
+ *
  * ── Reglas del asistente (HU-ASE-05) ────────────────────────────────────────
  *  H1  Público, sin sesión. El servidor no guarda la conversación: el frontend envía el
  *      mensaje nuevo y como mucho los últimos CHAT_MAX_TURNOS_HISTORIAL turnos, que conserva
@@ -420,7 +496,13 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *  · M01 Catálogo: una línea en la ficha de producto para montar la calculadora.
  *  · FP01 Landing: una línea para montar la calculadora general.
  *  · Core frontend: el botón del asistente en el layout público (Q7).
- *  · DevOps: `GEMINI_API_KEY` y `GEMINI_MODELO` en `.env.example` y en el VPS (Q5).
+ *  · SIMULADOR (E5) · Core frontend: `colorDeTexto` —hoy en `m01-catalogo/services/contraste`—
+ *    pasa a `core/utils/color-muestra.ts`, donde ya viven `luminancia` y `esColorMuyClaro`.
+ *    M03 no puede importar servicios de M01 (aislamiento, AGENTS.md) y duplicar el cálculo de
+ *    contraste sería tener dos verdades sobre si un texto se lee. M01 sigue usándolo desde el
+ *    core, sin cambiar su conducta.
+ *  · SIMULADOR (E5) · M01 Catálogo: una línea en la pestaña «En tu espacio» para montar el
+ *    componente de M03 en lugar de `AmbientesColor`, tal como P6 lo dejó previsto.
  *
  * ── Preguntas abiertas ──────────────────────────────────────────────────────
  *  Q1  Anexo B de la Tanda 2 (no está en el repo). Se asume, editable en el panel:
@@ -452,6 +534,14 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *      qué destinatario: se asume el correo de contacto del administrador configurado en M15.
  *  Q9  La suspensión por cuota y los topes por minuto viven en memoria: valen para un solo
  *      servidor (el VPS actual). Con varias instancias habría que llevarlos a la BD.
+ *  Q11 SIMULADOR · Cuántos ambientes y cuáles. Se asume, para arrancar, seis puntos de vista:
+ *      sala de frente, sala desde la esquina, alcoba, comedor, estudio y una fachada. El
+ *      mockup enseña siete miniaturas. Como se dibujan por código, cada uno cuesta un
+ *      componente: si el PO quiere más o distintos, se piden por su nombre.
+ *  Q12 SIMULADOR · Aspecto. El mockup muestra una fotografía y esto será una ilustración (S4).
+ *      El PO debe ver el resultado y decir si le sirve; si exige fotografía, cambia el
+ *      contrato entero, porque vuelve la dependencia de fotos y máscaras que este diseño
+ *      evita a propósito.
  *  Q10 El PO dice que M02 ya corrigió sus filtros, pero `origin/main` (324a947, 2026-10-26) no
  *      trae ningún cambio de M02 posterior al PR #62 y `idAcabado` no existe en su contrato ni
  *      en su código. Si la corrección está en una rama sin fusionar, hay que fusionarla antes
@@ -1008,3 +1098,55 @@ export type EstadoServicioIaResponseEnvelope = z.infer<typeof estadoServicioIaRe
 export const idProductoParamsSchema = z.object({ idProducto: z.coerce.number().int().positive() });
 export const idPreguntaParamsSchema = z.object({ idPregunta: z.coerce.number().int().positive() });
 export const idOpcionParamsSchema = z.object({ idOpcion: z.coerce.number().int().positive() });
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 9. SIMULADOR DE COLOR (HU-ASE-03, S1-S11)
+ *
+ * No hay endpoints: el simulador vive entero en el navegador (S3, S10). Estos esquemas
+ * existen para fijar la FORMA del catálogo de ambientes y validarlo en una prueba, de modo
+ * que un ambiente mal declarado se detecte al construir y no en producción.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** S7: el aviso que acompaña a toda vista del simulador. Texto fijo, como ADVERTENCIA_CALCULO. */
+export const ADVERTENCIA_SIMULADOR =
+  'El color de la pantalla es una referencia: el resultado real depende de la luz del lugar, de las manos aplicadas y de la superficie.';
+
+/** S5: dónde se puede usar el ambiente. Mismo vocabulario que el resto de M03. */
+export const tipoAmbienteSimuladorSchema = z.enum(['interior', 'exterior']);
+export type TipoAmbienteSimulador = z.infer<typeof tipoAmbienteSimuladorSchema>;
+
+/**
+ * S5 — Un ambiente de muestra. Es contenido fijo del módulo, no un recurso de la API.
+ *
+ * El dibujo NO se declara aquí: es un componente de React asociado a este `id` (S3). Esta
+ * forma solo fija lo que hace falta para listarlo, seleccionarlo y describirlo.
+ */
+export const ambienteSimuladorSchema = z.object({
+  /** Clave estable del punto de vista: `sala-frente`, `alcoba`, `fachada`. */
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  /** Nombre visible bajo la miniatura: «Sala», «Alcoba», «Fachada». */
+  nombre: z.string().min(1),
+  tipo: tipoAmbienteSimuladorSchema,
+  /** Describe el espacio y el punto de vista, no el color: el color lo añade el simulador (S9). */
+  alt: z.string().min(1),
+});
+export type AmbienteSimulador = z.infer<typeof ambienteSimuladorSchema>;
+
+/** El catálogo completo: al menos un ambiente y sin identificadores repetidos. */
+export const catalogoAmbientesSchema = z
+  .array(ambienteSimuladorSchema)
+  .min(1)
+  .refine((lista) => new Set(lista.map((a) => a.id)).size === lista.length, 'Hay ambientes con el mismo id');
+export type CatalogoAmbientes = z.infer<typeof catalogoAmbientesSchema>;
+
+/**
+ * S1, S2 — Lo que el simulador recibe de M01. Se declara aquí para que la frontera entre los
+ * dos módulos quede escrita: M01 entrega esto y nada más. Mientras no haya color elegido, M01
+ * no monta el simulador con datos: se muestra la invitación a elegir uno (S2).
+ */
+export const simuladorInputSchema = z.object({
+  hexadecimal: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  nombre: z.string().min(1),
+  codigo: z.string().nullable(),
+});
+export type SimuladorInput = z.infer<typeof simuladorInputSchema>;
