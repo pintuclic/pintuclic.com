@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Mail, MapPin, Phone } from 'lucide-react';
+import { ArrowLeft, Mail, MapPin, Phone, Receipt } from 'lucide-react';
 import { AdminPageHeader, Alert, ButtonLink, Skeleton } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
 import { useGestionStore } from '../../store/gestionStore';
@@ -45,9 +45,14 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
         title={`Pedido ${codigo}`}
         subtitle="Detalle completo para atender el pedido."
         actions={
-          <ButtonLink href="/admin/pedidos" variant="ghost" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />}>
-            Volver a pedidos
-          </ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href={`/admin/pedidos/${encodeURIComponent(codigo)}/comprobante`} variant="outline" size="sm" leftIcon={<Receipt className="h-4 w-4" />}>
+              Ver comprobante
+            </ButtonLink>
+            <ButtonLink href="/admin/pedidos" variant="ghost" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />}>
+              Volver a pedidos
+            </ButtonLink>
+          </div>
         }
       />
 

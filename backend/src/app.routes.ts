@@ -11,6 +11,7 @@ import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-fi
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
 import { OrdenesM08Adapter } from './modules/m07-checkout/adapters/ordenes-m08.adapter';
 import { construirModuloM07 } from './modules/m07-checkout/m07.routes';
+import { construirModuloM12 } from './modules/m12-facturacion/m12.routes';
 import { construirModuloM08 } from './modules/m08-ordenes/m08.routes';
 import { construirModuloM11 } from './modules/m11-postventa/m11.routes';
 import { construirModuloM05 } from './modules/m05-carrito/m05.routes';
@@ -117,7 +118,16 @@ export function construirAppRoutes(): Router {
 
   // M08: órdenes de venta. Cliente (`/ordenes/mis-pedidos`) y personal (`/ordenes/gestion`)
   // exigen sesión; el permiso `ventas.*` se resuelve en servidor dentro del módulo.
-  const m08 = construirModuloM08(m17.autorizacionService, { auditoria: m20.auditoria });
+  // M12: comprobante de venta imprimible. Se construye antes que M08 porque se engancha a su aviso «orden creada»
+  // (`estados.notificaciones`) para emitirlo al nacer la orden; el aviso al cliente sale por M18. Va antes de `/admin`.
+  const m12 = construirModuloM12(m17.autorizacionService, { notificaciones: m18.notificaciones });
+  router.use('/facturacion', exigirSesionSalvo(auth, []), m12.router);
+  router.use('/admin/facturacion', exigirSesionSalvo(auth, []), m12.adminRouter);
+
+  const m08 = construirModuloM08(m17.autorizacionService, {
+    auditoria: m20.auditoria,
+    estados: { notificaciones: m12.alCrearOrden },
+  });
   router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
 
   // M11: postventa (cancelaciones, devoluciones y reembolsos)
