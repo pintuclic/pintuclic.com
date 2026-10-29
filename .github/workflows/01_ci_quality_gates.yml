@@ -44,9 +44,11 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
       - name: 📦 Install governance tooling
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: 🔍 AST Zero ANY audit (backend + frontend + contratos)
         run: npm run check:no-any
@@ -70,13 +72,17 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
 
       - name: 📦 Install governance tooling (resuelve typescript del verificador AST)
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: 📦 Install backend dependencies
         working-directory: backend
-        run: npm ci || npm install
+        run: npm ci
 
       - name: 🔍 Zero ANY (Regla de Oro #11)
         working-directory: backend
@@ -107,13 +113,17 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
 
       - name: 📦 Install governance tooling (resuelve typescript del verificador AST)
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: 📦 Install frontend dependencies
         working-directory: frontend
-        run: npm ci || npm install
+        run: npm ci
 
       - name: 🔍 Zero ANY (Regla de Oro #11)
         working-directory: frontend
