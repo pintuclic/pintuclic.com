@@ -6,6 +6,22 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-29
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🎨 **Contrato del simulador de color (HU-ASE-03) y PR general.** El simulador pone el color elegido en la paleta sobre las paredes de unos ambientes de muestra. Aquí solo entra el contrato y lo compartido; el simulador se construye en su propia rama. Entra como la rama `chore/m03-contrato-simulador`.
+
+### Módulo M03 — Simulador de color (contrato)
+- **Se desbloquea HU-ASE-03.** La spec la daba por bloqueada por la elección del servicio de IA, ya resuelta. Estaba en «Historias sin requisitos derivados»: no tenía ni un RF ni un CA, así que todo lo que define su conducta lo pone el contrato (reglas S1-S11).
+- **Los ambientes son ilustraciones SVG dibujadas por código (S3).** Sin fotos ni máscaras, y por tanto sin depender de nadie que las produzca. El color se pinta en el navegador: cambiar de color es cambiar un atributo, sin red ni servidor. **Consecuencia que se dice de entrada (S4, Q12):** es una ilustración, no la fotografía del mockup de Pintuco; el PO valida el aspecto al verlo.
+- **No añade endpoints, tablas ni permisos, y no usa la IA (S10).** Funciona con el servicio de IA caído.
+- **Sin color elegido, el simulador no dibuja nada** salvo la invitación a elegir uno (S2). Ocupa la pestaña «En tu espacio» que M01 dejó reservada (M01 · P6).
+- **HU-ASE-04 y HU-ASE-07 quedan fuera**, como estaban.
+
+### Archivos compartidos
+- **`core/utils/color-muestra.ts`** pasa a tener `razonDeContraste` y `colorDeTexto`, que vivían en `m01-catalogo/services/contraste`. M03 no puede importar servicios de M01 y duplicar el cálculo sería tener dos verdades sobre si un texto se lee. **M01 no cambia de conducta:** su servicio los vuelve a exportar desde el core y su prueba existente pasa sin tocarla.
+- Prueba nueva en el core que recorre 4 913 colores del cubo RGB y comprueba que el texto elegido siempre se lee (≥ 4,5:1).
+- La línea que monta el simulador en la pestaña de M01 **no entra aquí**: importa un componente que aún no existe. Viaja con el simulador.
+
 ## [No publicado] - 2026-10-28 (b)
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** ✂️ **La calculadora se queda con una sola cosa que hacer.** Decisiones del Product Owner tras revisar la pantalla. Entra como la rama `feature/m03-calculadora-ajustes`.
