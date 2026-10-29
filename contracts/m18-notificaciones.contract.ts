@@ -12,9 +12,12 @@ import { z } from 'zod';
  * Alcance de este contrato: HU-NOT-01 (envío transaccional, sin endpoint público —
  * se invoca vía NotificacionesPort desde otros módulos backend), HU-NOT-03
  * (plantillas administrables) y HU-NOT-04 (entregabilidad / registro de rebotes).
- * HU-NOT-02 (aviso de cambio de estado de orden) queda pendiente de M08: su
- * contrato de tipos vive en `backend/src/modules/m18-notificaciones/interfaces/
- * notificaciones.port.ts` (EventoCambioEstadoOrden), sin endpoint ni wiring aún.
+ * HU-NOT-02 (avisos al cliente): sin endpoint; M08 y M21 los piden por NotificacionesPort
+ * (`notificarCambioEstadoOrden`, `notificarCotizacionRespondida`, `notificarCotizacionRechazada`).
+ * M18 no conoce el catálogo de estados: recibe el código del estado nuevo y, si no lo reconoce,
+ * lo muestra legible igualmente (RF-NOT-02-01). Cada aviso tiene plantilla editable como el resto.
+ * Fuera de alcance: aviso de demora por disponibilidad (RF-NOT-02-02, espera a M09) y de cotización
+ * próxima a caducar (RF-NOT-02-05, plazo sin definir).
  *
  * Fuente de verdad: docs/01_TRANSVERSALES/M18_NOTIFICACIONES.md
  * ============================================================================
@@ -38,6 +41,12 @@ export const TIPOS_COMUNICACION = [
   'alerta_servicio_ia',
   /** M12 · R9: el comprobante de venta está listo (número, total y enlace). */
   'comprobante_venta',
+  /** HU-NOT-02 · RF-NOT-02-01: cambió el estado del pedido del cliente. */
+  'estado_orden',
+  /** HU-NOT-02 · RF-NOT-02-03: la cotización del cliente fue respondida. */
+  'cotizacion_respondida',
+  /** HU-NOT-02 · RF-NOT-02-03: la cotización del cliente fue rechazada. */
+  'cotizacion_rechazada',
 ] as const;
 export const tipoComunicacionSchema = z.enum(TIPOS_COMUNICACION);
 export type TipoComunicacion = z.infer<typeof tipoComunicacionSchema>;

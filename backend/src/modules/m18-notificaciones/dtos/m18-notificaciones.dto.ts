@@ -21,7 +21,11 @@ export const TIPOS_COMUNICACION = [
   'cambio_correo_otp',
   'cambio_correo_confirmado',
   'dictamen_empresa',
+  'alerta_servicio_ia',
   'comprobante_venta',
+  'estado_orden',
+  'cotizacion_respondida',
+  'cotizacion_rechazada',
 ] as const;
 export const tipoComunicacionSchema = z.enum(TIPOS_COMUNICACION);
 export type TipoComunicacion = z.infer<typeof tipoComunicacionSchema>;

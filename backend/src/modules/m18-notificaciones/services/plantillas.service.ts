@@ -59,6 +59,24 @@ function renderizarMuestra(
         contenidoHtml: plantillasHtml.htmlComprobanteVenta(intro, 'Cliente de ejemplo', 'CV-000123', '$ 171.800', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001/comprobante'),
         contenidoTexto: plantillasHtml.textoComprobanteVenta(intro, 'Cliente de ejemplo', 'CV-000123', '$ 171.800', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001/comprobante'),
       };
+    case 'estado_orden':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlEstadoOrden(intro, 'Cliente de ejemplo', 'PC-2026-00001', 'despachado', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001'),
+        contenidoTexto: plantillasHtml.textoEstadoOrden(intro, 'Cliente de ejemplo', 'PC-2026-00001', 'despachado', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001'),
+      };
+    case 'cotizacion_respondida':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlCotizacionRespondida(intro, 'Cliente de ejemplo', 'COT-2026-00001', '$ 171.800', '15 de noviembre de 2026', 'https://pintuclic.com/cotizaciones/1'),
+        contenidoTexto: plantillasHtml.textoCotizacionRespondida(intro, 'Cliente de ejemplo', 'COT-2026-00001', '$ 171.800', '15 de noviembre de 2026', 'https://pintuclic.com/cotizaciones/1'),
+      };
+    case 'cotizacion_rechazada':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlCotizacionRechazada(intro, 'Cliente de ejemplo', 'COT-2026-00001', 'Producto fuera de catálogo', 'https://pintuclic.com/cotizaciones/1'),
+        contenidoTexto: plantillasHtml.textoCotizacionRechazada(intro, 'Cliente de ejemplo', 'COT-2026-00001', 'Producto fuera de catálogo', 'https://pintuclic.com/cotizaciones/1'),
+      };
   }
 }
 

@@ -16,7 +16,10 @@ export interface EventoNotificacion {
     | 'cambio_correo_confirmado'
     | 'dictamen_empresa'
     | 'alerta_servicio_ia'
-    | 'comprobante_venta';
+    | 'comprobante_venta'
+    | 'estado_orden'
+    | 'cotizacion_respondida'
+    | 'cotizacion_rechazada';
   destinatario: string;
   timestamp: Date;
   metadatos: Record<string, string | number | boolean>;
@@ -52,17 +55,22 @@ export interface NotificacionesPort {
     correo: string,
     datos: { nombre: string; numero: string; total: string; codigoOrden: string },
   ): Promise<void>;
-}
-
-/**
- * HU-NOT-02 (pendiente de M08): forma del aviso que M08 emitirá cuando cambie el
- * estado de una orden. Tipo exportado solo como contrato — sin método en
- * `NotificacionesPort` ni wiring, hasta que M08 exista (RF-NOT-02-01, RF-NOT-02-04).
- */
-export interface EventoCambioEstadoOrden {
-  idOrden: number;
-  correoCliente: string;
-  estadoAnterior: string;
-  estadoNuevo: string;
-  timestamp: Date;
+  /**
+   * HU-NOT-02 · RF-NOT-02-01: avisa al cliente que el estado de su pedido cambió. Recibe el código del estado nuevo
+   * tal como lo emite M08; M18 no necesita conocer el catálogo completo. Opcional por la misma razón que los demás avisos.
+   */
+  notificarCambioEstadoOrden?(
+    correo: string,
+    datos: { nombre: string; codigoOrden: string; estadoNuevo: string },
+  ): Promise<void>;
+  /** HU-NOT-02 · RF-NOT-02-03: la cotización fue respondida; lleva el total acordado ya formateado y su vencimiento. */
+  notificarCotizacionRespondida?(
+    correo: string,
+    datos: { nombre: string; codigo: string; idCotizacion: number; total: string; vencimiento: string },
+  ): Promise<void>;
+  /** HU-NOT-02 · RF-NOT-02-03: la cotización fue rechazada, con el motivo que escribió el personal. */
+  notificarCotizacionRechazada?(
+    correo: string,
+    datos: { nombre: string; codigo: string; idCotizacion: number; motivo: string },
+  ): Promise<void>;
 }

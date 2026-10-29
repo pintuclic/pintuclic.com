@@ -158,6 +158,27 @@ export class MemoriaNotificacionesAdapter implements NotificacionesPort {
     this.eventos.push({ tipo: 'comprobante_venta', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
   }
 
+  async notificarCambioEstadoOrden(
+    correo: string,
+    datos: { nombre: string; codigoOrden: string; estadoNuevo: string },
+  ): Promise<void> {
+    this.eventos.push({ tipo: 'estado_orden', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
+  }
+
+  async notificarCotizacionRespondida(
+    correo: string,
+    datos: { nombre: string; codigo: string; idCotizacion: number; total: string; vencimiento: string },
+  ): Promise<void> {
+    this.eventos.push({ tipo: 'cotizacion_respondida', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
+  }
+
+  async notificarCotizacionRechazada(
+    correo: string,
+    datos: { nombre: string; codigo: string; idCotizacion: number; motivo: string },
+  ): Promise<void> {
+    this.eventos.push({ tipo: 'cotizacion_rechazada', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
+  }
+
   obtenerEventos(): EventoNotificacion[] {
     return [...this.eventos];
   }
@@ -201,6 +222,18 @@ export class NoOpNotificacionesAdapter implements NotificacionesPort {
   }
 
   async notificarComprobanteVenta(): Promise<void> {
+    // No-op
+  }
+
+  async notificarCambioEstadoOrden(): Promise<void> {
+    // No-op
+  }
+
+  async notificarCotizacionRespondida(): Promise<void> {
+    // No-op
+  }
+
+  async notificarCotizacionRechazada(): Promise<void> {
     // No-op
   }
 }
@@ -414,6 +447,54 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
       subject,
       text: plantillasHtml.textoComprobanteVenta(intro, datos.nombre, datos.numero, datos.total, enlace),
       html: plantillasHtml.htmlComprobanteVenta(intro, datos.nombre, datos.numero, datos.total, enlace),
+    });
+  }
+
+  async notificarCambioEstadoOrden(
+    correo: string,
+    datos: { nombre: string; codigoOrden: string; estadoNuevo: string },
+  ): Promise<void> {
+    const enlace = `${this.frontendBaseUrl}/perfil/pedidos/${encodeURIComponent(datos.codigoOrden)}`;
+    const { subject, intro } = await this.resolverIntroYAsunto('estado_orden', {
+      subject: 'Novedades de tu pedido · Pintu Clic',
+      intro: 'El estado de tu pedido cambió. Aquí tienes el detalle; puedes consultar el pedido completo cuando quieras desde tu cuenta.',
+    });
+    await this.enviarConRegistro('estado_orden', correo, {
+      subject,
+      text: plantillasHtml.textoEstadoOrden(intro, datos.nombre, datos.codigoOrden, datos.estadoNuevo, enlace),
+      html: plantillasHtml.htmlEstadoOrden(intro, datos.nombre, datos.codigoOrden, datos.estadoNuevo, enlace),
+    });
+  }
+
+  async notificarCotizacionRespondida(
+    correo: string,
+    datos: { nombre: string; codigo: string; idCotizacion: number; total: string; vencimiento: string },
+  ): Promise<void> {
+    const enlace = `${this.frontendBaseUrl}/cotizaciones/${datos.idCotizacion}`;
+    const { subject, intro } = await this.resolverIntroYAsunto('cotizacion_respondida', {
+      subject: 'Respondimos tu cotización · Pintu Clic',
+      intro: 'Ya revisamos tu solicitud de cotización y preparamos nuestra respuesta. Ingresa a tu cuenta para ver las condiciones y aceptarla o rechazarla.',
+    });
+    await this.enviarConRegistro('cotizacion_respondida', correo, {
+      subject,
+      text: plantillasHtml.textoCotizacionRespondida(intro, datos.nombre, datos.codigo, datos.total, datos.vencimiento, enlace),
+      html: plantillasHtml.htmlCotizacionRespondida(intro, datos.nombre, datos.codigo, datos.total, datos.vencimiento, enlace),
+    });
+  }
+
+  async notificarCotizacionRechazada(
+    correo: string,
+    datos: { nombre: string; codigo: string; idCotizacion: number; motivo: string },
+  ): Promise<void> {
+    const enlace = `${this.frontendBaseUrl}/cotizaciones/${datos.idCotizacion}`;
+    const { subject, intro } = await this.resolverIntroYAsunto('cotizacion_rechazada', {
+      subject: 'Sobre tu solicitud de cotización · Pintu Clic',
+      intro: 'Revisamos tu solicitud de cotización y por ahora no podemos atenderla en las condiciones pedidas. Abajo encontrarás el motivo.',
+    });
+    await this.enviarConRegistro('cotizacion_rechazada', correo, {
+      subject,
+      text: plantillasHtml.textoCotizacionRechazada(intro, datos.nombre, datos.codigo, datos.motivo, enlace),
+      html: plantillasHtml.htmlCotizacionRechazada(intro, datos.nombre, datos.codigo, datos.motivo, enlace),
     });
   }
 }

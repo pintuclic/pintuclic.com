@@ -194,3 +194,87 @@ export function htmlDictamenEmpresa(intro: string, aprobada: boolean, motivo?: s
     </div>
   `.trim();
 }
+
+/** Etiquetas de los estados de la orden que conoce M18 (HU-NOT-02); un estado nuevo se muestra legible sin cambiar código. */
+const ETIQUETA_ESTADO_ORDEN: Readonly<Record<string, string>> = {
+  orden_confirmada: 'Confirmado',
+  revision_disponibilidad: 'Revisando disponibilidad',
+  en_preparacion: 'En alistamiento',
+  preparada: 'Alistado',
+  despachado: 'Enviado',
+  entregado: 'Entregado',
+  cancelado: 'Cancelado',
+  devuelto: 'Devuelto',
+};
+
+export function etiquetaEstadoOrden(estado: string): string {
+  const conocida = ETIQUETA_ESTADO_ORDEN[estado];
+  if (conocida) return conocida;
+  const legible = estado.replace(/_/g, ' ').trim();
+  return legible ? legible.charAt(0).toUpperCase() + legible.slice(1) : 'Actualizado';
+}
+
+export function textoEstadoOrden(intro: string, nombre: string, codigoOrden: string, estadoNuevo: string, enlace: string): string {
+  return [`Hola, ${nombre}.`, intro, '', `Pedido: ${codigoOrden}`, `Nuevo estado: ${etiquetaEstadoOrden(estadoNuevo)}`, '', `Ver pedido: ${enlace}`].join('\n');
+}
+
+export function htmlEstadoOrden(intro: string, nombre: string, codigoOrden: string, estadoNuevo: string, enlace: string): string {
+  const enlaceSeguro = escaparHtml(enlace);
+  return `
+    <div style="${CAJA_ESTILO}">
+      <h2 style="color: #0B2D6B; margin-top: 0;">Novedades de tu pedido</h2>
+      <p>Hola, ${escaparHtml(nombre)}.</p>
+      ${introAHtml(intro)}
+      <p style="font-size: 13px; color: #4B5563;">Pedido: <strong>${escaparHtml(codigoOrden)}</strong></p>
+      <p style="font-size: 13px; color: #4B5563;">Nuevo estado: <strong>${escaparHtml(etiquetaEstadoOrden(estadoNuevo))}</strong></p>
+      <p style="margin: 24px 0;">
+        <a href="${enlaceSeguro}" style="${BOTON_ESTILO}">Ver mi pedido</a>
+      </p>
+      <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Para verlo debes iniciar sesión. Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
+    </div>
+  `.trim();
+}
+
+export function textoCotizacionRespondida(intro: string, nombre: string, codigo: string, total: string, vencimiento: string, enlace: string): string {
+  return [`Hola, ${nombre}.`, intro, '', `Cotización: ${codigo}`, `Total acordado: ${total}`, `Vigente hasta: ${vencimiento}`, '', `Ver cotización: ${enlace}`].join('\n');
+}
+
+export function htmlCotizacionRespondida(intro: string, nombre: string, codigo: string, total: string, vencimiento: string, enlace: string): string {
+  const enlaceSeguro = escaparHtml(enlace);
+  return `
+    <div style="${CAJA_ESTILO}">
+      <h2 style="color: #0B2D6B; margin-top: 0;">Respondimos tu cotización</h2>
+      <p>Hola, ${escaparHtml(nombre)}.</p>
+      ${introAHtml(intro)}
+      <p style="font-size: 13px; color: #4B5563;">Cotización: <strong>${escaparHtml(codigo)}</strong></p>
+      <p style="font-size: 13px; color: #4B5563;">Total acordado: <strong>${escaparHtml(total)}</strong></p>
+      <p style="font-size: 13px; color: #4B5563;">Vigente hasta: <strong>${escaparHtml(vencimiento)}</strong></p>
+      <p style="margin: 24px 0;">
+        <a href="${enlaceSeguro}" style="${BOTON_ESTILO}">Ver cotización</a>
+      </p>
+      <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Para verla debes iniciar sesión. Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
+    </div>
+  `.trim();
+}
+
+export function textoCotizacionRechazada(intro: string, nombre: string, codigo: string, motivo: string, enlace: string): string {
+  const motivoLimpio = motivo.trim();
+  return [`Hola, ${nombre}.`, intro, '', `Cotización: ${codigo}`, ...(motivoLimpio ? [`Motivo: ${motivoLimpio}`] : []), '', `Ver cotización: ${enlace}`].join('\n');
+}
+
+export function htmlCotizacionRechazada(intro: string, nombre: string, codigo: string, motivo: string, enlace: string): string {
+  const enlaceSeguro = escaparHtml(enlace);
+  const motivoLimpio = motivo.trim();
+  return `
+    <div style="${CAJA_ESTILO}">
+      <h2 style="color: #0B2D6B; margin-top: 0;">Sobre tu solicitud de cotización</h2>
+      <p>Hola, ${escaparHtml(nombre)}.</p>
+      ${introAHtml(intro)}
+      <p style="font-size: 13px; color: #4B5563;">Cotización: <strong>${escaparHtml(codigo)}</strong></p>
+      ${motivoLimpio ? `<p style="font-size: 13px; color: #4B5563;">Motivo: <strong>${escaparHtml(motivoLimpio)}</strong></p>` : ''}
+      <p style="margin: 24px 0;">
+        <a href="${enlaceSeguro}" style="${BOTON_ESTILO}">Ver cotización</a>
+      </p>
+    </div>
+  `.trim();
+}

@@ -20,6 +20,11 @@ const ETIQUETAS_TIPO: Record<TipoComunicacion, string> = {
   cambio_correo_otp: 'Código de cambio de correo',
   cambio_correo_confirmado: 'Confirmación de cambio de correo',
   dictamen_empresa: 'Dictamen de cuenta empresa',
+  alerta_servicio_ia: 'Alerta del servicio de IA',
+  comprobante_venta: 'Comprobante de venta',
+  estado_orden: 'Cambio de estado del pedido',
+  cotizacion_respondida: 'Cotización respondida',
+  cotizacion_rechazada: 'Cotización rechazada',
 };
 
 const OPCIONES_TIPO = [
