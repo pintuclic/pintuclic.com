@@ -1,9 +1,36 @@
 import { CODIGOS_ERROR_M08, type CambiarEstadoRequest, type EstadoOrden } from '../dtos/m08-ordenes.dto';
-import type { ActorGestion, EstadosRepository, OrdenParaEstado } from '../interfaces/estados.interface';
+import type { ActorGestion, EstadosRepository, EstadosTx, OrdenParaEstado } from '../interfaces/estados.interface';
 import type { EventosOrdenPort } from '../interfaces/eventos-orden.port';
 import type { NotificacionesOrdenPort } from '../interfaces/notificaciones-orden.port';
 import type { RelojPort } from '../interfaces/reloj.port';
-import { evaluarTransicion, exigeMotivo } from './reglas-estado';
+import { evaluarTransicion, exigeMotivo, permitidaPorPostventa } from './reglas-estado';
+
+export type ResultadoCambioPostventa =
+  | { ok: true; estadoAnterior: EstadoOrden }
+  | { ok: false; razon: 'NO_EXISTE' }
+  | { ok: false; razon: 'NO_PERMITIDA' | 'ESTADO_CAMBIADO'; estadoActual: EstadoOrden };
+
+/**
+ * M11: aprobar una cancelación o una devolución total cambia la orden dentro de la transacción de postventa, con las
+ * mismas garantías que `cambiarEstado`: regla de origen, candado optimista e historial con autor y motivo.
+ */
+export async function cambiarEstadoPorPostventa(
+  tx: EstadosTx,
+  codigo: string,
+  hacia: 'cancelado' | 'devuelto',
+  motivo: string,
+  idUsuarioAutor: number,
+): Promise<ResultadoCambioPostventa> {
+  const actual = await tx.buscarOrden(codigo);
+  if (!actual) return { ok: false, razon: 'NO_EXISTE' };
+  if (!permitidaPorPostventa(actual.estado, hacia)) return { ok: false, razon: 'NO_PERMITIDA', estadoActual: actual.estado };
+
+  if (!(await tx.actualizarEstadoSiCoincide(codigo, actual.estado, hacia))) {
+    return { ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: actual.estado };
+  }
+  await tx.registrarHistorial({ codigo, estadoAnterior: actual.estado, estadoNuevo: hacia, idUsuarioAutor, motivo });
+  return { ok: true, estadoAnterior: actual.estado };
+}
 
 export class EstadoOrdenError extends Error {
   constructor(

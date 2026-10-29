@@ -56,7 +56,7 @@ export function construirModuloM11(
   const prisma = deps.prisma ?? new PrismaClient();
   const repo = new PrismaPostventaRepository(prisma);
   const ordenesPort = new PrismaOrdenesAdapterM11(prisma);
-  const service = deps.service ?? new PostventaService(repo, ordenesPort);
+  const service = deps.service ?? new PostventaService(repo, ordenesPort, deps.auditoria);
   const controller = new PostventaController(service);
 
   const router = Router();

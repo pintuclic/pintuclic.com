@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type {
   SolicitarCancelacionRequest,
   SolicitarDevolucionRequest,
@@ -19,6 +20,7 @@ import type {
   PostventaRepositoryPort,
   SolicitudPostventaEntidad,
 } from '../repositories/postventa.repository';
+import type { AuditoriaPort } from '../../m20-seguridad/interfaces/auditoria.port';
 import {
   ErrorPostventa,
   validarElegibilidadCancelacion,
@@ -26,10 +28,28 @@ import {
   validarTransicionPostventa,
 } from './reglas-postventa';
 
+function noDisponible(mensaje: string): ErrorPostventa {
+  return new ErrorPostventa('RECURSO_NO_DISPONIBLE', mensaje, 404);
+}
+
+function estadoCambiado(): ErrorPostventa {
+  return new ErrorPostventa(
+    'ESTADO_CAMBIADO',
+    'La solicitud cambió de estado mientras la gestionaba. Recargue y vuelva a intentarlo.',
+    409
+  );
+}
+
+function sumarCantidades(lineas: ReadonlyArray<{ cantidad: number }>): number {
+  return lineas.reduce((acc, l) => acc + l.cantidad, 0);
+}
+
 export class PostventaService implements PostventaServicePort {
   constructor(
     private readonly repo: PostventaRepositoryPort,
-    private readonly ordenesPort: OrdenesPortM11
+    private readonly ordenesPort: OrdenesPortM11,
+    private readonly auditoria?: AuditoriaPort,
+    private readonly reloj: () => Date = () => new Date()
   ) {}
 
   async solicitarCancelacion(
@@ -38,44 +58,37 @@ export class PostventaService implements PostventaServicePort {
   ): Promise<SolicitudPostventaDetalle> {
     const orden = await this.ordenesPort.obtenerOrdenParaPostventa(input.codigoOrden);
     if (!orden || orden.idUsuario !== idUsuario) {
-      throw new ErrorPostventa(
-        'RECURSO_NO_DISPONIBLE',
-        'La orden especificada no existe o no pertenece a su cuenta.',
-        404
-      );
+      throw noDisponible('La orden especificada no existe o no pertenece a su cuenta.');
     }
 
     validarElegibilidadCancelacion(orden.estado);
 
-    const existente = await this.repo.buscarPorOrden(orden.idOrden);
-    if (existente) {
-      throw new ErrorPostventa(
-        'SOLICITUD_DUPLICADA',
-        `Ya existe una solicitud en trámite (${existente.codigoVisible}) para este pedido.`,
-        409
+    const codigo = await this.repo.enTransaccion(async (tx) => {
+      await this.repo.bloquearOrden(orden.idOrden, tx);
+      await this.exigirSinSolicitudActiva(orden.idOrden, tx);
+
+      const codigo = await this.repo.generarSiguienteCodigo(tx);
+      await this.repo.crearSolicitud(
+        {
+          codigoVisible: codigo,
+          idOrden: orden.idOrden,
+          idUsuario,
+          tipo: 'cancelacion',
+          estado: 'solicitada',
+          motivoGeneral: input.motivo,
+          totalReembolso: orden.total,
+          datosBancarios: input.datosReembolso,
+          lineas: orden.lineas.map((l) => ({
+            idLineaOrden: l.idLineaOrden,
+            cantidad: l.cantidad,
+            precioUnitario: l.precioAplicado,
+            subtotal: l.precioAplicado * l.cantidad,
+            motivoEspecifico: input.motivo,
+          })),
+        },
+        tx
       );
-    }
-
-    const codigo = await this.repo.generarSiguienteCodigo();
-
-    const lineas = orden.lineas.map((l) => ({
-      idLineaOrden: l.idLineaOrden,
-      cantidad: l.cantidad,
-      precioUnitario: l.precioAplicado,
-      subtotal: l.precioAplicado * l.cantidad,
-      motivoEspecifico: input.motivo,
-    }));
-
-    await this.repo.crearSolicitud({
-      codigoVisible: codigo,
-      idOrden: orden.idOrden,
-      idUsuario,
-      tipo: 'cancelacion',
-      estado: 'solicitada',
-      motivoGeneral: input.motivo,
-      totalReembolso: orden.total,
-      datosBancarios: input.datosReembolso,
-      lineas,
+      return codigo;
     });
 
     return this.consultarMiSolicitud(idUsuario, codigo);
@@ -87,57 +100,54 @@ export class PostventaService implements PostventaServicePort {
   ): Promise<SolicitudPostventaDetalle> {
     const orden = await this.ordenesPort.obtenerOrdenParaPostventa(input.codigoOrden);
     if (!orden || orden.idUsuario !== idUsuario) {
-      throw new ErrorPostventa(
-        'RECURSO_NO_DISPONIBLE',
-        'La orden especificada no existe o no pertenece a su cuenta.',
-        404
-      );
+      throw noDisponible('La orden especificada no existe o no pertenece a su cuenta.');
     }
 
-    validarElegibilidadDevolucion(
-      input.tipo,
-      orden.estado,
-      orden.fecha,
-      input.lineas,
-      orden.lineas
-    );
+    const codigo = await this.repo.enTransaccion(async (tx) => {
+      await this.repo.bloquearOrden(orden.idOrden, tx);
 
-    const existente = await this.repo.buscarPorOrden(orden.idOrden);
-    if (existente) {
-      throw new ErrorPostventa(
-        'SOLICITUD_DUPLICADA',
-        `Ya existe una solicitud en trámite (${existente.codigoVisible}) para este pedido.`,
-        409
+      validarElegibilidadDevolucion(
+        input.tipo,
+        orden.estado,
+        orden.fechaEntrega ?? orden.fecha,
+        input.lineas,
+        orden.lineas,
+        this.reloj(),
+        await this.repo.cantidadesDevueltas(orden.idOrden, tx)
       );
-    }
+      await this.exigirSinSolicitudActiva(orden.idOrden, tx);
 
-    const codigo = await this.repo.generarSiguienteCodigo();
+      let totalReembolso = 0;
+      const lineas = input.lineas.map((l) => {
+        const orig = orden.lineas.find((o) => o.idLineaOrden === l.idLineaOrden)!;
+        const subtotal = orig.precioAplicado * l.cantidad;
+        totalReembolso += subtotal;
+        return {
+          idLineaOrden: l.idLineaOrden,
+          cantidad: l.cantidad,
+          precioUnitario: orig.precioAplicado,
+          subtotal,
+          motivoEspecifico: l.motivoEspecifico ?? input.motivoGeneral,
+        };
+      });
 
-    let totalReembolso = 0;
-    const lineas = input.lineas.map((l) => {
-      const orig = orden.lineas.find((o) => o.idLineaOrden === l.idLineaOrden)!;
-      const subtotal = orig.precioAplicado * l.cantidad;
-      totalReembolso += subtotal;
-      return {
-        idLineaOrden: l.idLineaOrden,
-        cantidad: l.cantidad,
-        precioUnitario: orig.precioAplicado,
-        subtotal,
-        motivoEspecifico: l.motivoEspecifico ?? input.motivoGeneral,
-      };
-    });
-
-    await this.repo.crearSolicitud({
-      codigoVisible: codigo,
-      idOrden: orden.idOrden,
-      idUsuario,
-      tipo: input.tipo,
-      estado: 'solicitada',
-      motivoGeneral: input.motivoGeneral,
-      totalReembolso,
-      datosBancarios: input.datosReembolso,
-      evidenciaUrls: input.evidenciaUrls,
-      lineas,
+      const codigo = await this.repo.generarSiguienteCodigo(tx);
+      await this.repo.crearSolicitud(
+        {
+          codigoVisible: codigo,
+          idOrden: orden.idOrden,
+          idUsuario,
+          tipo: input.tipo,
+          estado: 'solicitada',
+          motivoGeneral: input.motivoGeneral,
+          totalReembolso,
+          datosBancarios: input.datosReembolso,
+          evidenciaUrls: input.evidenciaUrls,
+          lineas,
+        },
+        tx
+      );
+      return codigo;
     });
 
     return this.consultarMiSolicitud(idUsuario, codigo);
@@ -189,11 +199,7 @@ export class PostventaService implements PostventaServicePort {
   ): Promise<SolicitudPostventaDetalle> {
     const raw = await this.repo.buscarPorCodigo(codigo);
     if (!raw || raw.idUsuario !== idUsuario) {
-      throw new ErrorPostventa(
-        'RECURSO_NO_DISPONIBLE',
-        'La solicitud de postventa solicitada no existe o no pertenece a su cuenta.',
-        404
-      );
+      throw noDisponible('La solicitud de postventa solicitada no existe o no pertenece a su cuenta.');
     }
 
     return this.mapearADetalle(raw);
@@ -250,82 +256,61 @@ export class PostventaService implements PostventaServicePort {
   async consultarGestionPorCodigo(codigo: string): Promise<SolicitudPostventaDetalle> {
     const raw = await this.repo.buscarPorCodigo(codigo);
     if (!raw) {
-      throw new ErrorPostventa(
-        'RECURSO_NO_DISPONIBLE',
-        'La solicitud de postventa solicitada no existe.',
-        404
-      );
+      throw noDisponible('La solicitud de postventa solicitada no existe.');
     }
 
     return this.mapearADetalle(raw);
   }
 
+  /** HU-POS-05: el cambio del pedido (M08) y el de la solicitud se confirman juntos o ninguno. */
   async resolverSolicitud(
     idEmpleado: number,
     codigo: string,
-    input: ResolverSolicitudRequest
+    input: ResolverSolicitudRequest,
+    ip: string | null = null
   ): Promise<SolicitudPostventaDetalle> {
-    const actual = await this.repo.buscarPorCodigo(codigo);
-    if (!actual) {
-      throw new ErrorPostventa(
-        'RECURSO_NO_DISPONIBLE',
-        'La solicitud de postventa solicitada no existe.',
-        404
-      );
-    }
-
     const estadoNuevo: EstadoPostventa = input.accion === 'aprobar' ? 'aprobada' : 'rechazada';
-    validarTransicionPostventa(actual.estado, estadoNuevo);
 
-    if (input.accion === 'aprobar') {
-      if (actual.tipo === 'cancelacion') {
-        await this.ordenesPort.actualizarEstadoOrden(
-          actual.orden.codigoVisible,
-          actual.orden.estado,
-          'cancelado',
-          `Cancelación aprobada por postventa (${codigo}): ${input.observaciones ?? 'Sin observaciones'}`,
-          idEmpleado
-        );
-      } else if (actual.tipo === 'devolucion') {
-        const ordenCompleta = await this.ordenesPort.obtenerOrdenParaPostventa(actual.orden.codigoVisible);
-        if (ordenCompleta) {
-          const totalCantOrden = ordenCompleta.lineas.reduce((acc, l) => acc + l.cantidad, 0);
-          const totalCantDev = actual.lineas.reduce((acc: number, l: { cantidad: number }) => acc + l.cantidad, 0);
-          if (totalCantDev >= totalCantOrden) {
-            await this.ordenesPort.actualizarEstadoOrden(
-              actual.orden.codigoVisible,
-              actual.orden.estado,
-              'devuelto',
-              `Devolución total aprobada (${codigo}): ${input.observaciones ?? 'Sin observaciones'}`,
-              idEmpleado
-            );
-          }
-        }
+    const { anterior, actualizado } = await this.repo.enTransaccion(async (tx) => {
+      const actual = await this.repo.buscarPorCodigo(codigo, tx);
+      if (!actual) {
+        throw noDisponible('La solicitud de postventa solicitada no existe.');
       }
-    }
+      validarTransicionPostventa(actual.estado, estadoNuevo);
 
-    const actualizado = await this.repo.actualizarResolucion(codigo, {
-      estado: estadoNuevo,
-      idEmpleadoResuelve: idEmpleado,
-      observacionesResolucion: input.observaciones,
-      motivoRechazo: input.motivoRechazo,
+      if (input.accion === 'aprobar') {
+        await this.aplicarEnPedido(actual, input.observaciones, idEmpleado, tx);
+      }
+
+      const actualizado = await this.repo.actualizarResolucion(
+        codigo,
+        {
+          estadoEsperado: actual.estado,
+          estado: estadoNuevo,
+          idEmpleadoResuelve: idEmpleado,
+          observacionesResolucion: input.observaciones,
+          motivoRechazo: input.motivoRechazo,
+        },
+        tx
+      );
+      if (!actualizado) throw estadoCambiado();
+      return { anterior: actual.estado, actualizado };
     });
 
+    await this.auditar(idEmpleado, `postventa.solicitud.${input.accion}`, codigo, anterior, estadoNuevo, ip);
     return this.mapearADetalle(actualizado);
   }
 
+  /** HU-POS-06 */
   async registrarReembolso(
     idEmpleado: number,
     codigo: string,
-    input: RegistrarReembolsoRequest
+    input: RegistrarReembolsoRequest,
+    ip: string | null = null
   ): Promise<SolicitudPostventaDetalle> {
     const actual = await this.repo.buscarPorCodigo(codigo);
     if (!actual) {
-      throw new ErrorPostventa(
-        'RECURSO_NO_DISPONIBLE',
-        'La solicitud de postventa solicitada no existe.',
-        404
-      );
+      throw noDisponible('La solicitud de postventa solicitada no existe.');
     }
 
     if (actual.estado !== 'aprobada') {
@@ -333,6 +318,15 @@ export class PostventaService implements PostventaServicePort {
         'TRANSICION_NO_PERMITIDA',
         `Solo solicitudes en estado "aprobada" admiten registro de reembolso (estado actual: ${actual.estado}).`,
         409
+      );
+    }
+
+    const total = Number(actual.totalReembolso);
+    if (input.montoReembolsado > total) {
+      throw new ErrorPostventa(
+        'PARAMETRO_INVALIDO',
+        `El monto reembolsado (${input.montoReembolsado}) supera el total de la solicitud (${total}).`,
+        400
       );
     }
 
@@ -344,8 +338,88 @@ export class PostventaService implements PostventaServicePort {
       notas: input.notas,
       idEmpleado,
     });
+    if (!actualizado) throw estadoCambiado();
 
+    await this.auditar(idEmpleado, 'postventa.reembolso.registrar', codigo, 'aprobada', 'reembolsada', ip);
     return this.mapearADetalle(actualizado);
+  }
+
+  /** RF-POS-01-04: una sola solicitud en trámite por pedido. */
+  private async exigirSinSolicitudActiva(idOrden: number, tx: Prisma.TransactionClient): Promise<void> {
+    const existente = await this.repo.buscarPorOrden(idOrden, tx);
+    if (existente) {
+      throw new ErrorPostventa(
+        'SOLICITUD_DUPLICADA',
+        `Ya existe una solicitud en trámite (${existente.codigoVisible}) para este pedido.`,
+        409
+      );
+    }
+  }
+
+  /**
+   * RF-POS-05-03: una cancelación aprobada cancela el pedido.
+   * RF-POS-05-04: una devolución que, sumada a las anteriores, cubre todas las unidades lo deja devuelto.
+   */
+  private async aplicarEnPedido(
+    solicitud: SolicitudPostventaEntidad,
+    observaciones: string | undefined,
+    idEmpleado: number,
+    tx: Prisma.TransactionClient
+  ): Promise<void> {
+    const codigoOrden = solicitud.orden.codigoVisible;
+    const nota = observaciones ?? 'Sin observaciones';
+
+    if (solicitud.tipo === 'cancelacion') {
+      await this.ordenesPort.cambiarEstadoOrden(
+        tx,
+        codigoOrden,
+        'cancelado',
+        `Cancelación aprobada por postventa (${solicitud.codigoVisible}): ${nota}`,
+        idEmpleado
+      );
+      return;
+    }
+    if (solicitud.tipo !== 'devolucion') return;
+
+    const orden = await this.ordenesPort.obtenerOrdenParaPostventa(codigoOrden);
+    if (!orden) return;
+    const yaDevueltas = [...(await this.repo.cantidadesDevueltas(orden.idOrden, tx)).values()].reduce((a, b) => a + b, 0);
+    if (yaDevueltas + sumarCantidades(solicitud.lineas) >= sumarCantidades(orden.lineas)) {
+      await this.ordenesPort.cambiarEstadoOrden(
+        tx,
+        codigoOrden,
+        'devuelto',
+        `Devolución total aprobada (${solicitud.codigoVisible}): ${nota}`,
+        idEmpleado
+      );
+    }
+  }
+
+  /** M20 (HU-SEG-04): un fallo al auditar no deshace la operación. */
+  private async auditar(
+    idUsuario: number,
+    accion: string,
+    codigo: string,
+    valorAnterior: EstadoPostventa,
+    valorNuevo: EstadoPostventa,
+    ip: string | null
+  ): Promise<void> {
+    try {
+      await this.auditoria?.registrarAccion?.({
+        idUsuario,
+        actor: null,
+        accion,
+        entidad: 'solicitud_postventa',
+        idEntidad: codigo,
+        valorAnterior,
+        valorNuevo,
+        resultado: 'exito',
+        fecha: this.reloj(),
+        ipOrigen: ip,
+      });
+    } catch {
+      // Sin efecto en la operación.
+    }
   }
 
   private mapearADetalle(raw: SolicitudPostventaEntidad): SolicitudPostventaDetalle {

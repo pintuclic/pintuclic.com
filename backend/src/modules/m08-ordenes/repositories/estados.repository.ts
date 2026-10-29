@@ -42,6 +42,11 @@ class PrismaEstadosTx implements EstadosTx {
   }
 }
 
+/** Para quien ya abrió su propia transacción (M11 al aprobar una postventa). */
+export function estadosTxDe(tx: Prisma.TransactionClient): EstadosTx {
+  return new PrismaEstadosTx(tx);
+}
+
 export class PrismaEstadosRepository implements EstadosRepository {
   async enTransaccion<T>(trabajo: (tx: EstadosTx) => Promise<T>): Promise<T> {
     return prisma.$transaction((px) => trabajo(new PrismaEstadosTx(px)));

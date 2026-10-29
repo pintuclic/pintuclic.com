@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type {
   SolicitarCancelacionRequest,
   SolicitarDevolucionRequest,
@@ -43,13 +44,15 @@ export interface PostventaServicePort {
   resolverSolicitud(
     idEmpleado: number,
     codigo: string,
-    input: ResolverSolicitudRequest
+    input: ResolverSolicitudRequest,
+    ip?: string | null
   ): Promise<SolicitudPostventaDetalle>;
 
   registrarReembolso(
     idEmpleado: number,
     codigo: string,
-    input: RegistrarReembolsoRequest
+    input: RegistrarReembolsoRequest,
+    ip?: string | null
   ): Promise<SolicitudPostventaDetalle>;
 }
 
@@ -60,6 +63,8 @@ export interface OrdenesPortM11 {
     idUsuario: number;
     estado: string;
     fecha: Date;
+    /** RN-POS-02 y RN-POS-03: los plazos corren desde la entrega (o el despacho, si no hay entrega registrada). */
+    fechaEntrega: Date | null;
     total: number;
     lineas: Array<{
       idLineaOrden: number;
@@ -73,9 +78,10 @@ export interface OrdenesPortM11 {
     }>;
   } | null>;
 
-  actualizarEstadoOrden(
+  /** Dentro de la transacción de la resolución: si la orden ya no admite el cambio, lanza y se deshace todo. */
+  cambiarEstadoOrden(
+    tx: Prisma.TransactionClient,
     codigoOrden: string,
-    estadoActual: string,
     estadoNuevo: 'cancelado' | 'devuelto',
     motivo: string,
     idUsuarioAutor: number

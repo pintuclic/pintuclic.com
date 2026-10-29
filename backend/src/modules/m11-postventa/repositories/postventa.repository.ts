@@ -42,6 +42,15 @@ export type SolicitudPostventaResumenDb = Prisma.SolicitudPostventaGetPayload<{
 }>;
 
 export interface PostventaRepositoryPort {
+  /** Todo lo que pasa dentro se confirma junto o no se confirma (cambio del pedido incluido). */
+  enTransaccion<T>(trabajo: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T>;
+
+  /** Bloquea la fila del pedido hasta el fin de la transacción: dos solicitudes del mismo pedido van en fila. */
+  bloquearOrden(idOrden: number, tx: Prisma.TransactionClient): Promise<void>;
+
+  /** RN-POS-05: unidades por línea de orden que ya devolvieron solicitudes aprobadas o reembolsadas. */
+  cantidadesDevueltas(idOrden: number, tx?: Prisma.TransactionClient): Promise<Map<number, number>>;
+
   generarSiguienteCodigo(tx?: Prisma.TransactionClient): Promise<string>;
 
   buscarPorCodigo(
@@ -96,17 +105,20 @@ export interface PostventaRepositoryPort {
 
   contarPorEstado(): Promise<Array<{ estado: EstadoPostventa; cantidad: number }>>;
 
+  /** Null si la solicitud ya no estaba en `estadoEsperado` (otra persona la resolvió antes). */
   actualizarResolucion(
     codigo: string,
     datos: {
+      estadoEsperado: EstadoPostventa;
       estado: EstadoPostventa;
       idEmpleadoResuelve: number;
       observacionesResolucion?: string | undefined;
       motivoRechazo?: MotivoRechazoPostventa | undefined;
     },
     tx?: Prisma.TransactionClient
-  ): Promise<SolicitudPostventaEntidad>;
+  ): Promise<SolicitudPostventaEntidad | null>;
 
+  /** Null si la solicitud ya no estaba aprobada. */
   registrarReembolso(
     codigo: string,
     datos: {
@@ -118,11 +130,31 @@ export interface PostventaRepositoryPort {
       idEmpleado: number;
     },
     tx?: Prisma.TransactionClient
-  ): Promise<SolicitudPostventaEntidad>;
+  ): Promise<SolicitudPostventaEntidad | null>;
 }
 
 export class PrismaPostventaRepository implements PostventaRepositoryPort {
   constructor(private readonly prisma: PrismaClient) {}
+
+  async enTransaccion<T>(trabajo: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return this.prisma.$transaction((tx) => trabajo(tx));
+  }
+
+  async bloquearOrden(idOrden: number, tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$queryRaw`SELECT id_orden FROM orden WHERE id_orden = ${idOrden} FOR UPDATE`;
+  }
+
+  async cantidadesDevueltas(idOrden: number, tx?: Prisma.TransactionClient): Promise<Map<number, number>> {
+    const client = tx ?? this.prisma;
+    const filas = await client.lineaSolicitudPostventa.groupBy({
+      by: ['idLineaOrden'],
+      where: {
+        solicitud: { idOrden, tipo: { in: ['devolucion', 'garantia'] }, estado: { in: ['aprobada', 'reembolsada'] } },
+      },
+      _sum: { cantidad: true },
+    });
+    return new Map(filas.map((f) => [f.idLineaOrden, f._sum.cantidad ?? 0]));
+  }
 
   async generarSiguienteCodigo(tx?: Prisma.TransactionClient): Promise<string> {
     const client = tx ?? this.prisma;
@@ -346,35 +378,36 @@ export class PrismaPostventaRepository implements PostventaRepositoryPort {
   async actualizarResolucion(
     codigo: string,
     datos: {
+      estadoEsperado: EstadoPostventa;
       estado: EstadoPostventa;
       idEmpleadoResuelve: number;
       observacionesResolucion?: string | undefined;
       motivoRechazo?: MotivoRechazoPostventa | undefined;
     },
     tx?: Prisma.TransactionClient
-  ): Promise<SolicitudPostventaEntidad> {
+  ): Promise<SolicitudPostventaEntidad | null> {
     const client = tx ?? this.prisma;
 
-    const actual = await client.solicitudPostventa.findUniqueOrThrow({
-      where: { codigoVisible: codigo },
-    });
-
-    await client.solicitudPostventa.update({
-      where: { codigoVisible: codigo },
+    // El filtro por estado hace de candado optimista, como en M08.
+    const { count } = await client.solicitudPostventa.updateMany({
+      where: { codigoVisible: codigo, estado: datos.estadoEsperado },
       data: {
         estado: datos.estado,
         idEmpleadoResuelve: datos.idEmpleadoResuelve,
         observacionesResolucion: datos.observacionesResolucion ?? null,
         motivoRechazo: datos.motivoRechazo ?? null,
         fechaResolucion: new Date(),
-        historial: {
-          create: {
-            estadoAnterior: actual.estado,
-            estadoNuevo: datos.estado,
-            idUsuarioAutor: datos.idEmpleadoResuelve,
-            motivo: datos.observacionesResolucion ?? `Solicitud ${datos.estado}`,
-          },
-        },
+      },
+    });
+    if (count !== 1) return null;
+
+    await client.historialEstadoPostventa.create({
+      data: {
+        solicitud: { connect: { codigoVisible: codigo } },
+        estadoAnterior: datos.estadoEsperado,
+        estadoNuevo: datos.estado,
+        autor: { connect: { idUsuario: datos.idEmpleadoResuelve } },
+        motivo: datos.observacionesResolucion ?? `Solicitud ${datos.estado}`,
       },
     });
 
@@ -396,31 +429,31 @@ export class PrismaPostventaRepository implements PostventaRepositoryPort {
       idEmpleado: number;
     },
     tx?: Prisma.TransactionClient
-  ): Promise<SolicitudPostventaEntidad> {
+  ): Promise<SolicitudPostventaEntidad | null> {
     const client = tx ?? this.prisma;
 
-    const actual = await client.solicitudPostventa.findUniqueOrThrow({
-      where: { codigoVisible: codigo },
-    });
-
-    await client.solicitudPostventa.update({
-      where: { codigoVisible: codigo },
+    const { count } = await client.solicitudPostventa.updateMany({
+      where: { codigoVisible: codigo, estado: 'aprobada' },
       data: {
         estado: 'reembolsada',
         metodoReembolso: datos.metodoReembolso,
         referenciaReembolso: datos.referenciaReembolso,
         comprobanteUrl: datos.comprobanteUrl ?? null,
         fechaReembolso: new Date(),
-        historial: {
-          create: {
-            estadoAnterior: actual.estado,
-            estadoNuevo: 'reembolsada',
-            idUsuarioAutor: datos.idEmpleado,
-            motivo: `Reembolso registrado (${datos.metodoReembolso} ref: ${datos.referenciaReembolso})${
-              datos.notas ? ` - ${datos.notas}` : ''
-            }`,
-          },
-        },
+      },
+    });
+    if (count !== 1) return null;
+
+    // El monto no tiene columna propia: queda en el historial, que es inmutable.
+    await client.historialEstadoPostventa.create({
+      data: {
+        solicitud: { connect: { codigoVisible: codigo } },
+        estadoAnterior: 'aprobada',
+        estadoNuevo: 'reembolsada',
+        autor: { connect: { idUsuario: datos.idEmpleado } },
+        motivo: `Reembolso registrado por ${datos.montoReembolsado} (${datos.metodoReembolso} ref: ${datos.referenciaReembolso})${
+          datos.notas ? ` - ${datos.notas}` : ''
+        }`,
       },
     });
 

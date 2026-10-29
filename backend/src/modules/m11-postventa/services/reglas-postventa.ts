@@ -72,11 +72,13 @@ export function validarElegibilidadCancelacion(estadoOrden: string): void {
 
 /**
  * Valida si una orden y sus líneas son elegibles para devolución o garantía.
+ * `fechaEntrega` es desde cuándo corren los plazos (RN-POS-02, RN-POS-03); `yaDevueltas` son las unidades por
+ * línea que otras solicitudes aprobadas o reembolsadas ya devolvieron (RN-POS-05).
  */
 export function validarElegibilidadDevolucion(
   tipo: 'devolucion' | 'garantia',
   estadoOrden: string,
-  fechaOrden: Date,
+  fechaEntrega: Date,
   lineasDevueltas: Array<{ idLineaOrden: number; cantidad: number }>,
   lineasOrdenOriginal: Array<{
     idLineaOrden: number;
@@ -84,7 +86,8 @@ export function validarElegibilidadDevolucion(
     esEntonado: boolean;
     nombreProducto: string;
   }>,
-  ahora: Date = new Date()
+  ahora: Date = new Date(),
+  yaDevueltas: ReadonlyMap<number, number> = new Map()
 ): void {
   if (!ESTADOS_ORDEN_DEVOLVIBLES.includes(estadoOrden)) {
     throw new ErrorPostventa(
@@ -95,7 +98,7 @@ export function validarElegibilidadDevolucion(
   }
 
   if (tipo === 'devolucion') {
-    const diasHabiles = calcularDiasHabiles(fechaOrden, ahora);
+    const diasHabiles = calcularDiasHabiles(fechaEntrega, ahora);
     if (diasHabiles > 5) {
       throw new ErrorPostventa(
         'PLAZO_VENCIDO',
@@ -104,7 +107,7 @@ export function validarElegibilidadDevolucion(
       );
     }
   } else if (tipo === 'garantia') {
-    const diasCalendario = calcularDiasCalendario(fechaOrden, ahora);
+    const diasCalendario = calcularDiasCalendario(fechaEntrega, ahora);
     if (diasCalendario > 30) {
       throw new ErrorPostventa(
         'PLAZO_VENCIDO',
@@ -114,21 +117,27 @@ export function validarElegibilidadDevolucion(
     }
   }
 
-  // Validar existencia de cada línea y cantidad solicitada
-  for (const solLinea of lineasDevueltas) {
-    const orig = lineasOrdenOriginal.find((l) => l.idLineaOrden === solLinea.idLineaOrden);
+  // Una misma línea repetida en la solicitud suma sus cantidades.
+  const pedidas = new Map<number, number>();
+  for (const l of lineasDevueltas) pedidas.set(l.idLineaOrden, (pedidas.get(l.idLineaOrden) ?? 0) + l.cantidad);
+
+  for (const [idLineaOrden, cantidad] of pedidas) {
+    const orig = lineasOrdenOriginal.find((l) => l.idLineaOrden === idLineaOrden);
     if (!orig) {
       throw new ErrorPostventa(
         'PARAMETRO_INVALIDO',
-        `La línea con id ${solLinea.idLineaOrden} no pertenece a esta orden.`,
+        `La línea con id ${idLineaOrden} no pertenece a esta orden.`,
         400
       );
     }
 
-    if (solLinea.cantidad > orig.cantidad) {
+    const devueltas = yaDevueltas.get(idLineaOrden) ?? 0;
+    if (cantidad + devueltas > orig.cantidad) {
       throw new ErrorPostventa(
         'PARAMETRO_INVALIDO',
-        `La cantidad a devolver (${solLinea.cantidad}) supera la cantidad comprada (${orig.cantidad}) para ${orig.nombreProducto}.`,
+        devueltas > 0
+          ? `De ${orig.nombreProducto} compraste ${orig.cantidad} y ya devolviste ${devueltas}: puedes devolver como máximo ${orig.cantidad - devueltas}.`
+          : `La cantidad a devolver (${cantidad}) supera la cantidad comprada (${orig.cantidad}) para ${orig.nombreProducto}.`,
         400
       );
     }

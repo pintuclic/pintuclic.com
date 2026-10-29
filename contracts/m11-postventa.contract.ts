@@ -308,5 +308,5 @@ export const ENDPOINTS_M11 = [
   { metodo: 'GET', ruta: '/postventa/gestion/resumen', acceso: 'ventas.ver', hu: 'HU-POS-04' },
   { metodo: 'GET', ruta: '/postventa/gestion/:codigo', acceso: 'ventas.ver', hu: 'HU-POS-04' },
   { metodo: 'PATCH', ruta: '/postventa/gestion/:codigo/resolver', acceso: 'ventas.gestionar', hu: 'HU-POS-05' },
-  { metodo: 'POST', ruta: '/postventa/gestion/:codigo/reembolso', acceso: 'ventas.gestionar', hu: 'HU-POS-06' },
+  { metodo: 'POST', ruta: '/postventa/gestion/:codigo/reembolsar', acceso: 'ventas.gestionar', hu: 'HU-POS-06' },
 ] as const;

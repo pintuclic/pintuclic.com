@@ -130,6 +130,38 @@ describe('M11 Reglas de Dominio de Postventa', () => {
     });
   });
 
+  describe('Unidades ya devueltas (RN-POS-05)', () => {
+    const lineas = [{ idLineaOrden: 1, cantidad: 3, esEntonado: false, nombreProducto: 'Viniltex Blanco Galón' }];
+    const entrega = new Date('2026-10-20T10:00:00Z');
+    const ahora = new Date('2026-10-21T10:00:00Z');
+
+    it('descuenta lo que otras solicitudes ya devolvieron', () => {
+      const yaDevueltas = new Map([[1, 2]]);
+      expect(() =>
+        validarElegibilidadDevolucion('devolucion', 'entregado', entrega, [{ idLineaOrden: 1, cantidad: 1 }], lineas, ahora, yaDevueltas)
+      ).not.toThrow();
+      expect(() =>
+        validarElegibilidadDevolucion('devolucion', 'entregado', entrega, [{ idLineaOrden: 1, cantidad: 2 }], lineas, ahora, yaDevueltas)
+      ).toThrowError(/ya devolviste 2/);
+    });
+
+    it('suma la misma línea si viene repetida en la solicitud', () => {
+      expect(() =>
+        validarElegibilidadDevolucion(
+          'devolucion',
+          'entregado',
+          entrega,
+          [
+            { idLineaOrden: 1, cantidad: 2 },
+            { idLineaOrden: 1, cantidad: 2 },
+          ],
+          lineas,
+          ahora
+        )
+      ).toThrowError(/supera la cantidad comprada/);
+    });
+  });
+
   describe('Máquina de Estados de Postventa', () => {
     it('permite transicionar de solicitada a aprobada o rechazada', () => {
       expect(() => validarTransicionPostventa('solicitada', 'aprobada')).not.toThrow();
