@@ -10,6 +10,14 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.25] - 2026-10-29
+### Esquema 4.24 (96 Tablas) - M18: avisos de estado de pedido y de cotización
+- **Alcance General:** PR general de M18 · HU-NOT-02 (contrato `contracts/m18-notificaciones.contract.ts`). Cambio aditivo; no crea tablas.
+  - **M18:** valores `estado_orden`, `cotizacion_respondida` y `cotizacion_rechazada` en `enum_tipo_comunicacion`, con sus plantillas en el seed (editables desde el panel).
+  - **Prisma:** los tres valores del enum `TipoComunicacion`.
+
+---
+
 ## [v3.24] - 2026-10-28
 ### Esquema 4.23 (96 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
 - **Alcance General:** pedido por el contrato `contracts/m11-postventa.contract.ts`. Cambio aditivo: tres tablas y cuatro ENUMs nuevos; no altera tablas existentes.

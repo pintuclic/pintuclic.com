@@ -691,6 +691,21 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
     'comprobante_venta',
     'Tu comprobante de compra · Pintu Clic',
     'Gracias por tu compra en Pintu Clic. Ya está listo el comprobante de tu pedido: puedes verlo, imprimirlo o guardarlo como PDF desde el enlace.'
+),
+(
+    'estado_orden',
+    'Novedades de tu pedido · Pintu Clic',
+    'El estado de tu pedido cambió. Aquí tienes el detalle; puedes consultar el pedido completo cuando quieras desde tu cuenta.'
+),
+(
+    'cotizacion_respondida',
+    'Respondimos tu cotización · Pintu Clic',
+    'Ya revisamos tu solicitud de cotización y preparamos nuestra respuesta. Ingresa a tu cuenta para ver las condiciones y aceptarla o rechazarla.'
+),
+(
+    'cotizacion_rechazada',
+    'Sobre tu solicitud de cotización · Pintu Clic',
+    'Revisamos tu solicitud de cotización y por ahora no podemos atenderla en las condiciones pedidas. Abajo encontrarás el motivo.'
 )
 ON CONFLICT (tipo) DO NOTHING;
 

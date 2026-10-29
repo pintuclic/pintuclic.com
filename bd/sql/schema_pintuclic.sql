@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.23 (v4.22 + M12: comprobante de venta imprimible y datos de facturación · M18: tipo comprobante_venta)
+-- VERSIÓN: 4.24 (v4.23 + M18: avisos de estado de pedido y de cotización)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 89
@@ -330,6 +330,11 @@ ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'alerta_servicio_ia';
 
 -- M18 (v4.23): aviso al cliente con el enlace a su comprobante de venta (M12 · R9)
 ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'comprobante_venta';
+
+-- M18 (v4.24): avisos al cliente por cambio de estado de su pedido y por la respuesta a su cotización (HU-NOT-02)
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'estado_orden';
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'cotizacion_respondida';
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'cotizacion_rechazada';
 
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS
