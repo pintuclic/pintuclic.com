@@ -61,7 +61,7 @@ describe('m08.routes · ensamblaje del módulo', () => {
       bloquearConsecutivo: async () => undefined,
       buscarExistente: async () => null,
       avanzarConsecutivo: async () => 42,
-      insertarOrden: async (codigo) => ({ codigo, estado: 'orden_confirmada' }),
+      insertarOrden: async (codigo) => ({ codigo, estado: 'revision_disponibilidad' }),
     };
     const repo: CreacionRepository = {
       enTransaccion: async (trabajo) => trabajo(tx),
@@ -78,7 +78,7 @@ describe('m08.routes · ensamblaje del módulo', () => {
     });
     const resultado = await m08.creacion.crearDesdePagoConfirmado(solicitud());
 
-    expect(resultado).toEqual({ codigo: 'PC-2026-00042', estado: 'orden_confirmada', creada: true });
+    expect(resultado).toEqual({ codigo: 'PC-2026-00042', estado: 'revision_disponibilidad', creada: true });
     expect(notificarOrdenCreada).toHaveBeenCalledWith({ codigo: 'PC-2026-00042', idUsuario: 7, total: 100000 });
   });
 

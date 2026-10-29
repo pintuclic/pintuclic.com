@@ -516,8 +516,8 @@ La prioridad de cada historia es la más alta de sus requisitos. El estado se re
 ### Ciclo de estados
 | Desde | Hacia | Regla |
 | :--- | :--- | :--- |
-| — | Orden confirmada | La orden nace en este estado al confirmarse el pago (RF-ORD-01-01). |
-| Orden confirmada | Revisión de disponibilidad | — |
+| — | Revisión de disponibilidad | La orden nace en este estado al confirmarse el pago (RF-ORD-01-01): es donde el personal comprueba que hay producto. |
+| Orden confirmada | Revisión de disponibilidad | Solo para órdenes anteriores a este cambio, que nacieron en «Orden confirmada»; ninguna orden nueva pasa por este estado. |
 | Revisión de disponibilidad | En preparación | Hoy lo registra el personal. Con M09 será automático al confirmar la última línea (RF-CUM-03-10). |
 | En preparación | Preparada | — |
 | Preparada | En preparación | Exige motivo; no se retrocede a la revisión de disponibilidad (RF-CUM-05-05). |

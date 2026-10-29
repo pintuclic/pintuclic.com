@@ -4,6 +4,8 @@ import type { SolicitudPagadaInput } from '../dtos/m08-ordenes.dto';
 import type { CreacionRepository, CreacionTx, OrdenCreada, OrdenExistente } from '../interfaces/ordenes.interface';
 
 const NOMBRE_CONSECUTIVO = 'orden';
+/** La orden nace ya en revisión de disponibilidad: es donde el personal confirma que hay producto (HU-ORD-03). */
+const ESTADO_INICIAL = 'revision_disponibilidad' as const;
 const LIMITES_TRANSACCION = { esperaConexionMs: 5_000, duracionMs: 15_000 } as const;
 
 /** Otra transacción creó antes una orden con el mismo `codigo_solicitud` o `transaccion_pago_id`. */
@@ -84,7 +86,7 @@ class PrismaCreacionTx implements CreacionTx {
           idUsuario: entrada.idUsuario,
           origen: entrada.origen,
           idCotizacion: entrada.idCotizacion,
-          estado: 'orden_confirmada',
+          estado: ESTADO_INICIAL,
           transaccionPagoId: entrada.transaccionPagoId,
           codigoSolicitud: entrada.codigoSolicitud,
           modoEntrega: entrada.modoEntrega,
@@ -120,7 +122,7 @@ class PrismaCreacionTx implements CreacionTx {
             })),
           },
           // Historial inicial: autor null = el sistema (D01 del DDL).
-          historial: { create: { estadoAnterior: null, estadoNuevo: 'orden_confirmada', idUsuarioAutor: null } },
+          historial: { create: { estadoAnterior: null, estadoNuevo: ESTADO_INICIAL, idUsuarioAutor: null } },
         },
         select: { codigoVisible: true, estado: true },
       });

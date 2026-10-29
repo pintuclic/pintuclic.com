@@ -115,7 +115,7 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
 
     const r = await creacion.crearDesdePagoConfirmado(entrada);
 
-    expect(r).toMatchObject({ creada: true, estado: 'orden_confirmada' });
+    expect(r).toMatchObject({ creada: true, estado: 'revision_disponibilidad' });
     expect(r.codigo).toBe(`PC-2026-${String(antes + 1).padStart(5, '0')}`);
     expect(await consecutivoActual()).toBe(antes + 1);
 
@@ -129,7 +129,7 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     expect(guardada?.lineas[0]?.descuentos.map((d) => d.ordenAplicacion).sort()).toEqual([1, 2]);
     expect(guardada?.lineas[0]?.baseConsumida).toBe('Base Deep 1 gal');
     expect(guardada?.historial).toHaveLength(1);
-    expect(guardada?.historial[0]).toMatchObject({ estadoAnterior: null, estadoNuevo: 'orden_confirmada', idUsuarioAutor: null });
+    expect(guardada?.historial[0]).toMatchObject({ estadoAnterior: null, estadoNuevo: 'revision_disponibilidad', idUsuarioAutor: null });
   });
 
   it('la misma solicitud, repetida o en paralelo, genera una sola orden y no salta números (CA-ORD-01-05)', async () => {
@@ -222,8 +222,8 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud());
 
     const resultados = await Promise.allSettled([
-      estados.cambiarEstado(codigo, { estadoActual: 'orden_confirmada', estadoNuevo: 'revision_disponibilidad' }, { idUsuario: ID_EMPLEADO }),
-      estados.cambiarEstado(codigo, { estadoActual: 'orden_confirmada', estadoNuevo: 'revision_disponibilidad' }, { idUsuario: 3 }),
+      estados.cambiarEstado(codigo, { estadoActual: 'revision_disponibilidad', estadoNuevo: 'en_preparacion' }, { idUsuario: ID_EMPLEADO }),
+      estados.cambiarEstado(codigo, { estadoActual: 'revision_disponibilidad', estadoNuevo: 'en_preparacion' }, { idUsuario: 3 }),
     ]);
 
     expect(resultados.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
@@ -234,7 +234,7 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
       where: { orden: { codigoVisible: codigo } },
       orderBy: { idHistorialEstadoOrden: 'asc' },
     });
-    expect(historial.map((h) => h.estadoNuevo)).toEqual(['orden_confirmada', 'revision_disponibilidad']);
+    expect(historial.map((h) => h.estadoNuevo)).toEqual(['revision_disponibilidad', 'en_preparacion']);
     expect([ID_EMPLEADO, 3]).toContain(historial[1]?.idUsuarioAutor);
   });
 
@@ -242,7 +242,6 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud({ modoEntrega: 'recogida', direccion: null }));
     const actor = { idUsuario: ID_EMPLEADO };
 
-    await estados.cambiarEstado(codigo, { estadoActual: 'orden_confirmada', estadoNuevo: 'revision_disponibilidad' }, actor);
     await estados.cambiarEstado(codigo, { estadoActual: 'revision_disponibilidad', estadoNuevo: 'en_preparacion' }, actor);
     await estados.cambiarEstado(codigo, { estadoActual: 'en_preparacion', estadoNuevo: 'preparada' }, actor);
     await expect(
@@ -258,7 +257,7 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     const correo = (await prisma.usuario.findUnique({ where: { idUsuario: ID_CLIENTE } }))?.correo ?? '';
     const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud());
 
-    const porEstado = await gestion.listar({ orden: 'antiguedad', estados: ['orden_confirmada'] });
+    const porEstado = await gestion.listar({ orden: 'antiguedad', estados: ['revision_disponibilidad'] });
     expect(porEstado.filas.map((f) => f.codigo)).toContain(codigo);
     const fechas = porEstado.filas.map((f) => f.entradaEstado.getTime());
     expect(fechas).toEqual([...fechas].sort((a, b) => a - b));
@@ -277,7 +276,7 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     expect(hoy.filas.map((f) => f.codigo)).toContain(codigo);
 
     const conteo = await gestion.contarPorEstado();
-    expect(conteo.find((c) => c.estado === 'orden_confirmada')?.cantidad).toBeGreaterThan(0);
+    expect(conteo.find((c) => c.estado === 'revision_disponibilidad')?.cantidad).toBeGreaterThan(0);
   });
 
   it('un texto de búsqueda con comodines o SQL se trata como texto literal', async () => {
@@ -293,7 +292,7 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
 
   it('el detalle del personal trae cliente, líneas, historial con autor, notas y contactos; el del cliente no (HU-ORD-09, 10)', async () => {
     const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud());
-    await estados.cambiarEstado(codigo, { estadoActual: 'orden_confirmada', estadoNuevo: 'revision_disponibilidad' }, { idUsuario: ID_EMPLEADO });
+    await estados.cambiarEstado(codigo, { estadoActual: 'revision_disponibilidad', estadoNuevo: 'en_preparacion' }, { idUsuario: ID_EMPLEADO });
     const nota = await notas.agregarNota(codigo, ID_EMPLEADO, 'Cliente pidió llamar antes');
     const contacto = await notas.agregarContacto(codigo, ID_EMPLEADO, 'telefono', 'Se avisó de la demora');
 
@@ -305,8 +304,8 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     expect(detalle?.direccion).toContain('Calle 10');
     expect(detalle?.lineas[0]).toMatchObject({ esEntonado: true, baseConsumida: 'Base Deep 1 gal' });
     expect(detalle?.historial.map((h) => [h.estadoNuevo, h.autor === null])).toEqual([
-      ['orden_confirmada', true],
-      ['revision_disponibilidad', false],
+      ['revision_disponibilidad', true],
+      ['en_preparacion', false],
     ]);
     expect(detalle?.notas.map((n) => n.texto)).toEqual(['Cliente pidió llamar antes']);
     expect(detalle?.contactos).toHaveLength(1);
