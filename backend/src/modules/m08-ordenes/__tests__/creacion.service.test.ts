@@ -33,7 +33,7 @@ class RepoMemoria implements CreacionRepository {
           },
           insertarOrden: async (codigo, entrada) => {
             if (this.fallarAlInsertar) throw this.fallarAlInsertar;
-            const orden = { codigo, estado: 'orden_confirmada' as const, entrada };
+            const orden = { codigo, estado: 'revision_disponibilidad' as const, entrada };
             this.ordenes.set(this.clave(entrada.codigoSolicitud, entrada.transaccionPagoId), orden);
             return { codigo, estado: orden.estado };
           },
@@ -121,10 +121,10 @@ describe('CreacionService (HU-ORD-01, HU-ORD-02, HU-ORD-06)', () => {
     servicio = new CreacionService(repo, notificaciones, { ahora: () => ahora });
   });
 
-  it('crea la orden con código PC-AAAA-NNNNN y la deja en orden_confirmada (CA-ORD-01-01)', async () => {
+  it('crea la orden con código PC-AAAA-NNNNN y la deja en revision_disponibilidad (CA-ORD-01-01)', async () => {
     const resultado = await servicio.crearDesdePagoConfirmado(solicitud());
 
-    expect(resultado).toEqual({ codigo: 'PC-2026-00001', estado: 'orden_confirmada', creada: true });
+    expect(resultado).toEqual({ codigo: 'PC-2026-00001', estado: 'revision_disponibilidad', creada: true });
     expect(repo.ordenes.size).toBe(1);
   });
 
@@ -142,7 +142,7 @@ describe('CreacionService (HU-ORD-01, HU-ORD-02, HU-ORD-06)', () => {
     const primera = await servicio.crearDesdePagoConfirmado(solicitud());
     const segunda = await servicio.crearDesdePagoConfirmado(solicitud());
 
-    expect(segunda).toEqual({ codigo: primera.codigo, estado: 'orden_confirmada', creada: false });
+    expect(segunda).toEqual({ codigo: primera.codigo, estado: 'revision_disponibilidad', creada: false });
     expect(repo.ordenes.size).toBe(1);
     expect(repo.consecutivo).toBe(1);
     expect(notificaciones.notificarOrdenCreada).toHaveBeenCalledTimes(1);
@@ -222,7 +222,7 @@ describe('CreacionService (HU-ORD-01, HU-ORD-02, HU-ORD-06)', () => {
   it('si otra transacción ganó por unicidad, devuelve la orden ya existente', async () => {
     const existente: OrdenExistente = {
       codigo: 'PC-2026-00009',
-      estado: 'orden_confirmada',
+      estado: 'revision_disponibilidad',
       codigoSolicitud: 'SOL-2026-00001',
       transaccionPagoId: 'TX-1',
       idUsuario: 7,
@@ -239,7 +239,7 @@ describe('CreacionService (HU-ORD-01, HU-ORD-02, HU-ORD-06)', () => {
     repo.fallarAlInsertar = new UnicidadOrdenError();
     vi.spyOn(repo, 'buscarExistente').mockResolvedValue({
       codigo: 'PC-2026-00009',
-      estado: 'orden_confirmada',
+      estado: 'revision_disponibilidad',
       codigoSolicitud: 'SOL-2026-00555',
       transaccionPagoId: 'TX-1',
       idUsuario: 7,

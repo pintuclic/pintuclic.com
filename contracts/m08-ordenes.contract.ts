@@ -140,7 +140,7 @@ export type MedioContacto = z.infer<typeof medioContactoSchema>;
  * `condicion` es lo que el servicio verifica además de la pareja desde → hacia.
  */
 export const TRANSICIONES_ESTADO = [
-  { desde: 'orden_confirmada', hacia: 'revision_disponibilidad', condicion: null },
+  { desde: 'orden_confirmada', hacia: 'revision_disponibilidad', condicion: 'Solo órdenes anteriores: las nuevas nacen ya en revision_disponibilidad' },
   { desde: 'revision_disponibilidad', hacia: 'en_preparacion', condicion: 'Hoy lo registra el personal; con M09 será automático (RF-CUM-03-10)' },
   { desde: 'en_preparacion', hacia: 'preparada', condicion: null },
   { desde: 'preparada', hacia: 'en_preparacion', condicion: 'Exige motivo; no se retrocede a revision_disponibilidad (RF-CUM-05-05)' },
