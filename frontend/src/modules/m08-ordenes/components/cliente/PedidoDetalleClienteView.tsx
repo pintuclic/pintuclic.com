@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Receipt } from 'lucide-react';
 import { Alert, ButtonLink, Container, Skeleton } from '@/core/components';
 import type { OrdenDetalleCliente } from '../../dtos/m08-ordenes.dto';
 import { mensajeDeError } from '../../services/mensaje-error';
@@ -66,6 +66,9 @@ export function PedidoDetalleClienteView({ codigo }: { codigo: string }) {
                       esEntonado: Boolean(l.colorSolicitado),
                     }))}
                   />
+                  <ButtonLink href={`/perfil/pedidos/${encodeURIComponent(orden.codigo)}/comprobante`} variant="outline" size="sm" leftIcon={<Receipt className="h-4 w-4" />} className="mt-3">
+                    Ver comprobante
+                  </ButtonLink>
                 </div>
                 <EstadoBadge estado={orden.estado} />
               </header>
