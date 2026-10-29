@@ -6,6 +6,23 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-29 (c)
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 📋 **M09 Cumplimiento y preparación: contrato y base de datos.** Entra como el PR general `chore/m09-contrato-bd`; el módulo sigue en su propia rama.
+
+### Módulo M09 — Contrato (HU-CUM-01, 03, 05 y 06)
+- **Es una mejora de M08, no un módulo pesado (PO).** Una lista de chequeo por línea en el detalle del pedido, el paso automático a preparación y la hoja que se imprime para la bodega. Nada más, para no cargar al empleado al confirmar el envío.
+- **Tres marcas por línea:** `disponible`, `consiguiendo_stock` (hay parte de las unidades o se espera el resto) y `no_disponible`; sin marca, la línea está pendiente. La línea solo pasa a `disponible` con todas sus unidades y no se cuentan unidades.
+- **Avance automático:** al quedar todas las líneas `disponible`, la orden pasa sola de revisión de disponibilidad a preparación. Se quita el paso manual de M08 (se hará con el módulo), de modo que nadie puede saltarse la revisión, tampoco el administrador.
+- **Todo el módulo exige `ventas.gestionar`**, también las consultas (RF-CUM-01-10).
+- **Hoja de preparación sin importes, descuentos ni datos de pago ni del cliente**; el esquema es estricto y una prueba lo comprueba.
+- **Preparación (HU-CUM-05):** sin pantallas ni tabla propias; es el cambio de estado de M08 con su historial.
+- **La spec `M09_ESPECIFICACION_CUMPLIMIENTO.md` se ajusta** (tres marcas en vez de parcial y nula, sin consecución) y se le quitan los requisitos de M14, que venían en el mismo documento. Donde difiera del contrato, manda el contrato.
+
+### Base de datos — esquema 4.24
+- Tabla `verificacion_linea_orden` de solo inserción (con disparador que rechaza UPDATE y DELETE) y ENUM `enum_estado_verificacion_linea`. Detalle en `bd/docs/CHANGELOG_DATABASE.md` (v3.25).
+- Se ejecutó el DDL dos veces seguidas y el seed sobre un PostgreSQL desechable (97 tablas, sin errores), y se probó la tabla: acepta las tres marcas, rechaza `parcial`, `pendiente`, filas sin autor, líneas inexistentes y cualquier UPDATE o DELETE. Un ciclo de escritura y lectura con Prisma confirma que el modelo coincide con la tabla.
+
 ## [No publicado] - 2026-10-29 (b)
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🏠 **Simulador de color: la pestaña «En tu espacio» deja de ser un aviso.** El color elegido en la paleta se pinta ahora sobre las paredes de seis ambientes. Entra como la rama `feature/m03-simulador-color`.
