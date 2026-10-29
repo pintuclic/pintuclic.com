@@ -10,6 +10,18 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.25] - 2026-10-29
+### Esquema 4.24 (97 Tablas) - M09: rastro de la revisión de disponibilidad por línea de orden
+- **Alcance General:** PR general de M09 (contrato `contracts/m09-cumplimiento.contract.ts`). Cambio aditivo: una tabla, un ENUM y un disparador; no altera tablas existentes.
+  - **`verificacion_linea_orden`**: una fila por cada marca que el personal pone a una línea de orden (`id_linea_orden`, `estado`, `id_usuario_autor`, `fecha`). Es de solo inserción: el estado vigente de una línea es su último registro y una línea sin registros está pendiente. El autor es obligatorio. Índice `(id_linea_orden, id_verificacion_linea_orden DESC)` para leer el último.
+  - **`fn_verificacion_linea_inmutable`** y su disparador `trg_verificacion_linea_sin_cambios`: rechazan UPDATE y DELETE sobre la tabla, sea quien sea, igual que M12 con el comprobante. Una marca equivocada se corrige con otro registro.
+  - **ENUM nuevo:** `enum_estado_verificacion_linea` (`disponible`, `consiguiendo_stock`, `no_disponible`). `pendiente` no es un valor: es la ausencia de registros.
+  - **Prisma:** modelo `VerificacionLineaOrden`, enum `EstadoVerificacionLinea` y las relaciones `verificaciones` en `LineaOrden` y `verificacionesLinea` en `Usuario`.
+  - **Sin permisos nuevos:** M09 usa `ventas.gestionar`, que ya está sembrado. No hay datos de seed.
+  - **Cabecera:** `TOTAL TABLAS` decía 89 aunque el script ya creaba 96; ahora dice 97, que es lo que crea.
+
+---
+
 ## [v3.24] - 2026-10-28
 ### Esquema 4.23 (96 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
 - **Alcance General:** pedido por el contrato `contracts/m11-postventa.contract.ts`. Cambio aditivo: tres tablas y cuatro ENUMs nuevos; no altera tablas existentes.

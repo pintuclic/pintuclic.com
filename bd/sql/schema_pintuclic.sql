@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.23 (v4.22 + M12: comprobante de venta imprimible y datos de facturación · M18: tipo comprobante_venta)
+-- VERSIÓN: 4.24 (v4.23 + M09: rastro de la revisión de disponibilidad por línea de orden)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 89
+-- TOTAL TABLAS: 97
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -274,6 +274,11 @@ BEGIN
             'fuera_de_plazo', 'producto_entonado', 'producto_abierto_o_danado',
             'evidencia_insuficiente', 'politica_no_cumplida', 'otro'
         );
+    END IF;
+
+    -- M09: marca que el personal pone a cada línea de una orden al revisar la disponibilidad
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_verificacion_linea') THEN
+        CREATE TYPE enum_estado_verificacion_linea AS ENUM ('disponible', 'consiguiendo_stock', 'no_disponible');
     END IF;
 END $$;
 
@@ -3151,6 +3156,46 @@ CREATE TRIGGER trg_linea_comprobante_sin_cambios
     BEFORE UPDATE OR DELETE ON linea_comprobante_venta
     FOR EACH ROW EXECUTE FUNCTION fn_comprobante_inmutable();
 
+-- ------------------------------------------------------------------------------
+-- M09: CUMPLIMIENTO Y PREPARACIÓN (contracts/m09-cumplimiento.contract.ts)
+-- ------------------------------------------------------------------------------
+
+-- Tabla: verificacion_linea_orden
+-- Rastro de solo inserción de las marcas que el personal pone a cada línea durante la revisión de disponibilidad
+-- (M09 · HU-CUM-01, R3). El estado de una línea es el de su último registro; una línea sin registros está pendiente.
+CREATE TABLE IF NOT EXISTS verificacion_linea_orden (
+    id_verificacion_linea_orden SERIAL PRIMARY KEY,
+    id_linea_orden INT NOT NULL,
+    estado enum_estado_verificacion_linea NOT NULL,
+    id_usuario_autor INT NOT NULL,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_vlo_linea_orden FOREIGN KEY (id_linea_orden)
+        REFERENCES linea_orden (id_linea_orden) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_vlo_autor FOREIGN KEY (id_usuario_autor)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+COMMENT ON TABLE verificacion_linea_orden IS 'Marcas de disponibilidad por línea de orden; solo inserción, el estado vigente es el último registro (M09 · R3)';
+COMMENT ON COLUMN verificacion_linea_orden.estado IS 'consiguiendo_stock = hay parte de las unidades o se espera el resto; la línea solo es disponible con todas (M09 · D10)';
+COMMENT ON COLUMN verificacion_linea_orden.id_usuario_autor IS 'Empleado que puso la marca; obligatorio, el rastro siempre tiene autor';
+
+CREATE INDEX IF NOT EXISTS idx_vlo_linea ON verificacion_linea_orden (id_linea_orden, id_verificacion_linea_orden DESC);
+
+-- Una marca registrada no se modifica ni se borra (M09 · R3): se corrige con otro registro. Un disparador lo rechaza sea quien sea.
+CREATE OR REPLACE FUNCTION fn_verificacion_linea_inmutable() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'El registro de verificación de una línea es inmutable: no se permite % (M09 · R3)', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END $$;
+
+COMMENT ON FUNCTION fn_verificacion_linea_inmutable() IS 'Rechaza UPDATE y DELETE sobre verificacion_linea_orden (M09 · R3)';
+
+DROP TRIGGER IF EXISTS trg_verificacion_linea_sin_cambios ON verificacion_linea_orden;
+CREATE TRIGGER trg_verificacion_linea_sin_cambios
+    BEFORE UPDATE OR DELETE ON verificacion_linea_orden
+    FOR EACH ROW EXECUTE FUNCTION fn_verificacion_linea_inmutable();
+
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (96 TABLAS - v4.23)
+-- FIN DEL SCRIPT DDL (97 TABLAS - v4.24)
 -- ==============================================================================
