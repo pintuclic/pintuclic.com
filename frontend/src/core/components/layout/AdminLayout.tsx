@@ -30,6 +30,7 @@ import {
   Wallet,
   X,
   Receipt,
+  BarChart3,
 } from 'lucide-react';
 import { apiClient } from '../../api/apiClient';
 import { useAuthStore } from '../../store/authStore';
@@ -90,6 +91,12 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
     label: 'Facturación',
     href: '/admin/facturacion',
     icon: <Receipt className="w-5 h-5 shrink-0" aria-hidden="true" />,
+    exact: false,
+  },
+  {
+    label: 'Reportes',
+    href: '/admin/reportes',
+    icon: <BarChart3 className="w-5 h-5 shrink-0" aria-hidden="true" />,
     exact: false,
   },
   {

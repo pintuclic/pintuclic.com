@@ -11,6 +11,7 @@ import { PrecioFinalM06Adapter } from './modules/m02-busqueda/services/precio-fi
 import { construirModuloM04 } from './modules/m04-cuentas/m04.routes';
 import { OrdenesM08Adapter } from './modules/m07-checkout/adapters/ordenes-m08.adapter';
 import { construirModuloM07 } from './modules/m07-checkout/m07.routes';
+import { construirModuloM19 } from './modules/m19-reportes/m19.routes';
 import { construirModuloM12 } from './modules/m12-facturacion/m12.routes';
 import { construirModuloM08 } from './modules/m08-ordenes/m08.routes';
 import { construirModuloM09 } from './modules/m09-cumplimiento/m09.routes';
@@ -134,6 +135,11 @@ export function construirAppRoutes(): Router {
   // M09: cumplimiento y preparación (lista de chequeo por línea, retenidas y hoja de preparación). Solo personal.
   const m09 = construirModuloM09(m17.autorizacionService, { auditoria: m20.auditoria });
   router.use('/cumplimiento', exigirSesionSalvo(auth, []), m09.router);
+
+  // M19: reportes y analítica de ventas (solo lectura). `ventas.ver` para verlos, `ventas.exportar` para el CSV y
+  // `personal.ver` para el top de clientes; solo sesión de personal. Va antes de `/admin` por lo mismo que M01.
+  const m19 = construirModuloM19(m17.autorizacionService, { auditoria: m20.auditoria });
+  router.use('/admin/reportes', exigirSesionSalvo(auth, []), m19.router);
 
   // M11: postventa (cancelaciones, devoluciones y reembolsos)
   const m11 = construirModuloM11(m17.autorizacionService, { auditoria: m20.auditoria });
