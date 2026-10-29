@@ -32,6 +32,39 @@ export async function cambiarEstadoPorPostventa(
   return { ok: true, estadoAnterior: actual.estado };
 }
 
+export type ResultadoAvanceCumplimiento =
+  | { ok: true }
+  | { ok: false; razon: 'NO_EXISTE' }
+  | { ok: false; razon: 'ESTADO_CAMBIADO'; estadoActual: EstadoOrden };
+
+/**
+ * M09: cuando todas las líneas de una orden en revisión de disponibilidad están disponibles, la orden pasa a
+ * preparación dentro de la transacción de M09, con las mismas garantías que `cambiarEstado`: candado optimista e
+ * historial con autor y motivo. Es la única vía a `en_preparacion` desde la revisión (ver `reglas-estado`).
+ */
+export async function cambiarEstadoPorCumplimiento(
+  tx: EstadosTx,
+  codigo: string,
+  motivo: string,
+  idUsuarioAutor: number,
+): Promise<ResultadoAvanceCumplimiento> {
+  const actual = await tx.buscarOrden(codigo);
+  if (!actual) return { ok: false, razon: 'NO_EXISTE' };
+  if (actual.estado !== 'revision_disponibilidad') return { ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: actual.estado };
+
+  if (!(await tx.actualizarEstadoSiCoincide(codigo, 'revision_disponibilidad', 'en_preparacion'))) {
+    return { ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: actual.estado };
+  }
+  await tx.registrarHistorial({
+    codigo,
+    estadoAnterior: 'revision_disponibilidad',
+    estadoNuevo: 'en_preparacion',
+    idUsuarioAutor,
+    motivo,
+  });
+  return { ok: true };
+}
+
 export class EstadoOrdenError extends Error {
   constructor(
     message: string,

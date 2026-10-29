@@ -518,7 +518,7 @@ La prioridad de cada historia es la más alta de sus requisitos. El estado se re
 | :--- | :--- | :--- |
 | — | Revisión de disponibilidad | La orden nace en este estado al confirmarse el pago (RF-ORD-01-01): es donde el personal comprueba que hay producto. |
 | Orden confirmada | Revisión de disponibilidad | Solo para órdenes anteriores a este cambio, que nacieron en «Orden confirmada»; ninguna orden nueva pasa por este estado. |
-| Revisión de disponibilidad | En preparación | Hoy lo registra el personal. Con M09 será automático al confirmar la última línea (RF-CUM-03-10). |
+| Revisión de disponibilidad | En preparación | Automático: lo hace M09 al marcar disponible la última línea (RF-CUM-03-10). El personal no lo pide a mano. |
 | En preparación | Preparada | — |
 | Preparada | En preparación | Exige motivo; no se retrocede a la revisión de disponibilidad (RF-CUM-05-05). |
 | Preparada | Despachado | Solo envío a domicilio: es su cierre normal (RF-ORD-03-06). |
