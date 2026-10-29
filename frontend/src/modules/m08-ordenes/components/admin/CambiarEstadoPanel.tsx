@@ -14,10 +14,15 @@ type Paso = OrdenDetalleGestion['transicionesPermitidas'][number];
 /**
  * Estados que se listan, en orden. Cancelado y devuelto quedan fuera (esperan la política de M11) y «Orden
  * confirmada» solo sale en las órdenes anteriores que aún están en él: ninguna orden nueva pasa por ahí.
+ * «Enviado» no existe para la recogida en almacén: pasa de preparada a entregada sin despacho.
  */
-function estadosVisibles(actual: EstadoOrden): EstadoOrden[] {
+export function estadosVisibles(actual: EstadoOrden, modo: OrdenDetalleGestion['modoEntrega']): EstadoOrden[] {
   return ESTADOS_ORDEN.filter(
-    (e) => e !== 'cancelado' && e !== 'devuelto' && (e !== 'orden_confirmada' || actual === 'orden_confirmada'),
+    (e) =>
+      e !== 'cancelado' &&
+      e !== 'devuelto' &&
+      (e !== 'orden_confirmada' || actual === 'orden_confirmada') &&
+      (e !== 'despachado' || modo !== 'recogida' || actual === 'despachado'),
   );
 }
 
@@ -27,7 +32,7 @@ function pasoInicial(estado: OrdenDetalleGestion['estado'], pasos: readonly Paso
 }
 
 export interface CambiarEstadoPanelProps {
-  orden: Pick<OrdenDetalleGestion, 'estado' | 'transicionesPermitidas'>;
+  orden: Pick<OrdenDetalleGestion, 'estado' | 'modoEntrega' | 'transicionesPermitidas'>;
   operando: boolean;
   onCambiar: (cambio: ReturnType<typeof aCambioEstado>) => Promise<boolean>;
 }
@@ -68,7 +73,7 @@ export function CambiarEstadoPanel({ orden, operando, onCambiar }: CambiarEstado
     >
       <fieldset className="space-y-2">
         <legend className="mb-1.5 font-title text-sm font-medium text-neutral-dark">Pasar a</legend>
-        {estadosVisibles(orden.estado).map((estado) => {
+        {estadosVisibles(orden.estado, orden.modoEntrega).map((estado) => {
           const esActual = estado === orden.estado;
           const habilitado = orden.transicionesPermitidas.includes(estado);
           return (
