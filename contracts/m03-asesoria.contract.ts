@@ -502,7 +502,10 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *    contraste sería tener dos verdades sobre si un texto se lee. M01 sigue usándolo desde el
  *    core, sin cambiar su conducta.
  *  · SIMULADOR (E5) · M01 Catálogo: una línea en la pestaña «En tu espacio» para montar el
- *    componente de M03 en lugar de `AmbientesColor`, tal como P6 lo dejó previsto.
+ *    componente de M03 en lugar de `AmbientesColor`, tal como P6 lo dejó previsto. **Esta línea
+ *    NO va en el PR general sino en el PR del simulador**: importa un componente que todavía no
+ *    existe, y fusionada antes rompería la compilación. Es la misma razón por la que la línea
+ *    de la calculadora en la ficha de producto viajó con el módulo.
  *
  * ── Preguntas abiertas ──────────────────────────────────────────────────────
  *  Q1  Anexo B de la Tanda 2 (no está en el repo). Se asume, editable en el panel:

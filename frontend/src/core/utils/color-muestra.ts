@@ -23,3 +23,18 @@ export function luminancia(hexadecimal: string): number {
 export function esColorMuyClaro(hexadecimal: string): boolean {
   return luminancia(hexadecimal) >= LUMINANCIA_MUY_CLARA;
 }
+
+/** Razón de contraste WCAG entre dos `#RRGGBB`: de 1 (iguales) a 21 (negro sobre blanco). */
+export function razonDeContraste(a: string, b: string): number {
+  const [claro, oscuro] = [luminancia(a), luminancia(b)].sort((x, y) => y - x) as [number, number];
+  return (claro + 0.05) / (oscuro + 0.05);
+}
+
+/**
+ * El texto que se lee mejor sobre `fondo`: negro o blanco, el de más contraste (siempre ≥ 4,5:1
+ * sobre cualquier color). Vive en el core porque lo usan varios módulos —la paleta de M01 y el
+ * rótulo del simulador de M03—; tener dos copias sería tener dos verdades sobre si un texto se lee.
+ */
+export function colorDeTexto(fondo: string): '#000000' | '#FFFFFF' {
+  return razonDeContraste(fondo, '#000000') >= razonDeContraste(fondo, '#FFFFFF') ? '#000000' : '#FFFFFF';
+}
