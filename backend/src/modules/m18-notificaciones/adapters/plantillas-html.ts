@@ -195,42 +195,37 @@ export function htmlDictamenEmpresa(intro: string, aprobada: boolean, motivo?: s
   `.trim();
 }
 
-/** Etiquetas de los estados de la orden que conoce M18 (HU-NOT-02); un estado nuevo se muestra legible sin cambiar código. */
-const ETIQUETA_ESTADO_ORDEN: Readonly<Record<string, string>> = {
-  orden_confirmada: 'Confirmado',
-  revision_disponibilidad: 'Revisando disponibilidad',
-  en_preparacion: 'En alistamiento',
-  preparada: 'Alistado',
-  despachado: 'Enviado',
-  entregado: 'Entregado',
-  cancelado: 'Cancelado',
-  devuelto: 'Devuelto',
-};
-
-export function etiquetaEstadoOrden(estado: string): string {
-  const conocida = ETIQUETA_ESTADO_ORDEN[estado];
-  if (conocida) return conocida;
-  const legible = estado.replace(/_/g, ' ').trim();
-  return legible ? legible.charAt(0).toUpperCase() + legible.slice(1) : 'Actualizado';
+export function textoOrdenDespachada(intro: string, nombre: string, codigoOrden: string, enlace: string): string {
+  return [`Hola, ${nombre}.`, intro, '', `Pedido: ${codigoOrden}`, '', `Ver pedido: ${enlace}`].join('\n');
 }
 
-export function textoEstadoOrden(intro: string, nombre: string, codigoOrden: string, estadoNuevo: string, enlace: string): string {
-  return [`Hola, ${nombre}.`, intro, '', `Pedido: ${codigoOrden}`, `Nuevo estado: ${etiquetaEstadoOrden(estadoNuevo)}`, '', `Ver pedido: ${enlace}`].join('\n');
-}
-
-export function htmlEstadoOrden(intro: string, nombre: string, codigoOrden: string, estadoNuevo: string, enlace: string): string {
+export function htmlOrdenDespachada(intro: string, nombre: string, codigoOrden: string, enlace: string): string {
   const enlaceSeguro = escaparHtml(enlace);
   return `
     <div style="${CAJA_ESTILO}">
-      <h2 style="color: #0B2D6B; margin-top: 0;">Novedades de tu pedido</h2>
+      <h2 style="color: #0B2D6B; margin-top: 0;">Tu pedido va en camino</h2>
       <p>Hola, ${escaparHtml(nombre)}.</p>
       ${introAHtml(intro)}
       <p style="font-size: 13px; color: #4B5563;">Pedido: <strong>${escaparHtml(codigoOrden)}</strong></p>
-      <p style="font-size: 13px; color: #4B5563;">Nuevo estado: <strong>${escaparHtml(etiquetaEstadoOrden(estadoNuevo))}</strong></p>
       <p style="margin: 24px 0;">
         <a href="${enlaceSeguro}" style="${BOTON_ESTILO}">Ver mi pedido</a>
       </p>
       <p style="font-size: 12px; color: #6B7280; word-break: break-all;">Para verlo debes iniciar sesión. Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${enlaceSeguro}</p>
+    </div>
+  `.trim();
+}
+
+export function textoOrdenCancelada(intro: string, nombre: string, codigoOrden: string): string {
+  return [`Hola, ${nombre}.`, intro, '', `Pedido: ${codigoOrden}`].join('\n');
+}
+
+export function htmlOrdenCancelada(intro: string, nombre: string, codigoOrden: string): string {
+  return `
+    <div style="${CAJA_ESTILO}">
+      <h2 style="color: #0B2D6B; margin-top: 0;">Tu pedido fue cancelado</h2>
+      <p>Hola, ${escaparHtml(nombre)}.</p>
+      ${introAHtml(intro)}
+      <p style="font-size: 13px; color: #4B5563;">Pedido: <strong>${escaparHtml(codigoOrden)}</strong></p>
     </div>
   `.trim();
 }

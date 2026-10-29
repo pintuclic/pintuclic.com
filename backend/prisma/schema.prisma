@@ -152,8 +152,10 @@ enum TipoComunicacion {
   alerta_servicio_ia
   /// M12 · R9: aviso al cliente con el enlace a su comprobante de venta
   comprobante_venta
-  /// M18 · HU-NOT-02: aviso al cliente cuando cambia el estado de su pedido
-  estado_orden
+  /// M18 · HU-NOT-02: aviso al cliente cuando su pedido se despacha (M08 · D05)
+  orden_despachada
+  /// M18 · HU-NOT-02: aviso al cliente cuando su pedido se cancela (M08 · D05)
+  orden_cancelada
   /// M18 · HU-NOT-02: aviso al cliente cuando su cotización es respondida
   cotizacion_respondida
   /// M18 · HU-NOT-02: aviso al cliente cuando su cotización es rechazada

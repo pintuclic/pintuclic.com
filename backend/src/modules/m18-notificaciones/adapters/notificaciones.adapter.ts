@@ -158,11 +158,12 @@ export class MemoriaNotificacionesAdapter implements NotificacionesPort {
     this.eventos.push({ tipo: 'comprobante_venta', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
   }
 
-  async notificarCambioEstadoOrden(
-    correo: string,
-    datos: { nombre: string; codigoOrden: string; estadoNuevo: string },
-  ): Promise<void> {
-    this.eventos.push({ tipo: 'estado_orden', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
+  async notificarOrdenDespachada(correo: string, datos: { nombre: string; codigoOrden: string }): Promise<void> {
+    this.eventos.push({ tipo: 'orden_despachada', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
+  }
+
+  async notificarOrdenCancelada(correo: string, datos: { nombre: string; codigoOrden: string }): Promise<void> {
+    this.eventos.push({ tipo: 'orden_cancelada', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
   }
 
   async notificarCotizacionRespondida(
@@ -225,7 +226,11 @@ export class NoOpNotificacionesAdapter implements NotificacionesPort {
     // No-op
   }
 
-  async notificarCambioEstadoOrden(): Promise<void> {
+  async notificarOrdenDespachada(): Promise<void> {
+    // No-op
+  }
+
+  async notificarOrdenCancelada(): Promise<void> {
     // No-op
   }
 
@@ -450,19 +455,28 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
     });
   }
 
-  async notificarCambioEstadoOrden(
-    correo: string,
-    datos: { nombre: string; codigoOrden: string; estadoNuevo: string },
-  ): Promise<void> {
+  async notificarOrdenDespachada(correo: string, datos: { nombre: string; codigoOrden: string }): Promise<void> {
     const enlace = `${this.frontendBaseUrl}/perfil/pedidos/${encodeURIComponent(datos.codigoOrden)}`;
-    const { subject, intro } = await this.resolverIntroYAsunto('estado_orden', {
-      subject: 'Novedades de tu pedido · Pintu Clic',
-      intro: 'El estado de tu pedido cambió. Aquí tienes el detalle; puedes consultar el pedido completo cuando quieras desde tu cuenta.',
+    const { subject, intro } = await this.resolverIntroYAsunto('orden_despachada', {
+      subject: 'Tu pedido va en camino · Pintu Clic',
+      intro: 'Tu pedido ya salió de nuestro almacén y va hacia la dirección de entrega. Puedes consultar su estado cuando quieras desde tu cuenta.',
     });
-    await this.enviarConRegistro('estado_orden', correo, {
+    await this.enviarConRegistro('orden_despachada', correo, {
       subject,
-      text: plantillasHtml.textoEstadoOrden(intro, datos.nombre, datos.codigoOrden, datos.estadoNuevo, enlace),
-      html: plantillasHtml.htmlEstadoOrden(intro, datos.nombre, datos.codigoOrden, datos.estadoNuevo, enlace),
+      text: plantillasHtml.textoOrdenDespachada(intro, datos.nombre, datos.codigoOrden, enlace),
+      html: plantillasHtml.htmlOrdenDespachada(intro, datos.nombre, datos.codigoOrden, enlace),
+    });
+  }
+
+  async notificarOrdenCancelada(correo: string, datos: { nombre: string; codigoOrden: string }): Promise<void> {
+    const { subject, intro } = await this.resolverIntroYAsunto('orden_cancelada', {
+      subject: 'Tu pedido fue cancelado · Pintu Clic',
+      intro: 'Te confirmamos que tu pedido fue cancelado. Si tienes dudas, escríbenos y con gusto te ayudamos.',
+    });
+    await this.enviarConRegistro('orden_cancelada', correo, {
+      subject,
+      text: plantillasHtml.textoOrdenCancelada(intro, datos.nombre, datos.codigoOrden),
+      html: plantillasHtml.htmlOrdenCancelada(intro, datos.nombre, datos.codigoOrden),
     });
   }
 

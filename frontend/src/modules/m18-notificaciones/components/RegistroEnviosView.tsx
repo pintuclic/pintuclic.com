@@ -22,7 +22,8 @@ const ETIQUETAS_TIPO: Record<TipoComunicacion, string> = {
   dictamen_empresa: 'Dictamen de cuenta empresa',
   alerta_servicio_ia: 'Alerta del servicio de IA',
   comprobante_venta: 'Comprobante de venta',
-  estado_orden: 'Cambio de estado del pedido',
+  orden_despachada: 'Pedido despachado',
+  orden_cancelada: 'Pedido cancelado',
   cotizacion_respondida: 'Cotización respondida',
   cotizacion_rechazada: 'Cotización rechazada',
 };

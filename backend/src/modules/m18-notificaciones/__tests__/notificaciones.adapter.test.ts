@@ -153,19 +153,20 @@ describe('SmtpNotificacionesAdapter · Envío de correos transaccionales por SMT
     expect(args.html).not.toContain('<b>Laura</b>');
   });
 
-  it('HU-NOT-02: el aviso de estado lleva pedido, estado legible y enlace; un estado desconocido sale legible y se escapa el nombre', async () => {
+  it('HU-NOT-02: el aviso de despacho lleva pedido y enlace, y escapa el nombre; el de cancelación no lleva enlace', async () => {
     const { transporter, sendMailMock } = crearTransporteMock();
     const adapter = new SmtpNotificacionesAdapter(configBase, transporter);
 
-    await adapter.notificarCambioEstadoOrden('cliente@gmail.com', { nombre: '<b>Laura</b>', codigoOrden: 'PC-2026-00001', estadoNuevo: 'despachado' });
-    await adapter.notificarCambioEstadoOrden('cliente@gmail.com', { nombre: 'Laura', codigoOrden: 'PC-2026-00001', estadoNuevo: 'en_ruta_final' });
+    await adapter.notificarOrdenDespachada('cliente@gmail.com', { nombre: '<b>Laura</b>', codigoOrden: 'PC-2026-00001' });
+    await adapter.notificarOrdenCancelada('cliente@gmail.com', { nombre: 'Laura', codigoOrden: 'PC-2026-00001' });
 
-    const [primero, segundo] = sendMailMock.mock.calls.map((c) => c[0]);
-    expect(primero.to).toBe('cliente@gmail.com');
-    expect(primero.text).toContain('Nuevo estado: Enviado');
-    expect(primero.text).toContain('/perfil/pedidos/PC-2026-00001');
-    expect(primero.html).toContain('&lt;b&gt;Laura&lt;/b&gt;');
-    expect(segundo.text).toContain('Nuevo estado: En ruta final');
+    const [despachada, cancelada] = sendMailMock.mock.calls.map((c) => c[0]);
+    expect(despachada.to).toBe('cliente@gmail.com');
+    expect(despachada.text).toContain('Pedido: PC-2026-00001');
+    expect(despachada.text).toContain('/perfil/pedidos/PC-2026-00001');
+    expect(despachada.html).toContain('&lt;b&gt;Laura&lt;/b&gt;');
+    expect(cancelada.text).toContain('Pedido: PC-2026-00001');
+    expect(cancelada.text).not.toContain('/perfil/pedidos');
   });
 
   it('HU-NOT-02: los avisos de cotización llevan código, condiciones y enlace; el motivo se escapa', async () => {

@@ -693,9 +693,14 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
     'Gracias por tu compra en Pintu Clic. Ya está listo el comprobante de tu pedido: puedes verlo, imprimirlo o guardarlo como PDF desde el enlace.'
 ),
 (
-    'estado_orden',
-    'Novedades de tu pedido · Pintu Clic',
-    'El estado de tu pedido cambió. Aquí tienes el detalle; puedes consultar el pedido completo cuando quieras desde tu cuenta.'
+    'orden_despachada',
+    'Tu pedido va en camino · Pintu Clic',
+    'Tu pedido ya salió de nuestro almacén y va hacia la dirección de entrega. Puedes consultar su estado cuando quieras desde tu cuenta.'
+),
+(
+    'orden_cancelada',
+    'Tu pedido fue cancelado · Pintu Clic',
+    'Te confirmamos que tu pedido fue cancelado. Si tienes dudas, escríbenos y con gusto te ayudamos.'
 ),
 (
     'cotizacion_respondida',

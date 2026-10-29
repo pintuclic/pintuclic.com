@@ -59,11 +59,17 @@ function renderizarMuestra(
         contenidoHtml: plantillasHtml.htmlComprobanteVenta(intro, 'Cliente de ejemplo', 'CV-000123', '$ 171.800', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001/comprobante'),
         contenidoTexto: plantillasHtml.textoComprobanteVenta(intro, 'Cliente de ejemplo', 'CV-000123', '$ 171.800', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001/comprobante'),
       };
-    case 'estado_orden':
+    case 'orden_despachada':
       return {
         asunto,
-        contenidoHtml: plantillasHtml.htmlEstadoOrden(intro, 'Cliente de ejemplo', 'PC-2026-00001', 'despachado', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001'),
-        contenidoTexto: plantillasHtml.textoEstadoOrden(intro, 'Cliente de ejemplo', 'PC-2026-00001', 'despachado', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001'),
+        contenidoHtml: plantillasHtml.htmlOrdenDespachada(intro, 'Cliente de ejemplo', 'PC-2026-00001', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001'),
+        contenidoTexto: plantillasHtml.textoOrdenDespachada(intro, 'Cliente de ejemplo', 'PC-2026-00001', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001'),
+      };
+    case 'orden_cancelada':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlOrdenCancelada(intro, 'Cliente de ejemplo', 'PC-2026-00001'),
+        contenidoTexto: plantillasHtml.textoOrdenCancelada(intro, 'Cliente de ejemplo', 'PC-2026-00001'),
       };
     case 'cotizacion_respondida':
       return {

@@ -13,9 +13,10 @@ import { z } from 'zod';
  * se invoca vía NotificacionesPort desde otros módulos backend), HU-NOT-03
  * (plantillas administrables) y HU-NOT-04 (entregabilidad / registro de rebotes).
  * HU-NOT-02 (avisos al cliente): sin endpoint; M08 y M21 los piden por NotificacionesPort
- * (`notificarCambioEstadoOrden`, `notificarCotizacionRespondida`, `notificarCotizacionRechazada`).
- * M18 no conoce el catálogo de estados: recibe el código del estado nuevo y, si no lo reconoce,
- * lo muestra legible igualmente (RF-NOT-02-01). Cada aviso tiene plantilla editable como el resto.
+ * (`notificarOrdenDespachada`, `notificarOrdenCancelada`, `notificarCotizacionRespondida`,
+ * `notificarCotizacionRechazada`). El catálogo de estados que avisan lo definió M08 (D05): solo
+ * despacho y cancelación; el nacimiento de la orden lo cubre el comprobante (M12). Cada aviso
+ * tiene plantilla editable como el resto.
  * Fuera de alcance: aviso de demora por disponibilidad (RF-NOT-02-02, espera a M09) y de cotización
  * próxima a caducar (RF-NOT-02-05, plazo sin definir).
  *
@@ -41,8 +42,10 @@ export const TIPOS_COMUNICACION = [
   'alerta_servicio_ia',
   /** M12 · R9: el comprobante de venta está listo (número, total y enlace). */
   'comprobante_venta',
-  /** HU-NOT-02 · RF-NOT-02-01: cambió el estado del pedido del cliente. */
-  'estado_orden',
+  /** HU-NOT-02 · M08 D05: el pedido del cliente se despachó. */
+  'orden_despachada',
+  /** HU-NOT-02 · M08 D05: el pedido del cliente se canceló (lo emite M11). */
+  'orden_cancelada',
   /** HU-NOT-02 · RF-NOT-02-03: la cotización del cliente fue respondida. */
   'cotizacion_respondida',
   /** HU-NOT-02 · RF-NOT-02-03: la cotización del cliente fue rechazada. */

@@ -17,7 +17,8 @@ export interface EventoNotificacion {
     | 'dictamen_empresa'
     | 'alerta_servicio_ia'
     | 'comprobante_venta'
-    | 'estado_orden'
+    | 'orden_despachada'
+    | 'orden_cancelada'
     | 'cotizacion_respondida'
     | 'cotizacion_rechazada';
   destinatario: string;
@@ -55,14 +56,10 @@ export interface NotificacionesPort {
     correo: string,
     datos: { nombre: string; numero: string; total: string; codigoOrden: string },
   ): Promise<void>;
-  /**
-   * HU-NOT-02 · RF-NOT-02-01: avisa al cliente que el estado de su pedido cambió. Recibe el código del estado nuevo
-   * tal como lo emite M08; M18 no necesita conocer el catálogo completo. Opcional por la misma razón que los demás avisos.
-   */
-  notificarCambioEstadoOrden?(
-    correo: string,
-    datos: { nombre: string; codigoOrden: string; estadoNuevo: string },
-  ): Promise<void>;
+  /** HU-NOT-02 · M08 D05: el pedido salió hacia el cliente. Opcional por la misma razón que los demás avisos. */
+  notificarOrdenDespachada?(correo: string, datos: { nombre: string; codigoOrden: string }): Promise<void>;
+  /** HU-NOT-02 · M08 D05: el pedido se canceló (lo emitirá M11 al ejecutar la cancelación). */
+  notificarOrdenCancelada?(correo: string, datos: { nombre: string; codigoOrden: string }): Promise<void>;
   /** HU-NOT-02 · RF-NOT-02-03: la cotización fue respondida; lleva el total acordado ya formateado y su vencimiento. */
   notificarCotizacionRespondida?(
     correo: string,

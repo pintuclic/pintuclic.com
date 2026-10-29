@@ -7,7 +7,8 @@ export type TipoComunicacion =
   | 'dictamen_empresa'
   | 'alerta_servicio_ia'
   | 'comprobante_venta'
-  | 'estado_orden'
+  | 'orden_despachada'
+  | 'orden_cancelada'
   | 'cotizacion_respondida'
   | 'cotizacion_rechazada';
 
