@@ -2,6 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { Alert, BareButton, SegmentedTabs } from '@/core/components';
+import { SimuladorColor } from '@/modules/m03-asesoria/components/publico/simulador/SimuladorColor';
 import {
   DEFINICION_ARMONIAS,
   DELTA_E_MUY_PARECIDO,
@@ -12,7 +13,6 @@ import {
 import { colorDeTexto, parecidoEnPalabras } from '../../services/contraste';
 import { paletaApi } from '../../services/paleta-api';
 import { useCargar } from '../../services/useCargarPaleta';
-import { AmbientesColor } from './AmbientesColor';
 
 export interface CombinadorColoresProps {
   /** El color elegido; sin él se invita a elegir uno. */
@@ -33,7 +33,7 @@ const Muestra: React.FC<{ hex: string }> = ({ hex }) => (
 
 /**
  * El combinador de colores (contrato M01 · P7, P8): las cuatro armonías del color elegido y, de cada muestra, el color real de
- * la carta más parecido, que se puede elegir con un clic. La segunda pestaña, «En tu espacio», está reservada para M03 (P6).
+ * la carta más parecido, que se puede elegir con un clic. La segunda pestaña, «En tu espacio», es el simulador de color de M03 (P6).
  */
 export const CombinadorColores: React.FC<CombinadorColoresProps> = ({ color, onElegir }) => {
   const [pestana, setPestana] = useState<Pestana>('combinador');
@@ -56,7 +56,8 @@ export const CombinadorColores: React.FC<CombinadorColoresProps> = ({ color, onE
 
       <div id="panel-combinador" role="tabpanel" aria-labelledby={`combinador-tab-${pestana}`}>
         {pestana === 'espacio' ? (
-          <AmbientesColor color={color} />
+          /* M03 · HU-ASE-03: el simulador de color. M01 solo le pasa el color elegido (M01 · P6). */
+          <SimuladorColor color={color} />
         ) : color === null ? (
           <p className="rounded-card border border-dashed border-neutral-light bg-neutral-lightest px-4 py-5 text-center font-sans text-sm text-neutral-medium">
             Elige un color en el abanico y aquí verás los colores que combinan con él.

@@ -541,6 +541,7 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *      sala de frente, sala desde la esquina, alcoba, comedor, estudio y una fachada. El
  *      mockup enseña siete miniaturas. Como se dibujan por código, cada uno cuesta un
  *      componente: si el PO quiere más o distintos, se piden por su nombre.
+ *      RESUELTA 2026-10-29: el PO no especificó cuántos y se construyeron esos seis.
  *  Q12 SIMULADOR · Aspecto. El mockup muestra una fotografía y esto será una ilustración (S4).
  *      El PO debe ver el resultado y decir si le sirve; si exige fotografía, cambia el
  *      contrato entero, porque vuelve la dependencia de fotos y máscaras que este diseño
