@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Package } from 'lucide-react';
-import { AdminPageHeader, Alert, Skeleton } from '@/core/components';
+import { Package, PackageSearch } from 'lucide-react';
+import { AdminPageHeader, Alert, ButtonLink, Skeleton } from '@/core/components';
 import type { EstadoOrden } from '../../dtos/m08-ordenes.dto';
 import { aFormularioBandeja } from '../../services/formularios';
 import { ESTADOS_EN_CURSO, ETIQUETA_ESTADO } from '../../services/presentacion';
@@ -61,6 +61,11 @@ export function BandejaView() {
       <AdminPageHeader
         title="Pedidos"
         subtitle="Atienda primero los pedidos que llevan más tiempo esperando. Cualquier compañero con permiso puede operar cualquier pedido."
+        actions={
+          <ButtonLink href="/admin/pedidos/retenidas" variant="outline" size="sm" leftIcon={<PackageSearch className="h-4 w-4" />}>
+            Pedidos detenidos
+          </ButtonLink>
+        }
       />
 
       <FiltrosBandejaForm

@@ -6,6 +6,30 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-30
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 📦 **M09 Cumplimiento y preparación: el módulo completo.** Entra como la rama `feature/m09-cumplimiento`, sobre el contrato y la base de datos ya fusionados.
+
+### Módulo M09 — Revisión de disponibilidad (HU-CUM-01, 03, 05 y 06)
+- **Una lista de chequeo dentro del detalle del pedido.** Cada producto se marca como disponible, consiguiendo stock o no disponible, y cada toque se guarda al instante. Hay un botón para marcar todos como disponibles. Sin pantallas ni pasos extra para el empleado.
+- **El pedido pasa solo a preparación** cuando todos los productos quedan disponibles, en la misma operación y con el empleado que marcó el último como autor. Corregir una marca después no lo devuelve.
+- **Rastro completo:** cada marca guarda quién y cuándo, y una corrección conserva las anteriores. La pantalla muestra quién marcó y cuántos cambios hubo.
+- **Pedidos detenidos:** una lista aparte, enlazada desde la bandeja de pedidos, con qué productos retienen cada pedido y en qué estado están, de los que más llevan esperando a los más recientes.
+- **Hoja de preparación imprimible** (sin precios, descuentos ni datos de pago ni del cliente), con la base de las líneas entonadas y la fecha y el estado del pedido al generarla. Se imprime o se guarda como PDF desde el navegador.
+- **Todo exige el permiso de gestión de pedidos**, también las consultas. Quien no lo tiene, o entra con una cuenta de cliente, recibe el mismo 404 que un pedido inexistente.
+- Se monta en `/api/v1/cumplimiento` y en las páginas `/admin/pedidos/retenidas` y `/admin/pedidos/[codigo]/hoja`.
+
+### M08 Pedidos (se tocan tres cosas, avisado)
+- **Se quita el paso manual de revisión a preparación** (contrato, sus dos copias, reglas, pruebas y §5 de la spec). Pedirlo a mano responde 409 y el panel «Cambiar estado» ya no aparece en revisión: lo hace M09. Ni el administrador puede saltarse la revisión.
+- Se añade `cambiarEstadoPorCumplimiento` (como M11 con la postventa) y se exporta la guarda de «solo personal».
+- El detalle del pedido monta el panel y el enlace a la hoja, y la bandeja enlaza a los pedidos detenidos.
+
+### Cómo se probó
+- Backend: lint, tipos, cero `any` y toda la suite en verde; pruebas unitarias, HTTP y de integración contra PostgreSQL real (dos empleados confirmando la última línea a la vez avanzan el pedido una sola vez).
+- Frontend: lint, tipos, accesibilidad, cero `any`, toda la suite y `build` en verde.
+- Pila real con sesión de administrador y de cliente, y navegador: marcar de a poco, avance automático, corrección, hoja, pedidos detenidos y móvil sin desbordes.
+- **No se probó:** la impresión real (solo que existe la regla de impresión y el botón); las pruebas de integración en CI, que se omiten sin base de datos.
+
 ## [No publicado] - 2026-10-29 (c)
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 📋 **M09 Cumplimiento y preparación: contrato y base de datos.** Entra como el PR general `chore/m09-contrato-bd`; el módulo sigue en su propia rama.

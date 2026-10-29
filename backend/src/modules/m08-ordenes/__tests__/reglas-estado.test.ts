@@ -6,7 +6,8 @@ type Caso = [EstadoOrden, EstadoOrden, ModoEntrega | null, 'ok' | 'NO_PERMITIDA'
 
 const CASOS: Caso[] = [
   ['orden_confirmada', 'revision_disponibilidad', null, 'ok'],
-  ['revision_disponibilidad', 'en_preparacion', null, 'ok'],
+  ['revision_disponibilidad', 'en_preparacion', null, 'NO_PERMITIDA'],
+  ['revision_disponibilidad', 'en_preparacion', 'domicilio', 'NO_PERMITIDA'],
   ['en_preparacion', 'preparada', null, 'ok'],
   ['preparada', 'en_preparacion', null, 'ok'],
   ['preparada', 'despachado', 'domicilio', 'ok'],
@@ -49,5 +50,8 @@ describe('reglas de estado de la orden (HU-ORD-03, §5 de la spec)', () => {
     expect(transicionesDisponibles('preparada', null)).toEqual(['en_preparacion', 'despachado', 'entregado']);
     expect(transicionesDisponibles('despachado', 'domicilio')).toEqual(['entregado']);
     expect(transicionesDisponibles('entregado', 'recogida')).toEqual([]);
+    // Desde la revisión de disponibilidad el personal no ofrece ningún paso: avanza M09 al marcar la última línea.
+    expect(transicionesDisponibles('revision_disponibilidad', 'domicilio')).toEqual([]);
+    expect(transicionesDisponibles('revision_disponibilidad', null)).toEqual([]);
   });
 });

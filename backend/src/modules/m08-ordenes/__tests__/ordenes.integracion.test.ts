@@ -62,6 +62,8 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
   let gestion: import('../repositories/gestion.repository').PrismaGestionRepository;
   let consulta: import('../repositories/consulta-cliente.repository').PrismaConsultaClienteRepository;
   let notas: import('../repositories/notas.repository').PrismaNotasRepository;
+  /** Lo que hace M09 al marcar la última línea: la única vía de revision_disponibilidad a en_preparacion. */
+  let avanzarPorCumplimiento: (codigo: string, idUsuario: number) => Promise<import('../services/estados.service').ResultadoAvanceCumplimiento>;
 
   /**
    * Último número usado. Sin fila en `consecutivo` la numeración arranca después del mayor código
@@ -100,6 +102,10 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
       notificaciones,
       reloj,
     );
+    const { cambiarEstadoPorCumplimiento } = await import('../services/estados.service.js');
+    const { estadosTxDe } = await import('../repositories/estados.repository.js');
+    avanzarPorCumplimiento = (codigo, idUsuario) =>
+      prisma.$transaction((tx) => cambiarEstadoPorCumplimiento(estadosTxDe(tx), codigo, 'Disponibilidad confirmada en todas las líneas', idUsuario));
     gestion = new PrismaGestionRepository();
     consulta = new PrismaConsultaClienteRepository();
     notas = new PrismaNotasRepository();
@@ -218,17 +224,19 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     expect(await consecutivoActual()).toBeGreaterThan(0);
   });
 
-  it('cambia el estado con candado optimista y deja autor en el historial; solo gana uno si compiten (R8)', async () => {
+  it('avanza a preparación con candado optimista y deja autor en el historial; solo gana uno si compiten (R8)', async () => {
     const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud());
 
-    const resultados = await Promise.allSettled([
-      estados.cambiarEstado(codigo, { estadoActual: 'revision_disponibilidad', estadoNuevo: 'en_preparacion' }, { idUsuario: ID_EMPLEADO }),
-      estados.cambiarEstado(codigo, { estadoActual: 'revision_disponibilidad', estadoNuevo: 'en_preparacion' }, { idUsuario: 3 }),
-    ]);
+    const resultados = await Promise.all([avanzarPorCumplimiento(codigo, ID_EMPLEADO), avanzarPorCumplimiento(codigo, 3)]);
 
-    expect(resultados.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
-    const perdedora = resultados.find((x) => x.status === 'rejected');
-    expect(perdedora).toMatchObject({ reason: { codigo: 'ESTADO_CAMBIADO' } });
+    expect(resultados.filter((x) => x.ok)).toHaveLength(1);
+    expect(resultados.find((x) => !x.ok)).toMatchObject({ ok: false, razon: 'ESTADO_CAMBIADO' });
+
+    // Pedir ese paso a mano ya no es posible: solo lo hace M09.
+    const otra = await creacion.crearDesdePagoConfirmado(solicitud());
+    await expect(
+      estados.cambiarEstado(otra.codigo, { estadoActual: 'revision_disponibilidad', estadoNuevo: 'en_preparacion' }, { idUsuario: ID_EMPLEADO }),
+    ).rejects.toMatchObject({ codigo: 'TRANSICION_NO_PERMITIDA' });
 
     const historial = await prisma.historialEstadoOrden.findMany({
       where: { orden: { codigoVisible: codigo } },
@@ -242,7 +250,7 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud({ modoEntrega: 'recogida', direccion: null }));
     const actor = { idUsuario: ID_EMPLEADO };
 
-    await estados.cambiarEstado(codigo, { estadoActual: 'revision_disponibilidad', estadoNuevo: 'en_preparacion' }, actor);
+    expect(await avanzarPorCumplimiento(codigo, actor.idUsuario)).toEqual({ ok: true });
     await estados.cambiarEstado(codigo, { estadoActual: 'en_preparacion', estadoNuevo: 'preparada' }, actor);
     await expect(
       estados.cambiarEstado(codigo, { estadoActual: 'preparada', estadoNuevo: 'despachado' }, actor),
@@ -292,7 +300,7 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
 
   it('el detalle del personal trae cliente, líneas, historial con autor, notas y contactos; el del cliente no (HU-ORD-09, 10)', async () => {
     const { codigo } = await creacion.crearDesdePagoConfirmado(solicitud());
-    await estados.cambiarEstado(codigo, { estadoActual: 'revision_disponibilidad', estadoNuevo: 'en_preparacion' }, { idUsuario: ID_EMPLEADO });
+    await avanzarPorCumplimiento(codigo, ID_EMPLEADO);
     const nota = await notas.agregarNota(codigo, ID_EMPLEADO, 'Cliente pidió llamar antes');
     const contacto = await notas.agregarContacto(codigo, ID_EMPLEADO, 'telefono', 'Se avisó de la demora');
 

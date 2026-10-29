@@ -137,11 +137,12 @@ export type MedioContacto = z.infer<typeof medioContactoSchema>;
  * R7. Transiciones permitidas. `devuelto` figura para documentar el destino, pero
  * responde 409 OPERACION_NO_HABILITADA hasta M11 (R9), igual que `cancelado`
  * (que puede partir de varios estados según la política y por eso no se lista).
+ * `revision_disponibilidad` → `en_preparacion` tampoco se lista: solo la hace M09 (RF-CUM-03-10) al quedar todas las
+ * líneas disponibles; pedirla a mano responde 409 TRANSICION_NO_PERMITIDA.
  * `condicion` es lo que el servicio verifica además de la pareja desde → hacia.
  */
 export const TRANSICIONES_ESTADO = [
   { desde: 'orden_confirmada', hacia: 'revision_disponibilidad', condicion: 'Solo órdenes anteriores: las nuevas nacen ya en revision_disponibilidad' },
-  { desde: 'revision_disponibilidad', hacia: 'en_preparacion', condicion: 'Hoy lo registra el personal; con M09 será automático (RF-CUM-03-10)' },
   { desde: 'en_preparacion', hacia: 'preparada', condicion: null },
   { desde: 'preparada', hacia: 'en_preparacion', condicion: 'Exige motivo; no se retrocede a revision_disponibilidad (RF-CUM-05-05)' },
   { desde: 'preparada', hacia: 'despachado', condicion: 'Solo modoEntrega = domicilio, o sin modo (orden anterior a la copia histórica)' },
