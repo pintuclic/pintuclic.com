@@ -3,7 +3,7 @@ import type { EstadoOrden, ModoEntrega } from '../dtos/m08-ordenes.dto';
 import type { EstadosRepository, EstadosTx, OrdenParaEstado } from '../interfaces/estados.interface';
 import type { EventosOrdenPort } from '../interfaces/eventos-orden.port';
 import type { NotificacionesOrdenPort } from '../interfaces/notificaciones-orden.port';
-import { EstadoOrdenError, EstadosService } from '../services/estados.service';
+import { cambiarEstadoPorPostventa, EstadoOrdenError, EstadosService } from '../services/estados.service';
 
 interface FilaHistorial {
   codigo: string;
@@ -215,5 +215,54 @@ describe('EstadosService (HU-ORD-03)', () => {
   it('EstadoOrdenError conserva código y estado HTTP', () => {
     const error = new EstadoOrdenError('x', 'ESTADO_CAMBIADO', 409);
     expect(error).toMatchObject({ codigo: 'ESTADO_CAMBIADO', statusCode: 409, name: 'EstadoOrdenError' });
+  });
+});
+
+describe('cambiarEstadoPorPostventa (M11 · RF-POS-05-03 y 05-04)', () => {
+  let repo: RepoMemoria;
+
+  beforeEach(() => {
+    repo = new RepoMemoria();
+  });
+
+  it('cancela antes de preparada y deja historial con autor y motivo', async () => {
+    repo.ordenes.set('PC-2026-00001', orden('en_preparacion'));
+    const r = await repo.enTransaccion((tx) => cambiarEstadoPorPostventa(tx, 'PC-2026-00001', 'cancelado', 'DEV-2026-00001', 21));
+    expect(r).toEqual({ ok: true, estadoAnterior: 'en_preparacion' });
+    expect(repo.ordenes.get('PC-2026-00001')?.estado).toBe('cancelado');
+    expect(repo.historial).toEqual([
+      { codigo: 'PC-2026-00001', estadoAnterior: 'en_preparacion', estadoNuevo: 'cancelado', idUsuarioAutor: 21, motivo: 'DEV-2026-00001' },
+    ]);
+  });
+
+  it('no cancela un pedido ya preparado o despachado', async () => {
+    repo.ordenes.set('PC-2026-00001', orden('despachado'));
+    const r = await repo.enTransaccion((tx) => cambiarEstadoPorPostventa(tx, 'PC-2026-00001', 'cancelado', 'x', 21));
+    expect(r).toEqual({ ok: false, razon: 'NO_PERMITIDA', estadoActual: 'despachado' });
+    expect(repo.historial).toHaveLength(0);
+  });
+
+  it('devuelve solo pedidos despachados o entregados', async () => {
+    repo.ordenes.set('PC-2026-00001', orden('entregado'));
+    expect(await repo.enTransaccion((tx) => cambiarEstadoPorPostventa(tx, 'PC-2026-00001', 'devuelto', 'x', 21))).toMatchObject({ ok: true });
+    repo.ordenes.set('PC-2026-00001', orden('orden_confirmada'));
+    expect(await repo.enTransaccion((tx) => cambiarEstadoPorPostventa(tx, 'PC-2026-00001', 'devuelto', 'x', 21))).toMatchObject({
+      ok: false,
+      razon: 'NO_PERMITIDA',
+    });
+  });
+
+  it('informa si otra persona cambió la orden entre la lectura y el cambio', async () => {
+    repo.ordenes.set('PC-2026-00001', orden('orden_confirmada'));
+    repo.perderCarrera = true;
+    const r = await repo.enTransaccion((tx) => cambiarEstadoPorPostventa(tx, 'PC-2026-00001', 'cancelado', 'x', 21));
+    expect(r).toEqual({ ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: 'orden_confirmada' });
+  });
+
+  it('informa si la orden no existe', async () => {
+    expect(await repo.enTransaccion((tx) => cambiarEstadoPorPostventa(tx, 'PC-2026-09999', 'cancelado', 'x', 21))).toEqual({
+      ok: false,
+      razon: 'NO_EXISTE',
+    });
   });
 });

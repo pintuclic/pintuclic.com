@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { Prisma } from '@prisma/client';
 import { PostventaService } from '../services/postventa.service';
 import type {
   PostventaRepositoryPort,
@@ -6,11 +7,18 @@ import type {
   SolicitudPostventaConLineas,
 } from '../repositories/postventa.repository';
 import type { OrdenesPortM11 } from '../interfaces/postventa.interface';
+import type { AuditoriaPort } from '../../m20-seguridad/interfaces/auditoria.port';
+import { ErrorPostventa } from '../services/reglas-postventa';
+
+/** Cliente de transacción de mentira: los dobles solo comprueban que se lo pasen. */
+const TX = { tx: true } as unknown as Prisma.TransactionClient;
+const AHORA = new Date('2026-10-28T15:00:00Z');
 
 describe('PostventaService (M11)', () => {
   let service: PostventaService;
   let repoMock: PostventaRepositoryPort;
   let ordenesPortMock: OrdenesPortM11;
+  let auditoriaMock: AuditoriaPort;
 
   const ordenEjemplo = {
     idOrden: 10,
@@ -18,6 +26,7 @@ describe('PostventaService (M11)', () => {
     idUsuario: 5,
     estado: 'orden_confirmada',
     fecha: new Date('2026-10-25T10:00:00Z'),
+    fechaEntrega: null as Date | null,
     total: 150000,
     lineas: [
       {
@@ -86,6 +95,9 @@ describe('PostventaService (M11)', () => {
 
   beforeEach(() => {
     repoMock = {
+      enTransaccion: vi.fn((trabajo: (tx: Prisma.TransactionClient) => Promise<unknown>) => trabajo(TX)),
+      bloquearOrden: vi.fn().mockResolvedValue(undefined),
+      cantidadesDevueltas: vi.fn().mockResolvedValue(new Map()),
       generarSiguienteCodigo: vi.fn().mockResolvedValue('DEV-2026-00001'),
       buscarPorCodigo: vi.fn().mockResolvedValue(solicitudRawMock as unknown as SolicitudPostventaEntidad),
       buscarPorOrden: vi.fn().mockResolvedValue(null),
@@ -110,10 +122,14 @@ describe('PostventaService (M11)', () => {
 
     ordenesPortMock = {
       obtenerOrdenParaPostventa: vi.fn().mockResolvedValue(ordenEjemplo),
-      actualizarEstadoOrden: vi.fn().mockResolvedValue(undefined),
+      cambiarEstadoOrden: vi.fn().mockResolvedValue(undefined),
+    };
+    auditoriaMock = {
+      registrarAccesoDenegado: vi.fn().mockResolvedValue(undefined),
+      registrarAccion: vi.fn().mockResolvedValue(undefined),
     };
 
-    service = new PostventaService(repoMock, ordenesPortMock);
+    service = new PostventaService(repoMock, ordenesPortMock, auditoriaMock, () => AHORA);
   });
 
   describe('solicitarCancelacion', () => {
@@ -159,16 +175,68 @@ describe('PostventaService (M11)', () => {
         observaciones: 'Cancelación autorizada por no estar despachada',
       });
 
-      expect(ordenesPortMock.actualizarEstadoOrden).toHaveBeenCalledWith(
+      expect(ordenesPortMock.cambiarEstadoOrden).toHaveBeenCalledWith(
+        TX,
         'PC-2026-00010',
-        'orden_confirmada',
         'cancelado',
         expect.stringContaining('DEV-2026-00001'),
         99
       );
       expect(repoMock.actualizarResolucion).toHaveBeenCalledWith(
         'DEV-2026-00001',
-        expect.objectContaining({ estado: 'aprobada', idEmpleadoResuelve: 99 })
+        expect.objectContaining({ estadoEsperado: 'solicitada', estado: 'aprobada', idEmpleadoResuelve: 99 }),
+        TX
+      );
+      expect(auditoriaMock.registrarAccion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idUsuario: 99,
+          accion: 'postventa.solicitud.aprobar',
+          idEntidad: 'DEV-2026-00001',
+          valorAnterior: 'solicitada',
+          valorNuevo: 'aprobada',
+        })
+      );
+    });
+
+    it('si M08 ya no admite el cambio, la solicitud no se resuelve', async () => {
+      vi.mocked(ordenesPortMock.cambiarEstadoOrden).mockRejectedValueOnce(
+        new ErrorPostventa('ORDEN_NO_ELEGIBLE', 'El pedido ya está despachado', 409)
+      );
+
+      await expect(
+        service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar' })
+      ).rejects.toMatchObject({ codigo: 'ORDEN_NO_ELEGIBLE' });
+      expect(repoMock.actualizarResolucion).not.toHaveBeenCalled();
+      expect(auditoriaMock.registrarAccion).not.toHaveBeenCalled();
+    });
+
+    it('si otra persona la resolvió antes, responde ESTADO_CAMBIADO', async () => {
+      vi.mocked(repoMock.actualizarResolucion).mockResolvedValueOnce(null);
+
+      await expect(
+        service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar' })
+      ).rejects.toMatchObject({ codigo: 'ESTADO_CAMBIADO', statusCode: 409 });
+    });
+
+    it('marca el pedido como devuelto cuando, sumando devoluciones anteriores, se devuelve todo', async () => {
+      const devolucion = {
+        ...solicitudRawMock,
+        tipo: 'devolucion',
+        lineas: [{ ...solicitudRawMock.lineas[0], cantidad: 1, subtotal: 75000 }],
+      } as unknown as SolicitudPostventaEntidad;
+      vi.mocked(repoMock.buscarPorCodigo).mockResolvedValue(devolucion);
+
+      await service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar' });
+      expect(ordenesPortMock.cambiarEstadoOrden).not.toHaveBeenCalled();
+
+      vi.mocked(repoMock.cantidadesDevueltas).mockResolvedValueOnce(new Map([[101, 1]]));
+      await service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar' });
+      expect(ordenesPortMock.cambiarEstadoOrden).toHaveBeenCalledWith(
+        TX,
+        'PC-2026-00010',
+        'devuelto',
+        expect.stringContaining('Devolución total'),
+        99
       );
     });
 
@@ -184,8 +252,10 @@ describe('PostventaService (M11)', () => {
         expect.objectContaining({
           estado: 'rechazada',
           motivoRechazo: 'politica_no_cumplida',
-        })
+        }),
+        TX
       );
+      expect(ordenesPortMock.cambiarEstadoOrden).not.toHaveBeenCalled();
     });
   });
 
@@ -206,6 +276,22 @@ describe('PostventaService (M11)', () => {
       expect(repoMock.registrarReembolso).toHaveBeenCalled();
     });
 
+    it('rechaza un monto mayor al total de la solicitud', async () => {
+      vi.mocked(repoMock.buscarPorCodigo).mockResolvedValueOnce({
+        ...solicitudRawMock,
+        estado: 'aprobada',
+      } as unknown as SolicitudPostventaEntidad);
+
+      await expect(
+        service.registrarReembolso(99, 'DEV-2026-00001', {
+          metodo: 'efectivo',
+          montoReembolsado: 150001,
+          referenciaTransaccion: 'CAJA-1',
+        })
+      ).rejects.toMatchObject({ codigo: 'PARAMETRO_INVALIDO' });
+      expect(repoMock.registrarReembolso).not.toHaveBeenCalled();
+    });
+
     it('rechaza registrar reembolso si la solicitud aún está en estado solicitada', async () => {
       await expect(
         service.registrarReembolso(99, 'DEV-2026-00001', {
@@ -214,6 +300,53 @@ describe('PostventaService (M11)', () => {
           referenciaTransaccion: 'TRANS-987654',
         })
       ).rejects.toMatchObject({ codigo: 'TRANSICION_NO_PERMITIDA' });
+    });
+  });
+
+  describe('solicitarDevolucion · plazo desde la entrega (RN-POS-02)', () => {
+    const entrada = {
+      codigoOrden: 'PC-2026-00010',
+      tipo: 'devolucion' as const,
+      motivoGeneral: 'El color no era el que esperaba',
+      lineas: [{ idLineaOrden: 101, cantidad: 1 }],
+    };
+
+    it('cuenta los 5 días hábiles desde la entrega, no desde la compra', async () => {
+      vi.mocked(ordenesPortMock.obtenerOrdenParaPostventa).mockResolvedValue({
+        ...ordenEjemplo,
+        estado: 'entregado',
+        fecha: new Date('2026-09-01T10:00:00Z'),
+        fechaEntrega: new Date('2026-10-26T10:00:00Z'),
+      });
+
+      await service.solicitarDevolucion(5, entrada);
+      expect(repoMock.bloquearOrden).toHaveBeenCalledWith(10, TX);
+      expect(repoMock.crearSolicitud).toHaveBeenCalledWith(
+        expect.objectContaining({ tipo: 'devolucion', totalReembolso: 75000 }),
+        TX
+      );
+    });
+
+    it('vence a los 5 días hábiles de la entrega', async () => {
+      vi.mocked(ordenesPortMock.obtenerOrdenParaPostventa).mockResolvedValue({
+        ...ordenEjemplo,
+        estado: 'entregado',
+        fechaEntrega: new Date('2026-10-01T10:00:00Z'),
+      });
+
+      await expect(service.solicitarDevolucion(5, entrada)).rejects.toMatchObject({ codigo: 'PLAZO_VENCIDO' });
+      expect(repoMock.crearSolicitud).not.toHaveBeenCalled();
+    });
+
+    it('no deja devolver unidades que ya se devolvieron', async () => {
+      vi.mocked(ordenesPortMock.obtenerOrdenParaPostventa).mockResolvedValue({
+        ...ordenEjemplo,
+        estado: 'entregado',
+        fechaEntrega: new Date('2026-10-27T10:00:00Z'),
+      });
+      vi.mocked(repoMock.cantidadesDevueltas).mockResolvedValueOnce(new Map([[101, 2]]));
+
+      await expect(service.solicitarDevolucion(5, entrada)).rejects.toMatchObject({ codigo: 'PARAMETRO_INVALIDO' });
     });
   });
 });

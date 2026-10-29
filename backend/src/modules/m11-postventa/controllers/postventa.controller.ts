@@ -149,7 +149,7 @@ export class PostventaController {
     const input = validar(res, resolverSolicitudRequestSchema, req.body);
     if (!input) return;
 
-    const data = await this.service.resolverSolicitud(actor.idUsuario, codigo, input);
+    const data = await this.service.resolverSolicitud(actor.idUsuario, codigo, input, req.ip ?? null);
     res.json({ success: true, data });
   });
 
@@ -166,7 +166,7 @@ export class PostventaController {
     const input = validar(res, registrarReembolsoRequestSchema, req.body);
     if (!input) return;
 
-    const data = await this.service.registrarReembolso(actor.idUsuario, codigo, input);
+    const data = await this.service.registrarReembolso(actor.idUsuario, codigo, input, req.ip ?? null);
     res.json({ success: true, data });
   });
 }
