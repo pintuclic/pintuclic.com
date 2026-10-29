@@ -686,6 +686,11 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
     'alerta_servicio_ia',
     'El asistente de la tienda no está respondiendo · Pintu Clic',
     'El servicio de inteligencia artificial que atiende el asistente y la búsqueda asistida acumuló varios fallos seguidos y dejó de responder. El resto del sitio sigue funcionando con normalidad. Revisa el detalle en el panel, en Asesoría.'
+),
+(
+    'comprobante_venta',
+    'Tu comprobante de compra · Pintu Clic',
+    'Gracias por tu compra en Pintu Clic. Ya está listo el comprobante de tu pedido: puedes verlo, imprimirlo o guardarlo como PDF desde el enlace.'
 )
 ON CONFLICT (tipo) DO NOTHING;
 

@@ -150,6 +150,8 @@ enum TipoComunicacion {
   dictamen_empresa
   /// M03 · I9: el servicio de IA acumuló los fallos consecutivos configurados
   alerta_servicio_ia
+  /// M12 · R9: aviso al cliente con el enlace a su comprobante de venta
+  comprobante_venta
 
   @@map("enum_tipo_comunicacion")
 }
@@ -409,6 +411,7 @@ model Usuario {
   entradasFaq            FaqEntrada[]          @relation("FaqEntradaAutor")
   contactoActualizado    ContactoInstitucional[] @relation("ContactoInstitucionalUsuarioActualizo")
   imagenesCategoriaInicio ImagenCategoriaInicio[] @relation("ImagenCategoriaInicioUsuarioActualizo")
+  datosFacturacionActualizados DatosFacturacion[] @relation("DatosFacturacionUsuarioActualizo")
 
   // M05 Relaciones
   carrito Carrito?
@@ -1596,6 +1599,7 @@ model Orden {
 
   usuario   Usuario                @relation(fields: [idUsuario], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_orden_usuario")
   lineas    LineaOrden[]
+  comprobante ComprobanteVenta?
   historial HistorialEstadoOrden[]
   notas     NotaOrden[]
   contactos ContactoOrden[]
@@ -1869,6 +1873,76 @@ model ImagenCategoriaInicio {
   usuarioActualizo Usuario?  @relation("ImagenCategoriaInicioUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_imagen_categoria_inicio_usuario")
 
   @@map("imagen_categoria_inicio")
+}
+
+/// Datos del vendedor para el comprobante de venta: una sola fila, id = 1, que edita el personal (M12 · R6)
+model DatosFacturacion {
+  idDatos            Int      @id @default(1) @map("id_datos") @db.SmallInt
+  razonSocial        String?  @map("razon_social") @db.VarChar(150)
+  nit                String?  @db.VarChar(30)
+  regimen            String?  @db.VarChar(150)
+  direccion          String?  @db.VarChar(200)
+  ciudad             String?  @db.VarChar(100)
+  telefono           String?  @db.VarChar(30)
+  correo             String?  @db.VarChar(150)
+  pieLegal           String?  @map("pie_legal") @db.VarChar(500)
+  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+  idUsuarioActualizo Int?     @map("id_usuario_actualizo")
+
+  usuarioActualizo Usuario? @relation("DatosFacturacionUsuarioActualizo", fields: [idUsuarioActualizo], references: [idUsuario], onDelete: SetNull, map: "fk_datos_facturacion_usuario")
+
+  @@map("datos_facturacion")
+}
+
+/// Comprobante de venta imprimible: copia congelada de una venta, uno por orden (M12 · R1, R3). No es factura electrónica DIAN.
+model ComprobanteVenta {
+  idComprobante        Int      @id @default(autoincrement()) @map("id_comprobante")
+  numero               String   @unique @db.VarChar(20)
+  idOrden              Int      @unique @map("id_orden")
+  fechaEmision         DateTime @default(now()) @map("fecha_emision") @db.Timestamptz(6)
+  vendedorRazonSocial  String   @map("vendedor_razon_social") @db.VarChar(150)
+  vendedorNit          String   @map("vendedor_nit") @db.VarChar(30)
+  vendedorRegimen      String?  @map("vendedor_regimen") @db.VarChar(150)
+  vendedorDireccion    String   @map("vendedor_direccion") @db.VarChar(200)
+  vendedorCiudad       String?  @map("vendedor_ciudad") @db.VarChar(100)
+  vendedorTelefono     String?  @map("vendedor_telefono") @db.VarChar(30)
+  vendedorCorreo       String?  @map("vendedor_correo") @db.VarChar(150)
+  compradorNombre      String   @map("comprador_nombre") @db.VarChar(150)
+  compradorDocumento   String?  @map("comprador_documento") @db.VarChar(30)
+  compradorCorreo      String   @map("comprador_correo") @db.VarChar(150)
+  compradorTelefono    String?  @map("comprador_telefono") @db.VarChar(30)
+  compradorDireccion   String   @map("comprador_direccion")
+  subtotal             Decimal  @db.Decimal(12, 2)
+  descuento            Decimal  @default(0.00) @db.Decimal(12, 2)
+  envio                Decimal  @default(0.00) @db.Decimal(12, 2)
+  baseSinIva           Decimal  @map("base_sin_iva") @db.Decimal(12, 2)
+  tasaIva              Decimal  @map("tasa_iva") @db.Decimal(5, 2)
+  iva                  Decimal  @db.Decimal(12, 2)
+  total                Decimal  @db.Decimal(12, 2)
+  pieLegal             String?  @map("pie_legal") @db.VarChar(500)
+
+  orden  Orden                    @relation(fields: [idOrden], references: [idOrden], onDelete: Restrict, map: "fk_comprobante_orden")
+  lineas LineaComprobanteVenta[]
+
+  @@map("comprobante_venta")
+}
+
+model LineaComprobanteVenta {
+  idLineaComprobante Int      @id @default(autoincrement()) @map("id_linea_comprobante")
+  idComprobante      Int      @map("id_comprobante")
+  orden              Int      @db.SmallInt
+  descripcion        String   @db.VarChar(150)
+  presentacion       String   @db.VarChar(150)
+  color              String?  @db.VarChar(150)
+  cantidad           Int
+  precioUnitario     Decimal  @map("precio_unitario") @db.Decimal(12, 2)
+  descuentoUnitario  Decimal  @default(0.00) @map("descuento_unitario") @db.Decimal(12, 2)
+  totalLinea         Decimal  @map("total_linea") @db.Decimal(12, 2)
+
+  comprobante ComprobanteVenta @relation(fields: [idComprobante], references: [idComprobante], onDelete: Restrict, map: "fk_linea_comprobante")
+
+  @@unique([idComprobante, orden], map: "uq_linea_comprobante_orden")
+  @@map("linea_comprobante_venta")
 }
 
 /// Entrada del catálogo de preguntas frecuentes (FAQ) para el Centro de Ayuda y puerto hacia M15
