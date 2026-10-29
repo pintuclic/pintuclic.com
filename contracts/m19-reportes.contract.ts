@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * ============================================================================
- * CONTRATO DE API REST — M19. Reportes y analítica de ventas  (PROPUESTA)
+ * CONTRATO DE API REST — M19. Reportes y analítica de ventas  (APROBADO — ampliado por el Tech Lead: informes por semana, mes y año, y resumen de clientes)
  * ============================================================================
  * Scope: m19-reportes · Ola 5 · Depende de M08 (órdenes) · Lee M01, M06, M11 y M12 (solo lectura)
  *
@@ -33,9 +33,13 @@ import { z } from 'zod';
  *      `ticketPromedio` = totalCobrado ÷ órdenes, sin decimales; null si no hay órdenes.
  *  R4  COMPARACIÓN. El resumen trae las mismas cifras del periodo inmediatamente anterior de igual duración y la variación en
  *      porcentaje con un decimal (`null` si el periodo anterior es 0).
- *  R5  SERIE. `agrupar` = `dia`, `semana` (lunes a domingo) o `mes`; un punto por intervalo, sin huecos (valen 0) y de más
- *      viejo a más nuevo. `periodo` es la fecha de inicio del intervalo. Máximo MAXIMO_PUNTOS_SERIE puntos: si el rango y la
- *      agrupación lo superan, 400 `RANGO_INVALIDO`.
+ *  R5  SERIE. `agrupar` = `dia`, `semana` (lunes a domingo), `mes` o `anio`; un punto por intervalo, sin huecos (valen 0) y de
+ *      más viejo a más nuevo. `periodo` es la fecha de inicio del intervalo (el lunes, el día 1 del mes o el 1 de enero). Los
+ *      intervalos de los extremos son COMPLETOS (el que contiene `desde` empieza antes, pero solo cuenta lo que cae en el
+ *      rango). La serie admite rangos de hasta MAXIMO_DIAS_RANGO_SERIE días (los demás reportes, MAXIMO_DIAS_RANGO) para poder
+ *      comparar meses y años. Máximo MAXIMO_PUNTOS_SERIE puntos: si el rango y la agrupación lo superan, 400 `RANGO_INVALIDO`.
+ *      Informes por periodo: semanal = rango de 7 a 90 días con `agrupar=dia`; mensual = el mes con `agrupar=dia` (o varios con
+ *      `mes`); anual = el año con `agrupar=mes` (o varios con `anio`).
  *  R6  VENTAS POR… Una sola ruta con `dimension`:
  *        producto       nombre del producto copiado en la línea (no se pierde si el producto se retira del catálogo)
  *        categoria      la categoría ACTUAL del producto de la línea (por su variante); sin variante o sin producto: «Sin clasificar»
@@ -63,6 +67,9 @@ import { z } from 'zod';
  *      clientes (R9): `ventas.ver` y además `personal.ver` (el que ya protege el listado de clientes). Sin permiso, 404 opaco
  *      `RECURSO_NO_DISPONIBLE` (ADR-003), igual que un recurso inexistente. Solo sesión de PERSONAL: una sesión de cliente
  *      nunca entra, aunque su rol traiga el permiso.
+ *  R14 COMPRADORES. `/compradores`: de las ventas del rango (R2), los clientes distintos que compraron; los NUEVOS (no tenían
+ *      ninguna venta anterior a `desde`) y los RECURRENTES (ya habían comprado antes); las órdenes por comprador (un decimal,
+ *      null si no hay) y cuántos compraron más de una vez en el rango. Solo cifras: sin nombres (R9).
  *  R13 RENDIMIENTO. Todo se calcula con agregaciones en la base (suma, conteo y agrupación), nunca trayendo filas para sumarlas
  *      en memoria. Con el rango máximo y el volumen esperado de la tienda, cada reporte responde en menos de 2 segundos.
  *
@@ -91,6 +98,7 @@ import { z } from 'zod';
  *   /descuentos                      ventas.ver       → descuentosResponse
  *   /clientes                        ventas.ver + personal.ver → topClientesResponse
  *   /postventa                       ventas.ver       → postventaResponse
+ *   /compradores                     ventas.ver       → compradoresResponse
  *   /facturacion                     ventas.ver       → facturacionResponse
  *   Todas aceptan `?formato=csv` (R11), que exige además `ventas.exportar`.
  * ============================================================================
@@ -110,6 +118,7 @@ export const CODIGOS_ERROR_M19 = {
 
 export const DIAS_POR_DEFECTO = 30;
 export const MAXIMO_DIAS_RANGO = 366;
+export const MAXIMO_DIAS_RANGO_SERIE = 1830;
 export const MAXIMO_PUNTOS_SERIE = 400;
 export const LIMITE_POR_DEFECTO = 20;
 export const LIMITE_MAXIMO = 100;
@@ -119,7 +128,7 @@ export const DIMENSIONES_VENTA = ['producto', 'categoria', 'marca', 'tipo_client
 export const dimensionVentaSchema = z.enum(DIMENSIONES_VENTA);
 export type DimensionVenta = z.infer<typeof dimensionVentaSchema>;
 
-export const AGRUPACIONES = ['dia', 'semana', 'mes'] as const;
+export const AGRUPACIONES = ['dia', 'semana', 'mes', 'anio'] as const;
 export const agrupacionSchema = z.enum(AGRUPACIONES);
 export type Agrupacion = z.infer<typeof agrupacionSchema>;
 
@@ -246,6 +255,16 @@ export const topClientesSchema = z.object({
 });
 export type TopClientes = z.infer<typeof topClientesSchema>;
 
+export const compradoresSchema = z.object({
+  periodo: periodoSchema,
+  compradores: enteroSchema,
+  nuevos: enteroSchema,
+  recurrentes: enteroSchema,
+  compraronMasDeUnaVez: enteroSchema,
+  ordenesPorComprador: z.number().nonnegative().nullable(),
+});
+export type Compradores = z.infer<typeof compradoresSchema>;
+
 export const postventaReporteSchema = z.object({
   periodo: periodoSchema,
   solicitudes: z.number().int().nonnegative(),
@@ -270,6 +289,7 @@ export const serieVentasResponseEnvelopeSchema = envelope(serieVentasSchema);
 export const ventasPorResponseEnvelopeSchema = envelope(ventasPorSchema);
 export const descuentosResponseEnvelopeSchema = envelope(descuentosSchema);
 export const topClientesResponseEnvelopeSchema = envelope(topClientesSchema);
+export const compradoresResponseEnvelopeSchema = envelope(compradoresSchema);
 export const postventaResponseEnvelopeSchema = envelope(postventaReporteSchema);
 export const facturacionResponseEnvelopeSchema = envelope(facturacionReporteSchema);
 
