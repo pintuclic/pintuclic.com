@@ -156,3 +156,42 @@ export function areaDeMedidas(ancho: string, ladoMayor: string, repeticiones: st
   // a · b queda a escala 10 000; se vuelve a escala 100 redondeando al céntimo más cercano.
   return Math.round((a * b * n) / 100) / 100;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * SIMULADOR DE COLOR (HU-ASE-03, S1-S11)
+ *
+ * Espejo de la sección 9 de `contracts/m03-asesoria.contract.ts`. No hay endpoints: el
+ * simulador vive entero en el navegador, así que estos esquemas fijan la forma del catálogo
+ * de ambientes y de lo que M01 le entrega. Una prueba comprueba que el aviso no se separe
+ * del contrato.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/** S7: el aviso que acompaña a toda vista del simulador. */
+export const ADVERTENCIA_SIMULADOR =
+  'El color de la pantalla es una referencia: el resultado real depende de la luz del lugar, de las manos aplicadas y de la superficie.';
+
+export const tipoAmbienteSimuladorSchema = z.enum(['interior', 'exterior']);
+export type TipoAmbienteSimulador = z.infer<typeof tipoAmbienteSimuladorSchema>;
+
+/** S5: un ambiente de muestra. El dibujo no se declara aquí: es un componente asociado al `id`. */
+export const ambienteSimuladorSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  nombre: z.string().min(1),
+  tipo: tipoAmbienteSimuladorSchema,
+  alt: z.string().min(1),
+});
+export type AmbienteSimulador = z.infer<typeof ambienteSimuladorSchema>;
+
+export const catalogoAmbientesSchema = z
+  .array(ambienteSimuladorSchema)
+  .min(1)
+  .refine((lista) => new Set(lista.map((a) => a.id)).size === lista.length, 'Hay ambientes con el mismo id');
+export type CatalogoAmbientes = z.infer<typeof catalogoAmbientesSchema>;
+
+/** S1, S2: lo que el simulador recibe de M01 y nada más. */
+export const simuladorInputSchema = z.object({
+  hexadecimal: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  nombre: z.string().min(1),
+  codigo: z.string().nullable(),
+});
+export type SimuladorInput = z.infer<typeof simuladorInputSchema>;

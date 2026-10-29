@@ -66,6 +66,8 @@ import {
  *      «En tu espacio». Esta última muestra un aviso («Muy pronto podrás ver este color en tus espacios») y es un
  *      componente propio (`AmbientesColor`) que recibe el color elegido: M03 lo reemplaza por su visualizador sin tocar
  *      el resto de la página. M01 NO dibuja ambientes.
+ *      ACTUALIZADO 2026-10-29: M03 ya lo reemplazó (M03 · HU-ASE-03, reglas S1-S11). `AmbientesColor` dejó de existir y la
+ *      pestaña monta `SimuladorColor`, que recibe el color elegido y nada más. El aviso «Muy pronto…» ya no se muestra.
  *  P7  COMBINADOR (ARMONIAS). Para el color elegido se calculan cuatro armonías, en el modelo HSL de su `hexadecimal`
  *      (DEFINICION_ARMONIAS fija las reglas exactas): complementario (tono +180°), análogos (±30°), tríadico (+120° y
  *      +240°) y monocromático (el mismo tono y saturación con otras luminosidades). Los grises y blancos (saturación

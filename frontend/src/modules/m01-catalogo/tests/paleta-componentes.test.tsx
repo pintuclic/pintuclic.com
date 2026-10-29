@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { Header, type HeaderProps } from '@/core/components/layout/Header';
 import { EncabezadoFijo } from '@/core/components/layout/EncabezadoFijo';
 import { AbanicoColores } from '../components/paleta/AbanicoColores';
-import { AmbientesColor } from '../components/paleta/AmbientesColor';
 import { CombinadorColores } from '../components/paleta/CombinadorColores';
 import { FiltroPaleta } from '../components/paleta/FiltroPaleta';
 import { OndaColor } from '../components/paleta/OndaColor';
@@ -47,14 +46,6 @@ describe('OndaColor (P15)', () => {
   });
 });
 
-describe('AmbientesColor (P6, reservado para M03)', () => {
-  it('muestra un aviso en lugar de un hueco vacío', () => {
-    const html = renderToStaticMarkup(<AmbientesColor color={AZUL} />);
-    expect(html.length).toBeGreaterThan(0);
-    expect(html).toMatch(/espacio/i);
-  });
-});
-
 describe('CombinadorColores (P7–P10)', () => {
   it('sin color pide elegir uno en el abanico', () => {
     const html = renderToStaticMarkup(<CombinadorColores color={null} onElegir={() => undefined} />);
@@ -68,7 +59,7 @@ describe('CombinadorColores (P7–P10)', () => {
     expect(html).not.toContain('p-5');
   });
 
-  it('ofrece las dos pestañas, con «En tu espacio» reservada', () => {
+  it('ofrece las dos pestañas: el combinador y «En tu espacio»', () => {
     const html = renderToStaticMarkup(<CombinadorColores color={AZUL} onElegir={() => undefined} />);
     expect(html).toContain('role="tablist"');
     expect(html).toContain('En tu espacio');

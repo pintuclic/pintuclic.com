@@ -6,6 +6,29 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-29 (b)
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🏠 **Simulador de color: la pestaña «En tu espacio» deja de ser un aviso.** El color elegido en la paleta se pinta ahora sobre las paredes de seis ambientes. Entra como la rama `feature/m03-simulador-color`.
+
+### Módulo M03 — Simulador de color (HU-ASE-03)
+- **Seis puntos de vista (S5):** sala de frente, sala desde la esquina, alcoba, comedor, estudio y fachada. El PO no especificó cuántos; se construyeron los seis del supuesto del contrato (Q11).
+- **Ilustraciones SVG dibujadas por código (S3).** Solo la pared lleva el color: el piso, los muebles, las ventanas y los cuadros son tonos fijos. La luz y la sombra son capas blancas y negras de poca opacidad sobre la pared, de modo que un tono claro sigue viéndose claro y uno oscuro, oscuro. Se probó con amarillo, azul profundo, blanco hueso y verde salvia.
+- **Es una ilustración, no la fotografía del mockup de Pintuco (S4, Q12).** Queda dicho aquí para que el PO lo valide al verlo.
+- **Cambiar de color o de ambiente no toca la red (S10).** Se comprobó en el navegador: ninguna petición del simulador. Funciona con el servicio de IA caído.
+- **Selector de ambiente (S6):** un grupo de radio de verdad, con una miniatura por vista ya pintada con el color elegido, el nombre debajo y una marca de check en la activa, para que se distinga sin depender del color del borde. Se maneja con las flechas del teclado.
+- **El color siempre identificado (S8):** nombre y código sobre la imagen, con texto negro o blanco según el contraste.
+- **Aviso fijo de que es una referencia (S7)** y leyenda «Así se vería …, aproximadamente».
+- **Accesibilidad (S9):** cada dibujo grande lleva su texto («Sala de frente…, con las paredes pintadas en Rojo Coral»); las miniaturas, que ya tienen su nombre visible, se ocultan a los lectores de pantalla; la transición del color se apaga con «reducir movimiento».
+- **Sin color elegido, o con un valor que no es `#RRGGBB`, no dibuja nada** salvo la invitación a elegir uno (S2, S9).
+
+### Defectos encontrados probando en el navegador
+- **La fila de miniaturas desbordaba la página en móvil.** Dos causas, las dos mías: un `<fieldset>` mide por defecto lo que mide su contenido y se estiraba hasta los 616 px, y los radios ocultos con `sr-only` son absolutos, así que el recorte de la fila desplazable no los alcanzaba y ensanchaban todo el documento. Se corrigió con `min-w-0` y haciendo `relative` cada etiqueta; ahora `html` y `body` miden lo mismo.
+- **La ilustración llenaba la pantalla de lado a lado** (más de 800 px de alto) y empujaba el selector fuera de la vista. Se limita su ancho.
+
+### M01 Catálogo (se tocan tres cosas, avisado)
+- `CombinadorColores.tsx` monta `SimuladorColor` donde estaba `AmbientesColor` y le pasa el color elegido, tal como M01 · P6 lo dejó previsto. **`AmbientesColor.tsx` desaparece**, con su bloque de prueba, y la prueba de las pestañas ya no dice «reservada».
+- El contrato de la paleta (`P6`) lleva una nota de que M03 ya lo reemplazó.
+
 ## [No publicado] - 2026-10-29
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🎨 **Contrato del simulador de color (HU-ASE-03) y PR general.** El simulador pone el color elegido en la paleta sobre las paredes de unos ambientes de muestra. Aquí solo entra el contrato y lo compartido; el simulador se construye en su propia rama. Entra como la rama `chore/m03-contrato-simulador`.
