@@ -26,6 +26,8 @@ const ETIQUETAS_TIPO: Record<TipoComunicacion, string> = {
   orden_cancelada: 'Pedido cancelado',
   cotizacion_respondida: 'Cotización respondida',
   cotizacion_rechazada: 'Cotización rechazada',
+  solicitud_empresa_recibida: 'Solicitud de empresa recibida',
+  renovacion_nit_recibida: 'Solicitud de NIT recibida',
 };
 
 const OPCIONES_TIPO = [

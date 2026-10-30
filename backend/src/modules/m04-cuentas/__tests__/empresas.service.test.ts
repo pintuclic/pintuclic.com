@@ -168,6 +168,8 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
       enviarEnlaceRecuperacion: vi.fn(),
       enviarEnlaceActivacion: vi.fn(),
       notificarDictamenEmpresa: vi.fn().mockResolvedValue(undefined),
+      notificarSolicitudEmpresaRecibida: vi.fn().mockResolvedValue(undefined),
+      notificarRenovacionNitRecibida: vi.fn().mockResolvedValue(undefined),
     };
 
     tiposCliente = {
@@ -244,6 +246,25 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
           contrasena: 'ClaveCorporativa123!',
         })
       ).rejects.toThrow(EmpresasError);
+    });
+  });
+
+  describe('M18 · acuse de recibo de las solicitudes de empresa', () => {
+    it('el registro de empresa avisa al correo empresarial y un fallo del correo no lo deshace', async () => {
+      vi.mocked(notificaciones.notificarSolicitudEmpresaRecibida!).mockRejectedValueOnce(new Error('SMTP caído'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const res = await service.registrarEmpresa({
+        nombreEmpresa: 'Pinturas del Valle S.A.S.',
+        nit: '901234567-1',
+        nombreRepresentante: 'Carlos Mario',
+        correoEmpresarial: 'contacto@valle.com',
+        telefono: '3151234567',
+        contrasena: 'ClaveCorporativa123!',
+      });
+
+      expect(res.idSolicitud).toBe('solicitud-uuid-1');
+      expect(notificaciones.notificarSolicitudEmpresaRecibida).toHaveBeenCalledWith('contacto@valle.com', { nombre: 'Pinturas del Valle S.A.S.' });
     });
   });
 
@@ -569,6 +590,22 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
           nitNuevo: '900999888-7',
         })
       );
+    });
+
+    it('M18 · RF-CUE-10-04: la solicitud de renovación avisa al correo de la cuenta, sin llevar el NIT', async () => {
+      vi.mocked(cuentasRepo.buscarCuentaEmpresaPorIdUsuario).mockResolvedValueOnce({ idUsuario: 33, nit: '900111222-3' } as CuentaEmpresa);
+      vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce({ idUsuario: 33, nombre: 'Pinturas del Valle', correo: 'valle@empresa.com' } as Awaited<ReturnType<typeof cuentasRepo.buscarPorId>>);
+
+      await service.solicitarRenovacionNit(33, {
+        nitNuevo: '900999888-7',
+        nombreOriginal: 'RUT.pdf',
+        tipoMime: 'application/pdf',
+        tamanoBytes: 2048,
+        sha256: 'b'.repeat(64),
+        contenidoBase64: Buffer.from('dummy').toString('base64'),
+      });
+
+      expect(notificaciones.notificarRenovacionNitRecibida).toHaveBeenCalledWith('valle@empresa.com', { nombre: 'Pinturas del Valle' });
     });
 
     it('aprueba la renovación mediante la operación atómica (el NIT cambia en la transacción)', async () => {

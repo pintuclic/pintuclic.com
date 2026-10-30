@@ -273,3 +273,17 @@ export function htmlCotizacionRechazada(intro: string, nombre: string, codigo: s
     </div>
   `.trim();
 }
+
+export function textoSolicitudRecibida(intro: string, nombre: string): string {
+  return [`Hola, ${nombre}.`, intro].join('\n');
+}
+
+export function htmlSolicitudRecibida(titulo: string, intro: string, nombre: string): string {
+  return `
+    <div style="${CAJA_ESTILO}">
+      <h2 style="color: #0B2D6B; margin-top: 0;">${escaparHtml(titulo)}</h2>
+      <p>Hola, ${escaparHtml(nombre)}.</p>
+      ${introAHtml(intro)}
+    </div>
+  `.trim();
+}

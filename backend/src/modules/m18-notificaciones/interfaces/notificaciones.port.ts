@@ -20,7 +20,9 @@ export interface EventoNotificacion {
     | 'orden_despachada'
     | 'orden_cancelada'
     | 'cotizacion_respondida'
-    | 'cotizacion_rechazada';
+    | 'cotizacion_rechazada'
+    | 'solicitud_empresa_recibida'
+    | 'renovacion_nit_recibida';
   destinatario: string;
   timestamp: Date;
   metadatos: Record<string, string | number | boolean>;
@@ -60,6 +62,10 @@ export interface NotificacionesPort {
   notificarOrdenDespachada?(correo: string, datos: { nombre: string; codigoOrden: string }): Promise<void>;
   /** HU-NOT-02 · M08 D05: el pedido se canceló (lo emitirá M11 al ejecutar la cancelación). */
   notificarOrdenCancelada?(correo: string, datos: { nombre: string; codigoOrden: string }): Promise<void>;
+  /** M04 · HU-CUE-03: acuse de recibo de la solicitud de cuenta empresa (registro directo o ascenso de un particular). */
+  notificarSolicitudEmpresaRecibida?(correo: string, datos: { nombre: string }): Promise<void>;
+  /** M04 · RF-CUE-10-04: acuse de recibo de la solicitud de renovación de NIT; no lleva el NIT. */
+  notificarRenovacionNitRecibida?(correo: string, datos: { nombre: string }): Promise<void>;
   /** HU-NOT-02 · RF-NOT-02-03: la cotización fue respondida; lleva el total acordado ya formateado y su vencimiento. */
   notificarCotizacionRespondida?(
     correo: string,

@@ -711,6 +711,16 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
     'cotizacion_rechazada',
     'Sobre tu solicitud de cotización · Pintu Clic',
     'Revisamos tu solicitud de cotización y por ahora no podemos atenderla en las condiciones pedidas. Abajo encontrarás el motivo.'
+),
+(
+    'solicitud_empresa_recibida',
+    'Recibimos tu solicitud de cuenta empresarial · Pintu Clic',
+    'Recibimos tu solicitud de cuenta empresarial y quedó en revisión. Te escribiremos a este correo cuando tengamos el resultado.'
+),
+(
+    'renovacion_nit_recibida',
+    'Recibimos tu solicitud de actualización de NIT · Pintu Clic',
+    'Recibimos tu solicitud de actualización del NIT de tu cuenta empresarial. Mientras la revisamos, tu cuenta sigue funcionando con el NIT actual.'
 )
 ON CONFLICT (tipo) DO NOTHING;
 

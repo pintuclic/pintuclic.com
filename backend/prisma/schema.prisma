@@ -160,6 +160,10 @@ enum TipoComunicacion {
   cotizacion_respondida
   /// M18 · HU-NOT-02: aviso al cliente cuando su cotización es rechazada
   cotizacion_rechazada
+  /// M18 · M04 HU-CUE-03: acuse de recibo de la solicitud de cuenta empresa
+  solicitud_empresa_recibida
+  /// M18 · M04 RF-CUE-10-04: acuse de recibo de la solicitud de renovación de NIT
+  renovacion_nit_recibida
 
   @@map("enum_tipo_comunicacion")
 }

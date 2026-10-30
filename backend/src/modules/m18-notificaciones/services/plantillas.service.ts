@@ -71,6 +71,18 @@ function renderizarMuestra(
         contenidoHtml: plantillasHtml.htmlOrdenCancelada(intro, 'Cliente de ejemplo', 'PC-2026-00001'),
         contenidoTexto: plantillasHtml.textoOrdenCancelada(intro, 'Cliente de ejemplo', 'PC-2026-00001'),
       };
+    case 'solicitud_empresa_recibida':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlSolicitudRecibida('Recibimos tu solicitud', intro, 'Cliente de ejemplo'),
+        contenidoTexto: plantillasHtml.textoSolicitudRecibida(intro, 'Cliente de ejemplo'),
+      };
+    case 'renovacion_nit_recibida':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlSolicitudRecibida('Recibimos tu solicitud de NIT', intro, 'Cliente de ejemplo'),
+        contenidoTexto: plantillasHtml.textoSolicitudRecibida(intro, 'Cliente de ejemplo'),
+      };
     case 'cotizacion_respondida':
       return {
         asunto,

@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.24 (v4.23 + M18: avisos de despacho, cancelación y cotización)
+-- VERSIÓN: 4.24 (v4.23 + M18: avisos de despacho, cancelación, cotización y solicitudes de empresa)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 89
@@ -336,6 +336,10 @@ ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'orden_despachada';
 ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'orden_cancelada';
 ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'cotizacion_respondida';
 ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'cotizacion_rechazada';
+
+-- M18 (v4.24): acuse de recibo de la solicitud de cuenta empresa y de la renovación de NIT (M04 · HU-CUE-03, RF-CUE-10-04)
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'solicitud_empresa_recibida';
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'renovacion_nit_recibida';
 
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS

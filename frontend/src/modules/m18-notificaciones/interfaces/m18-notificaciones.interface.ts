@@ -10,7 +10,9 @@ export type TipoComunicacion =
   | 'orden_despachada'
   | 'orden_cancelada'
   | 'cotizacion_respondida'
-  | 'cotizacion_rechazada';
+  | 'cotizacion_rechazada'
+  | 'solicitud_empresa_recibida'
+  | 'renovacion_nit_recibida';
 
 export type EstadoEnvio = 'pendiente' | 'enviado' | 'fallido';
 

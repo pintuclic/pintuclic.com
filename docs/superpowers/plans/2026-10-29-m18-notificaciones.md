@@ -31,7 +31,7 @@ Fuente: `docs/01_TRANSVERSALES/M18_NOTIFICACIONES.md` contrastado con las especi
 - `app.routes.ts`: el adaptador de M12 (`alCrearOrden`) reenvía `notificarOrdenDespachada` a M18, en vez de dejarla vacía.
 - Cuidar que M12 y M18 convivan: el comprobante al nacer y el aviso de despacho no se pisan.
 
-**Fase 3 — M04.**
+**Fase 3 — M04. HECHA.**
 - Tipos y plantillas para «solicitud de empresa recibida» y «solicitud de NIT recibida».
 - M04 los llama desde su servicio de empresas. Es código de M04: preguntar antes.
 

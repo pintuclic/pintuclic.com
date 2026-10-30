@@ -105,10 +105,25 @@ export class EmpresasService {
       tipoSolicitud: 'registro',
     });
 
+    await this.avisarSolicitudRecibida('empresa', correoNormalizado, input.nombreEmpresa);
+
     return {
       idSolicitud: solicitud.idSolicitud,
       mensaje: 'Solicitud corporativa recibida. Su cuenta será activada una vez validada la documentación.',
     };
+  }
+
+  /**
+   * M18 · HU-CUE-03 y RF-CUE-10-04: acuse de recibo. Es informativo: la solicitud ya quedó radicada, así que un fallo
+   * del correo se registra y no la deshace.
+   */
+  private async avisarSolicitudRecibida(tipo: 'empresa' | 'renovacion_nit', correo: string, nombre: string): Promise<void> {
+    try {
+      if (tipo === 'empresa') await this.notificaciones.notificarSolicitudEmpresaRecibida?.(correo, { nombre });
+      else await this.notificaciones.notificarRenovacionNitRecibida?.(correo, { nombre });
+    } catch (error) {
+      console.error(`[M04] No se pudo enviar el acuse de la solicitud (${tipo}):`, error instanceof Error ? error.message : error);
+    }
   }
 
   /**
@@ -161,6 +176,8 @@ export class EmpresasService {
       nit: nitNormalizado,
       tipoSolicitud: 'ascenso_particular',
     });
+
+    await this.avisarSolicitudRecibida('empresa', input.correoEmpresarial, input.nombreEmpresa);
 
     return {
       idSolicitud: solicitud.idSolicitud,
@@ -467,6 +484,10 @@ export class EmpresasService {
       nitNuevo: nitNuevoNormalizado,
       idDocumento: doc.idDocumento,
     });
+
+    // RF-CUE-10-04: el acuse llega al correo de acceso de la cuenta, que es el titular de la solicitud.
+    const titular = await this.cuentasRepo.buscarPorId(idUsuario);
+    if (titular) await this.avisarSolicitudRecibida('renovacion_nit', titular.correo, titular.nombre);
 
     return {
       idSolicitud: solicitud.idSolicitud,

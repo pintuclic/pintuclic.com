@@ -50,6 +50,10 @@ export const TIPOS_COMUNICACION = [
   'cotizacion_respondida',
   /** HU-NOT-02 · RF-NOT-02-03: la cotización del cliente fue rechazada. */
   'cotizacion_rechazada',
+  /** M04 · HU-CUE-03: acuse de recibo de la solicitud de cuenta empresa (registro o ascenso). */
+  'solicitud_empresa_recibida',
+  /** M04 · RF-CUE-10-04: acuse de recibo de la solicitud de renovación de NIT. */
+  'renovacion_nit_recibida',
 ] as const;
 export const tipoComunicacionSchema = z.enum(TIPOS_COMUNICACION);
 export type TipoComunicacion = z.infer<typeof tipoComunicacionSchema>;

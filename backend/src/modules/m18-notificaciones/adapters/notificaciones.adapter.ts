@@ -180,6 +180,14 @@ export class MemoriaNotificacionesAdapter implements NotificacionesPort {
     this.eventos.push({ tipo: 'cotizacion_rechazada', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
   }
 
+  async notificarSolicitudEmpresaRecibida(correo: string, datos: { nombre: string }): Promise<void> {
+    this.eventos.push({ tipo: 'solicitud_empresa_recibida', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
+  }
+
+  async notificarRenovacionNitRecibida(correo: string, datos: { nombre: string }): Promise<void> {
+    this.eventos.push({ tipo: 'renovacion_nit_recibida', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
+  }
+
   obtenerEventos(): EventoNotificacion[] {
     return [...this.eventos];
   }
@@ -231,6 +239,14 @@ export class NoOpNotificacionesAdapter implements NotificacionesPort {
   }
 
   async notificarOrdenCancelada(): Promise<void> {
+    // No-op
+  }
+
+  async notificarSolicitudEmpresaRecibida(): Promise<void> {
+    // No-op
+  }
+
+  async notificarRenovacionNitRecibida(): Promise<void> {
     // No-op
   }
 
@@ -477,6 +493,30 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
       subject,
       text: plantillasHtml.textoOrdenCancelada(intro, datos.nombre, datos.codigoOrden),
       html: plantillasHtml.htmlOrdenCancelada(intro, datos.nombre, datos.codigoOrden),
+    });
+  }
+
+  async notificarSolicitudEmpresaRecibida(correo: string, datos: { nombre: string }): Promise<void> {
+    const { subject, intro } = await this.resolverIntroYAsunto('solicitud_empresa_recibida', {
+      subject: 'Recibimos tu solicitud de cuenta empresarial · Pintu Clic',
+      intro: 'Recibimos tu solicitud de cuenta empresarial y quedó en revisión. Te escribiremos a este correo cuando tengamos el resultado.',
+    });
+    await this.enviarConRegistro('solicitud_empresa_recibida', correo, {
+      subject,
+      text: plantillasHtml.textoSolicitudRecibida(intro, datos.nombre),
+      html: plantillasHtml.htmlSolicitudRecibida('Recibimos tu solicitud', intro, datos.nombre),
+    });
+  }
+
+  async notificarRenovacionNitRecibida(correo: string, datos: { nombre: string }): Promise<void> {
+    const { subject, intro } = await this.resolverIntroYAsunto('renovacion_nit_recibida', {
+      subject: 'Recibimos tu solicitud de actualización de NIT · Pintu Clic',
+      intro: 'Recibimos tu solicitud de actualización del NIT de tu cuenta empresarial. Mientras la revisamos, tu cuenta sigue funcionando con el NIT actual.',
+    });
+    await this.enviarConRegistro('renovacion_nit_recibida', correo, {
+      subject,
+      text: plantillasHtml.textoSolicitudRecibida(intro, datos.nombre),
+      html: plantillasHtml.htmlSolicitudRecibida('Recibimos tu solicitud de NIT', intro, datos.nombre),
     });
   }
 
