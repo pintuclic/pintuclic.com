@@ -11,10 +11,12 @@ import type {
 import type {
   CambioCorreoIniciado,
   Direccion,
+  GoogleOAuthConfig,
   MisSolicitudes,
   PerfilUsuario,
   RegistroIniciado,
   ResultadoLogin,
+  ResultadoOAuthGoogle,
   UsuarioResumen,
 } from '../interfaces/api.interfaces';
 
@@ -53,6 +55,70 @@ export async function reenviarCodigoRegistro(idVerificacion: string): Promise<Re
     { idVerificacion },
   );
   return data.data;
+}
+
+/* ─── HU-CUE-02 · Autenticación con Google ─── */
+
+interface RespuestaOAuthGoogleApi {
+  registrado: boolean;
+  requiereVinculacion?: boolean;
+  tokenRegistroTemporal?: string;
+  tokenVinculacion?: string;
+  email?: string;
+  nombre?: string;
+  usuario?: UsuarioResumen;
+}
+
+export async function obtenerConfigGoogle(): Promise<GoogleOAuthConfig> {
+  const { data } = await apiClient.get<RespuestaExitosa<GoogleOAuthConfig>>('/cuentas/oauth/google/config');
+  return data.data;
+}
+
+export async function autenticarConGoogle(idToken: string): Promise<ResultadoOAuthGoogle> {
+  const { data } = await apiClient.post<RespuestaExitosa<RespuestaOAuthGoogleApi>>('/cuentas/oauth/google', {
+    idToken,
+  });
+  const respuesta = data.data;
+  if (respuesta.registrado && respuesta.usuario) {
+    return { etapa: 'sesion', usuario: respuesta.usuario };
+  }
+  if (respuesta.requiereVinculacion && respuesta.tokenVinculacion && respuesta.email && respuesta.nombre) {
+    return {
+      etapa: 'requiere_vinculacion',
+      tokenVinculacion: respuesta.tokenVinculacion,
+      email: respuesta.email,
+      nombre: respuesta.nombre,
+    };
+  }
+  return {
+    etapa: 'requiere_registro',
+    tokenRegistroTemporal: respuesta.tokenRegistroTemporal ?? '',
+    email: respuesta.email ?? '',
+    nombre: respuesta.nombre ?? '',
+  };
+}
+
+export async function completarRegistroGoogle(
+  tokenRegistroTemporal: string,
+  telefono: string,
+  contrasena: string,
+): Promise<UsuarioResumen> {
+  const { data } = await apiClient.post<RespuestaExitosa<{ usuario: UsuarioResumen }>>(
+    '/cuentas/oauth/google/completar',
+    { tokenRegistroTemporal, telefono, contrasena },
+  );
+  return data.data.usuario;
+}
+
+export async function vincularCuentaGoogle(
+  tokenVinculacion: string,
+  contrasena: string,
+): Promise<UsuarioResumen> {
+  const { data } = await apiClient.post<RespuestaExitosa<{ usuario: UsuarioResumen }>>(
+    '/cuentas/oauth/google/vincular',
+    { tokenVinculacion, contrasena },
+  );
+  return data.data.usuario;
 }
 
 /* ─── HU-CUE-03 · Registro de empresa ─── */

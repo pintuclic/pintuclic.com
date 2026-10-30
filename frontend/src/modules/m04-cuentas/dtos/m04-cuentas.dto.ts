@@ -135,13 +135,19 @@ export const completarRegistroGoogleFormSchema = z
   .object({
     telefono: telefonoSchema,
     contrasena: contrasenaSchema,
-    confirmarContrasena: z.string().min(1, 'Debe confirmar su contraseña'),
+    confirmarContrasena: z.string().min(1, 'Debes confirmar tu contraseña'),
+    aceptaTerminos: aceptaTerminosSchema,
   })
   .refine((data) => data.contrasena === data.confirmarContrasena, {
     message: 'Las contraseñas no coinciden',
     path: ['confirmarContrasena'],
   });
 export type CompletarRegistroGoogleFormData = z.infer<typeof completarRegistroGoogleFormSchema>;
+
+export const vincularGoogleFormSchema = z.object({
+  contrasena: z.string().min(1, 'Ingresa tu contraseña actual para confirmar la vinculación'),
+});
+export type VincularGoogleFormData = z.infer<typeof vincularGoogleFormSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 5. SCHEMAS DE FORMULARIOS: HU-CUE-03 REGISTRO EMPRESA B2B

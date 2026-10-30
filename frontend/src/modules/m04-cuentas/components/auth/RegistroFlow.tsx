@@ -24,7 +24,7 @@ import {
   type RegistroClienteFormData,
   type RegistroEmpresaFormData,
 } from '../../dtos/m04-cuentas.dto';
-import type { RegistroIniciado } from '../../interfaces/api.interfaces';
+import type { RegistroIniciado, ResultadoOAuthGoogle } from '../../interfaces/api.interfaces';
 import {
   reenviarCodigoRegistro,
   registrarCliente,
@@ -44,6 +44,7 @@ export interface RegistroFlowProps {
   onIrALogin: () => void;
   /** Se invoca al pulsar un enlace de salida (para cerrar el modal si lo hay). */
   onSalir?: () => void;
+  onResultadoGoogle?: (resultado: ResultadoOAuthGoogle) => void;
 }
 
 const TERMINOS = (
@@ -58,7 +59,7 @@ const TERMINOS = (
  * Natural: Datos → Verificación → Listo. Empresa (decisión del Director): Datos → Listo,
  * porque el administrador valida la empresa al aprobarla.
  */
-export function RegistroFlow({ onIrALogin, onSalir }: RegistroFlowProps) {
+export function RegistroFlow({ onIrALogin, onSalir, onResultadoGoogle }: RegistroFlowProps) {
   const idPestanas = useId();
   const [tipo, setTipo] = useState<TipoRegistro>('natural');
   const [paso, setPaso] = useState<Paso>('datos');
@@ -92,6 +93,7 @@ export function RegistroFlow({ onIrALogin, onSalir }: RegistroFlowProps) {
                   setRegistro(r);
                   setPaso('verificacion');
                 }}
+                onResultadoGoogle={onResultadoGoogle}
               />
             ) : (
               <FormularioEmpresa onRegistrado={() => setPaso('solicitud_enviada')} />
@@ -133,7 +135,13 @@ export function RegistroFlow({ onIrALogin, onSalir }: RegistroFlowProps) {
   );
 }
 
-function FormularioNatural({ onRegistrado }: { onRegistrado: (r: RegistroIniciado) => void }) {
+function FormularioNatural({
+  onRegistrado,
+  onResultadoGoogle,
+}: {
+  onRegistrado: (r: RegistroIniciado) => void;
+  onResultadoGoogle?: (resultado: ResultadoOAuthGoogle) => void;
+}) {
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const {
     register,
@@ -165,7 +173,7 @@ function FormularioNatural({ onRegistrado }: { onRegistrado: (r: RegistroIniciad
       <Button type="submit" fullWidth isLoading={isSubmitting}>
         Continuar
       </Button>
-      <BotonGoogle />
+      <BotonGoogle onResultado={onResultadoGoogle} />
     </form>
   );
 }

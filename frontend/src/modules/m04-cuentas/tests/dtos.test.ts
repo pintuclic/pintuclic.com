@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   cambioContrasenaPrimerAccesoFormSchema,
+  completarRegistroGoogleFormSchema,
   dictamenRegistroEmpresaFormSchema,
   dictamenSolicitudEmpresaFormSchema,
   direccionClienteFormSchema,
+  vincularGoogleFormSchema,
 } from '../dtos/m04-cuentas.dto';
 
 describe('M04 Frontend — DTO de dictamen (RN-CUE-17)', () => {
@@ -92,5 +94,26 @@ describe('M04 Frontend — teléfono de la dirección (regla transversal)', () =
     const res = direccionClienteFormSchema.safeParse({ ...base, telefono: '300abc4567' });
     expect(res.success).toBe(false);
     if (!res.success) expect(res.error.issues[0]?.message).toContain('números o caracteres de marcado');
+  });
+});
+
+describe('M04 Frontend — formularios de Google OAuth (HU-CUE-02)', () => {
+  it('exige teléfono, contraseña de 12+ caracteres coincidente y aceptación de términos al completar registro', () => {
+    const valido = {
+      telefono: '300 456 7890',
+      contrasena: 'ClaveFederada2026!',
+      confirmarContrasena: 'ClaveFederada2026!',
+      aceptaTerminos: true,
+    };
+    expect(completarRegistroGoogleFormSchema.safeParse(valido).success).toBe(true);
+    expect(
+      completarRegistroGoogleFormSchema.safeParse({ ...valido, confirmarContrasena: 'OtraClaveFederada2026!' }).success,
+    ).toBe(false);
+    expect(completarRegistroGoogleFormSchema.safeParse({ ...valido, aceptaTerminos: false }).success).toBe(false);
+  });
+
+  it('exige la contraseña actual para confirmar la vinculación con Google', () => {
+    expect(vincularGoogleFormSchema.safeParse({ contrasena: '' }).success).toBe(false);
+    expect(vincularGoogleFormSchema.safeParse({ contrasena: 'MiClaveActual123!' }).success).toBe(true);
   });
 });

@@ -8,11 +8,13 @@ import { DictamenPanel } from '../components/admin/DictamenPanel';
 import { EmpresasAdminView } from '../components/admin/EmpresasAdminView';
 import { EstadoBadge } from '../components/admin/ElementosAdmin';
 import { AuthPanel } from '../components/auth/AuthPanel';
+import { CompletarGoogleForm } from '../components/auth/CompletarGoogleForm';
 import { LoginForm } from '../components/auth/LoginForm';
 import { PrimerAccesoForm } from '../components/auth/PrimerAccesoForm';
 import { RecuperarForm } from '../components/auth/RecuperarForm';
 import { RegistroFlow } from '../components/auth/RegistroFlow';
 import { RestablecerForm } from '../components/auth/RestablecerForm';
+import { VincularGoogleForm } from '../components/auth/VincularGoogleForm';
 import { DireccionForm } from '../components/perfil/DireccionForm';
 import { SeguridadSection } from '../components/perfil/SeguridadSection';
 
@@ -44,9 +46,50 @@ describe('Login (HU-CUE-04)', () => {
     expect(salida).toContain('Crear cuenta');
   });
 
-  it('Google está visible pero deshabilitado y anunciado como "Próximamente"', () => {
-    expect(salida).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="google-proximamente"|<button[^>]*aria-describedby="google-proximamente"[^>]*disabled=""/);
-    expect(salida).toContain('id="google-proximamente"');
+  it('presenta el acceso con Google desbloqueado (sin rótulo "Próximamente")', () => {
+    expect(salida).toContain('Continuar con Google');
+    expect(salida).not.toContain('Próximamente');
+    expect(salida).not.toContain('google-proximamente');
+  });
+});
+
+describe('Autenticación federada con Google (HU-CUE-02)', () => {
+  it('al completar una cuenta nueva muestra el correo verificado y pide teléfono, contraseña y términos', () => {
+    const salida = html(
+      <CompletarGoogleForm
+        datosGoogle={{
+          tokenRegistroTemporal: 'tok-temporal-12345',
+          email: 'cliente.google@gmail.com',
+          nombre: 'Laura Gómez',
+        }}
+        onCompletado={nada}
+        onVolver={nada}
+      />,
+    );
+    expect(salida).toContain('Laura Gómez');
+    expect(salida).toContain('cliente.google@gmail.com');
+    expect(salida).toContain('type="tel"');
+    expect(salida.match(/autoComplete="new-password"/gi)).toHaveLength(2);
+    expect(salida).toContain('Términos y Condiciones');
+  });
+
+  it('al detectar un correo ya registrado pide la contraseña actual para confirmar la vinculación', () => {
+    const salida = html(
+      <VincularGoogleForm
+        datosVinculacion={{
+          tokenVinculacion: 'tok-vincular-12345',
+          email: 'existente@gmail.com',
+          nombre: 'Carlos Ruiz',
+        }}
+        onCompletado={nada}
+        onIrARecuperar={nada}
+        onVolver={nada}
+      />,
+    );
+    expect(salida).toContain('existente@gmail.com');
+    expect(salida).toContain('autoComplete="current-password"');
+    expect(salida).toContain('Vincular cuenta y entrar');
+    expect(salida).toContain('Cancelar y volver');
   });
 });
 

@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Alert, Button, Input, PasswordInput, TextButton } from '@/core/components';
 import { useAuthStore } from '@/core/store/authStore';
 import { loginFormSchema, type LoginFormData } from '../../dtos/m04-cuentas.dto';
-import type { UsuarioResumen } from '../../interfaces/api.interfaces';
+import type { ResultadoOAuthGoogle, UsuarioResumen } from '../../interfaces/api.interfaces';
 import { iniciarSesion } from '../../services/cuentas.service';
 import { aErrorCuentas } from '../../services/errores';
 import { BotonGoogle } from './BotonGoogle';
@@ -16,10 +16,17 @@ export interface LoginFormProps {
   onCambioObligatorio: (tokenCambio: string) => void;
   onIrARegistro: () => void;
   onIrARecuperar: () => void;
+  onResultadoGoogle?: (resultado: ResultadoOAuthGoogle) => void;
 }
 
 /** HU-CUE-04 · Inicio de sesión. Derivado del modal de registro (UI Spec §4.2, nota). */
-export function LoginForm({ onAutenticado, onCambioObligatorio, onIrARegistro, onIrARecuperar }: LoginFormProps) {
+export function LoginForm({
+  onAutenticado,
+  onCambioObligatorio,
+  onIrARegistro,
+  onIrARecuperar,
+  onResultadoGoogle,
+}: LoginFormProps) {
   const establecerUsuario = useAuthStore((s) => s.establecerUsuario);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const {
@@ -68,7 +75,7 @@ export function LoginForm({ onAutenticado, onCambioObligatorio, onIrARegistro, o
       <Button type="submit" fullWidth isLoading={isSubmitting}>
         Iniciar sesión
       </Button>
-      <BotonGoogle />
+      <BotonGoogle onResultado={onResultadoGoogle} />
       <p className="text-center font-sans text-sm text-neutral-dark">
         ¿No tienes cuenta?{' '}
         <TextButton onClick={onIrARegistro}>Crear cuenta</TextButton>

@@ -30,6 +30,32 @@ export type ResultadoLogin =
   | { tipo: 'sesion'; usuario: UsuarioResumen }
   | { tipo: 'cambio_obligatorio'; tokenCambio: string };
 
+/** GET /cuentas/oauth/google/config */
+export interface GoogleOAuthConfig {
+  habilitado: boolean;
+  clientId: string | null;
+}
+
+/** Datos temporales cuando Google valida un correo que aún no tiene cuenta en Pintu Clic. */
+export interface DatosRegistroGooglePendiente {
+  tokenRegistroTemporal: string;
+  email: string;
+  nombre: string;
+}
+
+/** Datos temporales cuando Google valida un correo que ya tiene cuenta activa por contraseña. */
+export interface DatosVinculacionGooglePendiente {
+  tokenVinculacion: string;
+  email: string;
+  nombre: string;
+}
+
+/** POST /cuentas/oauth/google: sesión directa, completar registro o confirmar vinculación. */
+export type ResultadoOAuthGoogle =
+  | { etapa: 'sesion'; usuario: UsuarioResumen }
+  | ({ etapa: 'requiere_registro' } & DatosRegistroGooglePendiente)
+  | ({ etapa: 'requiere_vinculacion' } & DatosVinculacionGooglePendiente);
+
 /** Tipo de cliente empresa de la cuenta (M06 · D8); null = sin descuento de empresa. */
 export interface TipoClienteResumen {
   nombre: string;
