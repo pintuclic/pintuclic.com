@@ -26,7 +26,7 @@ Fuente: `docs/01_TRANSVERSALES/M18_NOTIFICACIONES.md` contrastado con las especi
 - Ajustar SQL, Prisma, seed, contrato, puerto, adaptadores, plantillas y tests.
 - Los correos de despachada y cancelada llevan datos del pedido (código, modo de entrega), sin catálogo de estados.
 
-**Fase 2 — Cableado (archivos compartidos y otros módulos; pedir visto bueno).**
+**Fase 2 — Cableado. HECHA (solo `app.routes.ts` y adaptadores nuevos de M18; ni M08 ni M21 cambiaron).**
 - `app.routes.ts`: pasar a M21 un adaptador que reenvíe a M18. Hoy se construye sin ninguno.
 - `app.routes.ts`: el adaptador de M12 (`alCrearOrden`) reenvía `notificarOrdenDespachada` a M18, en vez de dejarla vacía.
 - Cuidar que M12 y M18 convivan: el comprobante al nacer y el aviso de despacho no se pisan.

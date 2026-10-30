@@ -21,6 +21,8 @@ import { construirModuloM15 } from './modules/m15-atencion/m15.routes';
 import { construirModuloM16 } from './modules/m16-contenido/m16.routes';
 import { construirModuloM17 } from './modules/m17-permisos/m17.routes';
 import { construirModuloM18 } from './modules/m18-notificaciones/m18.routes';
+import { AvisosCotizacionM18Adapter, AvisosOrdenM18Adapter } from './modules/m18-notificaciones/adapters/avisos-m18.adapter';
+import { PrismaDestinatarioRepository } from './modules/m18-notificaciones/repositories/destinatario.repository';
 import { construirModuloM20 } from './modules/m20-seguridad/m20.routes';
 import { construirModuloM21 } from './modules/m21-cotizaciones/m21.routes';
 
@@ -124,9 +126,16 @@ export function construirAppRoutes(): Router {
   router.use('/facturacion', exigirSesionSalvo(auth, []), m12.router);
   router.use('/admin/facturacion', exigirSesionSalvo(auth, []), m12.adminRouter);
 
+  const avisosOrdenM18 = new AvisosOrdenM18Adapter(m18.notificaciones, new PrismaDestinatarioRepository());
   const m08 = construirModuloM08(m17.autorizacionService, {
     auditoria: m20.auditoria,
-    estados: { notificaciones: m12.alCrearOrden },
+    // M08 D05: al nacer la orden sale el comprobante (M12); al despacharla, el aviso de M18.
+    estados: {
+      notificaciones: {
+        notificarOrdenCreada: (evento) => m12.alCrearOrden.notificarOrdenCreada(evento),
+        notificarOrdenDespachada: (evento) => avisosOrdenM18.notificarOrdenDespachada(evento),
+      },
+    },
   });
   router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
 
@@ -191,6 +200,8 @@ export function construirAppRoutes(): Router {
   // acordado. Va antes de `/admin` por lo mismo que M01.
   const m21 = construirModuloM21(m17.autorizacionService, {
     carrito: m05.carrito,
+    // M21 D8 / RF-NOT-02-03: avisos de cotización respondida y rechazada por M18.
+    notificaciones: new AvisosCotizacionM18Adapter(m18.notificaciones),
     parametros: {
       obtenerNumero: async (clave) => {
         const { parametros } = await m17.configService.obtenerCatalogo();
