@@ -1,5 +1,6 @@
 'use client';
 
+import { EnvioPersonal } from '@/modules/m10-entrega/components/EnvioPersonal';
 import { DetallePedidoView } from '@/modules/m08-ordenes/components/admin/DetallePedidoView';
 
 /**
@@ -8,5 +9,10 @@ import { DetallePedidoView } from '@/modules/m08-ordenes/components/admin/Detall
  * respondía 500 («Could not find the module … in the React Client Manifest»).
  */
 export function DetallePedidoAdmin({ codigo }: { codigo: string }) {
-  return <DetallePedidoView codigo={codigo} />;
+  return (
+    <div className="space-y-6">
+      <DetallePedidoView codigo={codigo} />
+      <EnvioPersonal codigo={codigo} />
+    </div>
+  );
 }
