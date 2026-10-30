@@ -45,7 +45,7 @@ Fuente: `docs/01_TRANSVERSALES/M18_NOTIFICACIONES.md` contrastado con las especi
 - M09: aviso de demora por falta de disponibilidad (RF-NOT-02-02).
 - M21: aviso de cotización por vencer, cuando el cliente fije el plazo.
 
-**Fase 6 — Documentación y cierre.**
+**Fase 6 — Documentación y cierre. Documentación HECHA; faltan separar el PR general, el push y los PR (a la espera de visto bueno).**
 - Anotar en el documento de M18: proveedor Brevo, plantillas con asunto y texto editable (sin variables), catálogo de avisos de la orden definido por M08.
 - Actualizar `RUTA_DEL_PROYECTO.md` (M18 aparece como «SMTP dentro de M04 y M17»).
 - PR general primero, luego PR del módulo, descripción de máximo 10 líneas.

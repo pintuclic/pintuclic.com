@@ -144,7 +144,7 @@ El **scope** es obligatorio para carpetas y commits ([GUIA_GIT_COMMITS_Y_PUSH.md
 | **M01** | Catálogo de Productos | 2 | `m01-catalogo` | M17 | — | 🟡 Contrato E1 en rama |
 | **M13** | Inventario (referencial; SAMIT a futuro) | 2 | `m13-inventario` | M01 (E2) | — | 🟡 Contrato en rama |
 | **M16** | Contenido Institucional | 2 | `m16-contenido` | M17 | — | ❌ Sin spec |
-| **M18** | Notificaciones y Comunicaciones | 2 | `m18-notificaciones` | M17 | — | 🟠 Spec ✅; SMTP ya conectado dentro de M04 y M17 |
+| **M18** | Notificaciones y Comunicaciones | 2 | `m18-notificaciones` | M17 | — | 🟡 En construcción: envío SMTP, plantillas editables, registro de envíos, avisos de M04/M08/M12/M21 y webhook de rebotes. Faltan los avisos de M11 y M09 |
 | **M02** | Búsqueda, Filtros y Descubrimiento | 3 | `m02-busqueda` | M01 (E2) | M06 | Spec ✅ |
 | **M06** | Precios, Promociones y Descuentos | 3 | `m06-precios` | M01 (E2), M04 | — | ❌ Sin spec |
 | **M05** | Carrito de Compras | 3 | `m05-carrito` | M01 (E2), M04 | M06, M13 | Spec ✅ |

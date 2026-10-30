@@ -344,6 +344,19 @@ rebotes. No comprende la elección del proveedor de correo.*
                  entonces queda registrado para su diagnóstico.
   ---------------------------------------------------------------------------
 
+# 5. Decisiones de construcción
+
+Registro de cómo se resolvió lo que el documento dejaba abierto. La voz de la verdad es `contracts/m18-notificaciones.contract.ts`.
+
+- **Proveedor (RF-NOT-01-05, pregunta HU-NOT-01 / HU-NOT-04).** El servicio se construyó sobre SMTP genérico y la configuración de ejemplo apunta a Brevo. Cambiar de proveedor es cambiar variables de entorno, no código. El cliente aún debe confirmar el proveedor.
+- **Plantillas (HU-NOT-03).** El administrador edita el asunto y una copia introductoria en texto plano. No edita HTML ni variables: el maquetado y los datos de cada envío (códigos, enlaces, nombres) los fija el sistema. Así RF-NOT-03-04 se cumple por construcción, y RF-NOT-03-02 queda cubierto sin exponer campos variables.
+- **Avisos de la orden (RF-NOT-02-01, RF-NOT-02-04).** El catálogo lo definió M08 (D05): correo al cliente solo cuando se despacha y cuando se cancela. El nacimiento de la orden lo cubre el comprobante de M12. El aviso de cancelación queda pendiente de M11. Los demás cambios de estado no envían correo.
+- **Cotizaciones (RF-NOT-02-03).** Se avisa cuando una cotización es respondida o rechazada. El aviso de «próxima a caducar» (RF-NOT-02-05) sigue bloqueado: no está definido el plazo.
+- **Cuentas empresa (M04).** Se acusa recibo de la solicitud de cuenta empresa (registro o ascenso) y de la solicitud de renovación de NIT (RF-CUE-10-04). El correo de renovación no lleva el NIT.
+- **Rebotes (RF-NOT-04-04).** El proveedor los reporta a `POST /api/v1/notificaciones/webhook/rebotes`, con un token compartido (`BREVO_WEBHOOK_TOKEN`). Se guardan enlazados al último envío a esa dirección y se ven en el panel.
+- **Autenticación del dominio (RF-NOT-04-02).** SPF, DKIM y DMARC son configuración de DNS y del proveedor al desplegar; no hay código que los implemente.
+- **Pendiente de otros módulos.** Avisos de postventa (M11) y de demora por falta de disponibilidad (RF-NOT-02-02, M09).
+
 # 6. Preguntas pendientes
 
 Todas las preguntas que quedan abiertas en esta tanda, agrupadas por
