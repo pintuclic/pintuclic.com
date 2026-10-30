@@ -78,12 +78,27 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
           fechaActualizacion: fechaBase,
         } as Usuario)
       ),
-      actualizarDatosPerfil: vi.fn(),
-      actualizarContrasena: vi.fn(),
+      actualizarDatosPerfil: vi.fn().mockImplementation((idUsuario: number, datos: { nombre?: string; telefono?: string | null }) =>
+        Promise.resolve({
+          idUsuario,
+          nombre: datos.nombre ?? 'Empresa Actualizada',
+          correo: 'contacto@valle.com',
+          contrasena: 'hash',
+          telefono: datos.telefono ?? null,
+          tipo: 'normal',
+          estado: 'pendiente',
+          idRol: null,
+          cambioContrasenaPendiente: false,
+          fechaCreacion: fechaBase,
+          fechaActualizacion: fechaBase,
+        } as Usuario),
+      ),
+      actualizarContrasena: vi.fn().mockResolvedValue({} as Usuario),
       actualizarCorreo: vi.fn(),
       actualizarEstado: vi.fn().mockResolvedValue({} as Usuario),
       desactivarCuenta: vi.fn(),
       buscarIdentidadExterna: vi.fn(),
+      buscarIdentidadExternaPorUsuario: vi.fn().mockResolvedValue(null),
       vincularIdentidadExterna: vi.fn(),
       buscarCuentaEmpresaPorNit: vi.fn().mockResolvedValue(null),
       buscarCuentaEmpresaPorIdUsuario: vi.fn().mockResolvedValue(null),
@@ -244,6 +259,67 @@ describe('EmpresasService (HU-CUE-03, HU-CUE-06, HU-CUE-09, HU-CUE-10)', () => {
           contrasena: 'ClaveCorporativa123!',
         })
       ).rejects.toThrow(EmpresasError);
+    });
+
+    it('rechaza si el correo ya tiene una solicitud pendiente o pertenece a una cuenta inactiva/bloqueada', async () => {
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 33,
+        correo: 'contacto@valle.com',
+        estado: 'inactivo',
+      } as Usuario);
+
+      await expect(
+        service.registrarEmpresa({
+          nombreEmpresa: 'Pinturas del Valle S.A.S.',
+          nit: '901234567-1',
+          nombreRepresentante: 'Carlos Mario',
+          correoEmpresarial: 'contacto@valle.com',
+          telefono: '3151234567',
+          contrasena: 'ClaveCorporativa123!',
+        }),
+      ).rejects.toMatchObject({ codigo: 'CORREO_YA_REGISTRADO', statusCode: 409 });
+
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 33,
+        correo: 'contacto@valle.com',
+        estado: 'pendiente',
+      } as Usuario);
+      vi.mocked(solicitudesRepo.buscarPendientePorUsuario).mockResolvedValueOnce(solicitudPendiente());
+
+      await expect(
+        service.registrarEmpresa({
+          nombreEmpresa: 'Pinturas del Valle S.A.S.',
+          nit: '901234567-1',
+          nombreRepresentante: 'Carlos Mario',
+          correoEmpresarial: 'contacto@valle.com',
+          telefono: '3151234567',
+          contrasena: 'ClaveCorporativa123!',
+        }),
+      ).rejects.toMatchObject({ codigo: 'SOLICITUD_PENDIENTE_EXISTENTE', statusCode: 409 });
+    });
+
+    it('actualiza clave y datos cuando una empresa reintenta registro tras un rechazo previo', async () => {
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 33,
+        correo: 'contacto@valle.com',
+        estado: 'pendiente',
+      } as Usuario);
+      vi.mocked(solicitudesRepo.buscarPendientePorUsuario).mockResolvedValueOnce(null);
+
+      await service.registrarEmpresa({
+        nombreEmpresa: 'Pinturas del Valle Renovada S.A.S.',
+        nit: '901234567-1',
+        nombreRepresentante: 'Carlos Mario',
+        correoEmpresarial: 'contacto@valle.com',
+        telefono: '3159998877',
+        contrasena: 'NuevaClaveCorporativa123!',
+      });
+
+      expect(cuentasRepo.actualizarContrasena).toHaveBeenCalledWith(33, expect.any(String), false);
+      expect(cuentasRepo.actualizarDatosPerfil).toHaveBeenCalledWith(33, {
+        nombre: 'Pinturas del Valle Renovada S.A.S.',
+        telefono: '3159998877',
+      });
     });
   });
 

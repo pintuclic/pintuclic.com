@@ -1,3 +1,4 @@
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import type { GoogleAuthPort, GoogleUserClaims } from '../interfaces/google-auth.port';
 
 export class GoogleAuthTokenInvalidoError extends Error {
@@ -7,9 +8,79 @@ export class GoogleAuthTokenInvalidoError extends Error {
   }
 }
 
+export interface VerificadorGoogleTicketPort {
+  verifyIdToken(options: { idToken: string; audience: string | string[] }): Promise<{
+    getPayload(): TokenPayload | undefined;
+  }>;
+}
+
+const ISSUERS_VALIDOS = new Set(['accounts.google.com', 'https://accounts.google.com']);
+
+function normalizarNombreGoogle(nombreRaw: string | undefined, email: string): string {
+  const limpio = (nombreRaw ?? '').trim();
+  if (limpio.length >= 2) {
+    return limpio.slice(0, 150);
+  }
+  const parteLocal = (email.split('@')[0] ?? '').replace(/[._-]+/g, ' ').trim();
+  if (parteLocal.length >= 2) {
+    return parteLocal.slice(0, 150);
+  }
+  return 'Cliente Google';
+}
+
 /**
- * HU-CUE-02 aplazada: mientras no exista un adaptador que verifique la firma del
- * ID token contra Google, ningún token es válido. Es el adaptador por omisión.
+ * HU-CUE-02: Verifica criptográficamente el ID token de Google Identity Services
+ * contra las claves públicas de Google (`iss`, `aud`, `exp` y firma RS256).
+ */
+export class GoogleOAuth2ClientAdapter implements GoogleAuthPort {
+  private readonly client: VerificadorGoogleTicketPort;
+  private readonly clientId: string;
+
+  constructor(clientId: string, oauthClient?: VerificadorGoogleTicketPort) {
+    const limpio = clientId.trim();
+    if (!limpio) {
+      throw new Error('GOOGLE_CLIENT_ID es requerido para inicializar GoogleOAuth2ClientAdapter.');
+    }
+    this.clientId = limpio;
+    this.client = oauthClient ?? new OAuth2Client(limpio);
+  }
+
+  async verificarIdToken(idToken: string): Promise<GoogleUserClaims> {
+    let payload: TokenPayload | undefined;
+    try {
+      const ticket = await this.client.verifyIdToken({
+        idToken,
+        audience: this.clientId,
+      });
+      payload = ticket.getPayload();
+    } catch {
+      throw new GoogleAuthTokenInvalidoError();
+    }
+
+    if (
+      !payload ||
+      !ISSUERS_VALIDOS.has(payload.iss) ||
+      typeof payload.sub !== 'string' ||
+      payload.sub.trim().length === 0 ||
+      typeof payload.email !== 'string' ||
+      payload.email.trim().length === 0
+    ) {
+      throw new GoogleAuthTokenInvalidoError();
+    }
+
+    const email = payload.email.trim().toLowerCase();
+    return {
+      sub: payload.sub.trim(),
+      email,
+      nombre: normalizarNombreGoogle(payload.name, email),
+      emailVerified: payload.email_verified === true,
+    };
+  }
+}
+
+/**
+ * Adaptador seguro por omisión cuando `GOOGLE_CLIENT_ID` no está configurado:
+ * rechaza cualquier intento de autenticación federada.
  */
 export class GoogleAuthDeshabilitadoAdapter implements GoogleAuthPort {
   async verificarIdToken(): Promise<GoogleUserClaims> {
@@ -17,7 +88,42 @@ export class GoogleAuthDeshabilitadoAdapter implements GoogleAuthPort {
   }
 }
 
-/** Solo para pruebas: acepta tokens sin verificarlos criptográficamente. */
+/**
+ * Lee `GOOGLE_CLIENT_ID` del entorno. En `NODE_ENV=test` devuelve `null` por omisión
+ * para mantener las pruebas unitarias desacopladas de variables locales.
+ */
+export function obtenerGoogleClientIdDesdeEntorno(env: NodeJS.ProcessEnv = process.env): string | null {
+  if (env.NODE_ENV === 'test') {
+    return null;
+  }
+  const clientId = env.GOOGLE_CLIENT_ID?.trim();
+  if (!clientId || clientId.length < 12 || /^(pendiente|reemplazar|tu[_-])/i.test(clientId)) {
+    return null;
+  }
+  return clientId;
+}
+
+export function crearGoogleAuthAdapterDesdeEntorno(env: NodeJS.ProcessEnv = process.env): {
+  adapter: GoogleAuthPort;
+  clientId: string | null;
+  habilitado: boolean;
+} {
+  const clientId = obtenerGoogleClientIdDesdeEntorno(env);
+  if (clientId) {
+    return {
+      adapter: new GoogleOAuth2ClientAdapter(clientId),
+      clientId,
+      habilitado: true,
+    };
+  }
+  return {
+    adapter: new GoogleAuthDeshabilitadoAdapter(),
+    clientId: null,
+    habilitado: false,
+  };
+}
+
+/** Solo para pruebas: acepta tokens simulados sin consultar claves remotas de Google. */
 export class MockGoogleAuthAdapter implements GoogleAuthPort {
   private tokens: Map<string, GoogleUserClaims> = new Map();
 

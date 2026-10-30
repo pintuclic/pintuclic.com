@@ -45,6 +45,7 @@ describe('PerfilService (HU-CUE-06, HU-CUE-10)', () => {
       actualizarEstado: vi.fn(),
       desactivarCuenta: vi.fn().mockResolvedValue({} as Usuario),
       buscarIdentidadExterna: vi.fn(),
+      buscarIdentidadExternaPorUsuario: vi.fn().mockResolvedValue(null),
       vincularIdentidadExterna: vi.fn(),
       buscarCuentaEmpresaPorNit: vi.fn(),
       buscarCuentaEmpresaPorIdUsuario: vi.fn(),

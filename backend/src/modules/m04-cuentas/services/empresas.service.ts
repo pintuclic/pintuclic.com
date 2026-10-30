@@ -63,10 +63,20 @@ export class EmpresasService {
       throw new EmpresasError('Ya existe una solicitud pendiente de validación para este NIT.', 'SOLICITUD_PENDIENTE_EXISTENTE', 409);
     }
 
-    // 2. Validar que el correo no esté ocupado
+    // 2. Validar que el correo no esté ocupado ni tenga una solicitud pendiente
     const correoOcupado = await this.cuentasRepo.buscarPorCorreo(correoNormalizado);
-    if (correoOcupado && correoOcupado.estado === 'activo') {
+    if (correoOcupado && correoOcupado.estado !== 'pendiente') {
       throw new EmpresasError('El correo electrónico ya se encuentra registrado.', 'CORREO_YA_REGISTRADO', 409);
+    }
+    if (correoOcupado) {
+      const pendienteCorreo = await this.solicitudesRepo.buscarPendientePorUsuario(correoOcupado.idUsuario);
+      if (pendienteCorreo) {
+        throw new EmpresasError(
+          'Ya existe una solicitud pendiente de validación para este correo.',
+          'SOLICITUD_PENDIENTE_EXISTENTE',
+          409,
+        );
+      }
     }
 
     // 3. Custodiar archivo RUT si viene adjunto
@@ -78,9 +88,9 @@ export class EmpresasService {
       );
     }
 
-    // 4. Crear usuario en estado pendiente. RN-CUE-15 / HU-CUE-03 E5: hasta la
-    //    aprobación la cuenta sigue siendo de tipo `normal`; solo la decisión
-    //    administrativa la convierte en `empresa`.
+    // 4. Crear usuario en estado pendiente (o actualizar sus datos si reintenta tras un rechazo previo).
+    //    RN-CUE-15 / HU-CUE-03 E5: hasta la aprobación la cuenta sigue siendo de tipo `normal`;
+    //    solo la decisión administrativa la convierte en `empresa`.
     const contrasenaHash = await derivarContrasena(input.contrasena);
     let usuario = correoOcupado;
     if (!usuario) {
@@ -91,6 +101,12 @@ export class EmpresasService {
         telefono: input.telefono,
         estado: 'pendiente',
         tipo: 'normal',
+      });
+    } else {
+      await this.cuentasRepo.actualizarContrasena(usuario.idUsuario, contrasenaHash, false);
+      usuario = await this.cuentasRepo.actualizarDatosPerfil(usuario.idUsuario, {
+        nombre: input.nombreEmpresa,
+        telefono: input.telefono,
       });
     }
 

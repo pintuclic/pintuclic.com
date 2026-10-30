@@ -9,6 +9,7 @@ import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/not
 import type { GoogleAuthPort } from '../interfaces/google-auth.port';
 import type { ParametrosCuentasPort } from '../interfaces/parametros-cuentas.port';
 import { SimuladoDateProviderAdapter } from '../adapters/date-provider.adapter';
+import { GoogleAuthTokenInvalidoError } from '../adapters/google-auth.adapter';
 import { AuthCuentasError, AuthCuentasService } from '../services/auth-cuentas.service';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 
@@ -81,6 +82,7 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
       ),
       desactivarCuenta: vi.fn(),
       buscarIdentidadExterna: vi.fn().mockResolvedValue(null),
+      buscarIdentidadExternaPorUsuario: vi.fn().mockResolvedValue(null),
       vincularIdentidadExterna: vi.fn().mockResolvedValue({
         idIdentidad: 1,
         idUsuario: 10,
@@ -321,6 +323,15 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
    * HU-CUE-02: FEDERACIÓN GOOGLE IDENTITY
    * ─────────────────────────────────────────────────────────────────────────── */
   describe('HU-CUE-02: Federación con Google', () => {
+    it('traduce GoogleAuthTokenInvalidoError a 401 TOKEN_INVALIDO_O_EXPIRADO sin lanzar 500', async () => {
+      vi.mocked(googleAuth.verificarIdToken).mockRejectedValueOnce(new GoogleAuthTokenInvalidoError());
+
+      await expect(authService.autenticarGoogle({ idToken: 'token-google-expirado' })).rejects.toMatchObject({
+        codigo: 'TOKEN_INVALIDO_O_EXPIRADO',
+        statusCode: 401,
+      });
+    });
+
     it('rechaza un correo no verificado por Google sin buscar ni vincular cuentas', async () => {
       vi.mocked(googleAuth.verificarIdToken).mockResolvedValueOnce({
         sub: 'google-sub-789',
@@ -337,7 +348,7 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
       expect(cuentasRepo.vincularIdentidadExterna).not.toHaveBeenCalled();
     });
 
-    it('inicia sesión directamente si el usuario ya tiene la identidad vinculada', async () => {
+    it('inicia sesión directamente si el usuario cliente ya tiene la identidad vinculada', async () => {
       vi.mocked(cuentasRepo.buscarIdentidadExterna).mockResolvedValueOnce({
         idIdentidad: 1,
         idUsuario: 20,
@@ -354,34 +365,136 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
         estado: 'activo',
         tipo: 'normal',
         idRol: null,
+        cambioContrasenaPendiente: false,
       } as Usuario);
 
       const res = await authService.autenticarGoogle({ idToken: 'valid-google-id-token' });
 
-      expect(res.cuentaNueva).toBe(false);
-      if (!res.cuentaNueva) {
+      expect(res.etapa).toBe('sesion');
+      if (res.etapa === 'sesion') {
         expect(res.usuario.idUsuario).toBe(20);
         expect(res.sesion.idSesion).toBe('sesion-activa-uuid');
       }
     });
 
+    it('rechaza acceso con Google en cuentas empresariales o administrativas (DP-12, RF-CUE-08-02)', async () => {
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 1,
+        correo: 'nuevo-google@pintuclic.com',
+        nombre: 'Admin',
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: 1,
+        cambioContrasenaPendiente: false,
+      } as Usuario);
+
+      await expect(authService.autenticarGoogle({ idToken: 'valid-google-id-token' })).rejects.toMatchObject({
+        codigo: 'PERMISO_DENEGADO',
+        statusCode: 403,
+      });
+      expect(cuentasRepo.vincularIdentidadExterna).not.toHaveBeenCalled();
+
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 25,
+        correo: 'nuevo-google@pintuclic.com',
+        nombre: 'Empresa S.A.S.',
+        estado: 'activo',
+        tipo: 'empresa',
+        idRol: null,
+        cambioContrasenaPendiente: false,
+      } as Usuario);
+
+      await expect(authService.autenticarGoogle({ idToken: 'valid-google-id-token' })).rejects.toMatchObject({
+        codigo: 'PERMISO_DENEGADO',
+        statusCode: 403,
+      });
+      expect(cuentasRepo.vincularIdentidadExterna).not.toHaveBeenCalled();
+    });
+
+    it('exige confirmar con la contraseña actual antes de vincular una cuenta activa existente (RF-CUE-02-03)', async () => {
+      const hashExistente = await derivarContrasena('ClavePersonalExistente123!');
+      const usuarioExistente = {
+        idUsuario: 44,
+        correo: 'nuevo-google@pintuclic.com',
+        nombre: 'Cliente Existente',
+        contrasena: hashExistente,
+        estado: 'activo',
+        tipo: 'normal',
+        idRol: null,
+        cambioContrasenaPendiente: false,
+      } as Usuario;
+
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce(usuarioExistente);
+
+      const paso1 = await authService.autenticarGoogle({ idToken: 'valid-google-id-token' });
+      expect(paso1.etapa).toBe('requiere_vinculacion');
+      expect(cuentasRepo.vincularIdentidadExterna).not.toHaveBeenCalled();
+      expect(sesionService.crear).not.toHaveBeenCalled();
+      if (paso1.etapa !== 'requiere_vinculacion') return;
+
+      // Con contraseña errónea rechaza y registra fallo anti-fuerza bruta
+      vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce(usuarioExistente);
+      await expect(
+        authService.vincularCuentaGoogle({
+          tokenVinculacion: paso1.tokenVinculacion,
+          contrasena: 'ClaveIncorrecta999!',
+        }),
+      ).rejects.toMatchObject({
+        codigo: 'CONTRASENA_INCORRECTA',
+        statusCode: 400,
+      });
+      expect(controlIntentosRepo.registrarFallo).toHaveBeenCalled();
+      expect(cuentasRepo.vincularIdentidadExterna).not.toHaveBeenCalled();
+
+      // Con contraseña correcta vincula la identidad Google e inicia sesión
+      vi.mocked(cuentasRepo.buscarPorId).mockResolvedValueOnce(usuarioExistente);
+      const vinculado = await authService.vincularCuentaGoogle({
+        tokenVinculacion: paso1.tokenVinculacion,
+        contrasena: 'ClavePersonalExistente123!',
+      });
+
+      expect(cuentasRepo.vincularIdentidadExterna).toHaveBeenCalledWith({
+        idUsuario: 44,
+        proveedor: 'google',
+        idProveedor: 'google-sub-456',
+        correoProveedor: 'nuevo-google@pintuclic.com',
+      });
+      expect(controlIntentosRepo.limpiar).toHaveBeenCalledWith('nuevo-google@pintuclic.com');
+      expect(vinculado.usuario.idUsuario).toBe(44);
+      expect(vinculado.sesion.idSesion).toBe('sesion-activa-uuid');
+    });
+
     it('emite token efímero de registro si es una cuenta nueva para obligar a fijar contraseña (RN-SEG-02)', async () => {
       const res = await authService.autenticarGoogle({ idToken: 'valid-google-id-token' });
 
-      expect(res.cuentaNueva).toBe(true);
-      if (res.cuentaNueva) {
+      expect(res.etapa).toBe('requiere_registro');
+      if (res.etapa === 'requiere_registro') {
         expect(res.tokenRegistroTemporal).toBeDefined();
         expect(res.email).toBe('nuevo-google@pintuclic.com');
       }
     });
 
-    it('completa registro federado fijando contraseña y teléfono', async () => {
-      // 1. Obtener token temporal
+    it('completa registro federado fijando contraseña y teléfono, y rechaza colisiones en cualquier estado', async () => {
       const authRes = await authService.autenticarGoogle({ idToken: 'valid-google-id-token' });
-      expect(authRes.cuentaNueva).toBe(true);
-      if (!authRes.cuentaNueva) return;
+      expect(authRes.etapa).toBe('requiere_registro');
+      if (authRes.etapa !== 'requiere_registro') return;
 
-      // 2. Completar registro
+      // Si el correo existe en estado inactivo o pendiente, rechaza con 409 en vez de colisionar con P2002
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        idUsuario: 99,
+        correo: 'nuevo-google@pintuclic.com',
+        estado: 'inactivo',
+      } as Usuario);
+
+      await expect(
+        authService.completarRegistroGoogle({
+          tokenRegistroTemporal: authRes.tokenRegistroTemporal,
+          telefono: '3109876543',
+          contrasena: 'MiPasswordFederado123!',
+        }),
+      ).rejects.toMatchObject({ codigo: 'CORREO_YA_REGISTRADO', statusCode: 409 });
+
+      // Con correo libre consolida cuenta y vincula Google
       const res = await authService.completarRegistroGoogle({
         tokenRegistroTemporal: authRes.tokenRegistroTemporal,
         telefono: '3109876543',

@@ -49,6 +49,7 @@ describe('RecuperacionPasswordService (HU-CUE-05)', () => {
       actualizarEstado: vi.fn(),
       desactivarCuenta: vi.fn(),
       buscarIdentidadExterna: vi.fn(),
+      buscarIdentidadExternaPorUsuario: vi.fn().mockResolvedValue(null),
       vincularIdentidadExterna: vi.fn(),
       buscarCuentaEmpresaPorNit: vi.fn(),
       buscarCuentaEmpresaPorIdUsuario: vi.fn(),
