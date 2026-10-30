@@ -8,6 +8,8 @@ import type {
   OrdenParaEnvio,
   OrdenesParaEnvioPort,
   OrigenEnvioPort,
+  VarianteParaEnvio,
+  VariantesParaEnvioPort,
 } from '../interfaces/entrega.interface';
 
 const INCLUIR_ORDEN = { orden: { select: { codigoVisible: true, idUsuario: true } } } as const;
@@ -146,5 +148,35 @@ export class PrismaOrigenEnvio implements OrigenEnvioPort {
       telefono: ficha?.telefono ?? null,
       correo: ficha?.correo ?? null,
     };
+  }
+}
+
+/** Lee de M01 el peso y las medidas de las variantes (solo lectura). */
+export class PrismaVariantesParaEnvio implements VariantesParaEnvioPort {
+  async porIds(ids: readonly number[]): Promise<Map<number, VarianteParaEnvio>> {
+    const filas = await prisma.variante.findMany({
+      where: { idVariante: { in: [...ids] } },
+      select: {
+        idVariante: true,
+        pesoGramos: true,
+        altoCm: true,
+        anchoCm: true,
+        largoCm: true,
+        producto: { select: { nombre: true } },
+        medida: { select: { nombre: true } },
+      },
+    });
+    return new Map(
+      filas.map((f) => [
+        f.idVariante,
+        {
+          descripcion: `${f.producto.nombre} · ${f.medida.nombre}`.slice(0, 150),
+          pesoGramos: f.pesoGramos,
+          altoCm: f.altoCm?.toNumber() ?? null,
+          anchoCm: f.anchoCm?.toNumber() ?? null,
+          largoCm: f.largoCm?.toNumber() ?? null,
+        },
+      ]),
+    );
   }
 }

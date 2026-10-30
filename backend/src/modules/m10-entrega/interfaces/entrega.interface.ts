@@ -24,6 +24,19 @@ export interface OrdenesParaEnvioPort {
   buscarPorCodigo(codigo: string): Promise<OrdenParaEnvio | null>;
 }
 
+/** Peso y medidas de la presentación comprada (P2), para armar los bultos de una cotización. */
+export interface VarianteParaEnvio {
+  descripcion: string;
+  pesoGramos: number | null;
+  altoCm: number | null;
+  anchoCm: number | null;
+  largoCm: number | null;
+}
+
+export interface VariantesParaEnvioPort {
+  porIds(ids: readonly number[]): Promise<Map<number, VarianteParaEnvio>>;
+}
+
 /** P3: de dónde sale el envío; lo lee de la ficha de datos del vendedor de M12. */
 export interface OrigenEnvioPort {
   obtener(): Promise<OrigenEnvio>;

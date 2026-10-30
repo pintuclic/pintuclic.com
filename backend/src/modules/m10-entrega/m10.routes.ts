@@ -7,8 +7,15 @@ import { EnvioPropioAdapter } from './adapters/envio-propio.adapter';
 import { EnvioAlDespacharAdapter } from './adapters/despacho.adapter';
 import { EnviosController } from './controllers/envios.controller';
 import { PERMISOS_M10, type ServicioEnviosPort } from './dtos/m10-entrega.dto';
-import type { EnviosRepositoryPort, OrdenesParaEnvioPort, OrigenEnvioPort, ParametrosEnvioPort } from './interfaces/entrega.interface';
-import { PrismaEnviosRepository, PrismaOrdenesParaEnvio, PrismaOrigenEnvio } from './repositories/envios.repository';
+import type {
+  EnviosRepositoryPort,
+  OrdenesParaEnvioPort,
+  OrigenEnvioPort,
+  ParametrosEnvioPort,
+  VariantesParaEnvioPort,
+} from './interfaces/entrega.interface';
+import { PrismaEnviosRepository, PrismaOrdenesParaEnvio, PrismaOrigenEnvio, PrismaVariantesParaEnvio } from './repositories/envios.repository';
+import { CotizadorEnvios } from './services/cotizador-envios';
 import { EnviosService } from './services/envios.service';
 
 export interface DependenciasM10 {
@@ -23,6 +30,9 @@ export interface DependenciasM10 {
   repo?: EnviosRepositoryPort;
   ordenes?: OrdenesParaEnvioPort;
   origen?: OrigenEnvioPort;
+  variantes?: VariantesParaEnvioPort;
+  /** Tiempo máximo que se espera al proveedor al cotizar antes de usar la tarifa de respaldo. */
+  tiempoCotizacionMs?: number;
 }
 
 export interface ModuloM10 {
@@ -31,6 +41,8 @@ export interface ModuloM10 {
   /** Montar en `/api/v1/entregas/webhook`, sin sesión (la identidad es el token). */
   webhookRouter: Router;
   envios: EnviosService;
+  /** Para pasarle a M07 (`cotizadorEnvio`): el costo del envío a domicilio, con respaldo si el proveedor falla. */
+  cotizador: CotizadorEnvios;
   /** Para pasarle a M08 (`estados.eventos`): crea el envío al despachar. */
   alDespachar: EnvioAlDespacharAdapter;
 }
@@ -39,7 +51,15 @@ const sinParametros: ParametrosEnvioPort = { obtenerNumero: async () => null };
 
 export function construirModuloM10(autorizacion: AutorizacionService, deps: DependenciasM10 = {}): ModuloM10 {
   const proveedor = deps.proveedor ?? new EnvioPropioAdapter(deps.parametros ?? sinParametros);
-  const envios = new EnviosService(proveedor, deps.repo ?? new PrismaEnviosRepository(), deps.ordenes ?? new PrismaOrdenesParaEnvio(), deps.origen ?? new PrismaOrigenEnvio());
+  const origen = deps.origen ?? new PrismaOrigenEnvio();
+  const envios = new EnviosService(proveedor, deps.repo ?? new PrismaEnviosRepository(), deps.ordenes ?? new PrismaOrdenesParaEnvio(), origen);
+  const cotizador = new CotizadorEnvios(
+    proveedor,
+    new EnvioPropioAdapter(deps.parametros ?? sinParametros),
+    deps.variantes ?? new PrismaVariantesParaEnvio(),
+    origen,
+    deps.tiempoCotizacionMs,
+  );
   const c = new EnviosController(envios, deps.auditoria, deps.webhookToken ?? process.env.ENVIOS_WEBHOOK_TOKEN?.trim());
 
   const ver = requirePermission(autorizacion, PERMISOS_M10.ver) as RequestHandler;
@@ -61,5 +81,5 @@ export function construirModuloM10(autorizacion: AutorizacionService, deps: Depe
   const webhookRouter = Router();
   webhookRouter.post('/:proveedor', c.webhook);
 
-  return { router, webhookRouter, envios, alDespachar: new EnvioAlDespacharAdapter(envios) };
+  return { router, webhookRouter, envios, cotizador, alDespachar: new EnvioAlDespacharAdapter(envios) };
 }
