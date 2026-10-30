@@ -918,6 +918,13 @@ CREATE TABLE IF NOT EXISTS variante (
     CONSTRAINT uq_variante_producto_medida UNIQUE (id_producto, id_medida)
 );
 
+-- M10 · P2 (v4.24): peso y medidas de la presentación, opcionales, para cotizar y rotular un envío con un servicio externo
+ALTER TABLE variante ADD COLUMN IF NOT EXISTS peso_gramos INT CONSTRAINT chk_variante_peso CHECK (peso_gramos > 0);
+ALTER TABLE variante ADD COLUMN IF NOT EXISTS alto_cm NUMERIC(6, 1) CONSTRAINT chk_variante_alto CHECK (alto_cm > 0);
+ALTER TABLE variante ADD COLUMN IF NOT EXISTS ancho_cm NUMERIC(6, 1) CONSTRAINT chk_variante_ancho CHECK (ancho_cm > 0);
+ALTER TABLE variante ADD COLUMN IF NOT EXISTS largo_cm NUMERIC(6, 1) CONSTRAINT chk_variante_largo CHECK (largo_cm > 0);
+COMMENT ON COLUMN variante.peso_gramos IS 'Peso de una unidad empacada, en gramos (M10 · P2); null si no se ha registrado';
+
 COMMENT ON TABLE variante IS 'Variante vendible = producto + medida, con su precio (RC-13/RC-20). El color NO es parte de la variante: se elige en la venta y el SKU final se compone (ej. P1-V2-ROJO).';
 COMMENT ON COLUMN variante.sku IS 'SKU de la variante, sin color. El SKU vendido (con color) se guarda en la línea de orden.';
 COMMENT ON COLUMN variante.precio_vigente IS 'Precio actual; se congela en la orden al comprar.';

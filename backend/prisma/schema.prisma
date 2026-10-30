@@ -1472,6 +1472,11 @@ model Variante {
   /// Código de SAMIT para la integración futura
   codigoProveedor       String?        @unique(map: "uq_variante_codigo_proveedor") @map("codigo_proveedor") @db.VarChar(100)
   estado                EstadoProducto @default(activo)
+  /// M10 · P2: peso de una unidad empacada, en gramos; null si no se ha registrado
+  pesoGramos            Int?           @map("peso_gramos")
+  altoCm                Decimal?       @map("alto_cm") @db.Decimal(6, 1)
+  anchoCm               Decimal?       @map("ancho_cm") @db.Decimal(6, 1)
+  largoCm               Decimal?       @map("largo_cm") @db.Decimal(6, 1)
 
   producto Producto        @relation(fields: [idProducto], references: [idProducto], onDelete: Restrict, map: "fk_variante_producto")
   medida   Medida          @relation(fields: [idMedida], references: [idMedida], onDelete: Restrict, map: "fk_variante_medida")

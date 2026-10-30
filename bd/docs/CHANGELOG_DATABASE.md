@@ -16,6 +16,7 @@ Este documento constituye el registro histórico y oficial del versionamiento de
   - **`envio_orden`**: un envío por orden a domicilio (`id_orden` UNIQUE), con proveedor, id externo, guía, enlaces de seguimiento y etiqueta, estado y último error genérico.
   - **`novedad_envio`**: novedades que reporta el proveedor sobre un envío; solo se añaden.
   - **ENUM nuevo:** `enum_estado_envio_orden`.
+  - **`variante`** (M10 · P2): columnas opcionales `peso_gramos`, `alto_cm`, `ancho_cm` y `largo_cm` (con `CHECK > 0`), para cotizar y rotular un envío con un servicio externo. Cambio aditivo; las variantes existentes quedan en `NULL`.
   - **Prisma:** modelos `EnvioOrden` y `NovedadEnvio`, enum `EstadoEnvioOrden` y la relación `envio` en `Orden`.
 
 ---
