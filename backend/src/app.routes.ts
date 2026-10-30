@@ -20,6 +20,7 @@ import { construirModuloM13 } from './modules/m13-inventario/m13.routes';
 import { construirModuloM15 } from './modules/m15-atencion/m15.routes';
 import { construirModuloM16 } from './modules/m16-contenido/m16.routes';
 import { construirModuloM17 } from './modules/m17-permisos/m17.routes';
+import { construirModuloM10 } from './modules/m10-entrega/m10.routes';
 import { construirModuloM18 } from './modules/m18-notificaciones/m18.routes';
 import { construirModuloM20 } from './modules/m20-seguridad/m20.routes';
 import { construirModuloM21 } from './modules/m21-cotizaciones/m21.routes';
@@ -124,9 +125,24 @@ export function construirAppRoutes(): Router {
   router.use('/facturacion', exigirSesionSalvo(auth, []), m12.router);
   router.use('/admin/facturacion', exigirSesionSalvo(auth, []), m12.adminRouter);
 
+  // M10: preparación para un servicio de envíos. Crea el envío cuando M08 despacha la orden (`estados.eventos`) y añade
+  // `/ordenes/.../envio`, por eso se monta antes que M08. Hoy atiende la entrega propia de la tienda (R2).
+  const m10 = construirModuloM10(m17.autorizacionService, {
+    auditoria: m20.auditoria,
+    parametros: {
+      obtenerNumero: async (clave) => {
+        const { parametros } = await m17.configService.obtenerCatalogo();
+        const valor = parametros.find((p) => p.clave === clave)?.valor;
+        return typeof valor === 'number' ? valor : null;
+      },
+    },
+  });
+  router.use('/ordenes', exigirSesionSalvo(auth, []), m10.router);
+  router.use('/entregas/webhook', m10.webhookRouter);
+
   const m08 = construirModuloM08(m17.autorizacionService, {
     auditoria: m20.auditoria,
-    estados: { notificaciones: m12.alCrearOrden },
+    estados: { notificaciones: m12.alCrearOrden, eventos: m10.alDespachar },
   });
   router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
 
