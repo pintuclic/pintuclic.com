@@ -3,6 +3,8 @@ import { apiClient, esRespuestaError } from '@/core/api/apiClient';
 import { revalidacionSchema, type Revalidacion } from '@/modules/m05-carrito/dtos/m05-carrito.dto';
 import type {
   CompraDirecta,
+  CotizacionEnvioCheckout,
+  CotizarEnvioRequest,
   CrearSolicitudRequest,
   EstadoSolicitud,
   PrepararCheckout,
@@ -53,6 +55,10 @@ export const checkoutApi = {
               : { codigoCupon },
       })
     ).data.data,
+
+  /** M10: cuánto cuesta enviar este pedido a esa dirección; lo calcula el servicio de envíos. */
+  cotizarEnvio: async (cuerpo: CotizarEnvioRequest): Promise<CotizacionEnvioCheckout> =>
+    (await apiClient.post<SobreUno<CotizacionEnvioCheckout>>('/checkout/envio/cotizar', cuerpo)).data.data,
 
   crear: async (cuerpo: CrearSolicitudRequest): Promise<Solicitud> =>
     (await apiClient.post<SobreUno<Solicitud>>('/checkout/solicitudes', cuerpo)).data.data,
@@ -116,6 +122,13 @@ export function revalidacionDeError(err: unknown): Revalidacion | null {
   if (codigoDeError(err) !== 'CARRITO_CAMBIO') return null;
   const r = revalidacionSchema.safeParse(detalles(err));
   return r.success ? r.data : null;
+}
+
+/** M10: con COSTO_ENVIO_CAMBIO la API manda el costo que cotizó ahora, para mostrarlo antes de volver a pagar. */
+export function costoEnvioDeError(err: unknown): number | null {
+  if (codigoDeError(err) !== 'COSTO_ENVIO_CAMBIO') return null;
+  const d = detalles(err);
+  return typeof d === 'object' && d !== null && 'costoEnvio' in d && typeof d.costoEnvio === 'number' ? d.costoEnvio : null;
 }
 
 /** R2 c: con PAGO_EN_CURSO la API manda el código de la compra que sigue en Nequi. */

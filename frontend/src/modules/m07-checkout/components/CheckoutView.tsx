@@ -10,11 +10,12 @@ import { Alert, Button, ButtonLink, Checkbox, Container, Input, Skeleton, Steppe
 import { formatCOP } from '@/core/utils/moneda';
 import type { CambioRevalidacion } from '@/modules/m05-carrito/dtos/m05-carrito.dto';
 import { pantallaDe, textoCambio } from '@/modules/m05-carrito/services/textos-carrito';
-import type { ModoEntrega, PrepararCheckout } from '../dtos/m07-checkout.dto';
+import { direccionEntregaSchema, type CotizacionEnvioCheckout, type ModoEntrega, type PrepararCheckout } from '../dtos/m07-checkout.dto';
 import { pagoFormSchema, type PagoFormData, type PagoFormEntrada } from '../dtos/formularios.dto';
 import {
   checkoutApi,
   codigoDeError,
+  costoEnvioDeError,
   mensajeDeError,
   pagoEnCursoDeError,
   requiereSesion,
@@ -62,6 +63,8 @@ export function CheckoutView() {
   const [datos, setDatos] = useState<PrepararCheckout | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cambios, setCambios] = useState<readonly CambioRevalidacion[]>([]);
+  /** M10: lo que cotizó el servicio de envíos para la dirección escrita; null mientras no hay una completa. */
+  const [cotizacion, setCotizacion] = useState<CotizacionEnvioCheckout | null>(null);
   const {
     register,
     handleSubmit,
@@ -74,6 +77,42 @@ export function CheckoutView() {
   // La casilla del Core Kit dibuja la marca con `checked`.
   const aceptaReglamento = watch('aceptaReglamento');
   const aceptaDatos = watch('aceptaDatos');
+  const [dirTexto, dirBarrio, dirApto, dirMunicipio, dirDepartamento, dirNombre, dirTelefono] = watch([
+    'direccion',
+    'barrio',
+    'apartamentoCasa',
+    'municipio',
+    'departamento',
+    'nombreRecibe',
+    'telefonoRecibe',
+  ]);
+
+  // M10: con la dirección completa se pide al servicio de envíos cuánto cuesta enviar este pedido (con una pausa
+  // para no consultar en cada tecla). Si falla, queda el costo estimado que trajo `preparar`.
+  useEffect(() => {
+    if (modo !== 'domicilio') return;
+    const direccion = direccionEntregaSchema.safeParse({
+      direccion: dirTexto,
+      barrio: dirBarrio,
+      apartamentoCasa: dirApto === '' ? null : dirApto,
+      municipio: dirMunicipio === '' ? null : dirMunicipio,
+      departamento: dirDepartamento === '' ? null : dirDepartamento,
+      nombreRecibe: dirNombre,
+      telefonoRecibe: dirTelefono,
+    });
+    if (!direccion.success) return;
+    let vigente = true;
+    const pausa = setTimeout(() => {
+      checkoutApi
+        .cotizarEnvio({ direccion: direccion.data, ...(directa === null ? {} : { directa }), ...(cupon === null ? {} : { codigoCupon: cupon }) })
+        .then((c) => vigente && setCotizacion(c))
+        .catch(() => vigente && setCotizacion(null));
+    }, 600);
+    return () => {
+      vigente = false;
+      clearTimeout(pausa);
+    };
+  }, [modo, dirTexto, dirBarrio, dirApto, dirMunicipio, dirDepartamento, dirNombre, dirTelefono, directa, cupon]);
 
   const cargar = useCallback(async (): Promise<void> => {
     try {
@@ -128,6 +167,7 @@ export function CheckoutView() {
               }
             : null,
         celularNequi: f.celularNequi,
+        ...(f.modoEntrega === 'domicilio' ? { costoEnvioMostrado: cotizacion?.costo ?? datos.envio.domicilio } : {}),
         aceptaciones: {
           tokenAceptacion: datos.terminos.tokenAceptacion,
           tokenDatosPersonales: datos.terminos.tokenDatosPersonales,
@@ -139,6 +179,12 @@ export function CheckoutView() {
       const enCurso = pagoEnCursoDeError(err);
       if (enCurso !== null) {
         router.push(`/checkout/${enCurso}`);
+        return;
+      }
+      const costoNuevo = costoEnvioDeError(err);
+      if (costoNuevo !== null) {
+        setCotizacion({ costo: costoNuevo, servicio: cotizacion?.servicio ?? 'Entrega a domicilio', esEstimado: false });
+        setError(`El costo del envío cambió a ${formatCOP(costoNuevo)}. Revisa el total y vuelve a pagar.`);
         return;
       }
       const revalidacion = revalidacionDeError(err);
@@ -189,7 +235,7 @@ export function CheckoutView() {
     );
   }
 
-  const envio = modo === 'recogida' ? datos.envio.recogida : datos.envio.domicilio;
+  const envio = modo === 'recogida' ? datos.envio.recogida : (cotizacion?.costo ?? datos.envio.domicilio);
   const sinPasarela = datos.terminos === null;
   // R17: en la compra directa M05 no filtró antes; una línea que no se vende no se paga.
   const noVendible = datos.carrito.lineas.some((l) => l.precio?.vendible !== true);
@@ -258,7 +304,7 @@ export function CheckoutView() {
                 onClick={() => elegirModo('domicilio')}
                 leftIcon={<Truck aria-hidden className="h-5 w-5" />}
               >
-                Envío a domicilio · {datos.envio.domicilio === 0 ? 'Gratis' : formatCOP(datos.envio.domicilio)}
+                Envío a domicilio · {(cotizacion?.costo ?? datos.envio.domicilio) === 0 ? 'Gratis' : formatCOP(cotizacion?.costo ?? datos.envio.domicilio)}
               </Button>
               <Button
                 type="button"
@@ -274,9 +320,11 @@ export function CheckoutView() {
             {modo === 'domicilio' ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <p className="text-sm text-neutral-dark sm:col-span-2">
-                  {datos.envio.domicilio === 0
+                  {envio === 0
                     ? 'Tu compra tiene envío gratis.'
-                    : `Envío gratis en compras desde ${formatCOP(datos.envio.umbralEnvioGratis)}.`}{' '}
+                    : cotizacion === null
+                      ? `Envío gratis en compras desde ${formatCOP(datos.envio.umbralEnvioGratis)}.`
+                      : `Envío a tu dirección: ${formatCOP(envio)}${cotizacion.esEstimado ? ' (estimado)' : ''}.`}{' '}
                   Esta dirección es solo para este pedido; no cambia la de tu perfil.
                 </p>
                 <div className="sm:col-span-2">

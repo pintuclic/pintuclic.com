@@ -1,7 +1,7 @@
 import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 import { pagoFormSchema, reintentoFormSchema } from '../dtos/formularios.dto';
-import { codigoDeError, mensajeDeError, pagoEnCursoDeError, revalidacionDeError } from '../services/checkout-api';
+import { codigoDeError, costoEnvioDeError, mensajeDeError, pagoEnCursoDeError, revalidacionDeError } from '../services/checkout-api';
 import { compraDirectaDeUrl, estadoDeUrl, pasoDe, sigueEnCurso, textoEnvio } from '../services/textos-checkout';
 
 function errorApi(status: number, code: string, details: unknown): AxiosError {
@@ -71,6 +71,10 @@ describe('M07 · errores de la API', () => {
   it('R2 c: PAGO_EN_CURSO trae el código de la compra que sigue en Nequi', () => {
     expect(pagoEnCursoDeError(errorApi(409, 'PAGO_EN_CURSO', { codigo: 'SOL-2026-00004' }))).toBe('SOL-2026-00004');
     expect(pagoEnCursoDeError(errorApi(409, 'CARRITO_CAMBIO', null))).toBeNull();
+    // M10: el costo nuevo que cotizó el servicio de envíos viaja en el error.
+    expect(costoEnvioDeError(errorApi(409, 'COSTO_ENVIO_CAMBIO', { costoEnvio: 23500 }))).toBe(23500);
+    expect(costoEnvioDeError(errorApi(409, 'COSTO_ENVIO_CAMBIO', null))).toBeNull();
+    expect(costoEnvioDeError(errorApi(409, 'CARRITO_CAMBIO', { costoEnvio: 1 }))).toBeNull();
   });
 
   it('R2 a: CARRITO_CAMBIO trae la revalidación; si viene mal formada se ignora', () => {
