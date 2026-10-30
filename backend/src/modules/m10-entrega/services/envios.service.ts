@@ -12,6 +12,7 @@ import type {
   EnviosRepositoryPort,
   OrdenParaEnvio,
   OrdenesParaEnvioPort,
+  OrigenEnvioPort,
 } from '../interfaces/entrega.interface';
 import { destinoDesdeTexto } from './destino';
 import { EnvioError, ProveedorEnvioError } from './envio.error';
@@ -42,6 +43,7 @@ export class EnviosService {
     private readonly proveedor: ServicioEnviosPort,
     private readonly repo: EnviosRepositoryPort,
     private readonly ordenes: OrdenesParaEnvioPort,
+    private readonly origen: OrigenEnvioPort,
   ) {}
 
   /**
@@ -106,6 +108,7 @@ export class EnviosService {
     try {
       const resultado = await this.proveedor.crearEnvio({
         codigoOrden: orden.codigo,
+        origen: await this.origen.obtener(),
         destino: destinoDesdeTexto(orden.direccion ?? ''),
         bultos: orden.lineas.map((l) => ({
           descripcion: l.descripcion,

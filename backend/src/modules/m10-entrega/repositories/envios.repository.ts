@@ -1,5 +1,5 @@
 import { prisma } from '../../../core/db/client';
-import type { EstadoEnvio } from '../dtos/m10-entrega.dto';
+import type { EstadoEnvio, OrigenEnvio } from '../dtos/m10-entrega.dto';
 import type {
   DatosGuardarEnvio,
   EnvioGuardado,
@@ -7,6 +7,7 @@ import type {
   NovedadGuardada,
   OrdenParaEnvio,
   OrdenesParaEnvioPort,
+  OrigenEnvioPort,
 } from '../interfaces/entrega.interface';
 
 const INCLUIR_ORDEN = { orden: { select: { codigoVisible: true, idUsuario: true } } } as const;
@@ -115,6 +116,23 @@ export class PrismaOrdenesParaEnvio implements OrdenesParaEnvioPort {
         cantidad: l.cantidad,
         valor: Number(l.precioAplicado),
       })),
+    };
+  }
+}
+
+/** P3: lee la ficha de datos del vendedor (M12). Sin ficha, todo null: el proveedor decidirá si le basta. */
+export class PrismaOrigenEnvio implements OrigenEnvioPort {
+  async obtener(): Promise<OrigenEnvio> {
+    const ficha = await prisma.datosFacturacion.findUnique({
+      where: { idDatos: 1 },
+      select: { razonSocial: true, direccion: true, ciudad: true, telefono: true, correo: true },
+    });
+    return {
+      nombre: ficha?.razonSocial ?? null,
+      direccion: ficha?.direccion ?? null,
+      ciudad: ficha?.ciudad ?? null,
+      telefono: ficha?.telefono ?? null,
+      correo: ficha?.correo ?? null,
     };
   }
 }

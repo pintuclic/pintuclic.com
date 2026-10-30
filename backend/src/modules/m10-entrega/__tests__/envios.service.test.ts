@@ -60,10 +60,12 @@ class RepoEnMemoria implements EnviosRepositoryPort {
   }
 }
 
+const ORIGEN = { nombre: 'Pintu Clic S.A.S.', direccion: 'Cra 1 # 2-3', ciudad: 'Bogotá', telefono: '6011234567', correo: 'ventas@pintuclic.co' };
+
 function montar(ordenes: Record<string, OrdenParaEnvio>, proveedor?: ServicioEnviosPort) {
   const repo = new RepoEnMemoria();
   const puerto: OrdenesParaEnvioPort = { buscarPorCodigo: async (c) => ordenes[c] ?? null };
-  const servicio = new EnviosService(proveedor ?? new EnvioPropioAdapter({ obtenerNumero: async () => null }), repo, puerto);
+  const servicio = new EnviosService(proveedor ?? new EnvioPropioAdapter({ obtenerNumero: async () => null }), repo, puerto, { obtener: async () => ORIGEN });
   return { repo, servicio };
 }
 
@@ -109,6 +111,22 @@ describe('EnviosService · R3 crear el envío al despachar', () => {
     falla = false;
     const reintento = await servicio.reintentar('PC-2026-00001');
     expect(reintento).toMatchObject({ estado: 'creado', numeroGuia: 'G-123', ultimoError: null });
+  });
+
+  it('P3: el proveedor recibe el origen (ficha del vendedor de M12) y el destino separado de la dirección de M07', async () => {
+    const crearEnvio = vi.fn().mockResolvedValue({ proveedor: 'transportadora_x', idExterno: null, numeroGuia: null, urlSeguimiento: null, urlEtiqueta: null });
+    const proveedor: ServicioEnviosPort = { proveedor: 'transportadora_x', cotizar: vi.fn(), consultarSeguimiento: vi.fn(), interpretarWebhook: vi.fn(), crearEnvio };
+    const { servicio } = montar({ 'PC-2026-00001': orden() }, proveedor);
+
+    await servicio.alCambiarEstado({ codigo: 'PC-2026-00001', estadoNuevo: 'despachado' });
+
+    expect(crearEnvio).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codigoOrden: 'PC-2026-00001',
+        origen: ORIGEN,
+        destino: expect.objectContaining({ direccion: 'Calle 10 # 5-20', nombreRecibe: 'Laura Pérez', municipio: null }),
+      }),
+    );
   });
 
   it('el error de un proveedor que no es ProveedorEnvioError no filtra su mensaje', async () => {

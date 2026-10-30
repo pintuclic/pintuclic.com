@@ -56,7 +56,8 @@ import { z } from 'zod';
  *  existe; cada uno toca a otro módulo y se aprueba y entrega por separado, con su propio PR:
  *  P1  Municipio y departamento del destino → dirección de M04, captura de M07 y copia en la orden de M08.
  *  P2  Peso y medidas de cada variante → catálogo de M01 (opcionales; el panel permite llenarlos).
- *  P3  Origen del envío (dirección y contacto del almacén) → parámetros de configuración de M17.
+ *  P3  Origen del envío (dirección y contacto del almacén) → HECHO sin tocar otro módulo: se lee de la ficha de
+ *      datos del vendedor de M12 (`datos_facturacion`), que el personal ya edita en el panel. Solo lectura.
  *  M10 los consume cuando existen y manda null cuando no (`destinoEnvioSchema`, `bultoEnvioSchema`).
  *
  * PREGUNTAS ABIERTAS AL CLIENTE
@@ -103,6 +104,16 @@ export const destinoEnvioSchema = z.object({
 });
 export type DestinoEnvio = z.infer<typeof destinoEnvioSchema>;
 
+/** Desde dónde sale el envío. Sale de la ficha de datos del vendedor de M12 (solo lectura); null si aún no la llenaron. */
+export const origenEnvioSchema = z.object({
+  nombre: z.string().nullable(),
+  direccion: z.string().nullable(),
+  ciudad: z.string().nullable(),
+  telefono: z.string().nullable(),
+  correo: z.string().nullable(),
+});
+export type OrigenEnvio = z.infer<typeof origenEnvioSchema>;
+
 /** Un bulto. Los pesos y medidas son null hasta que el catálogo los guarde (P2). */
 export const bultoEnvioSchema = z.object({
   descripcion: z.string().max(150),
@@ -116,6 +127,7 @@ export const bultoEnvioSchema = z.object({
 export type BultoEnvio = z.infer<typeof bultoEnvioSchema>;
 
 export const solicitudCotizacionSchema = z.object({
+  origen: origenEnvioSchema,
   destino: destinoEnvioSchema,
   bultos: z.array(bultoEnvioSchema).min(1),
   /** Total de la mercancía, para la regla de envío gratis del adaptador por defecto. */
@@ -133,6 +145,7 @@ export type OpcionEnvio = z.infer<typeof opcionEnvioSchema>;
 
 export const solicitudCrearEnvioSchema = z.object({
   codigoOrden: z.string().min(1),
+  origen: origenEnvioSchema,
   destino: destinoEnvioSchema,
   bultos: z.array(bultoEnvioSchema).min(1),
   servicio: z.string().max(100).nullable(),

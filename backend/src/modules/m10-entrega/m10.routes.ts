@@ -7,8 +7,8 @@ import { EnvioPropioAdapter } from './adapters/envio-propio.adapter';
 import { EnvioAlDespacharAdapter } from './adapters/despacho.adapter';
 import { EnviosController } from './controllers/envios.controller';
 import { PERMISOS_M10, type ServicioEnviosPort } from './dtos/m10-entrega.dto';
-import type { EnviosRepositoryPort, OrdenesParaEnvioPort, ParametrosEnvioPort } from './interfaces/entrega.interface';
-import { PrismaEnviosRepository, PrismaOrdenesParaEnvio } from './repositories/envios.repository';
+import type { EnviosRepositoryPort, OrdenesParaEnvioPort, OrigenEnvioPort, ParametrosEnvioPort } from './interfaces/entrega.interface';
+import { PrismaEnviosRepository, PrismaOrdenesParaEnvio, PrismaOrigenEnvio } from './repositories/envios.repository';
 import { EnviosService } from './services/envios.service';
 
 export interface DependenciasM10 {
@@ -22,6 +22,7 @@ export interface DependenciasM10 {
   /** Solo pruebas. */
   repo?: EnviosRepositoryPort;
   ordenes?: OrdenesParaEnvioPort;
+  origen?: OrigenEnvioPort;
 }
 
 export interface ModuloM10 {
@@ -38,7 +39,7 @@ const sinParametros: ParametrosEnvioPort = { obtenerNumero: async () => null };
 
 export function construirModuloM10(autorizacion: AutorizacionService, deps: DependenciasM10 = {}): ModuloM10 {
   const proveedor = deps.proveedor ?? new EnvioPropioAdapter(deps.parametros ?? sinParametros);
-  const envios = new EnviosService(proveedor, deps.repo ?? new PrismaEnviosRepository(), deps.ordenes ?? new PrismaOrdenesParaEnvio());
+  const envios = new EnviosService(proveedor, deps.repo ?? new PrismaEnviosRepository(), deps.ordenes ?? new PrismaOrdenesParaEnvio(), deps.origen ?? new PrismaOrigenEnvio());
   const c = new EnviosController(envios, deps.auditoria, deps.webhookToken ?? process.env.ENVIOS_WEBHOOK_TOKEN?.trim());
 
   const ver = requirePermission(autorizacion, PERMISOS_M10.ver) as RequestHandler;

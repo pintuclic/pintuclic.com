@@ -1,4 +1,4 @@
-import type { EstadoEnvio } from '../dtos/m10-entrega.dto';
+import type { EstadoEnvio, OrigenEnvio } from '../dtos/m10-entrega.dto';
 
 /** Lo que M10 necesita leer de una orden de M08 para crear el envío. Solo lectura. */
 export interface OrdenParaEnvio {
@@ -13,6 +13,11 @@ export interface OrdenParaEnvio {
 
 export interface OrdenesParaEnvioPort {
   buscarPorCodigo(codigo: string): Promise<OrdenParaEnvio | null>;
+}
+
+/** P3: de dónde sale el envío; lo lee de la ficha de datos del vendedor de M12. */
+export interface OrigenEnvioPort {
+  obtener(): Promise<OrigenEnvio>;
 }
 
 export interface EnvioGuardado {
