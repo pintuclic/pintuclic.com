@@ -3,11 +3,13 @@ import { requirePermission } from '../../core/middlewares/autorizacion.middlewar
 import type { AutorizacionService } from '../m20-seguridad/services/autorizacion.service';
 import { crearNotificacionesAdapterDesdeEntorno } from './adapters/notificaciones.adapter';
 import { PlantillasController } from './controllers/plantillas.controller';
+import { RebotesWebhookController } from './controllers/rebotes-webhook.controller';
 import { RegistroEnviosController } from './controllers/registro-envios.controller';
 import type { NotificacionesPort } from './interfaces/notificaciones.port';
 import type { ParametrosComunicacionesPort } from './interfaces/parametros-comunicaciones.port';
 import { PrismaPlantillasRepository } from './repositories/plantillas.repository';
 import { PrismaRegistroEnviosRepository } from './repositories/registro-envios.repository';
+import { RebotesService } from './services/rebotes.service';
 import { PlantillasService } from './services/plantillas.service';
 import { RegistroEnviosService } from './services/registro-envios.service';
 
@@ -15,6 +17,8 @@ export interface ModuloM18Config {
   notificaciones?: NotificacionesPort;
   /** HU-ADM-07: parámetros de comunicaciones de M17, inyectados desde app.routes.ts. */
   parametros?: ParametrosComunicacionesPort;
+  /** HU-NOT-04: token del webhook de rebotes del proveedor; por defecto `BREVO_WEBHOOK_TOKEN`. Sin él, el webhook responde 503. */
+  webhookToken?: string;
 }
 
 export function construirModuloM18(
@@ -22,6 +26,8 @@ export function construirModuloM18(
   config?: ModuloM18Config,
 ): {
   router: Router;
+  /** Sin sesión: montar en `/notificaciones/webhook` (la identidad es el token). */
+  webhookRouter: Router;
   notificaciones: NotificacionesPort;
   plantillasService: PlantillasService;
   registroEnviosService: RegistroEnviosService;
@@ -83,5 +89,13 @@ export function construirModuloM18(
     registroEnviosController.listarRebotes as RequestHandler,
   );
 
-  return { router, notificaciones, plantillasService, registroEnviosService };
+  // Webhook de rebotes (RF-NOT-04-04): sin sesión, protegido por token compartido.
+  const webhookRouter = Router();
+  const rebotesController = new RebotesWebhookController(
+    new RebotesService(registroEnviosRepo),
+    config?.webhookToken ?? process.env.BREVO_WEBHOOK_TOKEN?.trim(),
+  );
+  webhookRouter.post('/rebotes', rebotesController.recibir as RequestHandler);
+
+  return { router, webhookRouter, notificaciones, plantillasService, registroEnviosService };
 }

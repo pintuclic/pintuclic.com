@@ -39,6 +39,9 @@ export interface RegistroEnviosRepositoryPort {
 
   registrarRebote(idEnvio: string | null, destinatario: string, motivo?: string): Promise<void>;
 
+  /** Id del último envío entregado al proveedor para ese destinatario; null si nunca se le envió nada. */
+  buscarUltimoEnvioEnviado(destinatario: string): Promise<string | null>;
+
   listarEnvios(filtros: {
     pagina: number;
     limite: number;

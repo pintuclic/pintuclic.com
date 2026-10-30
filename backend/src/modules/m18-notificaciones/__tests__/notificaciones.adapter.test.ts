@@ -40,6 +40,7 @@ function crearRegistroMock(): {
   const registro: RegistroEnviosRepositoryPort = {
     registrarResultado: registrarResultadoMock,
     registrarRebote: vi.fn().mockResolvedValue(undefined),
+    buscarUltimoEnvioEnviado: vi.fn().mockResolvedValue(null),
     listarEnvios: vi.fn().mockResolvedValue({ envios: [], total: 0 }),
     listarRebotes: vi.fn().mockResolvedValue({ rebotes: [], total: 0 }),
   };

@@ -144,3 +144,26 @@ export const listarRebotesOutputSchema = z.object({
   limite: z.number().int().positive(),
 });
 export type ListarRebotesOutput = z.infer<typeof listarRebotesOutputSchema>;
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * 5. HU-NOT-04 / RF-NOT-04-04 — WEBHOOK DE REBOTES DEL PROVEEDOR (BREVO)
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * POST /notificaciones/webhook/rebotes — sin sesión; exige `Authorization: Bearer <BREVO_WEBHOOK_TOKEN>`.
+ * Acepta un evento o un lote. Solo estos eventos se guardan como rebote; los demás (entregado, abierto, clic…) se
+ * ignoran con 200 para que el proveedor no los reintente.
+ */
+export const EVENTOS_REBOTE = ['hard_bounce', 'soft_bounce', 'blocked', 'invalid_email'] as const;
+
+export const eventoProveedorSchema = z.object({
+  event: z.string().min(1).max(50),
+  email: z.string().min(3).max(150),
+  reason: z.string().max(1000).optional(),
+});
+export type EventoProveedor = z.infer<typeof eventoProveedorSchema>;
+
+export const webhookRebotesInputSchema = z.union([eventoProveedorSchema, z.array(eventoProveedorSchema).min(1).max(500)]);
+
+export const webhookRebotesOutputSchema = z.object({ registrados: z.number().int().nonnegative(), ignorados: z.number().int().nonnegative() });
+export type WebhookRebotesOutput = z.infer<typeof webhookRebotesOutputSchema>;

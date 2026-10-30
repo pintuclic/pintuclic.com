@@ -40,6 +40,15 @@ export class PrismaRegistroEnviosRepository implements RegistroEnviosRepositoryP
     });
   }
 
+  async buscarUltimoEnvioEnviado(destinatario: string): Promise<string | null> {
+    const fila = await prisma.envioNotificacion.findFirst({
+      where: { destinatario, estado: 'enviado' },
+      orderBy: { fechaCreacion: 'desc' },
+      select: { idEnvio: true },
+    });
+    return fila?.idEnvio ?? null;
+  }
+
   async listarEnvios(filtros: {
     pagina: number;
     limite: number;

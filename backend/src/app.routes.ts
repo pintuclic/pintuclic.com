@@ -295,6 +295,8 @@ export function construirAppRoutes(): Router {
 
   // M18: Notificaciones y Comunicaciones — plantillas y diagnóstico de envíos (HU-NOT-03/04)
   router.use('/admin/notificaciones', auth, m18.router);
+  // M18 · RF-NOT-04-04: rebotes del proveedor de correo. Sin sesión; lo protege el token compartido (BREVO_WEBHOOK_TOKEN).
+  router.use('/notificaciones/webhook', m18.webhookRouter);
 
   return router;
 }

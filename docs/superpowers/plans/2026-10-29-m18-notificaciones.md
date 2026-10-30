@@ -35,7 +35,7 @@ Fuente: `docs/01_TRANSVERSALES/M18_NOTIFICACIONES.md` contrastado con las especi
 - Tipos y plantillas para «solicitud de empresa recibida» y «solicitud de NIT recibida».
 - M04 los llama desde su servicio de empresas. Es código de M04: preguntar antes.
 
-**Fase 4 — Entregabilidad (HU-NOT-04).**
+**Fase 4 — Entregabilidad (HU-NOT-04). Webhook HECHO; la vista de rebotes ya existía; SPF/DKIM/DMARC siguen como tarea de despliegue.**
 - Endpoint autenticado para el webhook de rebotes de Brevo que llame a `registrarRebote`.
 - Vista de rebotes en el panel, con el listado que ya existe en el backend.
 - Documentar SPF, DKIM y DMARC del dominio como tarea de despliegue (no es código).

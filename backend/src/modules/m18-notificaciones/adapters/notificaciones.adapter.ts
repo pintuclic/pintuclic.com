@@ -74,8 +74,15 @@ export class RegistroEnviosEnMemoria implements RegistroEnviosRepositoryPort {
     return `memoria-${this.registros.length}`;
   }
 
-  async registrarRebote(): Promise<void> {
-    // No-op: sin persistencia real en memoria.
+  public rebotes: Array<{ idEnvio: string | null; destinatario: string; motivo?: string }> = [];
+
+  async registrarRebote(idEnvio: string | null, destinatario: string, motivo?: string): Promise<void> {
+    this.rebotes.push({ idEnvio, destinatario, ...(motivo === undefined ? {} : { motivo }) });
+  }
+
+  async buscarUltimoEnvioEnviado(destinatario: string): Promise<string | null> {
+    const indice = this.registros.map((r) => r.destinatario).lastIndexOf(destinatario);
+    return indice === -1 ? null : `memoria-${indice + 1}`;
   }
 
   async listarEnvios(): Promise<{ envios: never[]; total: number }> {
