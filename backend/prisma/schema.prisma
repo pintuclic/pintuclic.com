@@ -662,6 +662,9 @@ model DireccionCliente {
   direccion          String   @db.VarChar(255)
   barrio             String   @db.VarChar(100)
   apartamentoCasa    String?  @map("apartamento_casa") @db.VarChar(100)
+  /// M10 · P1: opcionales; un servicio de envíos los exige para cotizar
+  municipio          String?  @db.VarChar(100)
+  departamento       String?  @db.VarChar(100)
   nombreApellido     String   @map("nombre_apellido") @db.VarChar(150)
   telefono           String   @db.VarChar(20)
   esPredeterminada   Boolean  @default(false) @map("es_predeterminada")

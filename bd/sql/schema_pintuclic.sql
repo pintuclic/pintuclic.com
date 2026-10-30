@@ -3162,6 +3162,10 @@ CREATE TRIGGER trg_linea_comprobante_sin_cambios
 -- M10: ENTREGA (2 Tablas) — preparación para un servicio de envíos
 -- ==============================================================================
 
+-- M10 · P1 (v4.24): municipio y departamento del destino, opcionales, que un servicio de envíos exige para cotizar
+ALTER TABLE direccion_cliente ADD COLUMN IF NOT EXISTS municipio VARCHAR(100);
+ALTER TABLE direccion_cliente ADD COLUMN IF NOT EXISTS departamento VARCHAR(100);
+
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_envio_orden') THEN
