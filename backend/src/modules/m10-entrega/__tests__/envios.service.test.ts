@@ -235,6 +235,16 @@ describe('destinoDesdeTexto · el texto de dirección de M07', () => {
     });
   });
 
+  it('P1: lee los segmentos Municipio y Departamento que añade M07; si falta uno, queda null', () => {
+    expect(destinoDesdeTexto(`${DIRECCION} · Municipio: Bogotá · Departamento: Cundinamarca`)).toMatchObject({
+      direccion: 'Calle 10 # 5-20',
+      nombreRecibe: 'Laura Pérez',
+      municipio: 'Bogotá',
+      departamento: 'Cundinamarca',
+    });
+    expect(destinoDesdeTexto(`${DIRECCION} · Municipio: Medellín`)).toMatchObject({ municipio: 'Medellín', departamento: null });
+  });
+
   it('un texto que no sigue el formato se conserva entero en la dirección', () => {
     expect(destinoDesdeTexto('Carrera 7 con calle 50')).toMatchObject({ direccion: 'Carrera 7 con calle 50', barrio: null, nombreRecibe: null });
   });
