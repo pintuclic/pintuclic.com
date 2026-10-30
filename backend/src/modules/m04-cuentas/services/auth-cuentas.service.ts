@@ -10,6 +10,7 @@ import type { CodigosVerificacionRepository } from '../repositories/codigos-veri
 import type { ControlIntentosRepository } from '../repositories/control-intentos.repository';
 import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import type { GoogleAuthPort } from '../interfaces/google-auth.port';
+import { GoogleAuthTokenInvalidoError } from '../adapters/google-auth.adapter';
 import type { DateProviderPort } from '../interfaces/date-provider.port';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 import type {
@@ -17,6 +18,7 @@ import type {
   LoginGoogleRequest,
   LoginRequest,
   RegistroClienteRequest,
+  VincularGoogleRequest,
 } from '../dtos/m04-cuentas.dto';
 
 const DERIVACION_SENUELO = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.JustAPlaceholderHashForTimingXXXXXXXXXX';
@@ -39,6 +41,18 @@ export interface TokenRegistroGooglePayload {
   nombre: string;
   tipo: 'google_registro';
 }
+
+export interface TokenVinculacionGooglePayload {
+  idUsuario: number;
+  sub: string;
+  email: string;
+  tipo: 'google_vinculacion';
+}
+
+export type ResultadoAutenticarGoogle =
+  | { etapa: 'sesion'; usuario: Usuario; sesion: Sesion }
+  | { etapa: 'requiere_registro'; tokenRegistroTemporal: string; email: string; nombre: string }
+  | { etapa: 'requiere_vinculacion'; tokenVinculacion: string; email: string; nombre: string };
 
 export class AuthCuentasService {
   constructor(
@@ -75,16 +89,14 @@ export class AuthCuentasService {
   }> {
     const correoNormalizado = input.correo.trim().toLowerCase();
 
-    // Comprobar unicidad estricta (HU-CUE-08)
+    // Comprobar unicidad estricta en cualquier estado de cuenta (HU-CUE-08)
     const existente = await this.cuentasRepo.buscarPorCorreo(correoNormalizado);
     if (existente !== null) {
-      if (existente.estado === 'activo') {
-        throw new AuthCuentasError(
-          'El correo electrónico ya se encuentra registrado.',
-          'CORREO_YA_REGISTRADO',
-          409,
-        );
-      }
+      throw new AuthCuentasError(
+        'El correo electrónico ya se encuentra registrado.',
+        'CORREO_YA_REGISTRADO',
+        409,
+      );
     }
 
     // Generar código numérico de 6 dígitos
@@ -187,29 +199,24 @@ export class AuthCuentasService {
       );
     }
 
-    // Comprobar nuevamente unicidad antes de persistir
+    // Comprobar nuevamente unicidad antes de persistir: ningún estado existente se reutiliza
     const existente = await this.cuentasRepo.buscarPorCorreo(registro.correo);
-    let usuario: Usuario;
-    if (existente) {
-      if (existente.estado === 'pendiente') {
-        usuario = await this.cuentasRepo.actualizarEstado(existente.idUsuario, 'activo');
-      } else {
-        throw new AuthCuentasError(
-          'El usuario ya se encuentra registrado y activo.',
-          'CORREO_YA_REGISTRADO',
-          409,
-        );
-      }
-    } else {
-      usuario = await this.cuentasRepo.crearUsuarioCliente({
-        nombre: datos.nombre,
-        correo: registro.correo,
-        contrasenaHash: datos.contrasenaHash,
-        telefono: datos.telefono ?? null,
-        estado: 'activo',
-        tipo: 'normal',
-      });
+    if (existente !== null) {
+      throw new AuthCuentasError(
+        'El correo electrónico ya se encuentra registrado.',
+        'CORREO_YA_REGISTRADO',
+        409,
+      );
     }
+
+    const usuario = await this.cuentasRepo.crearUsuarioCliente({
+      nombre: datos.nombre,
+      correo: registro.correo,
+      contrasenaHash: datos.contrasenaHash,
+      telefono: datos.telefono ?? null,
+      estado: 'activo',
+      tipo: 'normal',
+    });
 
     // Consumir el código eliminándolo
     await this.codigosRepo.eliminar(idVerificacion);
@@ -355,7 +362,7 @@ export class AuthCuentasService {
       const tokenCambio = jwt.sign(
         { idUsuario: usuario.idUsuario, tipo: 'cambio_primer_acceso' },
         this.obtenerJwtSecret(),
-        { expiresIn: '15m' },
+        { algorithm: 'HS256', expiresIn: '15m' },
       );
 
       return {
@@ -440,12 +447,22 @@ export class AuthCuentasService {
   /**
    * HU-CUE-02: Federación con Google Identity
    */
-  async autenticarGoogle(input: LoginGoogleRequest): Promise<
-    | { cuentaNueva: false; usuario: Usuario; sesion: Sesion }
-    | { cuentaNueva: true; tokenRegistroTemporal: string; email: string; nombre: string }
-  > {
-    const claims = await this.googleAuth.verificarIdToken(input.idToken);
-    // Sin correo verificado por Google no hay prueba de titularidad para vincular cuentas.
+  async autenticarGoogle(input: LoginGoogleRequest): Promise<ResultadoAutenticarGoogle> {
+    let claims;
+    try {
+      claims = await this.googleAuth.verificarIdToken(input.idToken);
+    } catch (error) {
+      if (error instanceof GoogleAuthTokenInvalidoError) {
+        throw new AuthCuentasError(
+          'El inicio de sesión con Google expiró o no es válido. Inténtalo de nuevo.',
+          'TOKEN_INVALIDO_O_EXPIRADO',
+          401,
+        );
+      }
+      throw error;
+    }
+
+    // Sin correo verificado por Google no hay prueba de titularidad para autenticar ni vincular cuentas.
     if (!claims.emailVerified) {
       throw new AuthCuentasError('Credenciales incorrectas.', 'CREDENCIALES_INVALIDAS', 401);
     }
@@ -456,32 +473,90 @@ export class AuthCuentasService {
     if (identidad) {
       const usuario = await this.cuentasRepo.buscarPorId(identidad.idUsuario);
       if (!usuario || usuario.estado !== 'activo') {
-        throw new AuthCuentasError('Cuenta asociada inactiva o no disponible.', 'CUENTA_BLOQUEADA', 403);
+        throw new AuthCuentasError('La cuenta asociada se encuentra inactiva o bloqueada.', 'CUENTA_BLOQUEADA', 403);
+      }
+      // DP-12 / RF-CUE-08-02: cuentas empresariales y administrativas solo ingresan por correo y contraseña.
+      if (usuario.tipo === 'empresa' || esUsuarioAdministrativo(usuario)) {
+        throw new AuthCuentasError(
+          'Las cuentas empresariales y administrativas deben iniciar sesión con correo y contraseña.',
+          'PERMISO_DENEGADO',
+          403,
+        );
+      }
+      if (usuario.cambioContrasenaPendiente) {
+        throw new AuthCuentasError(
+          'Debes iniciar sesión con tu contraseña temporal para completar el primer acceso.',
+          'PERMISO_DENEGADO',
+          403,
+        );
       }
 
-      const tipoSesion = esUsuarioAdministrativo(usuario) ? 'admin' : 'cliente';
-      const sesion = await this.sesionService.crear(usuario.idUsuario, tipoSesion);
-      return { cuentaNueva: false, usuario, sesion };
+      const sesion = await this.sesionService.crear(usuario.idUsuario, 'cliente');
+      return { etapa: 'sesion', usuario, sesion };
     }
 
     // 2. Si no existe identidad externa, buscar si el correo ya existe en usuario
     const usuarioExistente = await this.cuentasRepo.buscarPorCorreo(emailNormalizado);
     if (usuarioExistente) {
+      if (usuarioExistente.tipo === 'empresa' || esUsuarioAdministrativo(usuarioExistente)) {
+        throw new AuthCuentasError(
+          'Las cuentas empresariales y administrativas deben iniciar sesión con correo y contraseña.',
+          'PERMISO_DENEGADO',
+          403,
+        );
+      }
+      if (usuarioExistente.estado === 'pendiente') {
+        throw new AuthCuentasError(
+          'La cuenta asociada a este correo está pendiente de revisión.',
+          'CUENTA_PENDIENTE_ACTIVACION',
+          403,
+        );
+      }
       if (usuarioExistente.estado !== 'activo') {
-        throw new AuthCuentasError('Cuenta existente no se encuentra activa.', 'CUENTA_BLOQUEADA', 403);
+        throw new AuthCuentasError(
+          'La cuenta asociada a este correo se encuentra inactiva o bloqueada.',
+          'CUENTA_BLOQUEADA',
+          403,
+        );
+      }
+      if (usuarioExistente.cambioContrasenaPendiente) {
+        throw new AuthCuentasError(
+          'Debes iniciar sesión con tu contraseña temporal antes de vincular Google.',
+          'PERMISO_DENEGADO',
+          403,
+        );
       }
 
-      // Vincular automáticamente la identidad de Google a la cuenta existente
-      await this.cuentasRepo.vincularIdentidadExterna({
+      const identidadPrevia = await this.cuentasRepo.buscarIdentidadExternaPorUsuario(
+        usuarioExistente.idUsuario,
+        'google',
+      );
+      if (identidadPrevia && identidadPrevia.idProveedor !== claims.sub) {
+        throw new AuthCuentasError(
+          'Esta cuenta ya se encuentra vinculada a otro perfil de Google.',
+          'CORREO_YA_REGISTRADO',
+          409,
+        );
+      }
+
+      // RF-CUE-02-03 / CA-CUE-02-02: nunca vincular automáticamente; pedir confirmación explícita con contraseña.
+      const payloadVinculacion: TokenVinculacionGooglePayload = {
         idUsuario: usuarioExistente.idUsuario,
-        proveedor: 'google',
-        idProveedor: claims.sub,
-        correoProveedor: emailNormalizado,
+        sub: claims.sub,
+        email: emailNormalizado,
+        tipo: 'google_vinculacion',
+      };
+      const tokenVinculacion = jwt.sign(payloadVinculacion, this.obtenerJwtSecret(), {
+        algorithm: 'HS256',
+        expiresIn: '10m',
       });
 
-      const tipoSesion = esUsuarioAdministrativo(usuarioExistente) ? 'admin' : 'cliente';
-      const sesion = await this.sesionService.crear(usuarioExistente.idUsuario, tipoSesion);
-      return { cuentaNueva: false, usuario: usuarioExistente, sesion };
+      return {
+        etapa: 'requiere_vinculacion',
+        tokenVinculacion,
+        email: emailNormalizado,
+        nombre: usuarioExistente.nombre,
+      };
     }
 
     // 3. Cuenta totalmente nueva: emitir token efímero firmado (TTL 10m) para obligar a fijar contraseña (RN-SEG-02 / ADR-011)
@@ -493,11 +568,12 @@ export class AuthCuentasService {
     };
 
     const tokenRegistro = jwt.sign(tokenPayload, this.obtenerJwtSecret(), {
+      algorithm: 'HS256',
       expiresIn: '10m',
     });
 
     return {
-      cuentaNueva: true,
+      etapa: 'requiere_registro',
       tokenRegistroTemporal: tokenRegistro,
       email: emailNormalizado,
       nombre: claims.nombre,
@@ -511,28 +587,42 @@ export class AuthCuentasService {
     usuario: Usuario;
     sesion: Sesion;
   }> {
-    let payload: TokenRegistroGooglePayload;
+    let payload: Partial<TokenRegistroGooglePayload>;
     try {
-      payload = jwt.verify(input.tokenRegistroTemporal, this.obtenerJwtSecret()) as TokenRegistroGooglePayload;
+      payload = jwt.verify(input.tokenRegistroTemporal, this.obtenerJwtSecret(), {
+        algorithms: ['HS256'],
+      }) as Partial<TokenRegistroGooglePayload>;
     } catch {
       throw new AuthCuentasError('Token de registro Google expirado o inválido.', 'TOKEN_INVALIDO_O_EXPIRADO', 401);
     }
 
-    if (payload.tipo !== 'google_registro') {
+    if (
+      payload.tipo !== 'google_registro' ||
+      typeof payload.sub !== 'string' ||
+      typeof payload.email !== 'string' ||
+      typeof payload.nombre !== 'string'
+    ) {
       throw new AuthCuentasError('Tipo de token no válido para completar registro.', 'TOKEN_INVALIDO_O_EXPIRADO', 401);
     }
 
-    // Comprobar que el correo no se haya registrado entretanto
-    const existente = await this.cuentasRepo.buscarPorCorreo(payload.email);
-    if (existente && existente.estado === 'activo') {
-      throw new AuthCuentasError('El correo ya ha sido registrado.', 'CORREO_YA_REGISTRADO', 409);
+    const emailNormalizado = payload.email.trim().toLowerCase();
+
+    // Comprobar que ni la identidad Google ni el correo se hayan registrado entretanto en ningún estado
+    const identidadExistente = await this.cuentasRepo.buscarIdentidadExterna('google', payload.sub);
+    if (identidadExistente) {
+      throw new AuthCuentasError('Esta cuenta de Google ya fue registrada.', 'CORREO_YA_REGISTRADO', 409);
+    }
+
+    const existente = await this.cuentasRepo.buscarPorCorreo(emailNormalizado);
+    if (existente !== null) {
+      throw new AuthCuentasError('El correo electrónico ya se encuentra registrado.', 'CORREO_YA_REGISTRADO', 409);
     }
 
     const contrasenaHash = await derivarContrasena(input.contrasena);
 
     const usuario = await this.cuentasRepo.crearUsuarioCliente({
       nombre: payload.nombre,
-      correo: payload.email,
+      correo: emailNormalizado,
       contrasenaHash,
       telefono: input.telefono,
       estado: 'activo',
@@ -543,9 +633,115 @@ export class AuthCuentasService {
       idUsuario: usuario.idUsuario,
       proveedor: 'google',
       idProveedor: payload.sub,
-      correoProveedor: payload.email,
+      correoProveedor: emailNormalizado,
     });
 
+    const sesion = await this.sesionService.crear(usuario.idUsuario, 'cliente');
+
+    return { usuario, sesion };
+  }
+
+  /**
+   * HU-CUE-02 (RF-CUE-02-03, CA-CUE-02-02, CA-CUE-02-03):
+   * Vincula una cuenta de cliente activa existente con Google tras verificar su contraseña actual.
+   */
+  async vincularCuentaGoogle(input: VincularGoogleRequest): Promise<{
+    usuario: Usuario;
+    sesion: Sesion;
+  }> {
+    const tokenInvalido = (): AuthCuentasError =>
+      new AuthCuentasError('La solicitud de vinculación con Google expiró o no es válida.', 'TOKEN_INVALIDO_O_EXPIRADO', 401);
+
+    let payload: Partial<TokenVinculacionGooglePayload>;
+    try {
+      payload = jwt.verify(input.tokenVinculacion, this.obtenerJwtSecret(), {
+        algorithms: ['HS256'],
+      }) as Partial<TokenVinculacionGooglePayload>;
+    } catch {
+      throw tokenInvalido();
+    }
+
+    if (
+      payload.tipo !== 'google_vinculacion' ||
+      typeof payload.idUsuario !== 'number' ||
+      typeof payload.sub !== 'string' ||
+      typeof payload.email !== 'string'
+    ) {
+      throw tokenInvalido();
+    }
+
+    const correoNormalizado = payload.email.trim().toLowerCase();
+    const ahora = this.dateProvider.ahora();
+    const [maxIntentosLogin, minutosBloqueo] = await Promise.all([
+      leerParametroCuentas(this.parametros, 'auth.intentos_fallidos_bloqueo'),
+      leerParametroCuentas(this.parametros, 'auth.duracion_bloqueo_minutos'),
+    ]);
+
+    // Control anti-fuerza bruta compartido con el login (ADR-012)
+    const control = await this.controlIntentosRepo.obtener(correoNormalizado);
+    if (control?.bloqueadoHasta && control.bloqueadoHasta.getTime() > ahora.getTime()) {
+      const segundosRestantes = Math.ceil((control.bloqueadoHasta.getTime() - ahora.getTime()) / 1000);
+      throw new AuthCuentasError(
+        `Cuenta bloqueada temporalmente por múltiples intentos fallidos. Intenta nuevamente en ${Math.ceil(segundosRestantes / 60)} minutos.`,
+        'CUENTA_BLOQUEADA',
+        423,
+        { reintentarEnSegundos: segundosRestantes },
+      );
+    }
+
+    const usuario = await this.cuentasRepo.buscarPorId(payload.idUsuario);
+    if (
+      !usuario ||
+      usuario.correo.trim().toLowerCase() !== correoNormalizado ||
+      usuario.estado !== 'activo' ||
+      usuario.tipo === 'empresa' ||
+      esUsuarioAdministrativo(usuario) ||
+      usuario.cambioContrasenaPendiente
+    ) {
+      throw tokenInvalido();
+    }
+
+    const coincide = await verificarContrasena(input.contrasena, usuario.contrasena);
+    if (!coincide) {
+      const fallo = await this.controlIntentosRepo.registrarFallo(
+        correoNormalizado,
+        maxIntentosLogin,
+        minutosBloqueo,
+        ahora,
+      );
+      if (fallo.bloqueadoHasta && fallo.bloqueadoHasta.getTime() > ahora.getTime()) {
+        throw new AuthCuentasError(
+          `Has superado el número de intentos permitidos. Tu cuenta fue bloqueada temporalmente por ${minutosBloqueo} minutos.`,
+          'CUENTA_BLOQUEADA',
+          423,
+          { reintentarEnSegundos: minutosBloqueo * 60 },
+        );
+      }
+      throw new AuthCuentasError('La contraseña actual no es correcta.', 'CONTRASENA_INCORRECTA', 400);
+    }
+
+    const [identidadPorSub, identidadDelUsuario] = await Promise.all([
+      this.cuentasRepo.buscarIdentidadExterna('google', payload.sub),
+      this.cuentasRepo.buscarIdentidadExternaPorUsuario(usuario.idUsuario, 'google'),
+    ]);
+
+    if (identidadPorSub && identidadPorSub.idUsuario !== usuario.idUsuario) {
+      throw new AuthCuentasError('Este perfil de Google ya está vinculado a otra cuenta.', 'CORREO_YA_REGISTRADO', 409);
+    }
+    if (identidadDelUsuario && identidadDelUsuario.idProveedor !== payload.sub) {
+      throw new AuthCuentasError('Esta cuenta ya está vinculada a otro perfil de Google.', 'CORREO_YA_REGISTRADO', 409);
+    }
+
+    if (!identidadDelUsuario) {
+      await this.cuentasRepo.vincularIdentidadExterna({
+        idUsuario: usuario.idUsuario,
+        proveedor: 'google',
+        idProveedor: payload.sub,
+        correoProveedor: correoNormalizado,
+      });
+    }
+
+    await this.controlIntentosRepo.limpiar(correoNormalizado);
     const sesion = await this.sesionService.crear(usuario.idUsuario, 'cliente');
 
     return { usuario, sesion };

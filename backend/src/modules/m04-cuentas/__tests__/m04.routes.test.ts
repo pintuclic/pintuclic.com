@@ -58,19 +58,27 @@ describe('m04.routes · Ensamblaje y registro de rutas de cuentas y perfiles', (
     expect(paths).toContain('/empresas/renovacion-nit');
   });
 
-  it('HU-CUE-02 aplazada: sin adaptador de Google inyectado no monta las rutas OAuth', () => {
+  it('HU-CUE-02: expone siempre /oauth/google/config y monta las acciones OAuth cuando Google está habilitado', () => {
     const sesionService = {} as unknown as SesionService;
     const rutasOauth = (m04: ReturnType<typeof construirModuloM04>): (string | undefined)[] =>
       m04.cuentasRouter.stack
         .map((layer) => layer.route?.path)
         .filter((path) => path?.startsWith('/oauth'));
 
-    expect(rutasOauth(construirModuloM04(sesionService, autorizacion))).toEqual([]);
+    expect(rutasOauth(construirModuloM04(sesionService, autorizacion))).toEqual(['/oauth/google/config']);
     expect(
       rutasOauth(
-        construirModuloM04(sesionService, autorizacion, { googleAuth: new MockGoogleAuthAdapter() }),
+        construirModuloM04(sesionService, autorizacion, {
+          googleAuth: new MockGoogleAuthAdapter(),
+          googleClientId: '123456789012-abc.apps.googleusercontent.com',
+        }),
       ),
-    ).toEqual(['/oauth/google', '/oauth/google/completar']);
+    ).toEqual([
+      '/oauth/google/config',
+      '/oauth/google',
+      '/oauth/google/completar',
+      '/oauth/google/vincular',
+    ]);
   });
 
   it('el router de administración de empresas registra las rutas de gestión de solicitudes', () => {

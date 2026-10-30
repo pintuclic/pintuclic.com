@@ -10,15 +10,21 @@ import {
   reenviarCodigoOtpRequestSchema,
   registroClienteRequestSchema,
   verificarCodigoOtpRequestSchema,
+  vincularGoogleRequestSchema,
 } from '../dtos/m04-cuentas.dto';
 import { AuthCuentasError, type AuthCuentasService } from '../services/auth-cuentas.service';
 import type { SesionService } from '../../m20-seguridad/services/sesion.service';
 
+export interface GoogleOAuthPublicConfig {
+  habilitado: boolean;
+  clientId: string | null;
+}
 
 export class AuthCuentasController {
   constructor(
     private readonly authService: AuthCuentasService,
     private readonly sesionService: SesionService,
+    private readonly googleConfig: GoogleOAuthPublicConfig = { habilitado: false, clientId: null },
   ) {}
 
   /** RF-SEG-02-02: la cookie vive lo mismo que la ventana de inactividad de la sesión creada. */
@@ -279,6 +285,21 @@ export class AuthCuentasController {
   };
 
   /**
+   * HU-CUE-02: Configuración pública OAuth de Google en tiempo de ejecución
+   * GET /cuentas/oauth/google/config
+   */
+  configGoogle = (_req: Request, res: Response): void => {
+    responderExito(
+      res,
+      {
+        habilitado: this.googleConfig.habilitado,
+        clientId: this.googleConfig.habilitado ? this.googleConfig.clientId : null,
+      },
+      'Configuración OAuth de Google obtenida.',
+    );
+  };
+
+  /**
    * HU-CUE-02: Autenticación federada Google
    * POST /cuentas/oauth/google
    */
@@ -297,16 +318,32 @@ export class AuthCuentasController {
 
     try {
       const resultado = await this.authService.autenticarGoogle(parse.data);
-      if (resultado.cuentaNueva) {
+      if (resultado.etapa === 'requiere_registro') {
         responderExito(
           res,
           {
             registrado: false,
+            requiereVinculacion: false,
             tokenRegistroTemporal: resultado.tokenRegistroTemporal,
             email: resultado.email,
             nombre: resultado.nombre,
           },
-          'Identidad verificada. Complete los datos requeridos para activar su cuenta.',
+          'Identidad verificada. Completa tus datos para activar tu cuenta.',
+        );
+        return;
+      }
+
+      if (resultado.etapa === 'requiere_vinculacion') {
+        responderExito(
+          res,
+          {
+            registrado: false,
+            requiereVinculacion: true,
+            tokenVinculacion: resultado.tokenVinculacion,
+            email: resultado.email,
+            nombre: resultado.nombre,
+          },
+          'Ya existe una cuenta con este correo. Confirma tu contraseña para vincular Google.',
         );
         return;
       }
@@ -370,6 +407,51 @@ export class AuthCuentasController {
           },
         },
         'Registro completado y sesión iniciada exitosamente.',
+      );
+    } catch (error) {
+      if (error instanceof AuthCuentasError) {
+        res.status(error.statusCode).json({
+          success: false,
+          error: { code: error.codigo, message: error.message, details: error.detalles ?? null },
+        });
+        return;
+      }
+      throw error;
+    }
+  };
+
+  /**
+   * HU-CUE-02 (RF-CUE-02-03): Confirmar contraseña y vincular cuenta existente con Google
+   * POST /cuentas/oauth/google/vincular
+   */
+  vincularGoogle = async (req: Request, res: Response): Promise<void> => {
+    const parse = vincularGoogleRequestSchema.safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'DATOS_INVALIDOS',
+          message: parse.error.issues[0]?.message ?? 'Datos de vinculación inválidos',
+        },
+      });
+      return;
+    }
+
+    try {
+      const resultado = await this.authService.vincularCuentaGoogle(parse.data);
+      this.fijarCookie(res, resultado.sesion);
+
+      responderExito(
+        res,
+        {
+          usuario: {
+            idUsuario: resultado.usuario.idUsuario,
+            nombre: resultado.usuario.nombre,
+            correo: resultado.usuario.correo,
+            tipo: resultado.usuario.tipo,
+          },
+        },
+        'Cuenta vinculada con Google y sesión iniciada exitosamente.',
       );
     } catch (error) {
       if (error instanceof AuthCuentasError) {

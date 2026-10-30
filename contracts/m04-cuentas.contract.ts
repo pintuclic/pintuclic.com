@@ -208,33 +208,64 @@ export type ActivacionCuentaResponse = z.infer<typeof activacionCuentaResponseSc
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 4. SCHEMAS: HU-CUE-02 AUTENTICACIÓN GOOGLE IDENTITY
- * ─────────────────────────────────────────────────────────────────────────── */
+ * ───────────────────────────────────────────────────────────────────────────
+ * Rutas públicas (montaje /api/v1/cuentas):
+ *  GET  /oauth/google/config     → googleOAuthConfigResponse (clientId público en runtime)
+ *  POST /oauth/google            → loginGoogleResponse (sesión directa, completar registro o confirmar vinculación)
+ *  POST /oauth/google/completar  → autenticacionGoogleConsolidadaResponse (crea cuenta B2C con clave y teléfono)
+ *  POST /oauth/google/vincular   → autenticacionGoogleConsolidadaResponse (confirma clave y vincula cuenta existente)
+ */
+
+export const googleOAuthConfigResponseSchema = z.object({
+  habilitado: z.boolean(),
+  clientId: z.string().trim().min(1).nullable(),
+});
+export type GoogleOAuthConfigResponse = z.infer<typeof googleOAuthConfigResponseSchema>;
 
 export const loginGoogleRequestSchema = z.object({
-  idToken: z.string().min(10, 'El token de Google es requerido'),
+  idToken: z.string().trim().min(10, 'El token de Google es requerido'),
 });
 export type LoginGoogleRequest = z.infer<typeof loginGoogleRequestSchema>;
 
-export const loginGoogleResponseSchema = z.object({
-  registrado: z.boolean(),
-  tokenRegistroTemporal: z.string().optional(),
-  usuario: z
-    .object({
-      idUsuario: idUsuarioSchema,
-      nombre: nombreSchema,
-      correo: correoSchema,
-      tipo: tipoUsuarioSchema,
-    })
-    .optional(),
-});
+export const loginGoogleResponseSchema = z.union([
+  z.object({
+    registrado: z.literal(true),
+    usuario: usuarioResumenSchema.omit({ esAdmin: true }),
+  }),
+  z.object({
+    registrado: z.literal(false),
+    requiereVinculacion: z.literal(false),
+    tokenRegistroTemporal: z.string().trim().min(10),
+    email: correoSchema,
+    nombre: nombreSchema,
+  }),
+  z.object({
+    registrado: z.literal(false),
+    requiereVinculacion: z.literal(true),
+    tokenVinculacion: z.string().trim().min(10),
+    email: correoSchema,
+    nombre: nombreSchema,
+  }),
+]);
 export type LoginGoogleResponse = z.infer<typeof loginGoogleResponseSchema>;
 
 export const completarRegistroGoogleRequestSchema = z.object({
-  tokenRegistroTemporal: z.string().min(10, 'Token temporal requerido'),
+  tokenRegistroTemporal: z.string().trim().min(10, 'Token temporal requerido'),
   telefono: telefonoSchema,
   contrasena: contrasenaSchema,
 });
 export type CompletarRegistroGoogleRequest = z.infer<typeof completarRegistroGoogleRequestSchema>;
+
+export const vincularGoogleRequestSchema = z.object({
+  tokenVinculacion: z.string().trim().min(10, 'Token de vinculación requerido'),
+  contrasena: z.string().min(1, 'La contraseña es requerida para confirmar la vinculación'),
+});
+export type VincularGoogleRequest = z.infer<typeof vincularGoogleRequestSchema>;
+
+export const autenticacionGoogleConsolidadaResponseSchema = z.object({
+  usuario: usuarioResumenSchema.omit({ esAdmin: true }),
+});
+export type AutenticacionGoogleConsolidadaResponse = z.infer<typeof autenticacionGoogleConsolidadaResponseSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 5. SCHEMAS: HU-CUE-03 REGISTRO DE CUENTA EMPRESA B2B

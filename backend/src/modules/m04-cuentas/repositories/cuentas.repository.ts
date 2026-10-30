@@ -48,6 +48,7 @@ export interface CuentasRepository {
   actualizarEstado(idUsuario: number, estado: EstadoUsuario): Promise<Usuario>;
   desactivarCuenta(idUsuario: number): Promise<Usuario>;
   buscarIdentidadExterna(proveedor: string, idProveedor: string): Promise<UsuarioIdentidadExterna | null>;
+  buscarIdentidadExternaPorUsuario(idUsuario: number, proveedor: string): Promise<UsuarioIdentidadExterna | null>;
   vincularIdentidadExterna(datos: {
     idUsuario: number;
     proveedor: string;
@@ -173,6 +174,20 @@ export class PrismaCuentasRepository implements CuentasRepository {
         proveedor_idProveedor: {
           proveedor,
           idProveedor,
+        },
+      },
+    });
+  }
+
+  async buscarIdentidadExternaPorUsuario(
+    idUsuario: number,
+    proveedor: string,
+  ): Promise<UsuarioIdentidadExterna | null> {
+    return prisma.usuarioIdentidadExterna.findUnique({
+      where: {
+        idUsuario_proveedor: {
+          idUsuario,
+          proveedor,
         },
       },
     });
