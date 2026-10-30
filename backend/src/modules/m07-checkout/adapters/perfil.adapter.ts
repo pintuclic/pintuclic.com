@@ -16,7 +16,7 @@ export class PrismaPerfilCheckoutAdapter implements PerfilCheckoutPort {
       prisma.direccionCliente.findFirst({
         where: { idUsuario },
         orderBy: { esPredeterminada: 'desc' },
-        select: { direccion: true, barrio: true, apartamentoCasa: true, nombreApellido: true, telefono: true },
+        select: { direccion: true, barrio: true, apartamentoCasa: true, municipio: true, departamento: true, nombreApellido: true, telefono: true },
       }),
     ]);
     return {
@@ -29,6 +29,8 @@ export class PrismaPerfilCheckoutAdapter implements PerfilCheckoutPort {
               direccion: direccion.direccion,
               barrio: direccion.barrio,
               apartamentoCasa: direccion.apartamentoCasa,
+              municipio: direccion.municipio,
+              departamento: direccion.departamento,
               nombreRecibe: direccion.nombreApellido,
               telefonoRecibe: direccion.telefono,
             },

@@ -55,10 +55,16 @@ export function celularNequiDe(telefono: string | null | undefined): string | nu
   return /^3\d{9}$/.test(limpio) ? limpio : null;
 }
 
-/** R14: la dirección como queda en la solicitud y en la orden. */
+/**
+ * R14: la dirección como queda en la solicitud y en la orden. Municipio y departamento (M10 · P1) van al final, cada
+ * uno en su segmento, solo si se capturaron: «… · Recibe: <nombre>, <teléfono> · Municipio: <m> · Departamento: <d>».
+ */
 export function textoDireccion(d: DireccionEntrega): string {
-  const partes = [d.direccion, d.barrio, d.apartamentoCasa].filter((p): p is string => p !== null && p.trim() !== '');
-  return `${partes.join(', ')} · Recibe: ${d.nombreRecibe}, ${d.telefonoRecibe}`;
+  const partes = [d.direccion, d.barrio, d.apartamentoCasa].filter((p): p is string => p !== null && p !== undefined && p.trim() !== '');
+  const base = `${partes.join(', ')} · Recibe: ${d.nombreRecibe}, ${d.telefonoRecibe}`;
+  const municipio = d.municipio?.trim();
+  const departamento = d.departamento?.trim();
+  return base + (municipio ? ` · Municipio: ${municipio}` : '') + (departamento ? ` · Departamento: ${departamento}` : '');
 }
 
 /** R9: el origen sale de las líneas de cotización; más de una cotización no se puede pagar junta. */

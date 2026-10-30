@@ -20,6 +20,8 @@ const base = {
   direccion: '',
   barrio: '',
   apartamentoCasa: '',
+  municipio: '',
+  departamento: '',
   nombreRecibe: '',
   telefonoRecibe: '',
   celularNequi: '3991111111',

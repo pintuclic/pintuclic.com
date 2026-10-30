@@ -28,6 +28,8 @@ const VACIO: PagoFormEntrada = {
   direccion: '',
   barrio: '',
   apartamentoCasa: '',
+  municipio: '',
+  departamento: '',
   nombreRecibe: '',
   telefonoRecibe: '',
   celularNequi: '',
@@ -83,6 +85,8 @@ export function CheckoutView() {
         direccion: d?.direccion ?? '',
         barrio: d?.barrio ?? '',
         apartamentoCasa: d?.apartamentoCasa ?? '',
+        municipio: d?.municipio ?? '',
+        departamento: d?.departamento ?? '',
         nombreRecibe: d?.nombreRecibe ?? '',
         telefonoRecibe: d?.telefonoRecibe ?? '',
         celularNequi: p.celularSugerido ?? '',
@@ -117,6 +121,8 @@ export function CheckoutView() {
                 direccion: f.direccion,
                 barrio: f.barrio,
                 apartamentoCasa: f.apartamentoCasa === '' ? null : f.apartamentoCasa,
+                municipio: f.municipio === '' ? null : f.municipio,
+                departamento: f.departamento === '' ? null : f.departamento,
                 nombreRecibe: f.nombreRecibe,
                 telefonoRecibe: f.telefonoRecibe,
               }
@@ -278,6 +284,8 @@ export function CheckoutView() {
                 </div>
                 <Input id="barrio" label="Barrio" error={errors.barrio?.message} {...register('barrio')} />
                 <Input id="apartamentoCasa" label="Apartamento o casa (opcional)" error={errors.apartamentoCasa?.message} {...register('apartamentoCasa')} />
+                <Input id="municipio" label="Municipio (opcional)" autoComplete="address-level2" error={errors.municipio?.message} {...register('municipio')} />
+                <Input id="departamento" label="Departamento (opcional)" autoComplete="address-level1" error={errors.departamento?.message} {...register('departamento')} />
                 <Input id="nombreRecibe" label="Quién recibe" autoComplete="name" error={errors.nombreRecibe?.message} {...register('nombreRecibe')} />
                 <Input id="telefonoRecibe" label="Teléfono de quien recibe" type="tel" autoComplete="tel" error={errors.telefonoRecibe?.message} {...register('telefonoRecibe')} />
               </div>

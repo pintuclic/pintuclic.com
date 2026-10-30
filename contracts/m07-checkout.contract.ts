@@ -268,6 +268,9 @@ export const direccionEntregaSchema = z.object({
   direccion: z.string().trim().min(5, 'La dirección debe tener al menos 5 caracteres').max(255),
   barrio: z.string().trim().min(2, 'El barrio debe tener al menos 2 caracteres').max(100),
   apartamentoCasa: z.string().trim().max(100).nullable(),
+  /** M10 · P1: opcionales; se anotan en el texto de la dirección de la orden. */
+  municipio: z.string().trim().max(100).nullable().optional(),
+  departamento: z.string().trim().max(100).nullable().optional(),
   nombreRecibe: nombreSchema,
   telefonoRecibe: telefonoSchema,
 });

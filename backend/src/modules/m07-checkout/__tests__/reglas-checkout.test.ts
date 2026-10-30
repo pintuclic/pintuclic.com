@@ -89,6 +89,19 @@ describe('M07 · reglas', () => {
     ).toBe('Carrera 7 # 45-23, Chapinero · Recibe: Ana Pérez, 3001234567');
   });
 
+  it('R14 · M10 P1: municipio y departamento, si se capturaron, van al final en su propio segmento', () => {
+    const base = { direccion: 'Carrera 7 # 45-23', barrio: 'Chapinero', apartamentoCasa: null, nombreRecibe: 'Ana Pérez', telefonoRecibe: '3001234567' };
+    expect(textoDireccion({ ...base, municipio: 'Bogotá', departamento: 'Cundinamarca' })).toBe(
+      'Carrera 7 # 45-23, Chapinero · Recibe: Ana Pérez, 3001234567 · Municipio: Bogotá · Departamento: Cundinamarca',
+    );
+    expect(textoDireccion({ ...base, municipio: 'Bogotá', departamento: null })).toBe(
+      'Carrera 7 # 45-23, Chapinero · Recibe: Ana Pérez, 3001234567 · Municipio: Bogotá',
+    );
+    expect(textoDireccion({ ...base, municipio: '  ', departamento: undefined })).toBe(
+      'Carrera 7 # 45-23, Chapinero · Recibe: Ana Pérez, 3001234567',
+    );
+  });
+
   it('R14: domicilio exige dirección; las casillas de Wompi son obligatorias', () => {
     const base = {
       pantalla: { lineas: [], total: 0 },

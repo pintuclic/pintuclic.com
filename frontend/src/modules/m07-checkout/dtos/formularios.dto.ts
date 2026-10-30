@@ -13,6 +13,8 @@ export const pagoFormSchema = z
     direccion: z.string().trim().max(255),
     barrio: z.string().trim().max(100),
     apartamentoCasa: z.string().trim().max(100),
+    municipio: z.string().trim().max(100),
+    departamento: z.string().trim().max(100),
     nombreRecibe: z.string().trim().max(150),
     telefonoRecibe: z.string().trim().max(20),
     celularNequi: celularNequiSchema,
