@@ -86,7 +86,7 @@ export class ConsultaClienteService {
 
   private async presentar(datos: DetalleOrdenDatos): Promise<OrdenDetalleCliente> {
     const referencias = datos.lineas.flatMap((l) => (l.idVarianteRef === null ? [] : [l.idVarianteRef]));
-    const disponibles = referencias.length > 0 ? await this.catalogo.variantesDisponibles(referencias) : new Set<number>();
+    const disponibles = referencias.length > 0 ? await this.catalogo.variantesDisponibles(referencias) : new Map<number, number>();
 
     return {
       ...aResumen(datos),
@@ -108,6 +108,7 @@ export class ConsultaClienteService {
         descuentos: [...linea.descuentos].sort((a, b) => a.ordenAplicacion - b.ordenAplicacion),
         // R14: sin referencia al catálogo no hay ficha a la que enlazar.
         productoDisponible: linea.idVarianteRef !== null && disponibles.has(linea.idVarianteRef),
+        idProducto: linea.idVarianteRef === null ? null : (disponibles.get(linea.idVarianteRef) ?? null),
       })),
       historial: [...datos.historial]
         .sort((a, b) => a.fecha.getTime() - b.fecha.getTime())

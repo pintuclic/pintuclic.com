@@ -232,6 +232,8 @@ export const lineaOrdenSchema = z.object({
   descuentos: z.array(descuentoOrdenSchema),
   /** R14. false → sin enlace a la ficha y con la nota de no disponible. */
   productoDisponible: z.boolean(),
+  /** Para enlazar a la ficha del producto (`/productos/:idProducto`); null cuando no está disponible (R14). */
+  idProducto: z.number().int().positive().nullable(),
 });
 export type LineaOrden = z.infer<typeof lineaOrdenSchema>;
 

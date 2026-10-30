@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { formatCOP } from '@/core/utils/moneda';
 import type { LineaOrden, LineaOrdenGestion } from '../dtos/m08-ordenes.dto';
 
@@ -9,7 +10,16 @@ export function LineasOrdenLista({ lineas }: { lineas: ReadonlyArray<LineaOrden 
         <li key={`${linea.skuVendido ?? linea.nombreProducto}-${indice}`} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-title text-sm font-semibold text-neutral-black">{linea.nombreProducto}</p>
+              {/* RF-ORD-04-03: con el producto en el catálogo, el nombre lleva a su ficha; si no, es solo texto. */}
+              {linea.idProducto === null ? (
+                <p className="font-title text-sm font-semibold text-neutral-black">{linea.nombreProducto}</p>
+              ) : (
+                <p className="font-title text-sm font-semibold">
+                  <Link href={`/productos/${linea.idProducto}`} className="text-action hover:text-action-hover hover:underline">
+                    {linea.nombreProducto}
+                  </Link>
+                </p>
+              )}
               <p className="text-xs text-neutral-medium">
                 {linea.varianteCopia}
                 {linea.colorSolicitado ? ` · Color: ${linea.colorSolicitado}` : ''}

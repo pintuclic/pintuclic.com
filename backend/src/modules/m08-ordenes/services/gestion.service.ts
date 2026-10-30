@@ -136,7 +136,7 @@ export class GestionService {
 
   private async presentar(datos: DetalleGestionDatos): Promise<OrdenDetalleGestion> {
     const referencias = datos.lineas.flatMap((l) => (l.idVarianteRef === null ? [] : [l.idVarianteRef]));
-    const disponibles = referencias.length > 0 ? await this.catalogo.variantesDisponibles(referencias) : new Set<number>();
+    const disponibles = referencias.length > 0 ? await this.catalogo.variantesDisponibles(referencias) : new Map<number, number>();
 
     return {
       codigo: datos.codigo,
@@ -167,6 +167,7 @@ export class GestionService {
         precioAplicado: linea.precioAplicado,
         descuentos: [...linea.descuentos].sort((a, b) => a.ordenAplicacion - b.ordenAplicacion),
         productoDisponible: linea.idVarianteRef !== null && disponibles.has(linea.idVarianteRef),
+        idProducto: linea.idVarianteRef === null ? null : (disponibles.get(linea.idVarianteRef) ?? null),
         esEntonado: linea.esEntonado,
         baseConsumida: linea.baseConsumida,
       })),

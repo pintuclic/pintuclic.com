@@ -182,7 +182,7 @@ describe('Gestión de pedidos · HTTP (HU-ORD-03, 05, 08, 09, 11)', () => {
     );
     const m08 = construirModuloM08(autorizacion, {
       auditoria,
-      gestion: { repo, catalogo: { variantesDisponibles: async (ids) => new Set(ids) } },
+      gestion: { repo, catalogo: { variantesDisponibles: async (ids) => new Map(ids.map((id) => [id, id + 100])) } },
       estados: { repo, eventos, notificaciones, reloj: { ahora: () => AHORA } },
     });
     const app = express();

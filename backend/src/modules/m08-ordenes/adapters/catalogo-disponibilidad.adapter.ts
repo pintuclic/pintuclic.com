@@ -7,8 +7,8 @@ import type { CatalogoDisponibilidadPort } from '../interfaces/consulta-cliente.
  * No modifica ni importa código de M01: solo consulta sus tablas.
  */
 export class PrismaCatalogoDisponibilidadAdapter implements CatalogoDisponibilidadPort {
-  async variantesDisponibles(idsVariante: number[]): Promise<Set<number>> {
-    if (idsVariante.length === 0) return new Set();
+  async variantesDisponibles(idsVariante: number[]): Promise<Map<number, number>> {
+    if (idsVariante.length === 0) return new Map();
 
     const filas = await prisma.variante.findMany({
       where: {
@@ -16,8 +16,8 @@ export class PrismaCatalogoDisponibilidadAdapter implements CatalogoDisponibilid
         estado: { in: ['activo', 'agotado'] },
         producto: { estado: 'activo' },
       },
-      select: { idVariante: true },
+      select: { idVariante: true, idProducto: true },
     });
-    return new Set(filas.map((f) => f.idVariante));
+    return new Map(filas.map((f) => [f.idVariante, f.idProducto]));
   }
 }

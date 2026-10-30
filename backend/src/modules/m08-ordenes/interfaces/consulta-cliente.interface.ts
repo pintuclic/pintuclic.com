@@ -62,5 +62,6 @@ export interface ConsultaClienteRepository {
 
 /** D6 del contrato: lectura de solo existencia sobre `id_variante_ref`; no modifica M01. */
 export interface CatalogoDisponibilidadPort {
-  variantesDisponibles(idsVariante: number[]): Promise<Set<number>>;
+  /** Las variantes que siguen en el catálogo, cada una con el id de su producto (para enlazar a su ficha). */
+  variantesDisponibles(idsVariante: number[]): Promise<Map<number, number>>;
 }

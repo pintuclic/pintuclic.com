@@ -106,7 +106,7 @@ describe('Notas internas y contactos · HTTP (HU-ORD-10, HU-ORD-09-02)', () => {
       { tienePermiso: async (idUsuario, codigo) => PERMISOS[idUsuario]?.includes(codigo) ?? false },
       auditoria,
     );
-    const catalogo = { variantesDisponibles: async (ids: number[]) => new Set(ids) };
+    const catalogo = { variantesDisponibles: async (ids: number[]) => new Map(ids.map((id) => [id, id + 100])) };
     const m08 = construirModuloM08(autorizacion, {
       consultaCliente: { repo, catalogo },
       gestion: { repo, catalogo },

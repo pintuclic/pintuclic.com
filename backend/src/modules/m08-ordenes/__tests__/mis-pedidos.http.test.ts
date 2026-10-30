@@ -94,7 +94,7 @@ describe('Mis pedidos · HTTP (HU-ORD-04, HU-ORD-07)', () => {
   const repo = new RepoMemoria();
   const auditoria = { registrarAccesoDenegado: vi.fn().mockResolvedValue(undefined) };
   const catalogo: CatalogoDisponibilidadPort = {
-    variantesDisponibles: async (ids) => new Set(ids.filter((id) => id !== 99)),
+    variantesDisponibles: async (ids) => new Map(ids.filter((id) => id !== 99).map((id) => [id, id + 100])),
   };
 
   const ACTORES: Record<string, Actor> = {
@@ -203,6 +203,8 @@ describe('Mis pedidos · HTTP (HU-ORD-04, HU-ORD-07)', () => {
 
     const { data } = ordenClienteResponseEnvelopeSchema.parse(json(r));
     expect(data.lineas.map((l) => l.productoDisponible)).toEqual([true, false]);
+    // Enlace a la ficha: solo si sigue en el catálogo; el retirado queda sin id (CA-ORD-04-04).
+    expect(data.lineas.map((l) => l.idProducto)).toEqual([111, null]);
     expect(data.lineas[1]).toMatchObject({ nombreProducto: 'Esmalte Retirado', cantidad: 2, precioAplicado: 75000 });
   });
 
