@@ -11,7 +11,10 @@ import {
   type AceptacionesWompi,
   type CarritoCheckoutPort,
   type CompraDirecta,
+  type CotizacionEnvioCheckout,
+  type CotizadorEnvioCheckoutPort,
   type CrearSolicitudRequest,
+  type DireccionEntrega,
   type ListarSolicitudesAdminRequest,
   type OrdenesCheckoutPort,
   type ParametrosCheckoutPort,
@@ -56,6 +59,8 @@ export interface DependenciasCheckout {
   pasarela: PasarelaPagoPort;
   perfil: PerfilCheckoutPort;
   parametros?: ParametrosCheckoutPort;
+  /** M10: cotiza el envío a domicilio (R10). Sin él, rige la tarifa plana de M17. */
+  cotizador?: CotizadorEnvioCheckoutPort;
   auditoria?: AuditoriaPort;
   reloj?: () => Date;
 }
@@ -84,12 +89,12 @@ export class CheckoutService {
       this.terminos(),
       this.dep.repo.abiertaDelUsuario(idUsuario),
     ]);
-    const totalMercancia = carrito.calculo?.resumen.total ?? 0;
+    const estimado = await this.costoDomicilio(carrito, perfil.direccion === null ? null : textoDireccion(perfil.direccion), envio);
     const enCurso = abierta !== null && abierta.estado === 'en_pago' && abierta.intentos.at(-1)?.estado === 'PENDING';
     return {
       carrito,
       envio: {
-        domicilio: costoEnvio('domicilio', totalMercancia, envio.base, envio.umbral),
+        domicilio: estimado.costo,
         recogida: 0,
         umbralEnvioGratis: envio.umbral,
       },
@@ -98,6 +103,21 @@ export class CheckoutService {
       terminos,
       solicitudEnCurso: enCurso ? abierta.codigo : null,
     };
+  }
+
+  /** M10: lo que costaría enviar este pedido a esa dirección. No guarda nada. */
+  async cotizarEnvio(
+    idUsuario: number,
+    direccion: DireccionEntrega,
+    directa?: CompraDirecta,
+    codigoCupon?: string,
+  ): Promise<CotizacionEnvioCheckout> {
+    const carrito =
+      directa === undefined
+        ? await this.dep.carrito.carritoDeCuenta(idUsuario, codigoCupon)
+        : await this.dep.carrito.carritoDirecto(idUsuario, directa);
+    if (carrito.lineas.length === 0) throw errores.carritoVacio();
+    return this.costoDomicilio(carrito, textoDireccion(direccion), await this.parametrosEnvio());
   }
 
   /** R2, en su orden. */
@@ -120,6 +140,20 @@ export class CheckoutService {
     const origen = origenDeLineas(carrito.lineas);
     if (origen === 'varias') throw errores.variasCotizaciones();
 
+    // b2) M10: el envío a domicilio lo cotiza el servicio de envíos (con respaldo si falla). Si el cliente tenía otro
+    //     costo en pantalla, se frena antes de tocar nada para que lo vea y confirme.
+    const cotizacionEnvio =
+      req.modoEntrega === 'domicilio' && req.direccion !== null
+        ? await this.costoDomicilio(carrito, textoDireccion(req.direccion), await this.parametrosEnvio())
+        : null;
+    if (
+      cotizacionEnvio !== null &&
+      req.costoEnvioMostrado !== undefined &&
+      aCentavos(req.costoEnvioMostrado) !== aCentavos(cotizacionEnvio.costo)
+    ) {
+      throw errores.costoEnvioCambio(cotizacionEnvio.costo);
+    }
+
     // c) Una sola compra abierta por cliente.
     const abierta = await this.dep.repo.abiertaDelUsuario(idUsuario);
     if (abierta !== null) {
@@ -130,8 +164,7 @@ export class CheckoutService {
 
     // d) Envío y congelado.
     const resumen = carrito.calculo.resumen;
-    const envio = await this.parametrosEnvio();
-    const costoEntrega = costoEnvio(req.modoEntrega, resumen.total, envio.base, envio.umbral);
+    const costoEntrega = cotizacionEnvio?.costo ?? 0;
     const cupon = carrito.calculo.cupon;
     const cuponAplicado = cupon !== null && cupon.aplicado && cupon.idCupon !== null ? cupon : null;
     const ahora = this.reloj();
@@ -305,6 +338,33 @@ export class CheckoutService {
     const s = await this.dep.repo.buscarPorCodigo(codigo);
     if (s === null) throw errores.noDisponible();
     return s;
+  }
+
+  /**
+   * R10 · M10: con servicio de envíos, el costo lo calcula él; sin servicio, o si falla de forma inesperada, rige la
+   * tarifa plana de M17. Nunca impide comprar.
+   */
+  private async costoDomicilio(
+    carrito: Awaited<ReturnType<CarritoCheckoutPort['carritoDeCuenta']>>,
+    direccion: string | null,
+    envio: { base: number; umbral: number },
+  ): Promise<CotizacionEnvioCheckout> {
+    const totalMercancia = carrito.calculo?.resumen.total ?? 0;
+    const tarifaPlana = (): CotizacionEnvioCheckout => ({
+      costo: costoEnvio('domicilio', totalMercancia, envio.base, envio.umbral),
+      servicio: 'Entrega a domicilio',
+      esEstimado: false,
+    });
+    if (this.dep.cotizador === undefined) return tarifaPlana();
+    try {
+      return await this.dep.cotizador.cotizarDomicilio({
+        direccion,
+        totalMercancia,
+        lineas: carrito.lineas.map((l) => ({ idVariante: l.idVariante, cantidad: l.cantidad, valor: l.precio?.subtotal ?? 0 })),
+      });
+    } catch {
+      return { ...tarifaPlana(), esEstimado: true };
+    }
   }
 
   private async parametrosEnvio(): Promise<{ base: number; umbral: number }> {

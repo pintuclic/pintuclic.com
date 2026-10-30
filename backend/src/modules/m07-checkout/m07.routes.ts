@@ -10,6 +10,7 @@ import {
   PERMISOS_PAGOS,
   type CarritoCheckoutPort,
   type OrdenesCheckoutPort,
+  type CotizadorEnvioCheckoutPort,
   type ParametrosCheckoutPort,
   type PasarelaPagoPort,
   type PerfilCheckoutPort,
@@ -31,6 +32,8 @@ export interface DependenciasM07 {
   ordenes: OrdenesCheckoutPort;
   /** M17: parámetros de envío (R10). */
   parametros?: ParametrosCheckoutPort;
+  /** M10: cotiza el envío a domicilio con el servicio de envíos (R10). Sin él rige la tarifa plana de M17. */
+  cotizador?: CotizadorEnvioCheckoutPort;
   /** M20: acciones del panel y eventos con firma inválida. */
   auditoria?: AuditoriaPort;
   /** Por defecto, Wompi con las variables WOMPI_* (P8). */
@@ -95,6 +98,7 @@ export function construirModuloM07(autorizacion: AutorizacionService, dep: Depen
     pasarela: dep.pasarela ?? new WompiAdapter(configuracionWompiDesdeEntorno()),
     perfil: dep.perfil ?? new PrismaPerfilCheckoutAdapter(),
     ...(dep.parametros === undefined ? {} : { parametros: dep.parametros }),
+    ...(dep.cotizador === undefined ? {} : { cotizador: dep.cotizador }),
     ...(dep.auditoria === undefined ? {} : { auditoria: dep.auditoria }),
     ...(dep.reloj === undefined ? {} : { reloj: dep.reloj }),
   });
@@ -103,6 +107,7 @@ export function construirModuloM07(autorizacion: AutorizacionService, dep: Depen
   const clienteRouter = Router();
   clienteRouter.use(soloCliente);
   clienteRouter.get('/preparar', c.preparar);
+  clienteRouter.post('/envio/cotizar', c.cotizarEnvio);
   clienteRouter.post('/solicitudes', c.crear);
   clienteRouter.get('/solicitudes/:codigo', c.obtener);
   clienteRouter.post('/solicitudes/:codigo/reintentar', c.reintentar);

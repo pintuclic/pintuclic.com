@@ -1,7 +1,7 @@
 import type { Revalidacion } from '../../m05-carrito/dtos/m05-carrito.dto';
 import type { CodigoErrorCheckout } from '../dtos/m07-checkout.dto';
 
-type Detalles = Revalidacion | { codigo: string } | { motivo: string } | null;
+type Detalles = Revalidacion | { codigo: string } | { motivo: string } | { costoEnvio: number } | null;
 
 /** Error de dominio de M07: sale tal cual en `{ success: false, error: { code, message, details } }`. */
 export class CheckoutError extends Error {
@@ -50,6 +50,14 @@ export const errores = {
       'Tu carrito cambió desde que lo revisaste. Revisa los precios y vuelve a confirmar.',
       409,
       revalidacion,
+    ),
+  /** M10: el servicio de envíos cotizó otro valor distinto del que el cliente tenía en pantalla. */
+  costoEnvioCambio: (costoEnvio: number): CheckoutError =>
+    new CheckoutError(
+      'COSTO_ENVIO_CAMBIO',
+      'El costo del envío cambió. Revisa el total y vuelve a confirmar.',
+      409,
+      { costoEnvio },
     ),
   variasCotizaciones: (): CheckoutError =>
     new CheckoutError(

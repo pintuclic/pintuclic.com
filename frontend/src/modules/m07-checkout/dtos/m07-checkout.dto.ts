@@ -150,6 +150,8 @@ export const crearSolicitudRequestSchema = z
     direccion: direccionEntregaSchema.nullable(),
     celularNequi: celularNequiSchema,
     aceptaciones: aceptacionesWompiSchema,
+    /** M10: el costo de envío que el cliente tenía en pantalla. Si el servidor cotiza otro, 409 COSTO_ENVIO_CAMBIO. */
+    costoEnvioMostrado: dineroSchema.optional(),
   })
   .refine((v) => v.modoEntrega !== 'domicilio' || v.direccion !== null, {
     message: 'Escribe la dirección de entrega',
@@ -160,6 +162,25 @@ export const crearSolicitudRequestSchema = z
     path: ['pantalla', 'codigoCupon'],
   });
 export type CrearSolicitudRequest = z.infer<typeof crearSolicitudRequestSchema>;
+
+/**
+ * POST /checkout/envio/cotizar (M10): cuánto cuesta enviar este pedido a esa dirección. El costo lo calcula el servicio
+ * de envíos con el peso y las medidas; si no responde, sale la tarifa de respaldo y `esEstimado` es true.
+ */
+export const cotizarEnvioRequestSchema = z.object({
+  direccion: direccionEntregaSchema,
+  codigoCupon: codigoCuponEntradaSchema.optional(),
+  directa: compraDirectaSchema.optional(),
+});
+export type CotizarEnvioRequest = z.infer<typeof cotizarEnvioRequestSchema>;
+
+export const cotizacionEnvioSchema = z.object({
+  costo: dineroSchema,
+  servicio: z.string(),
+  esEstimado: z.boolean(),
+});
+export type CotizacionEnvioCheckout = z.infer<typeof cotizacionEnvioSchema>;
+export const cotizacionEnvioResponseEnvelopeSchema = respuestaUno(cotizacionEnvioSchema);
 
 /** POST /checkout/solicitudes/:codigo/reintentar (R4). */
 export const reintentarPagoRequestSchema = z.object({
@@ -317,6 +338,7 @@ export const CODIGOS_ERROR_CHECKOUT = [
   'FIRMA_INVALIDA',
   'RECURSO_NO_DISPONIBLE',
   'CARRITO_CAMBIO',
+  'COSTO_ENVIO_CAMBIO',
   'VARIAS_COTIZACIONES',
   'PAGO_EN_CURSO',
   'CUPON_NO_DISPONIBLE',
@@ -366,6 +388,16 @@ export interface CarritoCheckoutPort {
  * cálculo nuevo y los datos de M01 de cada línea; aquí solo se registra o libera el cupón.
  */
 export type PreciosCheckoutPort = Pick<PreciosPort, 'registrarUsoCupon' | 'liberarUsoCupon'>;
+
+/** Lo que M07 usa de M10 (R10): el costo del envío a domicilio, ya con su respaldo si el servicio de envíos falla. */
+export interface CotizadorEnvioCheckoutPort {
+  cotizarDomicilio(entrada: {
+    /** Texto de la dirección (R14); null si aún no hay una y solo se estima. */
+    direccion: string | null;
+    totalMercancia: number;
+    lineas: ReadonlyArray<{ idVariante: number; cantidad: number; valor: number }>;
+  }): Promise<{ costo: number; servicio: string; esEstimado: boolean }>;
+}
 
 /** Lo que M07 usa de M17 (R10): null si el parámetro no se pudo leer. */
 export interface ParametrosCheckoutPort {

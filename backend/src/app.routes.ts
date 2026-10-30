@@ -283,6 +283,8 @@ export function construirAppRoutes(): Router {
         return typeof valor === 'number' ? valor : null;
       },
     },
+    // M10: el costo del envío a domicilio lo cotiza el servicio de envíos, con respaldo si falla (hoy, la entrega propia).
+    cotizador: m10.cotizador,
     auditoria: m20.auditoria,
     tareaPeriodica: process.env.VITEST === undefined,
   });

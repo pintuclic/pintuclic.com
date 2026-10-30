@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CrearSolicitudRequest } from '../dtos/m07-checkout.dto';
 import { CheckoutError, OrdenDefinitivaError } from '../services/checkout-error';
 import { CheckoutService } from '../services/checkout.service';
@@ -82,6 +82,74 @@ describe('M07 · CheckoutService', () => {
     expect(pasarela.transacciones.get('tx-1')).toMatchObject({ referencia: 'SOL-2026-00001-1', montoEnCentavos: 11_000_000 });
     // R12: el número completo no queda guardado.
     expect(JSON.stringify(repo.solicitudes)).not.toContain('3991111111');
+  });
+
+  describe('M10 · el envío a domicilio lo cotiza el servicio de envíos', () => {
+    const domicilio = { direccion: 'Calle 1 # 2-3', barrio: 'Centro', apartamentoCasa: null, nombreRecibe: 'Ana', telefonoRecibe: '3001234567' };
+    const crearConCotizador = (cotizar: (entrada: never) => Promise<{ costo: number; servicio: string; esEstimado: boolean }>) =>
+      new CheckoutService({
+        repo,
+        carrito: carritoF,
+        precios,
+        ordenes,
+        pasarela,
+        perfil: perfilFalso,
+        parametros: { obtenerNumero: async (clave) => (clave === 'comercial.costo_envio_base' ? 15_000 : 200_000) },
+        cotizador: { cotizarDomicilio: cotizar },
+        reloj: () => ahora,
+      });
+
+    it('el costo congelado y cobrado es el que cotiza el proveedor, no la tarifa plana', async () => {
+      const cotizar = vi.fn(async (_entrada: unknown) => ({ costo: 23_500, servicio: 'Express', esEstimado: false }));
+      servicio = crearConCotizador(cotizar);
+
+      const s = await servicio.crear(CLIENTE, { ...peticion, modoEntrega: 'domicilio', direccion: domicilio });
+
+      expect(s.costoEnvio).toBe(23_500);
+      expect(s.totalACobrar).toBe(123_500);
+      expect(cotizar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          direccion: 'Calle 1 # 2-3, Centro · Recibe: Ana, 3001234567',
+          totalMercancia: 100_000,
+          lineas: [expect.objectContaining({ idVariante: expect.any(Number), cantidad: expect.any(Number) })],
+        }),
+      );
+    });
+
+    it('si el costo que el cliente tenía en pantalla no coincide, 409 COSTO_ENVIO_CAMBIO con el nuevo y no se crea nada', async () => {
+      servicio = crearConCotizador(async () => ({ costo: 23_500, servicio: 'Express', esEstimado: false }));
+      const intento = servicio.crear(CLIENTE, { ...peticion, modoEntrega: 'domicilio', direccion: domicilio, costoEnvioMostrado: 15_000 });
+
+      await expect(intento).rejects.toMatchObject({ code: 'COSTO_ENVIO_CAMBIO', status: 409, details: { costoEnvio: 23_500 } });
+      expect(repo.solicitudes).toHaveLength(0);
+    });
+
+    it('con el mismo costo en pantalla la compra sigue', async () => {
+      servicio = crearConCotizador(async () => ({ costo: 23_500, servicio: 'Express', esEstimado: false }));
+      const s = await servicio.crear(CLIENTE, { ...peticion, modoEntrega: 'domicilio', direccion: domicilio, costoEnvioMostrado: 23_500 });
+      expect(s.costoEnvio).toBe(23_500);
+    });
+
+    it('si el cotizador falla de forma inesperada, rige la tarifa plana y el cliente puede comprar', async () => {
+      servicio = crearConCotizador(async () => {
+        throw new Error('cotizador caído');
+      });
+      const s = await servicio.crear(CLIENTE, { ...peticion, modoEntrega: 'domicilio', direccion: domicilio });
+      expect(s.costoEnvio).toBe(15_000);
+    });
+
+    it('la recogida no cotiza ni cobra envío', async () => {
+      servicio = crearConCotizador(async () => {
+        throw new Error('no debía llamarse');
+      });
+      const s = await servicio.crear(CLIENTE, { ...peticion, modoEntrega: 'recogida' });
+      expect(s.costoEnvio).toBe(0);
+    });
+
+    it('cotizarEnvio devuelve el costo y si es estimado, sin guardar nada', async () => {
+      servicio = crearConCotizador(async () => ({ costo: 12_000, servicio: 'Económico', esEstimado: true }));
+      expect(await servicio.cotizarEnvio(CLIENTE, domicilio)).toEqual({ costo: 12_000, servicio: 'Económico', esEstimado: true });
+    });
   });
 
   it('R2 a, b: carrito vacío, carrito que cambió y varias cotizaciones', async () => {

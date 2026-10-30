@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { ZodType } from 'zod';
 import {
   codigoSolicitudParamsSchema,
+  cotizarEnvioRequestSchema,
   crearSolicitudRequestSchema,
   listarSolicitudesAdminRequestSchema,
   prepararCheckoutRequestSchema,
@@ -74,6 +75,13 @@ export class CheckoutController {
     const directa =
       q.idVariante === undefined ? undefined : { idVariante: q.idVariante, idColor: q.idColor ?? null, cantidad: q.cantidad ?? 1 };
     exito(res, await this.servicio.preparar(actor(req), q.codigoCupon, directa));
+  });
+
+  /** M10: cuánto costaría enviar este pedido a esa dirección. */
+  cotizarEnvio = manejar(async (req, res) => {
+    const datos = validar(res, cotizarEnvioRequestSchema, req.body);
+    if (datos === null) return;
+    exito(res, await this.servicio.cotizarEnvio(actor(req), datos.direccion, datos.directa, datos.codigoCupon));
   });
 
   crear = manejar(async (req, res) => {
