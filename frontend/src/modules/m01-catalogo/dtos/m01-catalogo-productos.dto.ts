@@ -35,6 +35,10 @@ export const MAXIMO_PRECIO = 9_999_999_999.99;
 export const codigoColorSchema = z.string().trim().min(1).max(60);
 export const skuSchema = z.string().trim().min(1).max(60).regex(/^[A-Za-z0-9._-]+$/, 'Solo letras, números, punto, guion y guion bajo');
 export const codigoProveedorSchema = z.string().trim().min(1).max(100);
+
+/** M10 · P2: peso (g) y medidas (cm) de una unidad empacada, opcionales; los usa un servicio de envíos. */
+export const pesoGramosSchema = z.number().int().positive().max(1_000_000);
+export const medidaCmSchema = z.number().positive().max(10_000);
 export const existenciaSchema = z.number().int().min(0).max(2_147_483_647);
 export const precioSchema = z
   .number()
@@ -355,6 +359,11 @@ export const varianteSchema = z.object({
   precio: z.number().nonnegative(),
   existenciaReferencial: existenciaSchema,
   codigoProveedor: z.string().nullable(),
+  /** M10 · P2: null si no se ha registrado. */
+  pesoGramos: z.number().int().nullable(),
+  altoCm: z.number().nullable(),
+  anchoCm: z.number().nullable(),
+  largoCm: z.number().nullable(),
   estado: estadoSchema,
 });
 export type Variante = z.infer<typeof varianteSchema>;
@@ -453,6 +462,10 @@ export const crearVarianteRequestSchema = z.object({
   precio: precioSchema,
   sku: skuSchema.optional(),
   codigoProveedor: codigoProveedorSchema.nullable().optional(),
+  pesoGramos: pesoGramosSchema.nullable().optional(),
+  altoCm: medidaCmSchema.nullable().optional(),
+  anchoCm: medidaCmSchema.nullable().optional(),
+  largoCm: medidaCmSchema.nullable().optional(),
 });
 export type CrearVarianteRequest = z.infer<typeof crearVarianteRequestSchema>;
 
@@ -462,6 +475,10 @@ export const editarVarianteRequestSchema = z
     precio: precioSchema.optional(),
     sku: skuSchema.optional(),
     codigoProveedor: codigoProveedorSchema.nullable().optional(),
+    pesoGramos: pesoGramosSchema.nullable().optional(),
+    altoCm: medidaCmSchema.nullable().optional(),
+    anchoCm: medidaCmSchema.nullable().optional(),
+    largoCm: medidaCmSchema.nullable().optional(),
   })
   .refine(alMenosUnCampo, MENSAJE_SIN_CAMPOS);
 export type EditarVarianteRequest = z.infer<typeof editarVarianteRequestSchema>;

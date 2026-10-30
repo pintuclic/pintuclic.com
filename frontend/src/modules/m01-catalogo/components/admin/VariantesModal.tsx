@@ -52,6 +52,10 @@ const FormularioVariante: React.FC<FormularioVarianteProps> = ({
       precio: variante === null ? '' : String(variante.precio),
       sku: variante?.sku ?? '',
       codigoProveedor: variante?.codigoProveedor ?? '',
+      pesoGramos: variante?.pesoGramos == null ? '' : String(variante.pesoGramos),
+      altoCm: variante?.altoCm == null ? '' : String(variante.altoCm),
+      anchoCm: variante?.anchoCm == null ? '' : String(variante.anchoCm),
+      largoCm: variante?.largoCm == null ? '' : String(variante.largoCm),
     },
   });
   const idTipoMedida = watch('idTipoMedida');
@@ -145,6 +149,18 @@ const FormularioVariante: React.FC<FormularioVarianteProps> = ({
           error={errors.codigoProveedor?.message}
           helperText="Opcional."
         />
+        <fieldset className="space-y-3 rounded-input border border-neutral-light p-3">
+          <legend className="px-1 font-title text-sm font-medium text-neutral-dark">Datos para el envío (opcional)</legend>
+          <p className="text-xs text-neutral-medium">
+            Peso y medidas de una unidad ya empacada. No cambian nada hoy: los usará el servicio de envíos cuando se contrate.
+          </p>
+          <Input label="Peso (gramos)" inputMode="numeric" {...register('pesoGramos')} error={errors.pesoGramos?.message} />
+          <div className="grid grid-cols-3 gap-2">
+            <Input label="Alto (cm)" inputMode="decimal" {...register('altoCm')} error={errors.altoCm?.message} />
+            <Input label="Ancho (cm)" inputMode="decimal" {...register('anchoCm')} error={errors.anchoCm?.message} />
+            <Input label="Largo (cm)" inputMode="decimal" {...register('largoCm')} error={errors.largoCm?.message} />
+          </div>
+        </fieldset>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" type="button" onClick={onClose}>
             Cancelar

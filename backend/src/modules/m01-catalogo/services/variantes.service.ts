@@ -50,6 +50,10 @@ export class VariantesService extends ServicioCatalogoBase {
         precio: peticion.precio,
         sku,
         codigoProveedor,
+        pesoGramos: peticion.pesoGramos ?? null,
+        altoCm: peticion.altoCm ?? null,
+        anchoCm: peticion.anchoCm ?? null,
+        largoCm: peticion.largoCm ?? null,
       })
       .catch(traducirUnico);
   }
@@ -72,6 +76,10 @@ export class VariantesService extends ServicioCatalogoBase {
       ...(peticion.precio !== undefined ? { precio: peticion.precio } : {}),
       ...(peticion.sku !== undefined ? { sku: peticion.sku } : {}),
       ...(peticion.codigoProveedor !== undefined ? { codigoProveedor: peticion.codigoProveedor } : {}),
+      ...(peticion.pesoGramos !== undefined ? { pesoGramos: peticion.pesoGramos } : {}),
+      ...(peticion.altoCm !== undefined ? { altoCm: peticion.altoCm } : {}),
+      ...(peticion.anchoCm !== undefined ? { anchoCm: peticion.anchoCm } : {}),
+      ...(peticion.largoCm !== undefined ? { largoCm: peticion.largoCm } : {}),
     };
     return this.variantes.editar(id, cambios).catch(traducirUnico);
   }

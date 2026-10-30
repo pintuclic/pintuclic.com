@@ -110,12 +110,21 @@ export interface CrearVarianteDatos {
   /** null → el repositorio genera `P{idProducto}-V{idVariante}` (V3). */
   sku: string | null;
   codigoProveedor: string | null;
+  /** M10 · P2 */
+  pesoGramos: number | null;
+  altoCm: number | null;
+  anchoCm: number | null;
+  largoCm: number | null;
 }
 
 export interface EditarVarianteDatos {
   precio?: number;
   sku?: string;
   codigoProveedor?: string | null;
+  pesoGramos?: number | null;
+  altoCm?: number | null;
+  anchoCm?: number | null;
+  largoCm?: number | null;
 }
 
 export interface ClaveVariante {

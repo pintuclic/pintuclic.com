@@ -105,6 +105,10 @@ export function aVariante(f: {
   precioVigente: Prisma.Decimal;
   existenciaReferencial: number;
   codigoProveedor: string | null;
+  pesoGramos: number | null;
+  altoCm: Prisma.Decimal | null;
+  anchoCm: Prisma.Decimal | null;
+  largoCm: Prisma.Decimal | null;
   estado: string;
   medida: { nombre: string; tipoMedida: { nombre: string } };
 }): Variante {
@@ -118,6 +122,10 @@ export function aVariante(f: {
     precio: f.precioVigente.toNumber(),
     existenciaReferencial: f.existenciaReferencial,
     codigoProveedor: f.codigoProveedor,
+    pesoGramos: f.pesoGramos,
+    altoCm: f.altoCm?.toNumber() ?? null,
+    anchoCm: f.anchoCm?.toNumber() ?? null,
+    largoCm: f.largoCm?.toNumber() ?? null,
     estado: estadoDeVariante(f.estado),
   };
 }

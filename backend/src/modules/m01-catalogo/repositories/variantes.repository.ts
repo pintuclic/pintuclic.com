@@ -42,6 +42,10 @@ export class VariantesRepository implements VariantesRepositoryPort {
           sku: datos.sku ?? `tmp-${datos.idProducto}-${datos.idMedida}-${Date.now()}`,
           precioVigente: datos.precio,
           codigoProveedor: datos.codigoProveedor,
+          pesoGramos: datos.pesoGramos,
+          altoCm: datos.altoCm,
+          anchoCm: datos.anchoCm,
+          largoCm: datos.largoCm,
         },
         select: { idVariante: true },
       });
@@ -70,6 +74,10 @@ export class VariantesRepository implements VariantesRepositoryPort {
         ...(datos.precio !== undefined ? { precioVigente: datos.precio } : {}),
         ...(datos.sku !== undefined ? { sku: datos.sku } : {}),
         ...(datos.codigoProveedor !== undefined ? { codigoProveedor: datos.codigoProveedor } : {}),
+        ...(datos.pesoGramos !== undefined ? { pesoGramos: datos.pesoGramos } : {}),
+        ...(datos.altoCm !== undefined ? { altoCm: datos.altoCm } : {}),
+        ...(datos.anchoCm !== undefined ? { anchoCm: datos.anchoCm } : {}),
+        ...(datos.largoCm !== undefined ? { largoCm: datos.largoCm } : {}),
       },
     });
     return this.obtenerExistente(id);

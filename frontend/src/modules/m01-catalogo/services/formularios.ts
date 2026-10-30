@@ -119,6 +119,10 @@ export function aCuerpoVariante(f: FormVariante): Resultado<CrearVarianteRequest
     precio: aNumero(f.precio),
     ...(f.sku.trim() === '' ? {} : { sku: f.sku.trim() }),
     codigoProveedor: textoONulo(f.codigoProveedor),
+    pesoGramos: aNumeroONulo(f.pesoGramos),
+    altoCm: aNumeroONulo(f.altoCm),
+    anchoCm: aNumeroONulo(f.anchoCm),
+    largoCm: aNumeroONulo(f.largoCm),
   });
   return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
 }
@@ -129,6 +133,10 @@ export function aCuerpoVarianteEditada(f: FormVariante): Resultado<EditarVariant
     precio: aNumero(f.precio),
     sku: f.sku.trim(),
     codigoProveedor: textoONulo(f.codigoProveedor),
+    pesoGramos: aNumeroONulo(f.pesoGramos),
+    altoCm: aNumeroONulo(f.altoCm),
+    anchoCm: aNumeroONulo(f.anchoCm),
+    largoCm: aNumeroONulo(f.largoCm),
   });
   return r.success ? { ok: true, valor: r.data } : { ok: false, mensaje: primerMensaje(r.error) };
 }

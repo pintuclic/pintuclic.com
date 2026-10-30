@@ -82,6 +82,11 @@ export const formVarianteSchema = z.object({
   }),
   sku: z.string().trim().max(60, 'Máximo 60 caracteres'),
   codigoProveedor: z.string().trim().max(100, 'Máximo 100 caracteres'),
+  /** M10 · P2: opcionales; vacío = sin registrar. */
+  pesoGramos: z.string().trim().refine((v) => v === '' || /^\d+$/.test(v), 'Use un número entero de gramos'),
+  altoCm: z.string().trim().refine((v) => v === '' || /^\d+([.,]\d)?$/.test(v), 'Use un número, por ejemplo 12,5'),
+  anchoCm: z.string().trim().refine((v) => v === '' || /^\d+([.,]\d)?$/.test(v), 'Use un número, por ejemplo 12,5'),
+  largoCm: z.string().trim().refine((v) => v === '' || /^\d+([.,]\d)?$/.test(v), 'Use un número, por ejemplo 12,5'),
 });
 export type FormVariante = z.infer<typeof formVarianteSchema>;
 

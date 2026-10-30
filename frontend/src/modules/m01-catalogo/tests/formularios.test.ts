@@ -17,7 +17,7 @@ import {
   formDesdeProducto,
   type RelacionesProductoForm,
 } from '../services/formularios';
-import { formColorSchema, formComboSchema, formMedidaSchema, formProductoSchema } from '../dtos/formularios.dto';
+import { formColorSchema, formComboSchema, formMedidaSchema, formProductoSchema, formVarianteSchema } from '../dtos/formularios.dto';
 import type { Combo } from '../dtos/m01-catalogo-entrega3.dto';
 import type { ProductoDetalle } from '../dtos/m01-catalogo-productos.dto';
 
@@ -107,11 +107,22 @@ describe('M01 · formularios → cuerpos del contrato', () => {
       precio: '98900',
       sku: '',
       codigoProveedor: '',
+      pesoGramos: '',
+      altoCm: '',
+      anchoCm: '',
+      largoCm: '',
     };
     expect(aCuerpoVariante(f)).toEqual({
       ok: true,
-      valor: { idMedida: 4, precio: 98900, codigoProveedor: null },
+      valor: { idMedida: 4, precio: 98900, codigoProveedor: null, pesoGramos: null, altoCm: null, anchoCm: null, largoCm: null },
     });
+    // M10 · P2: peso y medidas opcionales; la coma decimal se acepta y vacío es null.
+    expect(aCuerpoVariante({ ...f, pesoGramos: '4200', altoCm: '25,5', anchoCm: '20', largoCm: '' })).toMatchObject({
+      ok: true,
+      valor: { pesoGramos: 4200, altoCm: 25.5, anchoCm: 20, largoCm: null },
+    });
+    expect(aCuerpoVariante({ ...f, pesoGramos: '0' }).ok).toBe(false);
+    expect(formVarianteSchema.safeParse({ ...f, pesoGramos: '4,5' }).success).toBe(false);
     expect(aCuerpoVariante({ ...f, precio: '10,5', sku: 'AB-1' })).toMatchObject({
       ok: true,
       valor: { precio: 10.5, sku: 'AB-1' },
