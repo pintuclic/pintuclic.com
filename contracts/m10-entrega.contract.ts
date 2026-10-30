@@ -97,8 +97,9 @@ export const destinoEnvioSchema = z.object({
   complemento: z.string().max(100).nullable(),
   municipio: z.string().max(100).nullable(),
   departamento: z.string().max(100).nullable(),
-  nombreRecibe: z.string().min(1).max(150),
-  telefonoRecibe: z.string().min(1).max(20),
+  /** null si la orden guardó la dirección como texto y no se pudo separar quién recibe. */
+  nombreRecibe: z.string().max(150).nullable(),
+  telefonoRecibe: z.string().max(20).nullable(),
 });
 export type DestinoEnvio = z.infer<typeof destinoEnvioSchema>;
 
@@ -212,6 +213,11 @@ export const envioDetallePersonalSchema = z.object({
 export type EnvioDetallePersonal = z.infer<typeof envioDetallePersonalSchema>;
 
 export const webhookEnvioOutputSchema = z.object({ procesado: z.boolean() });
+export type WebhookEnvioOutput = z.infer<typeof webhookEnvioOutputSchema>;
+
+export const PERMISOS_M10 = { ver: 'ventas.ver', gestionar: 'ventas.gestionar' } as const;
+
+export const codigoOrdenParamsSchema = z.object({ codigo: z.string().trim().min(1).max(50) });
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 4. MAPA DE RUTAS

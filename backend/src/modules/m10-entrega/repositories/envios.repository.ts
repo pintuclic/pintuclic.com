@@ -1,0 +1,120 @@
+import { prisma } from '../../../core/db/client';
+import type { EstadoEnvio } from '../dtos/m10-entrega.dto';
+import type {
+  DatosGuardarEnvio,
+  EnvioGuardado,
+  EnviosRepositoryPort,
+  NovedadGuardada,
+  OrdenParaEnvio,
+  OrdenesParaEnvioPort,
+} from '../interfaces/entrega.interface';
+
+const INCLUIR_ORDEN = { orden: { select: { codigoVisible: true, idUsuario: true } } } as const;
+
+function aEnvio(fila: {
+  idEnvio: string;
+  proveedor: string;
+  idExterno: string | null;
+  numeroGuia: string | null;
+  urlSeguimiento: string | null;
+  urlEtiqueta: string | null;
+  estado: string;
+  ultimoError: string | null;
+  fechaCreacion: Date;
+  fechaActualizacion: Date;
+  orden: { codigoVisible: string; idUsuario: number };
+}): EnvioGuardado {
+  return {
+    idEnvio: fila.idEnvio,
+    codigoOrden: fila.orden.codigoVisible,
+    idUsuario: fila.orden.idUsuario,
+    proveedor: fila.proveedor,
+    idExterno: fila.idExterno,
+    numeroGuia: fila.numeroGuia,
+    urlSeguimiento: fila.urlSeguimiento,
+    urlEtiqueta: fila.urlEtiqueta,
+    estado: fila.estado as EstadoEnvio,
+    ultimoError: fila.ultimoError,
+    fechaCreacion: fila.fechaCreacion,
+    fechaActualizacion: fila.fechaActualizacion,
+  };
+}
+
+export class PrismaEnviosRepository implements EnviosRepositoryPort {
+  async buscarPorCodigoOrden(codigo: string): Promise<EnvioGuardado | null> {
+    const fila = await prisma.envioOrden.findFirst({ where: { orden: { codigoVisible: codigo } }, include: INCLUIR_ORDEN });
+    return fila === null ? null : aEnvio(fila);
+  }
+
+  async buscarPorProveedorYExterno(proveedor: string, idExterno: string): Promise<EnvioGuardado | null> {
+    const fila = await prisma.envioOrden.findFirst({ where: { proveedor, idExterno }, include: INCLUIR_ORDEN });
+    return fila === null ? null : aEnvio(fila);
+  }
+
+  async guardar(datos: DatosGuardarEnvio): Promise<EnvioGuardado> {
+    const orden = await prisma.orden.findUniqueOrThrow({ where: { codigoVisible: datos.codigoOrden }, select: { idOrden: true } });
+    const valores = {
+      proveedor: datos.proveedor,
+      estado: datos.estado,
+      idExterno: datos.idExterno,
+      numeroGuia: datos.numeroGuia,
+      urlSeguimiento: datos.urlSeguimiento,
+      urlEtiqueta: datos.urlEtiqueta,
+      ultimoError: datos.ultimoError,
+      fechaActualizacion: new Date(),
+    };
+    const fila = await prisma.envioOrden.upsert({
+      where: { idOrden: orden.idOrden },
+      create: { idOrden: orden.idOrden, ...valores },
+      update: valores,
+      include: INCLUIR_ORDEN,
+    });
+    return aEnvio(fila);
+  }
+
+  async actualizarEstado(idEnvio: string, estado: EstadoEnvio): Promise<void> {
+    await prisma.envioOrden.update({ where: { idEnvio }, data: { estado, fechaActualizacion: new Date() } });
+  }
+
+  async registrarNovedad(idEnvio: string, detalle: string): Promise<void> {
+    await prisma.novedadEnvio.create({ data: { idEnvio, detalle: detalle.slice(0, 500) } });
+  }
+
+  async listarNovedades(idEnvio: string): Promise<NovedadGuardada[]> {
+    return prisma.novedadEnvio.findMany({
+      where: { idEnvio },
+      orderBy: { fecha: 'desc' },
+      select: { idNovedad: true, detalle: true, fecha: true },
+    });
+  }
+}
+
+/** Lectura mínima de M08 (la orden y sus líneas); M10 no escribe en ellas. */
+export class PrismaOrdenesParaEnvio implements OrdenesParaEnvioPort {
+  async buscarPorCodigo(codigo: string): Promise<OrdenParaEnvio | null> {
+    const fila = await prisma.orden.findUnique({
+      where: { codigoVisible: codigo },
+      select: {
+        codigoVisible: true,
+        idUsuario: true,
+        modoEntrega: true,
+        direccion: true,
+        total: true,
+        lineas: { select: { nombreProducto: true, varianteCopia: true, cantidad: true, precioAplicado: true } },
+      },
+    });
+    if (fila === null) return null;
+    return {
+      codigo: fila.codigoVisible,
+      idUsuario: fila.idUsuario,
+      modoEntrega: fila.modoEntrega,
+      direccion: fila.direccion,
+      total: Number(fila.total),
+      lineas: fila.lineas.map((l) => ({
+        descripcion: `${l.nombreProducto} · ${l.varianteCopia}`.slice(0, 150),
+        cantidad: l.cantidad,
+        valor: Number(l.precioAplicado),
+      })),
+    };
+  }
+}
