@@ -72,6 +72,8 @@ export function DireccionForm({ inicial, onGuardar, onCancelar }: DireccionFormP
       direccion: inicial?.direccion ?? '',
       barrio: inicial?.barrio ?? '',
       apartamentoCasa: inicial?.apartamentoCasa ?? '',
+      municipio: inicial?.municipio ?? '',
+      departamento: inicial?.departamento ?? '',
       nombreApellido: inicial?.nombreApellido ?? '',
       telefono: inicial?.telefono ?? '',
       // La única dirección de la cuenta siempre es la predeterminada.
@@ -180,6 +182,10 @@ export function DireccionForm({ inicial, onGuardar, onCancelar }: DireccionFormP
       <div className="grid gap-4 sm:grid-cols-2">
         <Input id="dir-barrio" label="Barrio" placeholder="Ej. El Poblado" error={errors.barrio?.message} {...register('barrio')} />
         <Input id="dir-apto" label="Apartamento o casa (opcional)" placeholder="Ej. Apto 301, Torre 2" error={errors.apartamentoCasa?.message} {...register('apartamentoCasa')} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Input id="dir-municipio" label="Municipio (opcional)" autoComplete="address-level2" placeholder="Ej. Medellín" error={errors.municipio?.message} {...register('municipio')} />
+        <Input id="dir-departamento" label="Departamento (opcional)" autoComplete="address-level1" placeholder="Ej. Antioquia" error={errors.departamento?.message} {...register('departamento')} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Input id="dir-nombre" label="Nombre y apellido de quien recibe" autoComplete="name" error={errors.nombreApellido?.message} {...register('nombreApellido')} />

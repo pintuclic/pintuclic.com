@@ -10,6 +10,8 @@ export interface DireccionesRepository {
     direccion: string;
     barrio: string;
     apartamentoCasa?: string | null;
+    municipio?: string | null;
+    departamento?: string | null;
     nombreApellido: string;
     telefono: string;
     esPredeterminada: boolean;
@@ -23,6 +25,8 @@ export interface DireccionesRepository {
       direccion?: string;
       barrio?: string;
       apartamentoCasa?: string | null;
+      municipio?: string | null;
+      departamento?: string | null;
       nombreApellido?: string;
       telefono?: string;
       latitud?: number | null;
@@ -58,6 +62,8 @@ export class PrismaDireccionesRepository implements DireccionesRepository {
     direccion: string;
     barrio: string;
     apartamentoCasa?: string | null;
+    municipio?: string | null;
+    departamento?: string | null;
     nombreApellido: string;
     telefono: string;
     esPredeterminada: boolean;
@@ -70,6 +76,8 @@ export class PrismaDireccionesRepository implements DireccionesRepository {
         direccion: datos.direccion.trim(),
         barrio: datos.barrio.trim(),
         apartamentoCasa: datos.apartamentoCasa?.trim() ?? null,
+        municipio: datos.municipio?.trim() || null,
+        departamento: datos.departamento?.trim() || null,
         nombreApellido: datos.nombreApellido.trim(),
         telefono: datos.telefono.trim(),
         esPredeterminada: datos.esPredeterminada,
@@ -86,6 +94,8 @@ export class PrismaDireccionesRepository implements DireccionesRepository {
       direccion?: string;
       barrio?: string;
       apartamentoCasa?: string | null;
+      municipio?: string | null;
+      departamento?: string | null;
       nombreApellido?: string;
       telefono?: string;
       latitud?: number | null;
@@ -97,6 +107,8 @@ export class PrismaDireccionesRepository implements DireccionesRepository {
     };
     if (datos.direccion !== undefined) data.direccion = datos.direccion.trim();
     if (datos.barrio !== undefined) data.barrio = datos.barrio.trim();
+    if (datos.municipio !== undefined) data.municipio = datos.municipio?.trim() || null;
+    if (datos.departamento !== undefined) data.departamento = datos.departamento?.trim() || null;
     if (datos.apartamentoCasa !== undefined) data.apartamentoCasa = datos.apartamentoCasa?.trim() ?? null;
     if (datos.nombreApellido !== undefined) data.nombreApellido = datos.nombreApellido.trim();
     if (datos.telefono !== undefined) data.telefono = datos.telefono.trim();

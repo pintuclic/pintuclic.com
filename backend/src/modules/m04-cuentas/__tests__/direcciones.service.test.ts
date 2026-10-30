@@ -79,6 +79,17 @@ describe('DireccionesService (HU-CUE-07)', () => {
     );
   });
 
+  it('M10 · P1: guarda municipio y departamento cuando vienen y null cuando no', async () => {
+    vi.mocked(direccionesRepo.contarPorUsuario).mockResolvedValue(0);
+    const base = { direccion: 'Calle 100 # 15-20', barrio: 'Chicó', nombreApellido: 'Laura Gomez', telefono: '3109876543', esPredeterminada: true };
+
+    await service.crear(5, { ...base, municipio: 'Bogotá', departamento: 'Cundinamarca' });
+    expect(direccionesRepo.crear).toHaveBeenLastCalledWith(expect.objectContaining({ municipio: 'Bogotá', departamento: 'Cundinamarca' }));
+
+    await service.crear(5, base);
+    expect(direccionesRepo.crear).toHaveBeenLastCalledWith(expect.objectContaining({ municipio: null, departamento: null }));
+  });
+
   it('rechaza una segunda dirección: el máximo por cuenta es una (RF-CUE-07-04)', async () => {
     vi.mocked(direccionesRepo.contarPorUsuario).mockResolvedValueOnce(1);
 

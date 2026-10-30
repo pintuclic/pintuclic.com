@@ -168,6 +168,8 @@ function cuerpoDireccion(datos: DireccionClienteFormData) {
     telefono: datos.telefono,
     esPredeterminada: datos.esPredeterminada,
     ...(datos.apartamentoCasa ? { apartamentoCasa: datos.apartamentoCasa } : {}),
+    ...(datos.municipio ? { municipio: datos.municipio } : {}),
+    ...(datos.departamento ? { departamento: datos.departamento } : {}),
     ...(datos.latitud !== undefined && datos.longitud !== undefined
       ? { latitud: datos.latitud, longitud: datos.longitud }
       : {}),

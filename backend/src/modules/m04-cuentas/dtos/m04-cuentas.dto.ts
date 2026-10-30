@@ -362,6 +362,9 @@ export const direccionClienteItemSchema = z.object({
   direccion: z.string().trim().min(5).max(255),
   barrio: z.string().trim().min(2).max(100),
   apartamentoCasa: z.string().trim().max(100).nullable().optional(),
+  /** M10 · P1: opcionales; un servicio de envíos los exige para cotizar. */
+  municipio: z.string().trim().max(100).nullable().optional(),
+  departamento: z.string().trim().max(100).nullable().optional(),
   nombreApellido: nombreSchema,
   telefono: telefonoSchema,
   esPredeterminada: z.boolean(),
@@ -376,6 +379,8 @@ export const crearDireccionRequestSchema = z.object({
   direccion: z.string().trim().min(5, 'La dirección debe tener al menos 5 caracteres').max(255),
   barrio: z.string().trim().min(2, 'El barrio debe tener al menos 2 caracteres').max(100),
   apartamentoCasa: z.string().trim().max(100).optional(),
+  municipio: z.string().trim().max(100).optional(),
+  departamento: z.string().trim().max(100).optional(),
   nombreApellido: nombreSchema,
   telefono: telefonoSchema,
   esPredeterminada: z.boolean().default(false),

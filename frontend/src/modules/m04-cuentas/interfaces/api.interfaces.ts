@@ -66,6 +66,8 @@ export interface Direccion {
   direccion: string;
   barrio: string;
   apartamentoCasa?: string | null;
+  municipio?: string | null;
+  departamento?: string | null;
   nombreApellido: string;
   telefono: string;
   esPredeterminada: boolean;

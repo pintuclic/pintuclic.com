@@ -132,6 +132,8 @@ export function DireccionesSection() {
                   {dir.apartamentoCasa ? `, ${dir.apartamentoCasa}` : ''}
                   <br />
                   {dir.barrio}
+                  {dir.municipio ? `, ${dir.municipio}` : ''}
+                  {dir.departamento ? `, ${dir.departamento}` : ''}
                   <br />
                   Tel. {dir.telefono}
                 </address>

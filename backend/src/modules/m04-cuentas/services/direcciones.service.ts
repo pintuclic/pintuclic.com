@@ -49,6 +49,8 @@ export class DireccionesService {
         direccion: input.direccion,
         barrio: input.barrio,
         apartamentoCasa: input.apartamentoCasa ?? null,
+        municipio: input.municipio ?? null,
+        departamento: input.departamento ?? null,
         nombreApellido: input.nombreApellido,
         telefono: input.telefono,
         esPredeterminada: true,
@@ -81,6 +83,8 @@ export class DireccionesService {
       direccion?: string;
       barrio?: string;
       apartamentoCasa?: string | null;
+      municipio?: string | null;
+      departamento?: string | null;
       nombreApellido?: string;
       telefono?: string;
       latitud?: number | null;
@@ -89,6 +93,8 @@ export class DireccionesService {
 
     if (input.direccion !== undefined) datosActualizacion.direccion = input.direccion;
     if (input.barrio !== undefined) datosActualizacion.barrio = input.barrio;
+    if (input.municipio !== undefined) datosActualizacion.municipio = input.municipio;
+    if (input.departamento !== undefined) datosActualizacion.departamento = input.departamento;
     if (input.apartamentoCasa !== undefined) datosActualizacion.apartamentoCasa = input.apartamentoCasa;
     if (input.nombreApellido !== undefined) datosActualizacion.nombreApellido = input.nombreApellido;
     if (input.telefono !== undefined) datosActualizacion.telefono = input.telefono;
