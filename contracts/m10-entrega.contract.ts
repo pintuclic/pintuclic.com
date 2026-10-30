@@ -40,6 +40,14 @@ import { z } from 'zod';
  *      compartido (mismo esquema que el webhook de rebotes de M18). Sin proveedor configurado, 503.
  *  R8  SECRETOS. Las credenciales del proveedor viven solo en el backend (variables `ENVIOS_*`). Nunca se
  *      devuelven ni se registran.
+ *  R10 COTIZACIÓN. El costo del envío a domicilio lo calcula el proveedor con origen, destino y peso y medidas de cada
+ *      bulto; M10 solo arma la petición y toma la opción más barata. M07 lo pide en el checkout (`POST
+ *      /checkout/envio/cotizar`) y lo congela al crear la solicitud.
+ *  R11 RESPALDO. Si el proveedor falla, tarda más de 8 s, no ofrece opciones, o (siendo un proveedor real) falta el
+ *      municipio o el peso de algún producto, se usa la tarifa de entrega propia y la cotización se marca
+ *      `esEstimado`. La compra nunca se bloquea por el proveedor.
+ *  R12 PRECIO CONSISTENTE. El cliente envía el costo que tenía en pantalla; si el servidor cotiza otro, M07 responde
+ *      409 COSTO_ENVIO_CAMBIO con el nuevo y no crea nada, para que lo confirme.
  *  R9  PERMISOS. Ver el envío: `ventas.ver`. Reintentar o crear a mano: `ventas.gestionar`. Toda
  *      denegación responde 404 RECURSO_NO_DISPONIBLE. Cada acción del panel se audita (M20).
  *
