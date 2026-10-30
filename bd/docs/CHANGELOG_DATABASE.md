@@ -10,6 +10,16 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.25] - 2026-10-29
+### Esquema 4.24 (98 Tablas) - M10: preparación para un servicio de envíos
+- **Alcance General:** PR general de M10 (contrato `contracts/m10-entrega.contract.ts`). Cambio aditivo; no altera tablas existentes.
+  - **`envio_orden`**: un envío por orden a domicilio (`id_orden` UNIQUE), con proveedor, id externo, guía, enlaces de seguimiento y etiqueta, estado y último error genérico.
+  - **`novedad_envio`**: novedades que reporta el proveedor sobre un envío; solo se añaden.
+  - **ENUM nuevo:** `enum_estado_envio_orden`.
+  - **Prisma:** modelos `EnvioOrden` y `NovedadEnvio`, enum `EstadoEnvioOrden` y la relación `envio` en `Orden`.
+
+---
+
 ## [v3.24] - 2026-10-28
 ### Esquema 4.23 (96 Tablas) - M11: postventa (devoluciones, cancelaciones y reembolsos)
 - **Alcance General:** pedido por el contrato `contracts/m11-postventa.contract.ts`. Cambio aditivo: tres tablas y cuatro ENUMs nuevos; no altera tablas existentes.

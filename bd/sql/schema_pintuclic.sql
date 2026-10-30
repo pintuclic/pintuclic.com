@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.23 (v4.22 + M12: comprobante de venta imprimible y datos de facturación · M18: tipo comprobante_venta)
+-- VERSIÓN: 4.24 (v4.23 + M10: envio_orden y novedad_envio para un servicio de envíos)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 89
@@ -3152,5 +3152,55 @@ CREATE TRIGGER trg_linea_comprobante_sin_cambios
     FOR EACH ROW EXECUTE FUNCTION fn_comprobante_inmutable();
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (96 TABLAS - v4.23)
+-- M10: ENTREGA (2 Tablas) — preparación para un servicio de envíos
+-- ==============================================================================
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_envio_orden') THEN
+        CREATE TYPE enum_estado_envio_orden AS ENUM ('pendiente', 'creado', 'en_transito', 'con_novedad', 'entregado', 'fallido');
+    END IF;
+END $$;
+
+-- Tabla: envio_orden
+-- Un envío por orden a domicilio. Lo crea M10 al despacharse la orden; el proveedor ('envio_propio' por defecto)
+-- puede ser cualquier servicio de envíos detrás de ServicioEnviosPort. El estado de la orden sigue siendo de M08.
+CREATE TABLE IF NOT EXISTS envio_orden (
+    id_envio UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_orden INT NOT NULL,
+    proveedor VARCHAR(50) NOT NULL,
+    id_externo VARCHAR(100),
+    numero_guia VARCHAR(100),
+    url_seguimiento TEXT,
+    url_etiqueta TEXT,
+    estado enum_estado_envio_orden NOT NULL DEFAULT 'pendiente',
+    ultimo_error VARCHAR(500),
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_envio_orden UNIQUE (id_orden),
+    CONSTRAINT fk_envio_orden FOREIGN KEY (id_orden)
+        REFERENCES orden (id_orden) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_envio_proveedor_externo ON envio_orden (proveedor, id_externo) WHERE id_externo IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_envio_orden_estado ON envio_orden (estado);
+
+COMMENT ON TABLE envio_orden IS 'Envío de una orden a domicilio con el servicio de envíos que lo atiende (M10)';
+COMMENT ON COLUMN envio_orden.ultimo_error IS 'Motivo genérico del último fallo del proveedor; nunca credenciales ni trazas';
+
+-- Tabla: novedad_envio
+-- Novedades que el proveedor reporta sobre un envío (dirección errónea, destinatario ausente...). Solo se añaden.
+CREATE TABLE IF NOT EXISTS novedad_envio (
+    id_novedad UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_envio UUID NOT NULL,
+    detalle VARCHAR(500) NOT NULL,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT fk_novedad_envio FOREIGN KEY (id_envio)
+        REFERENCES envio_orden (id_envio) ON UPDATE CASCADE ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_novedad_envio ON novedad_envio (id_envio);
+
+COMMENT ON TABLE novedad_envio IS 'Novedades de entrega reportadas por el proveedor de envíos (M10 · R6)';
+
+-- ==============================================================================
+-- FIN DEL SCRIPT DDL (98 TABLAS - v4.24)
 -- ==============================================================================

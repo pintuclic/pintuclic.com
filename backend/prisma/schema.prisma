@@ -1604,6 +1604,7 @@ model Orden {
   notas     NotaOrden[]
   contactos ContactoOrden[]
   solicitudesPostventa SolicitudPostventa[]
+  envio     EnvioOrden?
 
   @@index([idUsuario])
   @@index([estado])
@@ -2393,4 +2394,49 @@ model IntentoPago {
   @@unique([idSolicitud, numero], map: "uq_intento_pago_numero")
   @@index([idSolicitud], map: "idx_intento_pago_solicitud")
   @@map("intento_pago")
+}
+
+enum EstadoEnvioOrden {
+  pendiente
+  creado
+  en_transito
+  con_novedad
+  entregado
+  fallido
+
+  @@map("enum_estado_envio_orden")
+}
+
+/// Envío de una orden a domicilio con el servicio de envíos que lo atiende (M10)
+model EnvioOrden {
+  idEnvio            String           @id @default(uuid()) @map("id_envio") @db.Uuid
+  idOrden            Int              @unique(map: "uq_envio_orden") @map("id_orden")
+  proveedor          String           @db.VarChar(50)
+  idExterno          String?          @map("id_externo") @db.VarChar(100)
+  numeroGuia         String?          @map("numero_guia") @db.VarChar(100)
+  urlSeguimiento     String?          @map("url_seguimiento")
+  urlEtiqueta        String?          @map("url_etiqueta")
+  estado             EstadoEnvioOrden @default(pendiente)
+  ultimoError        String?          @map("ultimo_error") @db.VarChar(500)
+  fechaCreacion      DateTime         @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaActualizacion DateTime         @default(now()) @map("fecha_actualizacion") @db.Timestamptz(6)
+
+  orden     Orden          @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_envio_orden")
+  novedades NovedadEnvio[]
+
+  @@index([estado], map: "idx_envio_orden_estado")
+  @@map("envio_orden")
+}
+
+/// Novedades que el proveedor reporta sobre un envío; solo se añaden (M10 · R6)
+model NovedadEnvio {
+  idNovedad String   @id @default(uuid()) @map("id_novedad") @db.Uuid
+  idEnvio   String   @map("id_envio") @db.Uuid
+  detalle   String   @db.VarChar(500)
+  fecha     DateTime @default(now()) @db.Timestamptz(6)
+
+  envio EnvioOrden @relation(fields: [idEnvio], references: [idEnvio], onUpdate: Cascade, onDelete: Cascade, map: "fk_novedad_envio")
+
+  @@index([idEnvio], map: "idx_novedad_envio")
+  @@map("novedad_envio")
 }
