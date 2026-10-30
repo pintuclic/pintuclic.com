@@ -8,7 +8,16 @@ export interface OrdenParaEnvio {
   /** Texto con el que M07 guardó la dirección (R14 de M07). */
   direccion: string | null;
   total: number;
-  lineas: ReadonlyArray<{ descripcion: string; cantidad: number; valor: number }>;
+  /** Peso y medidas son de UNA unidad empacada (P2) y vienen de la variante comprada; null si no se registraron. */
+  lineas: ReadonlyArray<{
+    descripcion: string;
+    cantidad: number;
+    valor: number;
+    pesoGramos: number | null;
+    altoCm: number | null;
+    anchoCm: number | null;
+    largoCm: number | null;
+  }>;
 }
 
 export interface OrdenesParaEnvioPort {

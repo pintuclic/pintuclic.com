@@ -101,10 +101,18 @@ export class PrismaOrdenesParaEnvio implements OrdenesParaEnvioPort {
         modoEntrega: true,
         direccion: true,
         total: true,
-        lineas: { select: { nombreProducto: true, varianteCopia: true, cantidad: true, precioAplicado: true } },
+        lineas: { select: { nombreProducto: true, varianteCopia: true, cantidad: true, precioAplicado: true, idVarianteRef: true } },
       },
     });
     if (fila === null) return null;
+
+    // `idVarianteRef` no tiene FK a propósito (ADR-05 de M08): si la variante ya no existe, los datos quedan en null.
+    const ids = fila.lineas.flatMap((l) => (l.idVarianteRef === null ? [] : [l.idVarianteRef]));
+    const variantes = await prisma.variante.findMany({
+      where: { idVariante: { in: ids } },
+      select: { idVariante: true, pesoGramos: true, altoCm: true, anchoCm: true, largoCm: true },
+    });
+    const porId = new Map(variantes.map((v) => [v.idVariante, v]));
     return {
       codigo: fila.codigoVisible,
       idUsuario: fila.idUsuario,
@@ -115,6 +123,10 @@ export class PrismaOrdenesParaEnvio implements OrdenesParaEnvioPort {
         descripcion: `${l.nombreProducto} · ${l.varianteCopia}`.slice(0, 150),
         cantidad: l.cantidad,
         valor: Number(l.precioAplicado),
+        pesoGramos: porId.get(l.idVarianteRef ?? -1)?.pesoGramos ?? null,
+        altoCm: porId.get(l.idVarianteRef ?? -1)?.altoCm?.toNumber() ?? null,
+        anchoCm: porId.get(l.idVarianteRef ?? -1)?.anchoCm?.toNumber() ?? null,
+        largoCm: porId.get(l.idVarianteRef ?? -1)?.largoCm?.toNumber() ?? null,
       })),
     };
   }

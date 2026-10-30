@@ -22,7 +22,7 @@ function orden(sobrescribir: Partial<OrdenParaEnvio> = {}): OrdenParaEnvio {
     modoEntrega: 'domicilio',
     direccion: DIRECCION,
     total: 90000,
-    lineas: [{ descripcion: 'Viniltex · Galón', cantidad: 2, valor: 45000 }],
+    lineas: [{ descripcion: 'Viniltex · Galón', cantidad: 2, valor: 45000, pesoGramos: 4200, altoCm: 20.5, anchoCm: 18, largoCm: null }],
     ...sobrescribir,
   };
 }
@@ -125,6 +125,8 @@ describe('EnviosService · R3 crear el envío al despachar', () => {
         codigoOrden: 'PC-2026-00001',
         origen: ORIGEN,
         destino: expect.objectContaining({ direccion: 'Calle 10 # 5-20', nombreRecibe: 'Laura Pérez', municipio: null }),
+        // P2: el peso y las medidas de la variante viajan a cada bulto; lo que falta va en null.
+        bultos: [expect.objectContaining({ cantidad: 2, pesoGramos: 4200, altoCm: 20.5, anchoCm: 18, largoCm: null })],
       }),
     );
   });
