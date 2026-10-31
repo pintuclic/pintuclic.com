@@ -298,8 +298,10 @@ export class GobernanzaAdminService {
     idUsuario: number,
     input: PrimerAccesoAdminInput,
   ): Promise<{ mensaje: string }> {
-    const empleado = await this.empleadosRepo.obtenerPorId(idUsuario);
-    if (!empleado) {
+    // Es personal quien tiene rol administrador o empleado (M17 R-ACC-2); el repositorio de empleados no devuelve al admin.
+    const admin = await this.gobernanzaRepo.obtenerAdmin();
+    const esPersonal = admin?.idUsuario === idUsuario || (await this.empleadosRepo.obtenerPorId(idUsuario)) !== null;
+    if (!esPersonal) {
       throw new EmpleadoError(
         CODIGOS_ERROR_M17.EMPLEADO_NO_ENCONTRADO,
         'Usuario no encontrado.',

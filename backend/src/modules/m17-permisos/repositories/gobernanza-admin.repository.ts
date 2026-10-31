@@ -1,12 +1,10 @@
 import crypto from 'node:crypto';
 import { prisma } from '../../../core/db/client';
+import { ROL_ADMINISTRADOR } from '../../../core/utils/roles';
 import type {
   GobernanzaAdminRepositoryPort,
   SolicitudCambioCorreoAdmin,
 } from '../interfaces/gobernanza.interface';
-
-/** Rol del seed (seed_pintuclic.sql) que identifica a la cuenta administradora. */
-const ROL_ADMINISTRADOR = 'administrador';
 
 /** Marca las filas de codigo_verificacion que pertenecen a la gobernanza del admin. */
 const ORIGEN_GOBERNANZA = 'gobernanza_admin';

@@ -1,11 +1,30 @@
 import type { Request, Response } from 'express';
-import { responderExito } from '../../../core/utils/apiResponse';
+import { responderExito, responderRecursoNoDisponible } from '../../../core/utils/apiResponse';
 import { actualizarPermisosEmpleadoInputSchema } from '../dtos/m17-permisos.dto';
 import { EmpleadoError } from '../services/empleados.service';
 import type { PermisosService } from '../services/permisos.service';
 
 export class PermisosController {
   constructor(private readonly permisosService: PermisosService) {}
+
+  /** R-ACC-9. Un cliente (o cualquier cuenta que no sea de personal) recibe el 404 opaco de siempre. */
+  misPermisos = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const actor = req.actor;
+      if (!actor) {
+        responderRecursoNoDisponible(res);
+        return;
+      }
+      const resultado = await this.permisosService.misPermisos(actor.idUsuario);
+      if (resultado === null) {
+        responderRecursoNoDisponible(res);
+        return;
+      }
+      responderExito(res, resultado);
+    } catch (err: unknown) {
+      this.manejarError(res, err);
+    }
+  };
 
   obtenerMatriz = async (req: Request, res: Response): Promise<void> => {
     try {

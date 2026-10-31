@@ -385,8 +385,9 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
         estado: 'activo',
         tipo: 'normal',
         idRol: 1,
+        rolDirecto: { nombre: 'administrador' },
         cambioContrasenaPendiente: false,
-      } as Usuario);
+      } as unknown as Usuario);
 
       await expect(authService.autenticarGoogle({ idToken: 'valid-google-id-token' })).rejects.toMatchObject({
         codigo: 'PERMISO_DENEGADO',
@@ -591,7 +592,8 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
         estado: 'activo',
         tipo: 'normal',
         idRol: 1,
-        usuarioRol: { idRol: 1 },
+        rolDirecto: { nombre: 'administrador' },
+        fechaCreacion: new Date('2026-01-01T00:00:00Z'),
         cambioContrasenaPendiente: false,
       });
 
@@ -605,6 +607,53 @@ describe('AuthCuentasService (HU-CUE-01, HU-CUE-02, HU-CUE-04)', () => {
         expect(res.esAdmin).toBe(true);
         expect(sesionService.crear).toHaveBeenCalledWith(1, 'admin');
       }
+    });
+
+    it('abre sesión de personal para un empleado (rol empleado) y de cliente para quien tiene rol cliente (M17 R-ACC-2)', async () => {
+      const passHash = await derivarContrasena('Pintuclic2026');
+      const base = {
+        nombre: 'Persona',
+        telefono: '3001112233',
+        contrasena: passHash,
+        estado: 'activo' as const,
+        tipo: 'normal' as const,
+        fechaCreacion: new Date('2026-01-01T00:00:00Z'),
+        cambioContrasenaPendiente: false,
+      };
+
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        ...base,
+        idUsuario: 6,
+        correo: 'empleado@pintuclic.co',
+        idRol: 4,
+        rolDirecto: { nombre: 'empleado' },
+      });
+      const empleado = await authService.login({ correo: 'empleado@pintuclic.co', contrasena: 'Pintuclic2026' });
+      expect(empleado.requiereCambioContrasena).toBe(false);
+      if (!empleado.requiereCambioContrasena) expect(empleado.esAdmin).toBe(true);
+      expect(sesionService.crear).toHaveBeenLastCalledWith(6, 'admin');
+
+      // Un cliente del seed (rol 2) y un id de rol cualquiera ya NO son personal: manda el nombre del rol.
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        ...base,
+        idUsuario: 2,
+        correo: 'cliente@pintuclic.co',
+        idRol: 2,
+        rolDirecto: { nombre: 'cliente' },
+      });
+      const cliente = await authService.login({ correo: 'cliente@pintuclic.co', contrasena: 'Pintuclic2026' });
+      if (!cliente.requiereCambioContrasena) expect(cliente.esAdmin).toBe(false);
+      expect(sesionService.crear).toHaveBeenLastCalledWith(2, 'cliente');
+
+      vi.mocked(cuentasRepo.buscarPorCorreo).mockResolvedValueOnce({
+        ...base,
+        idUsuario: 9,
+        correo: 'otro@pintuclic.co',
+        idRol: 77,
+        rolDirecto: { nombre: 'rol-desconocido' },
+      });
+      const desconocido = await authService.login({ correo: 'otro@pintuclic.co', contrasena: 'Pintuclic2026' });
+      if (!desconocido.requiereCambioContrasena) expect(desconocido.esAdmin).toBe(false);
     });
 
     it('ejecuta señuelo de tiempo constante ante usuario inexistente (ADR-012)', async () => {

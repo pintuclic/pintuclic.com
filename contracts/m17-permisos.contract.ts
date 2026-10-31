@@ -26,8 +26,10 @@ import { z } from 'zod';
  *   R-ACC-6  Asignar permisos solo es posible sobre un empleado: si el destino no existe o no es empleado responde
  *            `EMPLEADO_NO_ENCONTRADO`; sobre el administrador, `OPERACION_BLOQUEADA_ADMIN`; sobre uno mismo,
  *            `OPERACION_BLOQUEADA_ADMIN` (RN-ADM-10).
- *   R-ACC-7  Nadie concede lo que no tiene: quien asigna permisos sin ser el administrador solo puede otorgar
- *            códigos que él mismo posee; si intenta otro, `PERMISO_NO_CONCEDIBLE` y no se guarda nada.
+ *   R-ACC-7  Nadie concede lo que no tiene: quien asigna permisos sin ser el administrador solo puede añadir o
+ *            retirar códigos que él mismo posee (los demás del destino quedan como están). Si el cambio toca otro,
+ *            `PERMISO_NO_CONCEDIBLE` y no se guarda nada. `seguridad.gestionar_permisos` solo lo da o quita el
+ *            administrador.
  *   R-ACC-8  El listado de colaboradores contiene únicamente cuentas con rol `empleado`.
  *   R-ACC-9  La interfaz arma su menú con GET /admin/mis-permisos. Ocultar opciones es usabilidad: el control de
  *            acceso sigue siendo del servidor en cada petición (RF-SEG-03-06).

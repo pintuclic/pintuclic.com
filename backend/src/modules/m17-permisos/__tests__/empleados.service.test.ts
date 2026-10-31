@@ -21,6 +21,7 @@ function crearMockRepos(): {
           idRol: 2,
           fechaCreacion: new Date('2026-01-01'),
           fechaUltimoAcceso: new Date('2026-01-02'),
+          cantidadPermisos: 0,
           primerAccesoPendiente: false,
         },
       ],
@@ -37,6 +38,7 @@ function crearMockRepos(): {
           idRol: 2,
           fechaCreacion: new Date('2026-01-01'),
           fechaUltimoAcceso: null,
+          cantidadPermisos: 0,
           primerAccesoPendiente: false,
         });
       }
@@ -53,6 +55,7 @@ function crearMockRepos(): {
           idRol: 5,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          cantidadPermisos: 0,
           primerAccesoPendiente: false,
         });
       }
@@ -68,6 +71,7 @@ function crearMockRepos(): {
         idRol: 10,
         fechaCreacion: new Date(),
         fechaUltimoAcceso: null,
+        cantidadPermisos: 0,
         primerAccesoPendiente: false,
       }),
     ),
@@ -81,11 +85,11 @@ function crearMockRepos(): {
         idRol: 2,
         fechaCreacion: new Date(),
         fechaUltimoAcceso: null,
+        cantidadPermisos: 0,
         primerAccesoPendiente: false,
       }),
     ),
     actualizarEstado: vi.fn().mockResolvedValue(undefined),
-    contarPermisos: vi.fn().mockResolvedValue(4),
   };
 
   const gobernanzaRepo: GobernanzaAdminRepositoryPort = {

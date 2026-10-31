@@ -29,3 +29,11 @@ export interface ActualizarPermisosRespuesta {
   permisosRevocadosEnCascada: CodigoPermiso[];
   totalPermisosActivos: number;
 }
+
+/** GET /admin/mis-permisos (R-ACC-9): lo que la persona que entró puede hacer, para armar el menú. */
+export interface MisPermisosRespuesta {
+  idUsuario: number;
+  nombre: string;
+  esAdministrador: boolean;
+  permisos: CodigoPermiso[];
+}

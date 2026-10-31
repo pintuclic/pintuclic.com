@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Prisma, type Sesion, type Usuario } from '@prisma/client';
 import { derivarContrasena, verificarContrasena } from '../../../core/utils/crypto';
-import { esUsuarioAdministrativo, type CuentasRepository } from '../repositories/cuentas.repository';
+import { esUsuarioDePersonal, type CuentasRepository } from '../repositories/cuentas.repository';
 import { obtenerSecretoJwt } from './secreto-jwt';
 import { generarCodigoOtp } from './codigo-otp';
 import { leerParametroCuentas } from './parametros-cuentas';
@@ -373,7 +373,7 @@ export class AuthCuentasService {
     }
 
     // 8. Crear sesión activa
-    const esAdmin = esUsuarioAdministrativo(usuario);
+    const esAdmin = esUsuarioDePersonal(usuario);
     const tipoSesion = esAdmin ? 'admin' : 'cliente';
     const sesion = await this.sesionService.crear(usuario.idUsuario, tipoSesion);
 
@@ -437,7 +437,7 @@ export class AuthCuentasService {
       false, // cambioContrasenaPendiente = false
     );
 
-    const esAdmin = esUsuarioAdministrativo(usuario);
+    const esAdmin = esUsuarioDePersonal(usuario);
     const tipoSesion = esAdmin ? 'admin' : 'cliente';
     const sesion = await this.sesionService.crear(usuario.idUsuario, tipoSesion);
 
@@ -476,7 +476,7 @@ export class AuthCuentasService {
         throw new AuthCuentasError('La cuenta asociada se encuentra inactiva o bloqueada.', 'CUENTA_BLOQUEADA', 403);
       }
       // DP-12 / RF-CUE-08-02: cuentas empresariales y administrativas solo ingresan por correo y contraseña.
-      if (usuario.tipo === 'empresa' || esUsuarioAdministrativo(usuario)) {
+      if (usuario.tipo === 'empresa' || esUsuarioDePersonal(usuario)) {
         throw new AuthCuentasError(
           'Las cuentas empresariales y administrativas deben iniciar sesión con correo y contraseña.',
           'PERMISO_DENEGADO',
@@ -498,7 +498,7 @@ export class AuthCuentasService {
     // 2. Si no existe identidad externa, buscar si el correo ya existe en usuario
     const usuarioExistente = await this.cuentasRepo.buscarPorCorreo(emailNormalizado);
     if (usuarioExistente) {
-      if (usuarioExistente.tipo === 'empresa' || esUsuarioAdministrativo(usuarioExistente)) {
+      if (usuarioExistente.tipo === 'empresa' || esUsuarioDePersonal(usuarioExistente)) {
         throw new AuthCuentasError(
           'Las cuentas empresariales y administrativas deben iniciar sesión con correo y contraseña.',
           'PERMISO_DENEGADO',
@@ -695,7 +695,7 @@ export class AuthCuentasService {
       usuario.correo.trim().toLowerCase() !== correoNormalizado ||
       usuario.estado !== 'activo' ||
       usuario.tipo === 'empresa' ||
-      esUsuarioAdministrativo(usuario) ||
+      esUsuarioDePersonal(usuario) ||
       usuario.cambioContrasenaPendiente
     ) {
       throw tokenInvalido();

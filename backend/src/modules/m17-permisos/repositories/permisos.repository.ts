@@ -1,4 +1,5 @@
 import { prisma } from '../../../core/db/client';
+import { DONDE_EMPLEADO } from '../../../core/utils/roles';
 import type { AreaFuncional } from '../dtos/m17-permisos.dto';
 import type { EntidadPermiso, PermisosRepositoryPort } from '../interfaces/permisos.interface';
 
@@ -14,6 +15,7 @@ export class PermisosRepository implements PermisosRepositoryPort {
     if (prefijo === 'notificaciones') return 'notificaciones';
     if (prefijo === 'atencion') return 'atencion';
     if (prefijo === 'patrocinios') return 'patrocinios';
+    if (prefijo === 'asesoria') return 'asesoria';
     return 'personal';
   }
 
@@ -32,102 +34,49 @@ export class PermisosRepository implements PermisosRepositoryPort {
   }
 
   async obtenerPermisosUsuario(idUsuario: number): Promise<string[]> {
-    const usuarioRol = await prisma.usuarioRol.findUnique({
-      where: { idUsuario },
-      include: {
-        rol: {
-          include: {
-            asignaciones: {
-              include: {
-                permiso: true,
-              },
-            },
-          },
-        },
+    const filas = await prisma.usuarioPermiso.findMany({
+      where: {
+        idUsuario,
+        permiso: { estado: 'activo' },
+        usuario: { estado: 'activo', ...DONDE_EMPLEADO },
       },
+      select: { permiso: { select: { nombre: true } } },
     });
-
-    if (!usuarioRol || !usuarioRol.rol) {
-      return [];
-    }
-
-    return usuarioRol.rol.asignaciones
-      .filter((a) => a.permiso.estado === 'activo')
-      .map((a) => a.permiso.nombre);
+    return filas.map((f) => f.permiso.nombre);
   }
 
   async tienePermiso(idUsuario: number, codigoPermiso: string): Promise<boolean> {
-    const asignacion = await prisma.asignacionPermiso.findFirst({
+    const fila = await prisma.usuarioPermiso.findFirst({
       where: {
-        rol: {
-          usuariosConRol: {
-            some: { idUsuario },
-          },
-        },
-        permiso: {
-          nombre: codigoPermiso,
-          estado: 'activo',
-        },
-      },
-    });
-
-    return asignacion !== null;
-  }
-
-  async asegurarRolEmpleado(idUsuario: number, nombreEmpleado: string): Promise<number> {
-    const existente = await prisma.usuarioRol.findUnique({
-      where: { idUsuario },
-    });
-
-    if (existente) {
-      return existente.idRol;
-    }
-
-    const nuevoRol = await prisma.rol.create({
-      data: {
-        nombre: `Perfil Empleado ${idUsuario} - ${nombreEmpleado.slice(0, 30)}`,
-        estado: 'activo',
-      },
-    });
-
-    await prisma.usuarioRol.create({
-      data: {
         idUsuario,
-        idRol: nuevoRol.idRol,
+        permiso: { nombre: codigoPermiso, estado: 'activo' },
+        // R-ACC-5: una fila suelta de una cuenta que no es empleado activo no concede nada.
+        usuario: { estado: 'activo', ...DONDE_EMPLEADO },
       },
+      select: { idUsuarioPermiso: true },
     });
-
-    return nuevoRol.idRol;
+    return fila !== null;
   }
 
   async asignarPermisos(idUsuario: number, codigosPermiso: string[]): Promise<void> {
-    const usuario = await prisma.usuario.findUnique({
-      where: { idUsuario },
-      select: { nombre: true },
-    });
-
-    const nombre = usuario?.nombre ?? `Empleado ${idUsuario}`;
-    const idRol = await this.asegurarRolEmpleado(idUsuario, nombre);
-
-    const permisosEncontrados = await prisma.permiso.findMany({
-      where: {
-        nombre: { in: codigosPermiso },
-        estado: 'activo',
-      },
-      select: { idPermiso: true },
-    });
-
     await prisma.$transaction(async (tx) => {
-      await tx.asignacionPermiso.deleteMany({
-        where: { idRol },
+      const empleado = await tx.usuario.findFirst({
+        where: { idUsuario, ...DONDE_EMPLEADO },
+        select: { idUsuario: true },
+      });
+      if (!empleado) {
+        throw new Error('Solo se asignan permisos a cuentas con rol empleado.');
+      }
+
+      const permisos = await tx.permiso.findMany({
+        where: { nombre: { in: codigosPermiso }, estado: 'activo' },
+        select: { idPermiso: true },
       });
 
-      if (permisosEncontrados.length > 0) {
-        await tx.asignacionPermiso.createMany({
-          data: permisosEncontrados.map((p) => ({
-            idRol,
-            idPermiso: p.idPermiso,
-          })),
+      await tx.usuarioPermiso.deleteMany({ where: { idUsuario } });
+      if (permisos.length > 0) {
+        await tx.usuarioPermiso.createMany({
+          data: permisos.map((p) => ({ idUsuario, idPermiso: p.idPermiso })),
           skipDuplicates: true,
         });
       }
