@@ -588,7 +588,8 @@ erDiagram
 | Tabla | PK | FKs | Descripción |
 | :--- | :--- | :--- | :--- |
 | **`usuario`** | `id_usuario` | `id_rol` $\rightarrow$ `rol` | Cuentas con `correo` UNIQUE, hash BCrypt en `contrasena`, tipo (`normal`/`empresa`) y estado. |
-| **`usuario_rol`** | `id_usuario_rol` | `id_usuario`, `id_rol` | Asignación con restricción `UNIQUE(id_usuario)` (máximo 1 rol por usuario). |
+| **`usuario_rol`** | `id_usuario_rol` | `id_usuario`, `id_rol` | **Obsoleta desde v4.25** (ADR-013): el rol de la cuenta es `usuario.id_rol`. Se elimina en un ciclo posterior. |
+| **`usuario_permiso`** | `id_usuario_permiso` | `id_usuario`, `id_permiso` (CASCADE) | Permisos atómicos concedidos individualmente a un empleado, `UNIQUE(id_usuario, id_permiso)` (v4.25, M17). Solo cuentan para cuentas activas con rol `empleado`. |
 | **`sesion`** | `id_sesion` (**UUID**) | `id_usuario` $\rightarrow$ `usuario` (CASCADE) | Sesiones abiertas por dispositivo (M20 / HU-SEG-02). Guarda último acceso y expiración. |
 
 ### Módulo 3: Catálogo — M01 (23 Tablas, esquema 4.3)

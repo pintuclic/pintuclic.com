@@ -1,6 +1,6 @@
 # ADR-006 — Modelo de permisos individuales sobre DDL relacional existente
 
-> **Estado:** APROBADO (ratificable en Gate 2) · **Fecha:** 2026-10-21  
+> **Estado:** REEMPLAZADO por [ADR-013](./ADR-013-permisos-individuales-por-usuario.md) (2026-10-30). Antes: APROBADO (ratificable en Gate 2) · **Fecha:** 2026-10-21  
 > **Decide:** Software Architect Lead · **Módulo:** M17
 
 ## Contexto

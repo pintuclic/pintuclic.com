@@ -164,6 +164,7 @@ export const usuarioResumenSchema = z.object({
   nombre: nombreSchema,
   correo: correoSchema,
   tipo: tipoUsuarioSchema,
+  /** true = personal con acceso al panel (rol administrador o empleado; M17 R-ACC-2). No significa "es el administrador": eso lo dice GET /admin/mis-permisos. */
   esAdmin: z.boolean().optional(),
 });
 export type UsuarioResumen = z.infer<typeof usuarioResumenSchema>;
@@ -475,6 +476,7 @@ export const perfilUsuarioResponseSchema = z.object({
   correo: correoSchema,
   telefono: telefonoSchema.nullable(),
   tipo: tipoUsuarioSchema,
+  /** true = personal con acceso al panel (rol administrador o empleado; M17 R-ACC-2). No significa "es el administrador": eso lo dice GET /admin/mis-permisos. */
   esAdmin: z.boolean().optional(),
   estado: estadoUsuarioSchema,
   cambioContrasenaPendiente: z.boolean(),

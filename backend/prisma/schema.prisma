@@ -365,6 +365,8 @@ model Usuario {
   estado                    EstadoUsuario @default(activo)
   tipo                      TipoUsuario   @default(normal)
   cambioContrasenaPendiente Boolean       @default(false) @map("cambio_contrasena_pendiente")
+  /// Fecha de alta de la cuenta (M17: antigüedad del colaborador).
+  fechaCreacion             DateTime      @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
 
   sesiones               Sesion[]
   consentimientos        ConsentimientoUsuario[]
@@ -372,7 +374,10 @@ model Usuario {
   parametrosActualizados ParametroSistema[]      @relation("ParametroUsuarioActualizo")
 
   rolDirecto Rol?        @relation("UsuarioRolDirecto", fields: [idRol], references: [idRol])
+  /// OBSOLETA desde v4.25 (M17 R-ACC-1): el rol de la cuenta es `idRol`. Nada la lee ni la escribe.
   usuarioRol UsuarioRol?
+  /// Permisos atómicos concedidos individualmente (M17 R-ACC-3). Solo cuentan para cuentas empleado activas.
+  permisosIndividuales UsuarioPermiso[]
 
   // M04 Relaciones
   cuentaEmpresa               CuentaEmpresa?
@@ -494,6 +499,7 @@ model Permiso {
   estado      EstadoGeneral @default(activo)
 
   asignaciones AsignacionPermiso[]
+  usuarios     UsuarioPermiso[]
 
   @@map("permisos")
 }
@@ -513,7 +519,22 @@ model AsignacionPermiso {
   @@map("asignacion_permiso")
 }
 
-/// Relación 1:1 Usuario - Rol con restricción UNIQUE(id_usuario)
+/// Permiso atómico concedido a una persona (M17 R-ACC-3). Sustituye al "rol por empleado" de ADR-006.
+model UsuarioPermiso {
+  idUsuarioPermiso Int @id @default(autoincrement()) @map("id_usuario_permiso")
+  idUsuario        Int @map("id_usuario")
+  idPermiso        Int @map("id_permiso")
+
+  usuario Usuario @relation(fields: [idUsuario], references: [idUsuario], onUpdate: Cascade, onDelete: Cascade)
+  permiso Permiso @relation(fields: [idPermiso], references: [idPermiso], onUpdate: Cascade, onDelete: Cascade)
+
+  @@unique([idUsuario, idPermiso], map: "uq_usuario_permiso")
+  @@index([idUsuario], map: "idx_usr_permiso_usuario")
+  @@index([idPermiso], map: "idx_usr_permiso_permiso")
+  @@map("usuario_permiso")
+}
+
+/// OBSOLETA desde v4.25 (M17 R-ACC-1). Se conserva un ciclo de despliegue y se elimina después.
 model UsuarioRol {
   idUsuarioRol Int @id @default(autoincrement()) @map("id_usuario_rol")
   idUsuario    Int @unique @map("id_usuario")

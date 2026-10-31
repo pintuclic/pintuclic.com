@@ -6,6 +6,20 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-30 (b)
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔐 **Permisos individuales por usuario: contrato y base de datos.** Entra como el PR general `chore/m17-permisos-usuario-bd`; el módulo (M17, M04 y el panel) sigue en su propia rama.
+
+### Qué cambia y por qué
+- **Contrato M17** con las reglas R-ACC-1 a R-ACC-9: un solo vínculo de rol, personal = administrador o empleado, permisos propios de cada empleado, nadie concede lo que no tiene y el endpoint `GET /admin/mis-permisos` para armar el menú. Nota de alcance en el contrato de M04 (`esAdmin` = personal con acceso al panel).
+- **Base de datos v4.25:** tabla `usuario_permiso`, columna `usuario.fecha_creacion`, rol `empleado` en el seed y `usuario_rol` obsoleta. **ADR-013** reemplaza a ADR-006.
+- **Motivo:** con el modelo anterior, asignar permisos a una cuenta de cliente los escribía en el rol compartido de todos los clientes, el listado de colaboradores incluía clientes y el personal veía el panel del administrador.
+
+### Cómo se probó
+- Esquema y seed aplicados dos veces seguidas sobre PostgreSQL 18 limpio (idempotentes, 98 tablas), y el esquema nuevo sobre una base creada con el anterior (el paso del despliegue), sin errores.
+- `prisma validate` y compilación estricta de los dos contratos.
+- **No se probó:** el código del módulo, que viene en el PR siguiente.
+
 ## [No publicado] - 2026-10-30
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 📦 **M09 Cumplimiento y preparación: el módulo completo.** Entra como la rama `feature/m09-cumplimiento`, sobre el contrato y la base de datos ya fusionados.

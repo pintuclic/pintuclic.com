@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script de Seed y Mocks de Prueba Inicial para Desarrollo y Testing
--- VERSIÓN: 4.18 (alineado con schema_pintuclic.sql v4.18 - asesoría M03 y auditoría M20)
+-- VERSIÓN: 4.25 (alineado con schema_pintuclic.sql v4.25 - M17: rol empleado y permisos individuales por usuario)
 -- MOTOR: PostgreSQL 12+ (Compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- PROPIEDAD: Totalmente idempotente (ON CONFLICT DO NOTHING + setval)
@@ -29,7 +29,9 @@ ON CONFLICT (id_sub_rol_empresa) DO NOTHING;
 INSERT INTO rol (id_rol, nombre, id_sub_rol_empresa, estado) VALUES
     (1, 'administrador', NULL, 'activo'),
     (2, 'cliente',       NULL, 'activo'),
-    (3, 'empresa_vip',   1,    'activo')
+    (3, 'empresa_vip',   1,    'activo'),
+    -- M17 R-ACC-1/R-ACC-3: marca al personal. No lleva permisos; los de cada empleado van en usuario_permiso.
+    (4, 'empleado',      NULL, 'activo')
 ON CONFLICT (id_rol) DO NOTHING;
 
 -- 1.4 Permisos Atómicos (Catálogo Maestro Oficial M17 / M20 / M04)
@@ -108,17 +110,17 @@ INSERT INTO usuario (id_usuario, nombre, telefono, correo, contrasena, id_rol, e
     (4, 'Pinturas del Valle S.A.S.',  '3208889900', 'contacto@pinturasvalle.co',
         '$2b$12$rzP5oOr82AJTsAGk4dRAEOtzJnPwwxpsSdcZkx3hm1jVa9AZjcXIC', 3, 'activo',   'empresa'),
     (5, 'Laura Martínez',             '3124567890', 'laura@pintuclic.co',
-        '$2b$12$rzP5oOr82AJTsAGk4dRAEOtzJnPwwxpsSdcZkx3hm1jVa9AZjcXIC', 2, 'activo',   'normal')
+        '$2b$12$rzP5oOr82AJTsAGk4dRAEOtzJnPwwxpsSdcZkx3hm1jVa9AZjcXIC', 2, 'activo',   'normal'),
+    -- Empleado de prueba (M17): rol empleado con solo catálogo.ver y ventas.ver. Cuenta de demostración: en producción real se desactiva o se borra a mano.
+    (6, 'Empleado Pruebas',           '3112223344', 'empleado@pintuclic.co',
+        '$2b$12$rzP5oOr82AJTsAGk4dRAEOtzJnPwwxpsSdcZkx3hm1jVa9AZjcXIC', 4, 'activo',   'normal')
 ON CONFLICT (id_usuario) DO NOTHING;
 
--- 2.2 Relación 1:1 Usuario - Rol
-INSERT INTO usuario_rol (id_usuario, id_rol) VALUES
-    (1, 1),
-    (2, 2),
-    (3, 2),
-    (4, 3),
-    (5, 2)
-ON CONFLICT (id_usuario) DO NOTHING;
+-- 2.2 Permisos individuales del empleado de prueba (M17 R-ACC-3). usuario_rol ya no se siembra (obsoleta desde v4.25).
+INSERT INTO usuario_permiso (id_usuario, id_permiso) VALUES
+    (6, 6),   -- catalogo.ver
+    (6, 10)   -- ventas.ver
+ON CONFLICT (id_usuario, id_permiso) DO NOTHING;
 
 -- 2.3 Sesiones de Usuario (M20 - HU-SEG-02)
 INSERT INTO sesion (id_sesion, id_usuario, tipo_sesion, fecha_inicio, fecha_ultimo_acceso, fecha_expiracion, estado, motivo_cierre) VALUES
@@ -998,7 +1000,7 @@ SELECT setval('rol_id_rol_seq',                                  COALESCE((SELEC
 SELECT setval('permisos_id_permiso_seq',                         COALESCE((SELECT MAX(id_permiso) FROM permisos), 1));
 SELECT setval('asignacion_permiso_id_asignacion_permiso_seq',    COALESCE((SELECT MAX(id_asignacion_permiso) FROM asignacion_permiso), 1));
 SELECT setval('usuario_id_usuario_seq',                          COALESCE((SELECT MAX(id_usuario) FROM usuario), 1));
-SELECT setval('usuario_rol_id_usuario_rol_seq',                  COALESCE((SELECT MAX(id_usuario_rol) FROM usuario_rol), 1));
+SELECT setval('usuario_permiso_id_usuario_permiso_seq',          COALESCE((SELECT MAX(id_usuario_permiso) FROM usuario_permiso), 1));
 SELECT setval('categoria_id_categoria_seq',                      COALESCE((SELECT MAX(id_categoria) FROM categoria), 1));
 SELECT setval('subcategoria_id_subcategoria_seq',               COALESCE((SELECT MAX(id_subcategoria) FROM subcategoria), 1));
 SELECT setval('superficie_id_superficie_seq',                    COALESCE((SELECT MAX(id_superficie) FROM superficie), 1));
