@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.24 (v4.23 + M09: rastro de la revisión de disponibilidad por línea de orden)
+-- VERSIÓN: 4.25 (v4.24 + M17: permisos individuales por usuario y fecha de creación de la cuenta)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
--- TOTAL TABLAS: 97
+-- TOTAL TABLAS: 98
 -- ==============================================================================
 
 -- Si deseas recrear el esquema desde cero, puedes descomentar la siguiente línea:
@@ -415,7 +415,7 @@ CREATE TABLE IF NOT EXISTS asignacion_permiso (
     CONSTRAINT uq_rol_permiso UNIQUE (id_rol, id_permiso)
 );
 
-COMMENT ON TABLE asignacion_permiso IS 'Relación N:M que asigna permisos específicos a cada rol';
+COMMENT ON TABLE asignacion_permiso IS 'Relación N:M que asigna permisos específicos a cada rol. Los de los empleados NO van aquí sino en usuario_permiso (M17 R-ACC-3)';
 
 -- ==============================================================================
 -- 2. MÓDULO DE USUARIOS Y CONTROL DE ACCESO
@@ -440,9 +440,13 @@ CREATE TABLE IF NOT EXISTS usuario (
 ALTER TABLE usuario ADD COLUMN IF NOT EXISTS cambio_contrasena_pendiente BOOLEAN NOT NULL DEFAULT false;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_correo_lower ON usuario (lower(correo));
 
+-- M17 (v4.25): fecha real de alta de la cuenta. En las filas que ya existían queda la fecha en que se aplicó este cambio.
+ALTER TABLE usuario ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now();
+
 COMMENT ON TABLE usuario IS 'Entidad de usuarios registrados en el sistema';
+COMMENT ON COLUMN usuario.fecha_creacion IS 'Fecha de alta de la cuenta (M17: antigüedad del colaborador en el listado)';
 COMMENT ON COLUMN usuario.contrasena IS 'Hash criptográfico seguro de la contraseña (BCrypt costo 12)';
-COMMENT ON COLUMN usuario.id_rol IS 'Rol directo asignado al usuario';
+COMMENT ON COLUMN usuario.id_rol IS 'Único vínculo de rol de la cuenta (M17 R-ACC-1): administrador, empleado, cliente o empresa_vip. Es personal quien tiene administrador o empleado';
 COMMENT ON COLUMN usuario.tipo IS 'Clasificación de cuenta: normal (B2C) o empresa (B2B)';
 COMMENT ON COLUMN usuario.cambio_contrasena_pendiente IS 'Bandera de cambio de clave forzoso en primer acceso de empleado (CA-ADM-01-03, RN-CUE-04, RFC-M04-001 C-8)';
 
@@ -457,7 +461,7 @@ CREATE TABLE IF NOT EXISTS usuario_rol (
         REFERENCES rol (id_rol) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-COMMENT ON TABLE usuario_rol IS 'Asignación de roles a usuarios con restricción UNIQUE(id_usuario)';
+COMMENT ON TABLE usuario_rol IS 'OBSOLETA desde v4.25 (M17 R-ACC-1): el rol de la cuenta es usuario.id_rol y nada la lee ni la escribe. Se conserva un ciclo de despliegue y se elimina después';
 
 -- Tabla: sesion
 -- Sesiones activas de los usuarios (M20 - HU-SEG-02). Permite cerrar una sesión concreta,
@@ -3197,5 +3201,28 @@ CREATE TRIGGER trg_verificacion_linea_sin_cambios
     FOR EACH ROW EXECUTE FUNCTION fn_verificacion_linea_inmutable();
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (97 TABLAS - v4.24)
+-- M17 (v4.25): PERMISOS INDIVIDUALES POR USUARIO
+-- ==============================================================================
+
+-- Tabla: usuario_permiso
+-- Un permiso atómico concedido a una persona. Sustituye al "rol por empleado" de ADR-006: el rol `empleado` solo
+-- marca que la cuenta es personal y no lleva permisos; lo que cada empleado puede hacer vive aquí. Cambio aditivo.
+CREATE TABLE IF NOT EXISTS usuario_permiso (
+    id_usuario_permiso SERIAL PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    id_permiso INT NOT NULL,
+    CONSTRAINT fk_usr_permiso_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_usr_permiso_permiso FOREIGN KEY (id_permiso)
+        REFERENCES permisos (id_permiso) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT uq_usuario_permiso UNIQUE (id_usuario, id_permiso)
+);
+
+CREATE INDEX IF NOT EXISTS idx_usr_permiso_usuario ON usuario_permiso(id_usuario);
+CREATE INDEX IF NOT EXISTS idx_usr_permiso_permiso ON usuario_permiso(id_permiso);
+
+COMMENT ON TABLE usuario_permiso IS 'Permisos atómicos concedidos individualmente a un empleado (M17 R-ACC-3). Solo cuentan si la cuenta está activa y tiene rol empleado (R-ACC-5)';
+
+-- ==============================================================================
+-- FIN DEL SCRIPT DDL (98 TABLAS - v4.25)
 -- ==============================================================================

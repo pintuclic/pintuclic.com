@@ -13,6 +13,24 @@ import { z } from 'zod';
  * Fuentes de verdad:
  *   - docs/01_TRANSVERSALES/M17_PERMISOS_Y_ROLES.md
  *   - docs/01_TRANSVERSALES/POLITICAS/politica_HU-ADM-03_control_acceso_servidor.md
+ *
+ * MODELO DE ACCESO (revisión 2026-10-30, sustituye a ADR-006 "un rol por empleado")
+ *   R-ACC-1  `usuario.id_rol` es el ÚNICO vínculo de rol de una cuenta. Tres roles: `administrador`, `empleado`
+ *            y los de cliente (`cliente`, `empresa_vip`). `usuario_rol` deja de leerse y de escribirse.
+ *   R-ACC-2  Es PERSONAL quien tiene rol `administrador` o `empleado`. Nadie más entra al panel ni a sus rutas.
+ *   R-ACC-3  El rol `empleado` NO lleva permisos. Los permisos de cada empleado son individuales y viven en
+ *            `usuario_permiso (id_usuario, id_permiso)`. Nunca se escriben en `asignacion_permiso`.
+ *   R-ACC-4  El administrador conserva las facultades totales e implícitas (ADR-008). No se le asignan permisos.
+ *   R-ACC-5  Un permiso solo cuenta si lo tiene un empleado ACTIVO con rol `empleado`. Una fila de
+ *            `usuario_permiso` de una cuenta que no sea empleado no concede nada.
+ *   R-ACC-6  Asignar permisos solo es posible sobre un empleado: si el destino no existe o no es empleado responde
+ *            `EMPLEADO_NO_ENCONTRADO`; sobre el administrador, `OPERACION_BLOQUEADA_ADMIN`; sobre uno mismo,
+ *            `OPERACION_BLOQUEADA_ADMIN` (RN-ADM-10).
+ *   R-ACC-7  Nadie concede lo que no tiene: quien asigna permisos sin ser el administrador solo puede otorgar
+ *            códigos que él mismo posee; si intenta otro, `PERMISO_NO_CONCEDIBLE` y no se guarda nada.
+ *   R-ACC-8  El listado de colaboradores contiene únicamente cuentas con rol `empleado`.
+ *   R-ACC-9  La interfaz arma su menú con GET /admin/mis-permisos. Ocultar opciones es usabilidad: el control de
+ *            acceso sigue siendo del servidor en cada petición (RF-SEG-03-06).
  * ============================================================================
  */
 
@@ -113,6 +131,7 @@ export const CODIGOS_ERROR_M17 = {
   CORREO_DUPLICADO: 'CORREO_DUPLICADO',
   PARAMETRO_INVALIDO: 'PARAMETRO_INVALIDO',
   OPERACION_BLOQUEADA_ADMIN: 'OPERACION_BLOQUEADA_ADMIN',
+  PERMISO_NO_CONCEDIBLE: 'PERMISO_NO_CONCEDIBLE',
   MOTIVO_REQUERIDO: 'MOTIVO_REQUERIDO',
   DATOS_CLIENTE_NO_EDITABLES: 'DATOS_CLIENTE_NO_EDITABLES',
   TOKEN_INVALIDO_O_EXPIRADO: 'TOKEN_INVALIDO_O_EXPIRADO',
@@ -126,6 +145,7 @@ export const codigoErrorM17Schema = z.enum([
   CODIGOS_ERROR_M17.CORREO_DUPLICADO,
   CODIGOS_ERROR_M17.PARAMETRO_INVALIDO,
   CODIGOS_ERROR_M17.OPERACION_BLOQUEADA_ADMIN,
+  CODIGOS_ERROR_M17.PERMISO_NO_CONCEDIBLE,
   CODIGOS_ERROR_M17.MOTIVO_REQUERIDO,
   CODIGOS_ERROR_M17.DATOS_CLIENTE_NO_EDITABLES,
   CODIGOS_ERROR_M17.TOKEN_INVALIDO_O_EXPIRADO,
@@ -272,6 +292,20 @@ export const actualizarPermisosEmpleadoOutputSchema = z.object({
   totalPermisosActivos: z.number().int().nonnegative(),
 });
 export type ActualizarPermisosEmpleadoOutput = z.infer<typeof actualizarPermisosEmpleadoOutputSchema>;
+
+/**
+ * GET /admin/mis-permisos (R-ACC-9). Exige sesión de personal, no un permiso concreto: cualquier empleado o el
+ * administrador puede preguntar qué puede hacer. Un cliente recibe el 404 opaco de siempre.
+ * El administrador recibe `esAdministrador: true` y todos los códigos del catálogo activo.
+ * Un empleado sin permisos recibe `permisos: []` (no es un error: la interfaz muestra "aún sin accesos").
+ */
+export const misPermisosOutputSchema = z.object({
+  idUsuario: identificadorUsuarioSchema,
+  nombre: z.string(),
+  esAdministrador: z.boolean(),
+  permisos: z.array(codigoPermisoSchema),
+});
+export type MisPermisosOutput = z.infer<typeof misPermisosOutputSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 5. CONTRATOS HU-ADM-04: GESTIÓN DE CLIENTES DESDE ADMINISTRACIÓN

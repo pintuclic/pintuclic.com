@@ -10,6 +10,18 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.26] - 2026-10-30
+### Esquema 4.25 (98 Tablas) - M17: permisos individuales por usuario y fecha de creación de la cuenta
+- **Alcance General:** PR general de la revisión del modelo de acceso (contrato `contracts/m17-permisos.contract.ts`, R-ACC-1 a R-ACC-9; ADR-013, que reemplaza a ADR-006). Cambio aditivo, idempotente: lo aplica el despliegue sin perder datos.
+  - **`usuario_permiso`**: un permiso atómico concedido a una persona (`id_usuario`, `id_permiso`, `UNIQUE` del par, borrado en cascada). Sustituye al «rol por empleado»: los permisos de un empleado ya no se escriben en `asignacion_permiso`.
+  - **`usuario.fecha_creacion`** (`TIMESTAMPTZ NOT NULL DEFAULT now()`): antes el listado de colaboradores devolvía «ahora» para todos. En las filas existentes queda la fecha en que se aplicó el cambio.
+  - **Rol `empleado`** (id 4 en el seed): marca al personal y no lleva permisos. `usuario.id_rol` pasa a ser el único vínculo de rol.
+  - **`usuario_rol` queda OBSOLETA**: ya no se siembra ni se lee; se conserva un ciclo de despliegue y se elimina después.
+  - **Seed:** rol `empleado`, la cuenta de demostración `empleado@pintuclic.co` con `catalogo.ver` y `ventas.ver`, y el reinicio de la secuencia de `usuario_permiso`. Las bases anteriores necesitan el rol `empleado` y reasignar a mano a su personal.
+  - **Prisma:** modelo `UsuarioPermiso`, relaciones en `Usuario` y `Permiso`, campo `fechaCreacion`.
+
+---
+
 ## [v3.25] - 2026-10-29
 ### Esquema 4.24 (97 Tablas) - M09: rastro de la revisión de disponibilidad por línea de orden
 - **Alcance General:** PR general de M09 (contrato `contracts/m09-cumplimiento.contract.ts`). Cambio aditivo: una tabla, un ENUM y un disparador; no altera tablas existentes.
