@@ -42,6 +42,7 @@ function orden(sobrescribir: Partial<DetalleOrdenDatos>): DetalleOrdenDatos {
           { ordenAplicacion: 2, origen: 'Cliente frecuente', porcentaje: 3, importe: 4000 },
           { ordenAplicacion: 1, origen: 'Promoción de temporada', porcentaje: 5, importe: 8100 },
         ],
+        ultimaMarca: null,
       },
       {
         nombreProducto: 'Esmalte Retirado',
@@ -53,6 +54,7 @@ function orden(sobrescribir: Partial<DetalleOrdenDatos>): DetalleOrdenDatos {
         precioAplicado: 75000,
         idVarianteRef: 99,
         descuentos: [],
+        ultimaMarca: null,
       },
     ],
     historial: [
@@ -204,6 +206,43 @@ describe('Mis pedidos · HTTP (HU-ORD-04, HU-ORD-07)', () => {
     const { data } = ordenClienteResponseEnvelopeSchema.parse(json(r));
     expect(data.lineas.map((l) => l.productoDisponible)).toEqual([true, false]);
     expect(data.lineas[1]).toMatchObject({ nombreProducto: 'Esmalte Retirado', cantidad: 2, precioAplicado: 75000 });
+  });
+
+  it('cada producto muestra si se está verificando, está confirmado o fue rechazado (RF-CUM-01-13)', async () => {
+    const [primera, segunda] = orden({}).lineas;
+    if (!primera || !segunda) throw new Error('El ejemplo debe traer dos líneas.');
+    repo.ordenes.push(
+      orden({
+        codigo: 'PC-2026-00006',
+        estado: 'revision_disponibilidad',
+        lineas: [{ ...primera, ultimaMarca: 'consiguiendo_stock' }, { ...segunda, ultimaMarca: 'no_disponible' }],
+      }),
+      orden({
+        codigo: 'PC-2026-00007',
+        estado: 'revision_disponibilidad',
+        lineas: [{ ...primera, ultimaMarca: 'disponible' }, { ...segunda, ultimaMarca: null }],
+      }),
+    );
+
+    const enRevision = ordenClienteResponseEnvelopeSchema.parse(json(await pedir('/mis-pedidos/PC-2026-00006', 'cliente')));
+    expect(enRevision.data.lineas.map((l) => l.disponibilidad)).toEqual(['verificando_disponibilidad', 'rechazado']);
+
+    const mezcla = ordenClienteResponseEnvelopeSchema.parse(json(await pedir('/mis-pedidos/PC-2026-00007', 'cliente')));
+    expect(mezcla.data.lineas.map((l) => l.disponibilidad)).toEqual(['confirmado', 'verificando_disponibilidad']);
+  });
+
+  it('una orden que sigue su curso confirma todo y una cancelada no muestra disponibilidad', async () => {
+    const preparada = ordenClienteResponseEnvelopeSchema.parse(json(await pedir('/mis-pedidos/PC-2026-00001', 'cliente')));
+    expect(preparada.data.lineas.map((l) => l.disponibilidad)).toEqual(['confirmado', 'confirmado']);
+
+    const cancelada = ordenClienteResponseEnvelopeSchema.parse(json(await pedir('/mis-pedidos/PC-2026-00004', 'cliente')));
+    expect(cancelada.data.lineas.map((l) => l.disponibilidad)).toEqual([null, null]);
+  });
+
+  it('no expone al cliente el estado interno de la línea ni quién la marcó (M09 R14)', async () => {
+    const r = await pedir('/mis-pedidos/PC-2026-00001', 'cliente');
+
+    expect(r.texto).not.toMatch(/estadoLinea|ultimaMarca|consiguiendo_stock|no_disponible|historial.*autor/);
   });
 
   it('no expone claves internas, notas ni quién hizo cada cambio (RF-ORD-10-01)', async () => {

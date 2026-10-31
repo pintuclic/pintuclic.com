@@ -1,5 +1,8 @@
 import type { EstadoOrden, ModoEntrega, OrigenOrden } from '../dtos/m08-ordenes.dto';
 
+/** Marcas que M09 pone a una línea (contrato de M09, R2). `pendiente` no es una marca: es no tener ninguna. */
+export type MarcaLinea = 'disponible' | 'consiguiendo_stock' | 'no_disponible' | 'preparada';
+
 export interface FilaResumenOrden {
   codigo: string;
   fecha: Date;
@@ -32,6 +35,8 @@ export interface LineaOrdenDatos {
   precioAplicado: number;
   idVarianteRef: number | null;
   descuentos: DescuentoLineaDatos[];
+  /** Última marca de M09 (R15); null si nadie la ha marcado. */
+  ultimaMarca: MarcaLinea | null;
 }
 
 export interface HistorialClienteDatos {

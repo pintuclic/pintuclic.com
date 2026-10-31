@@ -14,6 +14,7 @@ import { construirModuloM07 } from './modules/m07-checkout/m07.routes';
 import { construirModuloM19 } from './modules/m19-reportes/m19.routes';
 import { construirModuloM12 } from './modules/m12-facturacion/m12.routes';
 import { construirModuloM08 } from './modules/m08-ordenes/m08.routes';
+import { NotificacionesOrdenM18Adapter } from './modules/m08-ordenes/adapters/notificaciones-m18.adapter';
 import { construirModuloM09 } from './modules/m09-cumplimiento/m09.routes';
 import { construirModuloM11 } from './modules/m11-postventa/m11.routes';
 import { construirModuloM05 } from './modules/m05-carrito/m05.routes';
@@ -126,14 +127,20 @@ export function construirAppRoutes(): Router {
   router.use('/facturacion', exigirSesionSalvo(auth, []), m12.router);
   router.use('/admin/facturacion', exigirSesionSalvo(auth, []), m12.adminRouter);
 
+  // El aviso «orden cancelada» (M08 R10) sale por M18; «creada» sigue siendo el comprobante de M12.
   const m08 = construirModuloM08(m17.autorizacionService, {
     auditoria: m20.auditoria,
-    estados: { notificaciones: m12.alCrearOrden },
+    estados: { notificaciones: new NotificacionesOrdenM18Adapter(m18.notificaciones, m12.alCrearOrden) },
   });
   router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
 
+  // M11: postventa (cancelaciones, devoluciones y reembolsos). Se construye antes que M09 porque M09 le pide abrir la
+  // cancelación cuando falta un producto (M09 R18) y al aprobarse una cancelación avisa al cliente por M08 y M18.
+  const m11 = construirModuloM11(m17.autorizacionService, { auditoria: m20.auditoria, avisos: m08.notificaciones });
+  router.use('/postventa', exigirSesionSalvo(auth, []), m11.router);
+
   // M09: cumplimiento y preparación (lista de chequeo por línea, retenidas y hoja de preparación). Solo personal.
-  const m09 = construirModuloM09(m17.autorizacionService, { auditoria: m20.auditoria });
+  const m09 = construirModuloM09(m17.autorizacionService, { auditoria: m20.auditoria, cancelaciones: m11.service });
   router.use('/cumplimiento', exigirSesionSalvo(auth, []), m09.router);
 
   // M19: reportes y analítica de ventas (solo lectura). `ventas.ver` para verlos, `ventas.exportar` para el CSV y
@@ -141,9 +148,6 @@ export function construirAppRoutes(): Router {
   const m19 = construirModuloM19(m17.autorizacionService, { auditoria: m20.auditoria });
   router.use('/admin/reportes', exigirSesionSalvo(auth, []), m19.router);
 
-  // M11: postventa (cancelaciones, devoluciones y reembolsos)
-  const m11 = construirModuloM11(m17.autorizacionService, { auditoria: m20.auditoria });
-  router.use('/postventa', exigirSesionSalvo(auth, []), m11.router);
   // M02: búsqueda, filtros y descubrimiento (público) y analítica de búsquedas sin resultado (admin).
   // El precio final y las ofertas los da M06 (se pide de forma diferida: se construye después, por M01).
   const m02 = construirModuloM02(m17.autorizacionService, {

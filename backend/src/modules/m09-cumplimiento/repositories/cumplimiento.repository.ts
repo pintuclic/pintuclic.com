@@ -2,10 +2,16 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../../core/db/client';
 import { estadosTxDe } from '../../m08-ordenes/repositories/estados.repository';
 import { cambiarEstadoPorCumplimiento } from '../../m08-ordenes/services/estados.service';
-import { MOTIVO_AVANCE_AUTOMATICO, type EstadoMarca, type EstadoOrden } from '../dtos/m09-cumplimiento.dto';
+import {
+  MOTIVO_AVANCE_AUTOMATICO,
+  MOTIVO_AVANCE_PREPARADA,
+  type EstadoMarca,
+  type EstadoOrden,
+} from '../dtos/m09-cumplimiento.dto';
 import type {
   CumplimientoRepository,
   CumplimientoTx,
+  DestinoAvance,
   FilaRetenidaDatos,
   LineaDatos,
   MarcaNueva,
@@ -19,6 +25,13 @@ const SELECCION_ORDEN = {
   codigoVisible: true,
   estado: true,
   idUsuario: true,
+  // R18: la cancelación en trámite (solicitada o en revisión); M11 admite una sola por pedido.
+  solicitudesPostventa: {
+    where: { tipo: 'cancelacion', estado: { in: ['solicitada', 'en_revision'] } },
+    orderBy: { idSolicitudPostventa: 'desc' },
+    take: 1,
+    select: { codigoVisible: true, estado: true, idEmpleadoInicia: true, fechaSolicitud: true },
+  },
   lineas: {
     orderBy: { idLineaOrden: 'asc' },
     select: {
@@ -57,7 +70,22 @@ function aLineas(lineas: OrdenCruda['lineas']): LineaDatos[] {
 async function leerOrden(cliente: Cliente, codigo: string): Promise<OrdenDatos | null> {
   const fila = await cliente.orden.findUnique({ where: { codigoVisible: codigo }, select: SELECCION_ORDEN });
   if (!fila) return null;
-  return { codigo: fila.codigoVisible, estado: fila.estado satisfies EstadoOrden, idUsuario: fila.idUsuario, lineas: aLineas(fila.lineas) };
+  const tramite = fila.solicitudesPostventa[0];
+  return {
+    codigo: fila.codigoVisible,
+    estado: fila.estado satisfies EstadoOrden,
+    idUsuario: fila.idUsuario,
+    lineas: aLineas(fila.lineas),
+    cancelacion:
+      tramite === undefined || (tramite.estado !== 'solicitada' && tramite.estado !== 'en_revision')
+        ? null
+        : {
+            codigo: tramite.codigoVisible,
+            estado: tramite.estado,
+            iniciadaPor: tramite.idEmpleadoInicia === null ? 'cliente' : 'tienda',
+            fecha: tramite.fechaSolicitud,
+          },
+  };
 }
 
 class PrismaCumplimientoTx implements CumplimientoTx {
@@ -75,8 +103,9 @@ class PrismaCumplimientoTx implements CumplimientoTx {
     });
   }
 
-  async avanzarAPreparacion(codigo: string, idUsuarioAutor: number): Promise<ResultadoAvance> {
-    const resultado = await cambiarEstadoPorCumplimiento(estadosTxDe(this.tx), codigo, MOTIVO_AVANCE_AUTOMATICO, idUsuarioAutor);
+  async avanzar(codigo: string, hacia: DestinoAvance, idUsuarioAutor: number): Promise<ResultadoAvance> {
+    const motivo = hacia === 'preparada' ? MOTIVO_AVANCE_PREPARADA : MOTIVO_AVANCE_AUTOMATICO;
+    const resultado = await cambiarEstadoPorCumplimiento(estadosTxDe(this.tx), codigo, hacia, motivo, idUsuarioAutor);
     return resultado.ok ? { ok: true } : { ok: false, razon: resultado.razon };
   }
 }

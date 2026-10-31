@@ -2,12 +2,14 @@ import { apiClient } from '@/core/api/apiClient';
 import {
   hojaResponseEnvelopeSchema,
   retenidasResponseEnvelopeSchema,
+  solicitarCancelacionResponseEnvelopeSchema,
   verificacionResponseEnvelopeSchema,
   verificarLineasResponseEnvelopeSchema,
   type HojaPreparacion,
   type LineaVerificadaInput,
   type OrdenRetenida,
   type Paginacion,
+  type TramiteCancelacion,
   type VerificacionOrden,
 } from '../dtos/m09-cumplimiento.dto';
 
@@ -18,7 +20,7 @@ export interface RetenidasRespuesta {
 
 export interface ResultadoMarcado {
   verificacion: VerificacionOrden;
-  /** true = esta petición movió el pedido a preparación (R7). */
+  /** true = esta petición movió el pedido: a preparación (R7) o a «preparada» (R15). */
   avanzo: boolean;
 }
 
@@ -34,6 +36,13 @@ export async function obtenerVerificacion(codigo: string): Promise<VerificacionO
 export async function marcarLineas(codigo: string, lineas: readonly LineaVerificadaInput[]): Promise<ResultadoMarcado> {
   const { data } = await apiClient.put<unknown>(`${BASE}/ordenes/${encodeURIComponent(codigo)}/verificacion`, { lineas });
   return verificarLineasResponseEnvelopeSchema.parse(data).data;
+}
+
+/** HU-CUM-03 · R18. Pide la cancelación del pedido por falta de stock; la resuelve postventa y el cliente recibe el correo al aprobarse. */
+export async function solicitarCancelacion(codigo: string, nota?: string): Promise<TramiteCancelacion> {
+  const cuerpo = nota !== undefined && nota.trim() !== '' ? { nota: nota.trim() } : {};
+  const { data } = await apiClient.post<unknown>(`${BASE}/ordenes/${encodeURIComponent(codigo)}/cancelacion`, cuerpo);
+  return solicitarCancelacionResponseEnvelopeSchema.parse(data).data.cancelacion;
 }
 
 /** HU-CUM-03 · Pedidos detenidos en la revisión y por qué. */

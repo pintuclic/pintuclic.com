@@ -7,7 +7,9 @@ import { exigirSesionDePersonal } from '../m08-ordenes/m08.routes';
 import type { AuditoriaPort } from '../m20-seguridad/interfaces/auditoria.port';
 import type { AutorizacionService } from '../m20-seguridad/services/autorizacion.service';
 import { CumplimientoController } from './controllers/cumplimiento.controller';
-import type { CumplimientoRepository } from './interfaces/cumplimiento.interface';
+import type { PostventaServicePort } from '../m11-postventa/interfaces/postventa.interface';
+import { CancelacionesM11Adapter } from './adapters/cancelaciones-m11.adapter';
+import type { CancelacionesPort, CumplimientoRepository } from './interfaces/cumplimiento.interface';
 import { PrismaCumplimientoRepository } from './repositories/cumplimiento.repository';
 import { CumplimientoService } from './services/cumplimiento.service';
 
@@ -21,6 +23,9 @@ export interface ModuloM09Config {
   repo?: CumplimientoRepository;
   eventos?: EventosOrdenPort;
   reloj?: RelojPort;
+  /** R18: M11, que abre la cancelación. En pruebas se pasa un doble con `cancelacionesPuerto`. */
+  cancelaciones?: Pick<PostventaServicePort, 'solicitarCancelacionPorTienda'>;
+  cancelacionesPuerto?: CancelacionesPort;
 }
 
 /**
@@ -32,6 +37,7 @@ export function construirModuloM09(autorizacion: AutorizacionService, config?: M
     config?.repo ?? new PrismaCumplimientoRepository(),
     config?.eventos ?? new SinEventosOrdenAdapter(),
     config?.reloj ?? new RelojSistemaAdapter(),
+    config?.cancelacionesPuerto ?? (config?.cancelaciones ? new CancelacionesM11Adapter(config.cancelaciones) : undefined),
   );
   const controlador = new CumplimientoController(servicio);
   const gestionar = requirePermission(autorizacion, PERMISO_CUMPLIMIENTO) as RequestHandler;
@@ -44,5 +50,6 @@ export function construirModuloM09(autorizacion: AutorizacionService, config?: M
   router.get('/ordenes/:codigo/verificacion', gestionar, controlador.verificacion);
   router.put('/ordenes/:codigo/verificacion', gestionar, controlador.marcar);
   router.get('/ordenes/:codigo/hoja', gestionar, controlador.hoja);
+  router.post('/ordenes/:codigo/cancelacion', gestionar, controlador.cancelacion);
   return { router };
 }

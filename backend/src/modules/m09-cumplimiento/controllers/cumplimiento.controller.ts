@@ -3,6 +3,7 @@ import { responderRecursoNoDisponible } from '../../../core/utils/apiResponse';
 import {
   codigoOrdenParamsSchema,
   listarRetenidasRequestSchema,
+  solicitarCancelacionRequestSchema,
   verificarLineasRequestSchema,
 } from '../dtos/m09-cumplimiento.dto';
 import type { CumplimientoService } from '../services/cumplimiento.service';
@@ -43,6 +44,22 @@ export class CumplimientoController {
     if (peticion === null) return;
 
     res.json({ success: true, data: await this.servicio.marcar(parametros.codigo, peticion, actor) });
+  });
+
+  /** R18 · Pide la cancelación del pedido cuando falta un producto (la resuelve M11). */
+  cancelacion = manejarCumplimiento(async (req: Request, res: Response): Promise<void> => {
+    const actor = req.actor;
+    if (actor === undefined) {
+      responderRecursoNoDisponible(res);
+      return;
+    }
+    const parametros = validar(res, codigoOrdenParamsSchema, req.params);
+    if (parametros === null) return;
+    const peticion = validar(res, solicitarCancelacionRequestSchema, req.body ?? {});
+    if (peticion === null) return;
+
+    const cancelacion = await this.servicio.solicitarCancelacion(parametros.codigo, peticion, actor);
+    res.status(201).json({ success: true, data: { cancelacion } });
   });
 
   hoja = manejarCumplimiento(async (req: Request, res: Response): Promise<void> => {

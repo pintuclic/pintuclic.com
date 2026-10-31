@@ -13,7 +13,18 @@ export interface EventoOrdenDespachada {
   idUsuario: number;
 }
 
+/** R10 (revisión 2026-10-31): M11 lo emite cuando una cancelación aprobada deja la orden en `cancelado`. */
+export interface EventoOrdenCancelada {
+  codigo: string;
+  idUsuario: number;
+  /** Lo que el cliente leerá: el motivo de la solicitud. Nunca importes ni datos de pago. */
+  motivo: string;
+  origen: 'tienda' | 'cliente';
+}
+
 export interface NotificacionesOrdenPort {
   notificarOrdenCreada(evento: EventoOrdenCreada): Promise<void>;
   notificarOrdenDespachada(evento: EventoOrdenDespachada): Promise<void>;
+  /** Opcional como en M18: los adaptadores anteriores no lo conocen; quien llama comprueba que esté. */
+  notificarOrdenCancelada?(evento: EventoOrdenCancelada): Promise<void>;
 }

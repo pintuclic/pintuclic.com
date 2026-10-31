@@ -37,31 +37,34 @@ export type ResultadoAvanceCumplimiento =
   | { ok: false; razon: 'NO_EXISTE' }
   | { ok: false; razon: 'ESTADO_CAMBIADO'; estadoActual: EstadoOrden };
 
+/** M09: los dos avances automáticos, con el estado desde el que se hacen. */
+const ORIGEN_DEL_AVANCE: Readonly<Record<'en_preparacion' | 'preparada', EstadoOrden>> = {
+  en_preparacion: 'revision_disponibilidad',
+  preparada: 'en_preparacion',
+};
+
 /**
- * M09: cuando todas las líneas de una orden en revisión de disponibilidad están disponibles, la orden pasa a
- * preparación dentro de la transacción de M09, con las mismas garantías que `cambiarEstado`: candado optimista e
- * historial con autor y motivo. Es la única vía a `en_preparacion` desde la revisión (ver `reglas-estado`).
+ * M09: cuando todas las líneas de una orden en revisión están disponibles, la orden pasa a preparación; cuando todas las
+ * de una orden en preparación están preparadas, pasa a preparada. Ocurre dentro de la transacción de M09, con las mismas
+ * garantías que `cambiarEstado`: candado optimista e historial con autor y motivo. Son las únicas vías a esos estados
+ * (ver `reglas-estado`).
  */
 export async function cambiarEstadoPorCumplimiento(
   tx: EstadosTx,
   codigo: string,
+  hacia: 'en_preparacion' | 'preparada',
   motivo: string,
   idUsuarioAutor: number,
 ): Promise<ResultadoAvanceCumplimiento> {
+  const desde = ORIGEN_DEL_AVANCE[hacia];
   const actual = await tx.buscarOrden(codigo);
   if (!actual) return { ok: false, razon: 'NO_EXISTE' };
-  if (actual.estado !== 'revision_disponibilidad') return { ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: actual.estado };
+  if (actual.estado !== desde) return { ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: actual.estado };
 
-  if (!(await tx.actualizarEstadoSiCoincide(codigo, 'revision_disponibilidad', 'en_preparacion'))) {
+  if (!(await tx.actualizarEstadoSiCoincide(codigo, desde, hacia))) {
     return { ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: actual.estado };
   }
-  await tx.registrarHistorial({
-    codigo,
-    estadoAnterior: 'revision_disponibilidad',
-    estadoNuevo: 'en_preparacion',
-    idUsuarioAutor,
-    motivo,
-  });
+  await tx.registrarHistorial({ codigo, estadoAnterior: desde, estadoNuevo: hacia, idUsuarioAutor, motivo });
   return { ok: true };
 }
 
@@ -114,6 +117,10 @@ export class EstadosService {
         idUsuarioAutor: actor.idUsuario,
         motivo,
       });
+      // M09 R16: devolver una orden preparada a preparación pone sus líneas preparadas otra vez como disponibles.
+      if (cambio.estadoActual === 'preparada' && cambio.estadoNuevo === 'en_preparacion') {
+        await tx.reiniciarMarcasPreparadas(codigo, actor.idUsuario);
+      }
       return actual;
     });
 

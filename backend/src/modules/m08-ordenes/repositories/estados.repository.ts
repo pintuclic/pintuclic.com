@@ -40,6 +40,21 @@ class PrismaEstadosTx implements EstadosTx {
       },
     });
   }
+
+  async reiniciarMarcasPreparadas(codigo: string, idUsuarioAutor: number): Promise<void> {
+    const lineas = await this.tx.lineaOrden.findMany({
+      where: { orden: { codigoVisible: codigo } },
+      select: {
+        idLineaOrden: true,
+        verificaciones: { orderBy: { idVerificacionLineaOrden: 'desc' }, take: 1, select: { estado: true } },
+      },
+    });
+    const preparadas = lineas.filter((l) => l.verificaciones[0]?.estado === 'preparada');
+    if (preparadas.length === 0) return;
+    await this.tx.verificacionLineaOrden.createMany({
+      data: preparadas.map((l) => ({ idLineaOrden: l.idLineaOrden, estado: 'disponible' as const, idUsuarioAutor })),
+    });
+  }
 }
 
 /** Para quien ya abrió su propia transacción (M11 al aprobar una postventa). */

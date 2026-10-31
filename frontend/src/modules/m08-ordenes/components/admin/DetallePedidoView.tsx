@@ -5,8 +5,11 @@ import Link from 'next/link';
 import { ArrowLeft, ClipboardList, Mail, MapPin, Phone, Receipt } from 'lucide-react';
 import { AdminPageHeader, Alert, ButtonLink, Skeleton } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
-import { PanelDisponibilidad } from '@/modules/m09-cumplimiento/components/PanelDisponibilidad';
+import { CabeceraDeProductos } from '@/modules/m09-cumplimiento/components/CabeceraDeProductos';
+import { ControlesLinea } from '@/modules/m09-cumplimiento/components/ControlesLinea';
 import { ESTADOS_CUMPLIMIENTO } from '@/modules/m09-cumplimiento/dtos/m09-cumplimiento.dto';
+import { useVerificacionDelPedido } from '@/modules/m09-cumplimiento/hooks/useVerificacionDelPedido';
+import { useAccesoStore } from '@/modules/m17-permisos/store/accesoStore';
 import { useGestionStore } from '../../store/gestionStore';
 import { ETIQUETA_MODO_ENTREGA, formatearFecha } from '../../services/presentacion';
 import { EstadoBadge } from '../EstadoBadge';
@@ -34,9 +37,14 @@ function Tarjeta({ id, titulo, children }: { id: string; titulo: string; childre
  */
 export function DetallePedidoView({ codigo }: { codigo: string }) {
   const { detalle, historialCliente, historialClienteError, cargandoDetalle, operando, error, aviso } = useGestionStore();
-  const { abrirDetalle, cerrarDetalle, cambiarEstado, agregarNota } = useGestionStore.getState();
+  const { abrirDetalle, cerrarDetalle, cambiarEstado, agregarNota, agregarContacto } = useGestionStore.getState();
+  const acceso = useAccesoStore((s) => s.acceso);
   // M09: la revisión de disponibilidad y la hoja de preparación existen mientras el pedido está en revisión o en preparación.
   const enCumplimiento = detalle !== null && (ESTADOS_CUMPLIMIENTO as readonly string[]).includes(detalle.estado);
+  // Marcar productos exige «Gestión de pedidos»; con solo «Revisar órdenes» se ve el estado de cada producto y nada más.
+  const puedeGestionar = acceso !== null && (acceso.esAdministrador || acceso.permisos.includes('ventas.gestionar'));
+  const conChequeo = enCumplimiento && puedeGestionar;
+  useVerificacionDelPedido(codigo, conChequeo, () => void abrirDetalle(codigo, { silencioso: true }));
 
   useEffect(() => {
     void abrirDetalle(codigo);
@@ -89,14 +97,18 @@ export function DetallePedidoView({ codigo }: { codigo: string }) {
               {detalle.observaciones && <p className="mt-2 text-sm text-neutral-dark">{detalle.observaciones}</p>}
             </Tarjeta>
 
-            {enCumplimiento && (
-              <Tarjeta id="disponibilidad" titulo="Revisión de disponibilidad">
-                <PanelDisponibilidad codigo={codigo} onAvanzo={() => void abrirDetalle(codigo, { silencioso: true })} />
-              </Tarjeta>
-            )}
-
             <Tarjeta id="productos" titulo="Productos">
-              <LineasOrdenLista lineas={detalle.lineas} />
+              {conChequeo && (
+                <CabeceraDeProductos
+                  codigo={codigo}
+                  cliente={detalle.cliente}
+                  onContactar={(medio) => void agregarContacto({ medio })}
+                />
+              )}
+              <LineasOrdenLista
+                lineas={detalle.lineas}
+                controles={conChequeo ? (numeroLinea) => <ControlesLinea numeroLinea={numeroLinea} /> : undefined}
+              />
               <div className="mt-4 border-t border-neutral-light pt-3">
                 <TotalesOrden
                   subTotal={detalle.subTotal}

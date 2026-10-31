@@ -23,10 +23,13 @@ class RepoMemoria implements EstadosRepository {
   historial: FilaHistorial[] = [];
   /** Simula que otra persona cambió el estado justo entre la lectura y la actualización. */
   perderCarrera = false;
+  /** Veces que se reiniciaron las líneas preparadas (M09 R16). */
+  reinicios: Array<{ codigo: string; idUsuarioAutor: number }> = [];
 
   async enTransaccion<T>(trabajo: (tx: EstadosTx) => Promise<T>): Promise<T> {
     const copiaOrdenes = new Map([...this.ordenes].map(([k, v]) => [k, { ...v }]));
     const copiaHistorial = [...this.historial];
+    const copiaReinicios = [...this.reinicios];
     try {
       return await trabajo({
         buscarOrden: async (codigo) => {
@@ -42,10 +45,14 @@ class RepoMemoria implements EstadosRepository {
         registrarHistorial: async (fila) => {
           this.historial.push(fila);
         },
+        reiniciarMarcasPreparadas: async (codigo, idUsuarioAutor) => {
+          this.reinicios.push({ codigo, idUsuarioAutor });
+        },
       });
     } catch (error) {
       this.ordenes = copiaOrdenes;
       this.historial = copiaHistorial;
+      this.reinicios = copiaReinicios;
       throw error;
     }
   }
@@ -299,7 +306,7 @@ describe('revisión de disponibilidad → preparación: solo la hace M09 (RF-CUM
 
   it('cambiarEstadoPorCumplimiento la pasa a preparación y deja autor, motivo y estados en el historial', async () => {
     const resultado = await repo.enTransaccion((tx) =>
-      cambiarEstadoPorCumplimiento(tx, 'PC-2026-00001', 'Disponibilidad confirmada en todas las líneas', 21),
+      cambiarEstadoPorCumplimiento(tx, 'PC-2026-00001', 'en_preparacion', 'Disponibilidad confirmada en todas las líneas', 21),
     );
 
     expect(resultado).toEqual({ ok: true });
@@ -315,12 +322,85 @@ describe('revisión de disponibilidad → preparación: solo la hace M09 (RF-CUM
     ]);
   });
 
+  it('cambiarEstadoPorCumplimiento pasa de preparación a preparada (M09 R15) con su propio motivo', async () => {
+    repo.ordenes.set('PC-2026-00001', orden('en_preparacion'));
+
+    const resultado = await repo.enTransaccion((tx) =>
+      cambiarEstadoPorCumplimiento(tx, 'PC-2026-00001', 'preparada', 'Preparación completa en todas las líneas', 21),
+    );
+
+    expect(resultado).toEqual({ ok: true });
+    expect(repo.ordenes.get('PC-2026-00001')?.estado).toBe('preparada');
+    expect(repo.historial).toEqual([
+      {
+        codigo: 'PC-2026-00001',
+        estadoAnterior: 'en_preparacion',
+        estadoNuevo: 'preparada',
+        idUsuarioAutor: 21,
+        motivo: 'Preparación completa en todas las líneas',
+      },
+    ]);
+  });
+
+  it('no pasa a preparada una orden que sigue en revisión: ESTADO_CAMBIADO y nada escrito', async () => {
+    const resultado = await repo.enTransaccion((tx) => cambiarEstadoPorCumplimiento(tx, 'PC-2026-00001', 'preparada', 'x', 21));
+
+    expect(resultado).toEqual({ ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: 'revision_disponibilidad' });
+    expect(repo.historial).toHaveLength(0);
+  });
+
+  it('pedir a mano de preparación a preparada responde 409 TRANSICION_NO_PERMITIDA, también al administrador', async () => {
+    repo.ordenes.set('PC-2026-00001', orden('en_preparacion'));
+    const servicio = new EstadosService(
+      repo,
+      { emitirCambioEstado: vi.fn().mockResolvedValue(undefined) },
+      { notificarOrdenCreada: vi.fn().mockResolvedValue(undefined), notificarOrdenDespachada: vi.fn().mockResolvedValue(undefined) },
+      { ahora: () => new Date('2026-10-24T15:00:00Z') },
+    );
+
+    await expect(
+      servicio.cambiarEstado('PC-2026-00001', { estadoActual: 'en_preparacion', estadoNuevo: 'preparada' }, actor),
+    ).rejects.toMatchObject({ codigo: 'TRANSICION_NO_PERMITIDA', statusCode: 409 });
+    expect(repo.ordenes.get('PC-2026-00001')?.estado).toBe('en_preparacion');
+  });
+
+  function servicioDePrueba(): EstadosService {
+    return new EstadosService(
+      repo,
+      { emitirCambioEstado: vi.fn().mockResolvedValue(undefined) },
+      { notificarOrdenCreada: vi.fn().mockResolvedValue(undefined), notificarOrdenDespachada: vi.fn().mockResolvedValue(undefined) },
+      { ahora: () => new Date('2026-10-24T15:00:00Z') },
+    );
+  }
+
+  it('devolver una orden preparada a preparación reinicia sus líneas preparadas con el autor de la devolución (M09 R16)', async () => {
+    repo.ordenes.set('PC-2026-00001', orden('preparada'));
+
+    await servicioDePrueba().cambiarEstado(
+      'PC-2026-00001',
+      { estadoActual: 'preparada', estadoNuevo: 'en_preparacion', motivo: 'Falta una lata' },
+      actor,
+    );
+
+    expect(repo.reinicios).toEqual([{ codigo: 'PC-2026-00001', idUsuarioAutor: actor.idUsuario }]);
+  });
+
+  it('despachar una orden preparada no reinicia ninguna línea', async () => {
+    repo.ordenes.set('PC-2026-00001', orden('preparada', 'domicilio'));
+
+    await servicioDePrueba().cambiarEstado('PC-2026-00001', { estadoActual: 'preparada', estadoNuevo: 'despachado' }, actor);
+
+    expect(repo.reinicios).toHaveLength(0);
+  });
+
   it.each<EstadoOrden>(['orden_confirmada', 'en_preparacion', 'preparada', 'despachado', 'cancelado'])(
     'si la orden está en %s responde ESTADO_CAMBIADO y no escribe nada',
     async (estado) => {
       repo.ordenes.set('PC-2026-00001', orden(estado));
 
-      const resultado = await repo.enTransaccion((tx) => cambiarEstadoPorCumplimiento(tx, 'PC-2026-00001', 'x', 21));
+      const resultado = await repo.enTransaccion((tx) =>
+        cambiarEstadoPorCumplimiento(tx, 'PC-2026-00001', 'en_preparacion', 'x', 21),
+      );
 
       expect(resultado).toEqual({ ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: estado });
       expect(repo.ordenes.get('PC-2026-00001')?.estado).toBe(estado);
@@ -331,14 +411,14 @@ describe('revisión de disponibilidad → preparación: solo la hace M09 (RF-CUM
   it('si otra persona la cambió entre la lectura y la escritura, pierde la carrera sin dejar rastro', async () => {
     repo.perderCarrera = true;
 
-    const resultado = await repo.enTransaccion((tx) => cambiarEstadoPorCumplimiento(tx, 'PC-2026-00001', 'x', 21));
+    const resultado = await repo.enTransaccion((tx) => cambiarEstadoPorCumplimiento(tx, 'PC-2026-00001', 'en_preparacion', 'x', 21));
 
     expect(resultado).toEqual({ ok: false, razon: 'ESTADO_CAMBIADO', estadoActual: 'revision_disponibilidad' });
     expect(repo.historial).toHaveLength(0);
   });
 
   it('una orden inexistente responde NO_EXISTE', async () => {
-    const resultado = await repo.enTransaccion((tx) => cambiarEstadoPorCumplimiento(tx, 'PC-2026-99999', 'x', 21));
+    const resultado = await repo.enTransaccion((tx) => cambiarEstadoPorCumplimiento(tx, 'PC-2026-99999', 'en_preparacion', 'x', 21));
 
     expect(resultado).toEqual({ ok: false, razon: 'NO_EXISTE' });
   });

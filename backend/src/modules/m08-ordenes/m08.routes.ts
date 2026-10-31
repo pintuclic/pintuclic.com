@@ -93,7 +93,7 @@ export interface ModuloM08Config {
 export function construirModuloM08(
   autorizacion: AutorizacionService,
   config?: ModuloM08Config,
-): { router: Router; creacion: CreacionService } {
+): { router: Router; creacion: CreacionService; notificaciones: NotificacionesOrdenPort } {
   const reloj = config?.estados?.reloj ?? new RelojSistemaAdapter();
   const notificaciones = config?.estados?.notificaciones ?? new SinNotificacionesOrdenAdapter();
   const catalogoPorDefecto = new PrismaCatalogoDisponibilidadAdapter();
@@ -152,5 +152,5 @@ export function construirModuloM08(
     router.patch(ruta, gestionar, notas.inmutable);
     router.delete(ruta, gestionar, notas.inmutable);
   }
-  return { router, creacion };
+  return { router, creacion, notificaciones };
 }

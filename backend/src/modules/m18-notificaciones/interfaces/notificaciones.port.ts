@@ -16,7 +16,8 @@ export interface EventoNotificacion {
     | 'cambio_correo_confirmado'
     | 'dictamen_empresa'
     | 'alerta_servicio_ia'
-    | 'comprobante_venta';
+    | 'comprobante_venta'
+    | 'orden_cancelada';
   destinatario: string;
   timestamp: Date;
   metadatos: Record<string, string | number | boolean>;
@@ -51,6 +52,14 @@ export interface NotificacionesPort {
   notificarComprobanteVenta?(
     correo: string,
     datos: { nombre: string; numero: string; total: string; codigoOrden: string },
+  ): Promise<void>;
+  /**
+   * M11 · R-POS-B: avisa al cliente que su pedido se canceló, con el motivo. Opcional por la misma razón que los
+   * anteriores. Sin importes ni datos de pago.
+   */
+  notificarOrdenCancelada?(
+    correo: string,
+    datos: { nombre: string; codigoOrden: string; motivo: string; origen: 'tienda' | 'cliente' },
   ): Promise<void>;
 }
 

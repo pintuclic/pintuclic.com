@@ -158,6 +158,13 @@ export class MemoriaNotificacionesAdapter implements NotificacionesPort {
     this.eventos.push({ tipo: 'comprobante_venta', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
   }
 
+  async notificarOrdenCancelada(
+    correo: string,
+    datos: { nombre: string; codigoOrden: string; motivo: string; origen: 'tienda' | 'cliente' },
+  ): Promise<void> {
+    this.eventos.push({ tipo: 'orden_cancelada', destinatario: correo, timestamp: new Date(), metadatos: { ...datos } });
+  }
+
   obtenerEventos(): EventoNotificacion[] {
     return [...this.eventos];
   }
@@ -201,6 +208,10 @@ export class NoOpNotificacionesAdapter implements NotificacionesPort {
   }
 
   async notificarComprobanteVenta(): Promise<void> {
+    // No-op
+  }
+
+  async notificarOrdenCancelada(): Promise<void> {
     // No-op
   }
 }
@@ -414,6 +425,21 @@ export class SmtpNotificacionesAdapter implements NotificacionesPort {
       subject,
       text: plantillasHtml.textoComprobanteVenta(intro, datos.nombre, datos.numero, datos.total, enlace),
       html: plantillasHtml.htmlComprobanteVenta(intro, datos.nombre, datos.numero, datos.total, enlace),
+    });
+  }
+
+  async notificarOrdenCancelada(
+    correo: string,
+    datos: { nombre: string; codigoOrden: string; motivo: string; origen: 'tienda' | 'cliente' },
+  ): Promise<void> {
+    const { subject, intro } = await this.resolverIntroYAsunto('orden_cancelada', {
+      subject: 'Tu pedido fue cancelado · Pintu Clic',
+      intro: 'Te escribimos para avisarte que tu pedido en Pintu Clic fue cancelado. Abajo encontrarás el motivo.',
+    });
+    await this.enviarConRegistro('orden_cancelada', correo, {
+      subject,
+      text: plantillasHtml.textoOrdenCancelada(intro, datos.nombre, datos.codigoOrden, datos.motivo, datos.origen),
+      html: plantillasHtml.htmlOrdenCancelada(intro, datos.nombre, datos.codigoOrden, datos.motivo, datos.origen),
     });
   }
 }

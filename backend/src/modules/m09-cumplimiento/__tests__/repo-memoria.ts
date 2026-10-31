@@ -1,9 +1,10 @@
 import type { EstadosTx, FilaHistorialEstado, OrdenParaEstado } from '../../m08-ordenes/interfaces/estados.interface';
 import { cambiarEstadoPorCumplimiento } from '../../m08-ordenes/services/estados.service';
-import { MOTIVO_AVANCE_AUTOMATICO, type EstadoMarca, type EstadoOrden } from '../dtos/m09-cumplimiento.dto';
+import { MOTIVO_AVANCE_AUTOMATICO, MOTIVO_AVANCE_PREPARADA, type EstadoMarca, type EstadoOrden } from '../dtos/m09-cumplimiento.dto';
 import type {
   CumplimientoRepository,
   CumplimientoTx,
+  DestinoAvance,
   FilaRetenidaDatos,
   LineaDatos,
   MarcaNueva,
@@ -38,15 +39,19 @@ export function linea(numeroLinea: number, p: Plantilla): LineaDatos {
 
 /** Una orden de tres líneas: un vinilo entonado, una brocha y un rodillo. */
 export function ordenDe(codigo: string, estado: EstadoOrden, lineas?: LineaDatos[]): OrdenDatos {
+  // Cada orden tiene claves de línea propias, como en la base: `insertarMarcas` busca la línea solo por su clave.
+  const desplazamiento = Number(codigo.replace(/\D/g, '')) * 100;
+  const conClaveUnica = (ls: LineaDatos[]): LineaDatos[] => ls.map((l) => ({ ...l, idLinea: desplazamiento + l.numeroLinea }));
   return {
     codigo,
     estado,
     idUsuario: 7,
-    lineas: lineas ?? [
+    cancelacion: null,
+    lineas: conClaveUnica(lineas ?? [
       linea(1, { nombreProducto: 'Vinilo Tipo 1', varianteCopia: 'Galón', cantidad: 2, esEntonado: true, baseConsumida: 'Base Deep 1 gal', colorSolicitado: 'Rojo Colonial' }),
       linea(2, { nombreProducto: 'Brocha 4"', varianteCopia: 'Unidad' }),
       linea(3, { nombreProducto: 'Rodillo felpa', varianteCopia: 'Unidad', cantidad: 3 }),
-    ],
+    ]),
   };
 }
 
@@ -113,6 +118,7 @@ export class RepoMemoria implements CumplimientoRepository {
       registrarHistorial: async (fila) => {
         this.historial.push(fila);
       },
+      reiniciarMarcasPreparadas: async () => undefined,
     };
     const tx: CumplimientoTx = {
       cargarOrden: (codigo) => this.cargarOrden(codigo),
@@ -129,8 +135,9 @@ export class RepoMemoria implements CumplimientoRepository {
           this.escrituras += 1;
         }
       },
-      avanzarAPreparacion: async (codigo, idUsuarioAutor): Promise<ResultadoAvance> => {
-        const r = await cambiarEstadoPorCumplimiento(estadosTx, codigo, MOTIVO_AVANCE_AUTOMATICO, idUsuarioAutor);
+      avanzar: async (codigo, hacia: DestinoAvance, idUsuarioAutor): Promise<ResultadoAvance> => {
+        const motivo = hacia === 'preparada' ? MOTIVO_AVANCE_PREPARADA : MOTIVO_AVANCE_AUTOMATICO;
+        const r = await cambiarEstadoPorCumplimiento(estadosTx, codigo, hacia, motivo, idUsuarioAutor);
         return r.ok ? { ok: true } : { ok: false, razon: r.razon };
       },
     };
