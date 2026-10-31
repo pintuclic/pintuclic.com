@@ -11,6 +11,18 @@ import { z } from 'zod';
  * Define tipos, esquemas Zod de validación, envelopes y códigos de error para
  * la gestión de cancelaciones de órdenes, devoluciones por retracto legal
  * (Ley 1480 de 2011), reclamaciones por garantía y liquidación de reembolsos.
+ *
+ * ── Revisión 2026-10-31 (cancelación por falta de stock, ver contrato de M09 R18 y R20) ─────────────
+ *  R-POS-A  La TIENDA también puede iniciar una cancelación. Es una función interna sin ruta HTTP,
+ *           `solicitarCancelacionPorTienda({ idEmpleado, codigoOrden, motivo })`, que la llama M09. Aplica las mismas
+ *           reglas que la del cliente (estado cancelable, RF-POS-01-02, y una sola solicitud en trámite,
+ *           RF-POS-01-04) y crea la solicitud `solicitada` con `id_usuario` = el dueño de la orden,
+ *           `id_empleado_inicia` = el empleado y reembolso = total de la orden. No lleva datos bancarios: se piden
+ *           al cliente al contactarlo. El cliente la ve en «Mis solicitudes» marcada como iniciada por la tienda.
+ *  R-POS-B  Al APROBAR una cancelación, sea cual sea su origen, M11 avisa al cliente cuando la transacción ya se
+ *           confirmó (plantilla `orden_cancelada` de M18, vía el puerto de notificaciones de M08). El motivo del
+ *           correo es el `motivo_general` de la solicitud. Un fallo del correo no revierte la aprobación; rechazar
+ *           no envía nada. La resolución sigue exigiendo `ventas.gestionar`.
  * ============================================================================
  */
 
@@ -181,6 +193,11 @@ export const historialEstadoPostventaSchema = z.object({
 });
 export type HistorialEstadoPostventa = z.infer<typeof historialEstadoPostventaSchema>;
 
+/** R-POS-A. Quién abrió el trámite: el cliente, o la tienda por una cancelación (p. ej. falta de stock). */
+export const ORIGENES_SOLICITUD = ['cliente', 'tienda'] as const;
+export const origenSolicitudSchema = z.enum(ORIGENES_SOLICITUD);
+export type OrigenSolicitud = z.infer<typeof origenSolicitudSchema>;
+
 export const solicitudPostventaResumenSchema = z.object({
   idSolicitud: z.number().int().positive(),
   codigo: codigoPostventaSchema,
@@ -189,6 +206,8 @@ export const solicitudPostventaResumenSchema = z.object({
   nombreCliente: z.string(),
   tipo: tipoPostventaSchema,
   estado: estadoPostventaSchema,
+  /** R-POS-A. `tienda` solo ocurre en cancelaciones. */
+  iniciadaPor: origenSolicitudSchema,
   totalReembolso: importeSchema,
   totalItems: z.number().int().nonnegative(),
   fechaSolicitud: fechaHoraSchema,

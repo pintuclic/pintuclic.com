@@ -519,13 +519,16 @@ La prioridad de cada historia es la más alta de sus requisitos. El estado se re
 | — | Revisión de disponibilidad | La orden nace en este estado al confirmarse el pago (RF-ORD-01-01): es donde el personal comprueba que hay producto. |
 | Orden confirmada | Revisión de disponibilidad | Solo para órdenes anteriores a este cambio, que nacieron en «Orden confirmada»; ninguna orden nueva pasa por este estado. |
 | Revisión de disponibilidad | En preparación | Automático: lo hace M09 al marcar disponible la última línea (RF-CUM-03-10). El personal no lo pide a mano. |
-| En preparación | Preparada | — |
-| Preparada | En preparación | Exige motivo; no se retrocede a la revisión de disponibilidad (RF-CUM-05-05). |
+| En preparación | Preparada | Automático: lo hace M09 al marcar preparada la última línea (RF-CUM-05-06). El personal no lo pide a mano. |
+| Preparada | En preparación | Exige motivo; no se retrocede a la revisión de disponibilidad (RF-CUM-05-05). Las líneas preparadas vuelven a «disponible» para volver a prepararlas (RF-CUM-05-06). |
 | Preparada | Despachado | Solo envío a domicilio: es su cierre normal (RF-ORD-03-06). |
 | Preparada | Entregado | Solo recogida en almacén: es su cierre (RF-ORD-03-06). |
 | Despachado | Entregado | Opcional, si el personal confirma la llegada (RF-ORD-03-06). |
 | Según la política de M11 | Cancelado | La registra un empleado; el cliente no cancela por sí mismo (RF-ORD-03-04). No habilitado hasta la política de M11 (RF-POS-04-03). |
 | Entregado | Devuelto | Devolución aceptada; no aplica a colores entonados a medida (RF-ORD-03-04, CA-ORD-03-09). No habilitado hasta la política de M11. |
+
+### Estado de cada producto del pedido (revisión del 31 de octubre de 2026)
+Cada línea tiene un estado propio, que se calcula al leer y no se guarda en la línea: pendiente, disponible, consiguiendo stock, no disponible o preparada (marcas que pone el personal con M09, la última manda) y, desde el despacho, despachada, entregada, cancelada o devuelta (las hereda de la orden). El personal con `ventas.ver` lo ve en el detalle del pedido. El cliente ve en «Mis pedidos», por cada producto, uno de tres textos: verificando disponibilidad (pendiente o consiguiendo stock), confirmado (disponible, preparada o despachada) o rechazado (no disponible); no ve quién lo marcó ni cuándo, y no recibe aviso por correo al cambiar. Detalle en `contracts/m08-ordenes.contract.ts` (R15 y R16) y `contracts/m09-cumplimiento.contract.ts`.
 
 Todos los pasos exigen «Gestión de pedidos» (RF-ORD-05-01, RF-CUM-01-10). Una orden sin modo de entrega, anterior a la copia histórica, admite desde Preparada tanto Despachado como Entregado.
 

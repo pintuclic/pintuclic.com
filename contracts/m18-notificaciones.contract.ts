@@ -38,6 +38,12 @@ export const TIPOS_COMUNICACION = [
   'alerta_servicio_ia',
   /** M12 · R9: el comprobante de venta está listo (número, total y enlace). */
   'comprobante_venta',
+  /**
+   * M11 · R-POS-B (revisión 2026-10-31): se canceló el pedido. Datos fijos: nombre, código del pedido, origen
+   * (`tienda` o `cliente`) y motivo. Nunca importes ni datos de pago. Editable por el administrador: solo el asunto
+   * y la introducción; el motivo y la frase del reembolso van fijos.
+   */
+  'orden_cancelada',
 ] as const;
 export const tipoComunicacionSchema = z.enum(TIPOS_COMUNICACION);
 export type TipoComunicacion = z.infer<typeof tipoComunicacionSchema>;

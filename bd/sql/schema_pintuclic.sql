@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.25 (v4.24 + M17: permisos individuales por usuario y fecha de creación de la cuenta)
+-- VERSIÓN: 4.26 (v4.25 + M09: la marca «preparada» por línea; M11: cancelación iniciada por la tienda; M18: plantilla orden_cancelada)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 98
@@ -276,7 +276,7 @@ BEGIN
         );
     END IF;
 
-    -- M09: marca que el personal pone a cada línea de una orden al revisar la disponibilidad
+    -- M09: marca que el personal pone a cada línea de una orden (disponibilidad y, desde v4.26, preparada)
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_estado_verificacion_linea') THEN
         CREATE TYPE enum_estado_verificacion_linea AS ENUM ('disponible', 'consiguiendo_stock', 'no_disponible');
     END IF;
@@ -310,6 +310,10 @@ ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'revision_disponibilidad' A
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'preparada' AFTER 'en_preparacion';
 ALTER TYPE enum_estado_orden ADD VALUE IF NOT EXISTS 'devuelto' AFTER 'cancelado';
 
+-- M09 (v4.26): la línea también se marca «preparada» cuando se alista en la bodega. En una base existente el valor se añade
+-- sin tocar las marcas anteriores; no se usa en este mismo script, así que no hay problema con la transacción.
+ALTER TYPE enum_estado_verificacion_linea ADD VALUE IF NOT EXISTS 'preparada' AFTER 'no_disponible';
+
 -- M13 (ExistenciaComboPort): la existencia de un combo baja al crearse la orden y vuelve al cancelarse.
 ALTER TYPE enum_origen_ajuste_inventario ADD VALUE IF NOT EXISTS 'orden' AFTER 'samit';
 ALTER TYPE enum_motivo_ajuste_inventario ADD VALUE IF NOT EXISTS 'venta' AFTER 'carga_masiva';
@@ -335,6 +339,9 @@ ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'alerta_servicio_ia';
 
 -- M18 (v4.23): aviso al cliente con el enlace a su comprobante de venta (M12 · R9)
 ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'comprobante_venta';
+
+-- M18 (v4.26): aviso al cliente con el motivo cuando se cancela su pedido (M11 · cancelación aprobada, M08 · R10)
+ALTER TYPE enum_tipo_comunicacion ADD VALUE IF NOT EXISTS 'orden_cancelada';
 
 -- ==============================================================================
 -- 1. MÓDULO DE DESCUENTOS, ROLES Y PERMISOS
@@ -1633,7 +1640,12 @@ CREATE TABLE IF NOT EXISTS solicitud_postventa (
     CONSTRAINT ck_postventa_total_reembolso CHECK (total_reembolso >= 0)
 );
 
+-- M11 (v4.26): la tienda también puede iniciar una cancelación (p. ej. por falta de stock, desde M09). NULL = la pidió el cliente.
+ALTER TABLE solicitud_postventa ADD COLUMN IF NOT EXISTS id_empleado_inicia INT
+    CONSTRAINT fk_postventa_empleado_inicia REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE SET NULL;
+
 COMMENT ON TABLE solicitud_postventa IS 'Cabecera de trámites de postventa: cancelaciones, devoluciones y garantías (M11)';
+COMMENT ON COLUMN solicitud_postventa.id_empleado_inicia IS 'Empleado que inició el trámite en nombre de la tienda (cancelación por falta de stock, M09 · R18); NULL cuando lo pidió el cliente';
 COMMENT ON COLUMN solicitud_postventa.codigo_visible IS 'DEV-AAAA-NNNNN: código público generado con consecutivo corrido (M11)';
 COMMENT ON COLUMN solicitud_postventa.total_reembolso IS 'Monto económico total a restituir por la cancelación o devolución';
 
@@ -3179,8 +3191,8 @@ CREATE TABLE IF NOT EXISTS verificacion_linea_orden (
         REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE verificacion_linea_orden IS 'Marcas de disponibilidad por línea de orden; solo inserción, el estado vigente es el último registro (M09 · R3)';
-COMMENT ON COLUMN verificacion_linea_orden.estado IS 'consiguiendo_stock = hay parte de las unidades o se espera el resto; la línea solo es disponible con todas (M09 · D10)';
+COMMENT ON TABLE verificacion_linea_orden IS 'Marcas por línea de orden (disponibilidad y preparada); solo inserción, el estado vigente es el último registro (M09 · R3)';
+COMMENT ON COLUMN verificacion_linea_orden.estado IS 'consiguiendo_stock = hay parte de las unidades o se espera el resto; la línea solo es disponible con todas (M09 · D10); preparada = ya alistada en la bodega (M09 · R2)';
 COMMENT ON COLUMN verificacion_linea_orden.id_usuario_autor IS 'Empleado que puso la marca; obligatorio, el rastro siempre tiene autor';
 
 CREATE INDEX IF NOT EXISTS idx_vlo_linea ON verificacion_linea_orden (id_linea_orden, id_verificacion_linea_orden DESC);
@@ -3224,5 +3236,5 @@ CREATE INDEX IF NOT EXISTS idx_usr_permiso_permiso ON usuario_permiso(id_permiso
 COMMENT ON TABLE usuario_permiso IS 'Permisos atómicos concedidos individualmente a un empleado (M17 R-ACC-3). Solo cuentan si la cuenta está activa y tiene rol empleado (R-ACC-5)';
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (98 TABLAS - v4.25)
+-- FIN DEL SCRIPT DDL (98 TABLAS - v4.26)
 -- ==============================================================================
