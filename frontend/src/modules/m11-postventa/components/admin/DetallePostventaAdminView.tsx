@@ -112,6 +112,7 @@ export function DetallePostventaAdminView({ codigo }: { codigo: string }) {
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-neutral-medium">
                   {ETIQUETA_TIPO_POSTVENTA[solicitud.tipo]}
+                  {solicitud.iniciadaPor === 'tienda' ? ' · iniciada por la tienda' : ''}
                 </span>
                 <h1 className="text-2xl font-bold text-neutral-black">
                   Solicitud {solicitud.codigo}

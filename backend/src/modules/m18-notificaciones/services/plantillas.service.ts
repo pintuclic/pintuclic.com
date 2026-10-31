@@ -59,6 +59,12 @@ function renderizarMuestra(
         contenidoHtml: plantillasHtml.htmlComprobanteVenta(intro, 'Cliente de ejemplo', 'CV-000123', '$ 171.800', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001/comprobante'),
         contenidoTexto: plantillasHtml.textoComprobanteVenta(intro, 'Cliente de ejemplo', 'CV-000123', '$ 171.800', 'https://pintuclic.com/perfil/pedidos/PC-2026-00001/comprobante'),
       };
+    case 'orden_cancelada':
+      return {
+        asunto,
+        contenidoHtml: plantillasHtml.htmlOrdenCancelada(intro, 'Cliente de ejemplo', 'PC-2026-00001', 'Sin existencias: Vinilo Blanco Mate, galón (1 unidad).', 'tienda'),
+        contenidoTexto: plantillasHtml.textoOrdenCancelada(intro, 'Cliente de ejemplo', 'PC-2026-00001', 'Sin existencias: Vinilo Blanco Mate, galón (1 unidad).', 'tienda'),
+      };
   }
 }
 

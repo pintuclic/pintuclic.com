@@ -62,8 +62,12 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
   let gestion: import('../repositories/gestion.repository').PrismaGestionRepository;
   let consulta: import('../repositories/consulta-cliente.repository').PrismaConsultaClienteRepository;
   let notas: import('../repositories/notas.repository').PrismaNotasRepository;
-  /** Lo que hace M09 al marcar la última línea: la única vía de revision_disponibilidad a en_preparacion. */
-  let avanzarPorCumplimiento: (codigo: string, idUsuario: number) => Promise<import('../services/estados.service').ResultadoAvanceCumplimiento>;
+  /** Lo que hace M09 al marcar la última línea: la única vía a en_preparacion y a preparada. */
+  let avanzarPorCumplimiento: (
+    codigo: string,
+    idUsuario: number,
+    hacia?: 'en_preparacion' | 'preparada',
+  ) => Promise<import('../services/estados.service').ResultadoAvanceCumplimiento>;
 
   /**
    * Último número usado. Sin fila en `consecutivo` la numeración arranca después del mayor código
@@ -104,8 +108,8 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     );
     const { cambiarEstadoPorCumplimiento } = await import('../services/estados.service.js');
     const { estadosTxDe } = await import('../repositories/estados.repository.js');
-    avanzarPorCumplimiento = (codigo, idUsuario) =>
-      prisma.$transaction((tx) => cambiarEstadoPorCumplimiento(estadosTxDe(tx), codigo, 'Disponibilidad confirmada en todas las líneas', idUsuario));
+    avanzarPorCumplimiento = (codigo, idUsuario, hacia = 'en_preparacion') =>
+      prisma.$transaction((tx) => cambiarEstadoPorCumplimiento(estadosTxDe(tx), codigo, hacia, 'Avance automático de M09', idUsuario));
     gestion = new PrismaGestionRepository();
     consulta = new PrismaConsultaClienteRepository();
     notas = new PrismaNotasRepository();
@@ -251,7 +255,11 @@ describe.skipIf(URL_BD === undefined)('M08 · repositorios contra PostgreSQL rea
     const actor = { idUsuario: ID_EMPLEADO };
 
     expect(await avanzarPorCumplimiento(codigo, actor.idUsuario)).toEqual({ ok: true });
-    await estados.cambiarEstado(codigo, { estadoActual: 'en_preparacion', estadoNuevo: 'preparada' }, actor);
+    // A preparada tampoco se llega a mano: solo M09, al quedar todas las líneas preparadas.
+    await expect(
+      estados.cambiarEstado(codigo, { estadoActual: 'en_preparacion', estadoNuevo: 'preparada' }, actor),
+    ).rejects.toMatchObject({ codigo: 'TRANSICION_NO_PERMITIDA' });
+    expect(await avanzarPorCumplimiento(codigo, actor.idUsuario, 'preparada')).toEqual({ ok: true });
     await expect(
       estados.cambiarEstado(codigo, { estadoActual: 'preparada', estadoNuevo: 'despachado' }, actor),
     ).rejects.toMatchObject({ codigo: 'TRANSICION_NO_PERMITIDA' });

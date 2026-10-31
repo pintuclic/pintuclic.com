@@ -60,12 +60,13 @@ export type MedioContacto = z.infer<typeof medioContactoSchema>;
  * (que puede partir de varios estados según la política y por eso no se lista).
  * `revision_disponibilidad` → `en_preparacion` tampoco se lista: solo la hace M09 (RF-CUM-03-10) al quedar todas las
  * líneas disponibles; pedirla a mano responde 409 TRANSICION_NO_PERMITIDA.
+ * `en_preparacion` → `preparada` tampoco se lista (revisión 2026-10-31): solo la hace M09 al quedar todas las líneas
+ * `preparada` (M09 R15); pedirla a mano responde 409 TRANSICION_NO_PERMITIDA.
  * `condicion` es lo que el servicio verifica además de la pareja desde → hacia.
  */
 export const TRANSICIONES_ESTADO = [
   { desde: 'orden_confirmada', hacia: 'revision_disponibilidad', condicion: 'Solo órdenes anteriores: las nuevas nacen ya en revision_disponibilidad' },
-  { desde: 'en_preparacion', hacia: 'preparada', condicion: null },
-  { desde: 'preparada', hacia: 'en_preparacion', condicion: 'Exige motivo; no se retrocede a revision_disponibilidad (RF-CUM-05-05)' },
+  { desde: 'preparada', hacia: 'en_preparacion', condicion: 'Exige motivo; no se retrocede a revision_disponibilidad (RF-CUM-05-05). Las líneas `preparada` vuelven a `disponible` (M09 R16)' },
   { desde: 'preparada', hacia: 'despachado', condicion: 'Solo modoEntrega = domicilio, o sin modo (orden anterior a la copia histórica)' },
   { desde: 'preparada', hacia: 'entregado', condicion: 'Solo modoEntrega = recogida, o sin modo' },
   { desde: 'despachado', hacia: 'entregado', condicion: 'Opcional: el personal confirma la llegada' },
@@ -143,6 +144,45 @@ export const descuentoOrdenSchema = z.object({
 });
 export type DescuentoOrden = z.infer<typeof descuentoOrdenSchema>;
 
+/**
+ * R15. Estado de una línea. Las cinco primeras son marcas de M09 (`pendiente` = sin marcas); las cuatro últimas las
+ * hereda de la orden desde que sale de la preparación. Se calcula al leer, no se guarda.
+ */
+export const ESTADOS_LINEA = [
+  'pendiente',
+  'disponible',
+  'consiguiendo_stock',
+  'no_disponible',
+  'preparada',
+  'despachada',
+  'entregada',
+  'cancelada',
+  'devuelta',
+] as const;
+export const estadoLineaSchema = z.enum(ESTADOS_LINEA);
+export type EstadoLinea = z.infer<typeof estadoLineaSchema>;
+
+/** R16. Lo que ve el cliente de cada línea. */
+export const DISPONIBILIDADES_CLIENTE = ['verificando_disponibilidad', 'confirmado', 'rechazado'] as const;
+export const disponibilidadClienteSchema = z.enum(DISPONIBILIDADES_CLIENTE);
+export type DisponibilidadCliente = z.infer<typeof disponibilidadClienteSchema>;
+
+/**
+ * R16. De estado de línea a lo que ve el cliente. `null` = no se muestra (la orden cancelada o devuelta ya lo dice
+ * todo). `consiguiendo_stock` es «verificando»: todavía no se sabe. `no_disponible` es «rechazado».
+ */
+export const DISPONIBILIDAD_POR_ESTADO_LINEA: Readonly<Record<EstadoLinea, DisponibilidadCliente | null>> = {
+  pendiente: 'verificando_disponibilidad',
+  consiguiendo_stock: 'verificando_disponibilidad',
+  disponible: 'confirmado',
+  preparada: 'confirmado',
+  despachada: 'confirmado',
+  entregada: 'confirmado',
+  no_disponible: 'rechazado',
+  cancelada: null,
+  devuelta: null,
+};
+
 export const lineaOrdenSchema = z.object({
   nombreProducto: z.string(),
   varianteCopia: z.string(),
@@ -154,6 +194,8 @@ export const lineaOrdenSchema = z.object({
   descuentos: z.array(descuentoOrdenSchema),
   /** R14. false → sin enlace a la ficha y con la nota de no disponible. */
   productoDisponible: z.boolean(),
+  /** R16. null cuando la orden está cancelada o devuelta. */
+  disponibilidad: disponibilidadClienteSchema.nullable(),
 });
 export type LineaOrden = z.infer<typeof lineaOrdenSchema>;
 
@@ -161,6 +203,8 @@ export type LineaOrden = z.infer<typeof lineaOrdenSchema>;
 export const lineaOrdenGestionSchema = lineaOrdenSchema.extend({
   esEntonado: z.boolean(),
   baseConsumida: z.string().nullable(),
+  /** R15 y R16. Solo el estado; el rastro con autor y fecha es de M09. */
+  estadoLinea: estadoLineaSchema,
 });
 export type LineaOrdenGestion = z.infer<typeof lineaOrdenGestionSchema>;
 

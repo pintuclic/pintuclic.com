@@ -1,3 +1,4 @@
+import { disponibilidadParaCliente, estadoDeLinea } from './estado-linea';
 import type { Actor } from '../../m20-seguridad/interfaces/actor.interface';
 import {
   ESTADOS_FINALIZADOS,
@@ -167,8 +168,10 @@ export class GestionService {
         precioAplicado: linea.precioAplicado,
         descuentos: [...linea.descuentos].sort((a, b) => a.ordenAplicacion - b.ordenAplicacion),
         productoDisponible: linea.idVarianteRef !== null && disponibles.has(linea.idVarianteRef),
+        disponibilidad: disponibilidadParaCliente(estadoDeLinea(datos.estado, linea.ultimaMarca)),
         esEntonado: linea.esEntonado,
         baseConsumida: linea.baseConsumida,
+        estadoLinea: estadoDeLinea(datos.estado, linea.ultimaMarca),
       })),
       historial: [...datos.historial]
         .sort((a, b) => a.fecha.getTime() - b.fecha.getTime())

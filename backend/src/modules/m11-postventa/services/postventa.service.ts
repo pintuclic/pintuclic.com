@@ -21,6 +21,7 @@ import type {
   SolicitudPostventaEntidad,
 } from '../repositories/postventa.repository';
 import type { AuditoriaPort } from '../../m20-seguridad/interfaces/auditoria.port';
+import type { NotificacionesOrdenPort } from '../../m08-ordenes/interfaces/notificaciones-orden.port';
 import {
   ErrorPostventa,
   validarElegibilidadCancelacion,
@@ -49,7 +50,9 @@ export class PostventaService implements PostventaServicePort {
     private readonly repo: PostventaRepositoryPort,
     private readonly ordenesPort: OrdenesPortM11,
     private readonly auditoria?: AuditoriaPort,
-    private readonly reloj: () => Date = () => new Date()
+    private readonly reloj: () => Date = () => new Date(),
+    /** R-POS-B: por dónde se avisa al cliente cuando se aprueba una cancelación. Sin esto, no se avisa. */
+    private readonly avisos?: Pick<NotificacionesOrdenPort, 'notificarOrdenCancelada'>
   ) {}
 
   async solicitarCancelacion(
@@ -61,9 +64,34 @@ export class PostventaService implements PostventaServicePort {
       throw noDisponible('La orden especificada no existe o no pertenece a su cuenta.');
     }
 
+    const codigo = await this.radicarCancelacion(orden, input.motivo, input.datosReembolso, undefined);
+    return this.consultarMiSolicitud(idUsuario, codigo);
+  }
+
+  async solicitarCancelacionPorTienda(
+    idEmpleado: number,
+    codigoOrden: string,
+    motivo: string
+  ): Promise<SolicitudPostventaDetalle> {
+    const orden = await this.ordenesPort.obtenerOrdenParaPostventa(codigoOrden);
+    if (!orden) {
+      throw noDisponible('La orden especificada no existe.');
+    }
+
+    const codigo = await this.radicarCancelacion(orden, motivo, undefined, idEmpleado);
+    return this.consultarGestionPorCodigo(codigo);
+  }
+
+  /** La cancelación del cliente y la de la tienda comparten reglas; solo cambia quién la abre (R-POS-A). */
+  private async radicarCancelacion(
+    orden: NonNullable<Awaited<ReturnType<OrdenesPortM11['obtenerOrdenParaPostventa']>>>,
+    motivo: string,
+    datosReembolso: DatosBancariosInput | undefined,
+    idEmpleadoInicia: number | undefined
+  ): Promise<string> {
     validarElegibilidadCancelacion(orden.estado);
 
-    const codigo = await this.repo.enTransaccion(async (tx) => {
+    return this.repo.enTransaccion(async (tx) => {
       await this.repo.bloquearOrden(orden.idOrden, tx);
       await this.exigirSinSolicitudActiva(orden.idOrden, tx);
 
@@ -72,26 +100,26 @@ export class PostventaService implements PostventaServicePort {
         {
           codigoVisible: codigo,
           idOrden: orden.idOrden,
-          idUsuario,
+          // Siempre el dueño del pedido: es quien la ve en «Mis solicitudes» y quien recibe el aviso.
+          idUsuario: orden.idUsuario,
           tipo: 'cancelacion',
           estado: 'solicitada',
-          motivoGeneral: input.motivo,
+          motivoGeneral: motivo,
           totalReembolso: orden.total,
-          datosBancarios: input.datosReembolso,
+          datosBancarios: datosReembolso,
+          idEmpleadoInicia,
           lineas: orden.lineas.map((l) => ({
             idLineaOrden: l.idLineaOrden,
             cantidad: l.cantidad,
             precioUnitario: l.precioAplicado,
             subtotal: l.precioAplicado * l.cantidad,
-            motivoEspecifico: input.motivo,
+            motivoEspecifico: motivo,
           })),
         },
         tx
       );
       return codigo;
     });
-
-    return this.consultarMiSolicitud(idUsuario, codigo);
   }
 
   async solicitarDevolucion(
@@ -174,6 +202,7 @@ export class PostventaService implements PostventaServicePort {
       nombreCliente: i.usuario.nombre,
       tipo: i.tipo,
       estado: i.estado,
+      iniciadaPor: i.idEmpleadoInicia ? 'tienda' : 'cliente',
       totalReembolso: Number(i.totalReembolso),
       totalItems: i.lineas.reduce((acc: number, curr: { cantidad: number }) => acc + curr.cantidad, 0),
       fechaSolicitud: i.fechaSolicitud.toISOString(),
@@ -230,6 +259,7 @@ export class PostventaService implements PostventaServicePort {
       nombreCliente: i.usuario.nombre,
       tipo: i.tipo,
       estado: i.estado,
+      iniciadaPor: i.idEmpleadoInicia ? 'tienda' : 'cliente',
       totalReembolso: Number(i.totalReembolso),
       totalItems: i.lineas.reduce((acc: number, curr: { cantidad: number }) => acc + curr.cantidad, 0),
       fechaSolicitud: i.fechaSolicitud.toISOString(),
@@ -298,6 +328,7 @@ export class PostventaService implements PostventaServicePort {
     });
 
     await this.auditar(idEmpleado, `postventa.solicitud.${input.accion}`, codigo, anterior, estadoNuevo, ip);
+    if (input.accion === 'aprobar') await this.avisarCancelacion(actualizado);
     return this.mapearADetalle(actualizado);
   }
 
@@ -342,6 +373,24 @@ export class PostventaService implements PostventaServicePort {
 
     await this.auditar(idEmpleado, 'postventa.reembolso.registrar', codigo, 'aprobada', 'reembolsada', ip);
     return this.mapearADetalle(actualizado);
+  }
+
+  /** R-POS-B: ya con la transacción confirmada, el cliente se entera de por qué se canceló su pedido. Un fallo no la deshace. */
+  private async avisarCancelacion(solicitud: SolicitudPostventaEntidad): Promise<void> {
+    if (solicitud.tipo !== 'cancelacion' || !this.avisos?.notificarOrdenCancelada) return;
+    try {
+      await this.avisos.notificarOrdenCancelada({
+        codigo: solicitud.orden.codigoVisible,
+        idUsuario: solicitud.idUsuario,
+        motivo: solicitud.motivoGeneral,
+        origen: solicitud.idEmpleadoInicia ? 'tienda' : 'cliente',
+      });
+    } catch (error) {
+      console.error(
+        `[M11] No se pudo avisar la cancelación de ${solicitud.orden.codigoVisible}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
   }
 
   /** RF-POS-01-04: una sola solicitud en trámite por pedido. */
@@ -431,6 +480,7 @@ export class PostventaService implements PostventaServicePort {
       nombreCliente: raw.usuario.nombre,
       tipo: raw.tipo,
       estado: raw.estado,
+      iniciadaPor: raw.idEmpleadoInicia ? 'tienda' : 'cliente',
       totalReembolso: Number(raw.totalReembolso),
       totalItems: raw.lineas.reduce((acc: number, l) => acc + l.cantidad, 0),
       fechaSolicitud: raw.fechaSolicitud.toISOString(),

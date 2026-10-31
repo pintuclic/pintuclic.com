@@ -11,12 +11,12 @@ interface ReglaTransicion {
 
 /**
  * Tabla del §5 de la spec y TRANSICIONES_ESTADO del contrato (R7). El orden fija el de las listas.
- * `revision_disponibilidad` → `en_preparacion` no está: solo la hace M09 al quedar todas las líneas disponibles
- * (`cambiarEstadoPorCumplimiento`), de modo que nadie, tampoco el administrador, pueda saltarse la revisión.
+ * `revision_disponibilidad` → `en_preparacion` y `en_preparacion` → `preparada` no están: solo las hace M09 al quedar
+ * todas las líneas disponibles y, después, todas preparadas (`cambiarEstadoPorCumplimiento`), de modo que nadie,
+ * tampoco el administrador, pueda saltarse la revisión ni dar por preparado un pedido con líneas sin alistar.
  */
 const TRANSICIONES_HABILITADAS: readonly ReglaTransicion[] = [
   { desde: 'orden_confirmada', hacia: 'revision_disponibilidad' },
-  { desde: 'en_preparacion', hacia: 'preparada' },
   { desde: 'preparada', hacia: 'en_preparacion' },
   { desde: 'preparada', hacia: 'despachado', modo: 'domicilio' },
   { desde: 'preparada', hacia: 'entregado', modo: 'recogida' },

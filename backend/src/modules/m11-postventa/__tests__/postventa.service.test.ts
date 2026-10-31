@@ -19,6 +19,7 @@ describe('PostventaService (M11)', () => {
   let repoMock: PostventaRepositoryPort;
   let ordenesPortMock: OrdenesPortM11;
   let auditoriaMock: AuditoriaPort;
+  let avisosMock: { notificarOrdenCancelada: ReturnType<typeof vi.fn> };
 
   const ordenEjemplo = {
     idOrden: 10,
@@ -49,6 +50,7 @@ describe('PostventaService (M11)', () => {
     idUsuario: 5,
     tipo: 'cancelacion',
     estado: 'solicitada',
+    idEmpleadoInicia: null as number | null,
     motivoGeneral: 'Me equivoqué de producto al comprar',
     observacionesResolucion: null,
     motivoRechazo: null,
@@ -129,7 +131,148 @@ describe('PostventaService (M11)', () => {
       registrarAccion: vi.fn().mockResolvedValue(undefined),
     };
 
-    service = new PostventaService(repoMock, ordenesPortMock, auditoriaMock, () => AHORA);
+    avisosMock = { notificarOrdenCancelada: vi.fn().mockResolvedValue(undefined) };
+
+    service = new PostventaService(repoMock, ordenesPortMock, auditoriaMock, () => AHORA, avisosMock);
+  });
+
+  describe('solicitarCancelacionPorTienda (R-POS-A)', () => {
+    const MOTIVO = 'Sin existencias de: Viniltex Blanco, Galón (2 unidades).';
+
+    it('abre la cancelación a nombre del dueño del pedido, con el empleado que la inició y sin datos bancarios', async () => {
+      vi.mocked(repoMock.buscarPorCodigo).mockResolvedValue({
+        ...solicitudRawMock,
+        idEmpleadoInicia: 31,
+      } as unknown as SolicitudPostventaEntidad);
+
+      const res = await service.solicitarCancelacionPorTienda(31, 'PC-2026-00010', MOTIVO);
+
+      expect(repoMock.crearSolicitud).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idUsuario: 5,
+          idEmpleadoInicia: 31,
+          tipo: 'cancelacion',
+          estado: 'solicitada',
+          motivoGeneral: MOTIVO,
+          totalReembolso: 150000,
+          datosBancarios: undefined,
+        }),
+        TX
+      );
+      expect(res).toMatchObject({ codigo: 'DEV-2026-00001', tipo: 'cancelacion', iniciadaPor: 'tienda' });
+    });
+
+    it('la del cliente sigue sin empleado y se marca como iniciada por el cliente', async () => {
+      const res = await service.solicitarCancelacion(5, { codigoOrden: 'PC-2026-00010', motivo: 'Compré por error y necesito cancelar' });
+
+      expect(repoMock.crearSolicitud).toHaveBeenCalledWith(expect.objectContaining({ idUsuario: 5, idEmpleadoInicia: undefined }), TX);
+      expect(res.iniciadaPor).toBe('cliente');
+    });
+
+    it('aplica las mismas reglas de estado: un pedido ya despachado no se cancela', async () => {
+      vi.mocked(ordenesPortMock.obtenerOrdenParaPostventa).mockResolvedValueOnce({ ...ordenEjemplo, estado: 'despachado' });
+
+      await expect(service.solicitarCancelacionPorTienda(31, 'PC-2026-00010', MOTIVO)).rejects.toMatchObject({
+        codigo: 'ORDEN_NO_ELEGIBLE',
+      });
+      expect(repoMock.crearSolicitud).not.toHaveBeenCalled();
+    });
+
+    it('aplica la regla de una sola solicitud en trámite', async () => {
+      vi.mocked(repoMock.buscarPorOrden).mockResolvedValueOnce({ codigoVisible: 'DEV-2026-00001' } as unknown as SolicitudPostventaConLineas);
+
+      await expect(service.solicitarCancelacionPorTienda(31, 'PC-2026-00010', MOTIVO)).rejects.toMatchObject({
+        codigo: 'SOLICITUD_DUPLICADA',
+      });
+    });
+
+    it('un pedido que no existe responde RECURSO_NO_DISPONIBLE', async () => {
+      vi.mocked(ordenesPortMock.obtenerOrdenParaPostventa).mockResolvedValueOnce(null);
+
+      await expect(service.solicitarCancelacionPorTienda(31, 'PC-2026-99999', MOTIVO)).rejects.toMatchObject({
+        codigo: 'RECURSO_NO_DISPONIBLE',
+      });
+    });
+  });
+
+  describe('aviso al cliente al aprobar una cancelación (R-POS-B)', () => {
+    it('avisa con el código del pedido, el dueño, el motivo y quién la inició, ya con la transacción confirmada', async () => {
+      const enTransaccion = vi.mocked(repoMock.enTransaccion);
+      await service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar', observaciones: 'Autorizada' });
+
+      expect(avisosMock.notificarOrdenCancelada).toHaveBeenCalledTimes(1);
+      expect(avisosMock.notificarOrdenCancelada).toHaveBeenCalledWith({
+        codigo: 'PC-2026-00010',
+        idUsuario: 5,
+        motivo: 'Me equivoqué de producto al comprar',
+        origen: 'cliente',
+      });
+      // Salió después de la transacción, no dentro: el correo no puede retener el bloqueo de la orden.
+      expect(enTransaccion.mock.invocationCallOrder[0]).toBeLessThan(avisosMock.notificarOrdenCancelada.mock.invocationCallOrder[0]!);
+    });
+
+    it('una cancelación abierta por la tienda avisa con origen tienda', async () => {
+      vi.mocked(repoMock.buscarPorCodigo).mockResolvedValue({ ...solicitudRawMock, idEmpleadoInicia: 31 } as unknown as SolicitudPostventaEntidad);
+      vi.mocked(repoMock.actualizarResolucion).mockResolvedValue({
+        ...solicitudRawMock,
+        idEmpleadoInicia: 31,
+        estado: 'aprobada',
+      } as unknown as SolicitudPostventaEntidad);
+
+      await service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar' });
+
+      expect(avisosMock.notificarOrdenCancelada).toHaveBeenCalledWith(expect.objectContaining({ origen: 'tienda' }));
+    });
+
+    it('rechazar no avisa de nada', async () => {
+      vi.mocked(repoMock.actualizarResolucion).mockResolvedValueOnce({
+        ...solicitudRawMock,
+        estado: 'rechazada',
+      } as unknown as SolicitudPostventaEntidad);
+
+      await service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'rechazar', observaciones: 'Ya se despachó' });
+
+      expect(avisosMock.notificarOrdenCancelada).not.toHaveBeenCalled();
+    });
+
+    it('aprobar una devolución no manda el aviso de cancelación', async () => {
+      vi.mocked(repoMock.buscarPorCodigo).mockResolvedValue({ ...solicitudRawMock, tipo: 'devolucion' } as unknown as SolicitudPostventaEntidad);
+      vi.mocked(repoMock.actualizarResolucion).mockResolvedValueOnce({
+        ...solicitudRawMock,
+        tipo: 'devolucion',
+        estado: 'aprobada',
+      } as unknown as SolicitudPostventaEntidad);
+
+      await service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar' });
+
+      expect(avisosMock.notificarOrdenCancelada).not.toHaveBeenCalled();
+    });
+
+    it('si el correo falla, la cancelación igualmente queda aprobada y la respuesta es buena', async () => {
+      avisosMock.notificarOrdenCancelada.mockRejectedValue(new Error('SMTP caído'));
+      const consola = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const res = await service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar' });
+
+      expect(res.estado).toBe('aprobada');
+      expect(consola).toHaveBeenCalled();
+      consola.mockRestore();
+    });
+
+    it('si el pedido ya no admite la cancelación, no se avisa a nadie', async () => {
+      vi.mocked(ordenesPortMock.cambiarEstadoOrden).mockRejectedValueOnce(new ErrorPostventa('ORDEN_NO_ELEGIBLE', 'Ya está despachado', 409));
+
+      await expect(service.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar' })).rejects.toMatchObject({ codigo: 'ORDEN_NO_ELEGIBLE' });
+      expect(avisosMock.notificarOrdenCancelada).not.toHaveBeenCalled();
+    });
+
+    it('sin puerto de avisos conectado, aprobar funciona igual', async () => {
+      const sinAvisos = new PostventaService(repoMock, ordenesPortMock, auditoriaMock, () => AHORA);
+
+      const res = await sinAvisos.resolverSolicitud(99, 'DEV-2026-00001', { accion: 'aprobar' });
+
+      expect(res.estado).toBe('aprobada');
+    });
   });
 
   describe('solicitarCancelacion', () => {

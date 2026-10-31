@@ -22,12 +22,22 @@ export interface LineaDatos {
   registros: RegistroDatos[];
 }
 
+/** R18. Una solicitud de cancelación en trámite sobre la orden (de M11). */
+export interface TramiteCancelacionDatos {
+  codigo: string;
+  estado: 'solicitada' | 'en_revision';
+  iniciadaPor: 'cliente' | 'tienda';
+  fecha: Date;
+}
+
 export interface OrdenDatos {
   codigo: string;
   estado: EstadoOrden;
   /** Cliente titular: el evento de cambio de estado lo necesita. */
   idUsuario: number;
   lineas: LineaDatos[];
+  /** R18. La cancelación en trámite, o null. */
+  cancelacion: TramiteCancelacionDatos | null;
 }
 
 export interface FilaRetenidaDatos {
@@ -46,13 +56,22 @@ export interface MarcaNueva {
 
 export type ResultadoAvance = { ok: true } | { ok: false; razon: 'NO_EXISTE' | 'ESTADO_CAMBIADO' };
 
-/** Todo lo que M09 hace de una vez sobre una orden: una sola transacción (R7). */
+/** Los dos avances automáticos de M09 (R7 y R15). */
+export type DestinoAvance = 'en_preparacion' | 'preparada';
+
+/** Todo lo que M09 hace de una vez sobre una orden: una sola transacción (R7, R15). */
 export interface CumplimientoTx {
   /** Lee la orden bloqueándola hasta el final de la transacción, para que dos marcas simultáneas no se pisen. */
   cargarOrden(codigo: string): Promise<OrdenDatos | null>;
   insertarMarcas(marcas: readonly MarcaNueva[], idUsuarioAutor: number): Promise<void>;
-  /** Pasa la orden a preparación con la función de M08 (candado optimista e historial). */
-  avanzarAPreparacion(codigo: string, idUsuarioAutor: number): Promise<ResultadoAvance>;
+  /** Pasa la orden a preparación o a preparada con la función de M08 (candado optimista e historial). */
+  avanzar(codigo: string, hacia: DestinoAvance, idUsuarioAutor: number): Promise<ResultadoAvance>;
+}
+
+/** R18. Lo que M09 necesita de M11 para abrir una cancelación en nombre de la tienda. */
+export interface CancelacionesPort {
+  /** Lanza `CumplimientoError` con ORDEN_NO_CANCELABLE, SOLICITUD_DUPLICADA o RECURSO_NO_DISPONIBLE según el caso. */
+  solicitarPorTienda(idEmpleado: number, codigoOrden: string, motivo: string): Promise<{ codigo: string; fecha: Date }>;
 }
 
 export interface CumplimientoRepository {

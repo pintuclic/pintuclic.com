@@ -8,9 +8,11 @@ import {
   errorResponseEnvelopeSchema,
   hojaResponseEnvelopeSchema,
   retenidasResponseEnvelopeSchema,
+  solicitarCancelacionResponseEnvelopeSchema,
   verificacionResponseEnvelopeSchema,
   verificarLineasResponseEnvelopeSchema,
 } from '../dtos/m09-cumplimiento.dto';
+import { CumplimientoError } from '../services/cumplimiento.service';
 import { construirModuloM09 } from '../m09.routes';
 import { AHORA, ordenDe, RepoMemoria } from './repo-memoria';
 
@@ -23,6 +25,10 @@ describe('M09 · HTTP (HU-CUM-01, 03 y 06)', () => {
   const erroresNoControlados: unknown[] = [];
   const auditoria = { registrarAccesoDenegado: vi.fn().mockResolvedValue(undefined) };
   const eventos = { emitirCambioEstado: vi.fn().mockResolvedValue(undefined) };
+  /** M11 en pruebas: apunta lo que se le pide y puede fallar como fallaría con una solicitud ya en trámite. */
+  const cancelaciones = {
+    solicitarPorTienda: vi.fn<(idEmpleado: number, codigoOrden: string, motivo: string) => Promise<{ codigo: string; fecha: Date }>>(),
+  };
 
   const ACTORES: Record<string, Actor> = {
     gestor: { idUsuario: 21, idSesion: 's21', tipoSesion: 'admin' },
@@ -46,7 +52,13 @@ describe('M09 · HTTP (HU-CUM-01, 03 y 06)', () => {
       { tienePermiso: async (idUsuario, codigo) => PERMISOS[idUsuario]?.includes(codigo) ?? false },
       auditoria,
     );
-    const m09 = construirModuloM09(autorizacion, { auditoria, repo, eventos, reloj: { ahora: () => AHORA } });
+    const m09 = construirModuloM09(autorizacion, {
+      auditoria,
+      repo,
+      eventos,
+      reloj: { ahora: () => AHORA },
+      cancelacionesPuerto: cancelaciones,
+    });
     const app = express();
     app.use(express.json());
     app.use((req, _res, next) => {
@@ -79,6 +91,8 @@ describe('M09 · HTTP (HU-CUM-01, 03 y 06)', () => {
     repo.cargar(ordenDe(CODIGO, 'revision_disponibilidad'));
     auditoria.registrarAccesoDenegado.mockClear();
     eventos.emitirCambioEstado.mockClear();
+    cancelaciones.solicitarPorTienda.mockReset();
+    cancelaciones.solicitarPorTienda.mockResolvedValue({ codigo: 'DEV-2026-00012', fecha: new Date('2026-10-31T10:00:00Z') });
     erroresNoControlados.length = 0;
   });
 
@@ -107,6 +121,7 @@ describe('M09 · HTTP (HU-CUM-01, 03 y 06)', () => {
       ['GET', `/ordenes/${CODIGO}/verificacion`, undefined],
       ['PUT', `/ordenes/${CODIGO}/verificacion`, TODAS],
       ['GET', `/ordenes/${CODIGO}/hoja`, undefined],
+      ['POST', `/ordenes/${CODIGO}/cancelacion`, { nota: 'Sin stock' }],
     ];
 
     it.each(RUTAS)('%s %s: quien solo tiene ventas.ver responde 404 opaco (los GET también)', async (metodo, ruta, cuerpo) => {
@@ -190,11 +205,10 @@ describe('M09 · HTTP (HU-CUM-01, 03 y 06)', () => {
       expect(r.cuerpo).toMatchObject({ error: { code: 'PARAMETRO_INVALIDO' } });
     });
 
-    it('una orden fuera de cumplimiento responde 409 ORDEN_FUERA_DE_CUMPLIMIENTO (R4)', async () => {
+    it('una orden fuera de cumplimiento responde 409 ORDEN_FUERA_DE_CUMPLIMIENTO al marcar y al pedir la hoja (R4)', async () => {
       repo.cargar(ordenDe('PC-2026-00002', 'despachado'));
 
       for (const [metodo, ruta, cuerpo] of [
-        ['GET', '/ordenes/PC-2026-00002/verificacion', undefined],
         ['PUT', '/ordenes/PC-2026-00002/verificacion', TODAS],
         ['GET', '/ordenes/PC-2026-00002/hoja', undefined],
       ] as const) {
@@ -202,6 +216,24 @@ describe('M09 · HTTP (HU-CUM-01, 03 y 06)', () => {
         expect(r.status).toBe(409);
         expect(errorResponseEnvelopeSchema.parse(r.cuerpo).error.code).toBe('ORDEN_FUERA_DE_CUMPLIMIENTO');
       }
+    });
+
+    it('consultar la verificación de una orden ya despachada responde 200 con las líneas heredadas (R4, R17)', async () => {
+      repo.cargar(ordenDe('PC-2026-00002', 'despachado'));
+
+      const r = await llamar('GET', '/ordenes/PC-2026-00002/verificacion', 'gestor');
+
+      expect(r.status).toBe(200);
+      const { data } = verificacionResponseEnvelopeSchema.parse(r.cuerpo);
+      expect(data.estado).toBe('despachado');
+      expect(data.lineas.every((l) => l.estado === 'despachada')).toBe(true);
+    });
+
+    it('marcar preparada con la orden en revisión responde 409 MARCA_NO_PERMITIDA (R15)', async () => {
+      const r = await llamar('PUT', `/ordenes/${CODIGO}/verificacion`, 'gestor', { lineas: [{ numeroLinea: 1, estado: 'preparada' }] });
+
+      expect(r.status).toBe(409);
+      expect(errorResponseEnvelopeSchema.parse(r.cuerpo).error).toMatchObject({ code: 'MARCA_NO_PERMITIDA', details: { lineas: [1] } });
     });
 
     it('si la orden cambió justo antes del avance responde 409 ESTADO_CAMBIADO', async () => {
@@ -218,6 +250,82 @@ describe('M09 · HTTP (HU-CUM-01, 03 y 06)', () => {
         const r = await llamar(metodo, `/ordenes/${CODIGO}/verificacion`, 'gestor', {});
         expect(r.status).toBe(404);
       }
+    });
+  });
+
+  describe('pedir la cancelación por falta de stock (R18)', () => {
+    async function conUnProductoSinStock(): Promise<void> {
+      await llamar('PUT', `/ordenes/${CODIGO}/verificacion`, 'gestor', { lineas: [{ numeroLinea: 2, estado: 'no_disponible' }] });
+    }
+
+    it('responde 201 con la solicitud iniciada por la tienda y se la pide a M11 con el motivo armado (CA-CUM-03-07)', async () => {
+      await conUnProductoSinStock();
+
+      const r = await llamar('POST', `/ordenes/${CODIGO}/cancelacion`, 'gestor', { nota: 'Llega a fin de mes' });
+
+      expect(r.status).toBe(201);
+      const { data } = solicitarCancelacionResponseEnvelopeSchema.parse(r.cuerpo);
+      expect(data.cancelacion).toEqual({ codigo: 'DEV-2026-00012', estado: 'solicitada', iniciadaPor: 'tienda', fecha: '2026-10-31T10:00:00.000Z' });
+      expect(cancelaciones.solicitarPorTienda).toHaveBeenCalledWith(
+        21,
+        CODIGO,
+        'Sin existencias de: Brocha 4", Unidad (1 unidad).\nNota: Llega a fin de mes',
+      );
+    });
+
+    it('sin cuerpo también vale: la nota es opcional', async () => {
+      await conUnProductoSinStock();
+
+      const r = await fetch(`${baseUrl}/cumplimiento/ordenes/${CODIGO}/cancelacion`, { method: 'POST', headers: { 'x-actor': 'gestor' } });
+
+      expect(r.status).toBe(201);
+    });
+
+    it('una nota de más de 300 caracteres responde 400 y no llega a M11', async () => {
+      await conUnProductoSinStock();
+
+      const r = await llamar('POST', `/ordenes/${CODIGO}/cancelacion`, 'gestor', { nota: 'x'.repeat(301) });
+
+      expect(r.status).toBe(400);
+      expect(cancelaciones.solicitarPorTienda).not.toHaveBeenCalled();
+    });
+
+    it('sin ningún producto no disponible responde 409 SIN_LINEAS_NO_DISPONIBLES', async () => {
+      const r = await llamar('POST', `/ordenes/${CODIGO}/cancelacion`, 'gestor', {});
+
+      expect(r.status).toBe(409);
+      expect(errorResponseEnvelopeSchema.parse(r.cuerpo).error.code).toBe('SIN_LINEAS_NO_DISPONIBLES');
+      expect(cancelaciones.solicitarPorTienda).not.toHaveBeenCalled();
+    });
+
+    it('con la orden despachada responde 409 ORDEN_NO_CANCELABLE', async () => {
+      repo.cargar(ordenDe('PC-2026-00002', 'despachado'));
+
+      const r = await llamar('POST', '/ordenes/PC-2026-00002/cancelacion', 'gestor', {});
+
+      expect(r.status).toBe(409);
+      expect(errorResponseEnvelopeSchema.parse(r.cuerpo).error.code).toBe('ORDEN_NO_CANCELABLE');
+    });
+
+    it('si M11 dice que ya hay una solicitud en trámite, responde 409 SOLICITUD_DUPLICADA (CA-CUM-03-09)', async () => {
+      await conUnProductoSinStock();
+      cancelaciones.solicitarPorTienda.mockRejectedValue(new CumplimientoError('Ya existe una solicitud en trámite (DEV-2026-00012).', 'SOLICITUD_DUPLICADA', 409));
+
+      const r = await llamar('POST', `/ordenes/${CODIGO}/cancelacion`, 'gestor', {});
+
+      expect(r.status).toBe(409);
+      expect(errorResponseEnvelopeSchema.parse(r.cuerpo).error.code).toBe('SOLICITUD_DUPLICADA');
+    });
+
+    it('no toca la orden ni sus marcas: solo pide (D17)', async () => {
+      await conUnProductoSinStock();
+      const escrituras = repo.escrituras;
+
+      await llamar('POST', `/ordenes/${CODIGO}/cancelacion`, 'gestor', {});
+
+      expect(repo.ordenes.get(CODIGO)?.estado).toBe('revision_disponibilidad');
+      expect(repo.escrituras).toBe(escrituras);
+      expect(erroresNoControlados).toEqual([]);
     });
   });
 

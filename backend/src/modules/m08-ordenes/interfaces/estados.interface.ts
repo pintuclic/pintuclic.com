@@ -25,6 +25,11 @@ export interface EstadosTx {
   /** Cambia el estado solo si sigue siendo `desde`; false = otra persona se adelantó (R8). */
   actualizarEstadoSiCoincide(codigo: string, desde: EstadoOrden, hacia: EstadoOrden): Promise<boolean>;
   registrarHistorial(fila: FilaHistorialEstado): Promise<void>;
+  /**
+   * M09 R16: al devolver una orden preparada a preparación, cada línea cuya última marca es `preparada` vuelve a
+   * `disponible` con una marca nueva (el rastro anterior se conserva).
+   */
+  reiniciarMarcasPreparadas(codigo: string, idUsuarioAutor: number): Promise<void>;
 }
 
 export interface EstadosRepository {
