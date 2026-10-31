@@ -9,6 +9,8 @@ export interface EntidadEmpleado {
   idRol: number | null;
   fechaCreacion: Date;
   fechaUltimoAcceso: Date | null;
+  /** Permisos individuales activos (usuario_permiso). */
+  cantidadPermisos: number;
   /** Aún no definió su contraseña (cambio_contrasena_pendiente). */
   primerAccesoPendiente: boolean;
 }
@@ -28,6 +30,11 @@ export interface FiltrosListadoEmpleados {
   limite: number;
 }
 
+/**
+ * Salvo `obtenerPorCorreo`, todo opera solo sobre cuentas con rol `empleado` (M17 R-ACC-8): un cliente o el
+ * administrador se comportan como inexistentes. `obtenerPorCorreo` mira todas las cuentas porque sirve para
+ * detectar correos repetidos.
+ */
 export interface EmpleadosRepositoryPort {
   listar(filtros: FiltrosListadoEmpleados): Promise<{ empleados: EntidadEmpleado[]; total: number }>;
   obtenerPorId(idUsuario: number): Promise<EntidadEmpleado | null>;
@@ -43,5 +50,4 @@ export interface EmpleadosRepositoryPort {
     datos: { nombre?: string | undefined; telefono?: string | undefined },
   ): Promise<EntidadEmpleado>;
   actualizarEstado(idUsuario: number, nuevoEstado: EstadoCuentaEmpleado): Promise<void>;
-  contarPermisos(idUsuario: number): Promise<number>;
 }

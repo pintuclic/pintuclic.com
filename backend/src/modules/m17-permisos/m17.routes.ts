@@ -70,11 +70,7 @@ export function construirModuloM17(
   const gobernanzaRepo = new GobernanzaAdminRepository();
 
   // 2. Servicios
-  const resolutorPermisos = new ResolutorPermisosDatabaseAdapter(
-    permisosRepo,
-    empleadosRepo,
-    gobernanzaRepo,
-  );
+  const resolutorPermisos = new ResolutorPermisosDatabaseAdapter(permisosRepo, gobernanzaRepo);
   const autorizacionService = new AutorizacionService(resolutorPermisos, auditoria);
   const empleadosService = new EmpleadosService(
     empleadosRepo,
@@ -82,7 +78,7 @@ export function construirModuloM17(
     sesionService,
     config?.activacionEmpleado,
   );
-  const permisosService = new PermisosService(permisosRepo, empleadosRepo);
+  const permisosService = new PermisosService(permisosRepo, empleadosRepo, gobernanzaRepo);
   const clientesService = new ClientesAdminService(clientesRepo, gobernanzaRepo, sesionService);
   const configService = new ConfiguracionService(configRepo);
   const gobernanzaService = new GobernanzaAdminService(gobernanzaRepo, empleadosRepo, sesionService);
@@ -102,6 +98,9 @@ export function construirModuloM17(
 
   // Resumen del panel: sesión obligatoria (la monta el router padre); cada bloque se filtra por permiso en el servicio.
   router.get('/resumen', panelController.resumen as RequestHandler);
+
+  // R-ACC-9: qué puede hacer quien pregunta (para armar el menú). Sesión obligatoria; sin permiso concreto.
+  router.get('/mis-permisos', permisosController.misPermisos as RequestHandler);
 
   // HU-ADM-01: Gestión de Colaboradores / Empleados
   router.get(

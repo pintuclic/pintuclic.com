@@ -6,6 +6,27 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-31
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🔐 **Permisos individuales por usuario y panel según los permisos: el módulo.** Entra como la rama `feature/m17-permisos-por-usuario`, sobre el contrato y la base de datos del PR general `chore/m17-permisos-usuario-bd` (que debe fusionarse antes).
+
+### Qué se arregla
+- **El personal ya no ve el panel del administrador.** El menú se arma con los permisos de cada persona y el rol se muestra como «Colaborador». Gobernanza y Configuración global solo salen para la cuenta administradora. Quien teclea una sección que no tiene ve un aviso claro (con el título correcto), no una pantalla rota. Un empleado sin ningún acceso ve un mensaje de bienvenida; uno cuyos accesos no alimentan el resumen, la lista de sus secciones. Un cliente que entra a `/admin` vuelve a la tienda.
+- **Los permisos se guardan por persona** (`usuario_permiso`) y nunca en un rol: se acaba la escalada en la que dar permisos a una cuenta de cliente se los daba a todos los clientes. Solo se asignan a cuentas con rol `empleado`; sobre un cliente responde como si no existiera y sobre el administrador está bloqueado.
+- **Nadie concede lo que no tiene.** Quien no es el administrador solo añade o retira permisos que él mismo posee, y `seguridad.gestionar_permisos` solo lo mueve el administrador (`PERMISO_NO_CONCEDIBLE`).
+- **Quién es personal** se decide por el nombre del rol (`administrador` o `empleado`) en `usuario.id_rol`, ya no por «cualquier id distinto de 2 y 3». El listado de colaboradores deja de mostrar clientes y la lista de clientes del administrador deja de ocultar a los del seed.
+- **El listado de colaboradores** muestra la fecha de alta real y cuenta los permisos en una sola consulta (antes una por empleado).
+- **Nuevo `GET /admin/mis-permisos`** (sesión de personal): lo que puede hacer quien entró; el administrador recibe todo el catálogo.
+- **Toca fuera de M17 (autorizado):** M04 (criterio de personal en el inicio de sesión y el perfil) y `core` (`utils/roles.ts`; el `AdminLayout` acepta el rol visible y oculta las opciones del administrador).
+
+### Cómo se probó
+- Backend y frontend: lint, tipos, cero `any` y `test:contracts` en verde; suites completas (backend 1130 pruebas, frontend 837). Una prueba de M05 agotó su tiempo bajo carga y pasa sola.
+- **PostgreSQL real** (11 pruebas nuevas de integración): rol del empleado nuevo, listado sin clientes, rechazo al asignar a un cliente, una fila suelta de un cliente no concede nada, desactivar y reactivar, permiso inactivo en el catálogo.
+- **Pila real** (25 escenarios con sesiones reales): inicio de sesión de administrador, empleado y cliente; `mis-permisos`; 404 al asignar a un cliente; alta de empleado; asignación con permisos implícitos; delegación con `PERMISO_NO_CONCEDIBLE`; revocación en caliente sin volver a iniciar sesión.
+- **Navegador:** empleado con solo `catalogo.ver` (cuatro secciones, rol «Colaborador», aviso en una sección ajena con el título correcto) y cliente devuelto a la tienda.
+- **No se probó:** el administrador en el navegador (solo por API y pruebas), las demás pantallas con un empleado de permisos parciales y el despliegue real en el VPS.
+- **Para el VPS:** la base se recrea (`down -v`). El seed crea el rol `empleado` y la cuenta de demostración `empleado@pintuclic.co`; desactívala o bórrala en producción real, igual que las otras cuentas del seed, cuya contraseña está en el repositorio.
+
 ## [No publicado] - 2026-10-30 (b)
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🔐 **Permisos individuales por usuario: contrato y base de datos.** Entra como el PR general `chore/m17-permisos-usuario-bd`; el módulo (M17, M04 y el panel) sigue en su propia rama.

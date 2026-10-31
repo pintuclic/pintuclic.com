@@ -1,6 +1,6 @@
 import { derivarContrasena, verificarContrasena } from '../../../core/utils/crypto';
 import {
-  esUsuarioAdministrativo,
+  esUsuarioDePersonal,
   type CuentaEmpresaConTipo,
   type CuentasRepository,
 } from '../repositories/cuentas.repository';
@@ -71,7 +71,7 @@ export class PerfilService {
       correo: usuario.correo,
       telefono: usuario.telefono,
       tipo: usuario.tipo,
-      esAdmin: esUsuarioAdministrativo(usuario),
+      esAdmin: esUsuarioDePersonal(usuario),
       estado: usuario.estado,
       cambioContrasenaPendiente: usuario.cambioContrasenaPendiente,
       empresa: empresa

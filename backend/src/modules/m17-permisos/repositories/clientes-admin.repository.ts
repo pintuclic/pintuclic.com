@@ -1,4 +1,5 @@
 import { prisma } from '../../../core/db/client';
+import { DONDE_NO_PERSONAL } from '../../../core/utils/roles';
 import type {
   ClientesAdminRepositoryPort,
   EntidadClienteAdmin,
@@ -11,8 +12,9 @@ export class ClientesAdminRepository implements ClientesAdminRepositoryPort {
   async buscar(
     filtros: FiltrosBusquedaClientes,
   ): Promise<{ clientes: EntidadClienteAdmin[]; total: number }> {
+    // Clientes = toda cuenta que no es de personal (R-ACC-2). Va en AND para no chocar con el OR de la búsqueda.
     const where: Record<string, unknown> = {
-      usuarioRol: null,
+      AND: [DONDE_NO_PERSONAL],
     };
 
     if (filtros.tipo && filtros.tipo !== 'todos') {

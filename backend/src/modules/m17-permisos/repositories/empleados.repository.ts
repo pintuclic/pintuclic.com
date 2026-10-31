@@ -1,15 +1,42 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../../core/db/client';
+import { DONDE_EMPLEADO, ROL_EMPLEADO } from '../../../core/utils/roles';
 import type {
   EmpleadosRepositoryPort,
   EntidadEmpleado,
   FiltrosListadoEmpleados,
 } from '../interfaces/empleados.interface';
 
+/** Datos que hacen falta para armar un `EntidadEmpleado`: último acceso y permisos activos en una sola consulta. */
+const INCLUIR_RESUMEN = {
+  sesiones: {
+    take: 1,
+    orderBy: { fechaUltimoAcceso: 'desc' },
+    select: { fechaUltimoAcceso: true },
+  },
+  _count: { select: { permisosIndividuales: { where: { permiso: { estado: 'activo' } } } } },
+} satisfies Prisma.UsuarioInclude;
+
+type FilaEmpleado = Prisma.UsuarioGetPayload<{ include: typeof INCLUIR_RESUMEN }>;
+
+function aEntidad(f: FilaEmpleado): EntidadEmpleado {
+  return {
+    idUsuario: f.idUsuario,
+    nombre: f.nombre,
+    correo: f.correo,
+    telefono: f.telefono,
+    estado: f.estado as EntidadEmpleado['estado'],
+    idRol: f.idRol,
+    fechaCreacion: f.fechaCreacion,
+    fechaUltimoAcceso: f.sesiones[0]?.fechaUltimoAcceso ?? null,
+    cantidadPermisos: f._count.permisosIndividuales,
+    primerAccesoPendiente: f.cambioContrasenaPendiente,
+  };
+}
+
 export class EmpleadosRepository implements EmpleadosRepositoryPort {
   async listar(filtros: FiltrosListadoEmpleados): Promise<{ empleados: EntidadEmpleado[]; total: number }> {
-    const where: Record<string, unknown> = {
-      usuarioRol: { isNot: null },
-    };
+    const where: Prisma.UsuarioWhereInput = { ...DONDE_EMPLEADO };
 
     if (filtros.estado) {
       where.estado = filtros.estado;
@@ -28,77 +55,28 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
         skip: (filtros.pagina - 1) * filtros.limite,
         take: filtros.limite,
         orderBy: { idUsuario: 'desc' },
-        include: {
-          sesiones: {
-            take: 1,
-            orderBy: { fechaUltimoAcceso: 'desc' },
-            select: { fechaUltimoAcceso: true },
-          },
-        },
+        include: INCLUIR_RESUMEN,
       }),
       prisma.usuario.count({ where }),
     ]);
 
-    const empleados: EntidadEmpleado[] = filas.map((f) => ({
-      idUsuario: f.idUsuario,
-      nombre: f.nombre,
-      correo: f.correo,
-      telefono: f.telefono,
-      estado: f.estado as EntidadEmpleado['estado'],
-      idRol: f.idRol,
-      fechaCreacion: new Date(),
-      fechaUltimoAcceso: f.sesiones[0]?.fechaUltimoAcceso ?? null,
-      primerAccesoPendiente: f.cambioContrasenaPendiente,
-    }));
-
-    return { empleados, total };
+    return { empleados: filas.map(aEntidad), total };
   }
 
   async obtenerPorId(idUsuario: number): Promise<EntidadEmpleado | null> {
-    const fila = await prisma.usuario.findUnique({
-      where: { idUsuario },
-      include: {
-        sesiones: {
-          take: 1,
-          orderBy: { fechaUltimoAcceso: 'desc' },
-          select: { fechaUltimoAcceso: true },
-        },
-      },
+    const fila = await prisma.usuario.findFirst({
+      where: { idUsuario, ...DONDE_EMPLEADO },
+      include: INCLUIR_RESUMEN,
     });
-
-    if (!fila) return null;
-
-    return {
-      idUsuario: fila.idUsuario,
-      nombre: fila.nombre,
-      correo: fila.correo,
-      telefono: fila.telefono,
-      estado: fila.estado as EntidadEmpleado['estado'],
-      idRol: fila.idRol,
-      fechaCreacion: new Date(),
-      fechaUltimoAcceso: fila.sesiones[0]?.fechaUltimoAcceso ?? null,
-      primerAccesoPendiente: fila.cambioContrasenaPendiente,
-    };
+    return fila ? aEntidad(fila) : null;
   }
 
   async obtenerPorCorreo(correo: string): Promise<EntidadEmpleado | null> {
     const fila = await prisma.usuario.findUnique({
       where: { correo },
+      include: INCLUIR_RESUMEN,
     });
-
-    if (!fila) return null;
-
-    return {
-      idUsuario: fila.idUsuario,
-      nombre: fila.nombre,
-      correo: fila.correo,
-      telefono: fila.telefono,
-      estado: fila.estado as EntidadEmpleado['estado'],
-      idRol: fila.idRol,
-      fechaCreacion: new Date(),
-      fechaUltimoAcceso: null,
-      primerAccesoPendiente: fila.cambioContrasenaPendiente,
-    };
+    return fila ? aEntidad(fila) : null;
   }
 
   async crear(datos: {
@@ -107,46 +85,22 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
     telefono: string;
     contrasenaHash: string;
   }): Promise<EntidadEmpleado> {
-    return prisma.$transaction(async (tx) => {
-      const nuevoUsuario = await tx.usuario.create({
-        data: {
-          nombre: datos.nombre,
-          correo: datos.correo,
-          telefono: datos.telefono,
-          contrasena: datos.contrasenaHash,
-          estado: 'activo',
-          tipo: 'normal',
-          // CA-ADM-01-03: queda pendiente hasta que el empleado defina su contraseña con el enlace.
-          cambioContrasenaPendiente: true,
-        },
-      });
-
-      const nuevoRol = await tx.rol.create({
-        data: {
-          nombre: `Perfil Empleado ${nuevoUsuario.idUsuario} - ${datos.nombre.slice(0, 30)}`,
-          estado: 'activo',
-        },
-      });
-
-      await tx.usuarioRol.create({
-        data: {
-          idUsuario: nuevoUsuario.idUsuario,
-          idRol: nuevoRol.idRol,
-        },
-      });
-
-      return {
-        idUsuario: nuevoUsuario.idUsuario,
-        nombre: nuevoUsuario.nombre,
-        correo: nuevoUsuario.correo,
-        telefono: nuevoUsuario.telefono,
-        estado: nuevoUsuario.estado as EntidadEmpleado['estado'],
-        idRol: nuevoRol.idRol,
-        fechaCreacion: new Date(),
-        fechaUltimoAcceso: null,
-        primerAccesoPendiente: nuevoUsuario.cambioContrasenaPendiente,
-      };
+    const creado = await prisma.usuario.create({
+      data: {
+        nombre: datos.nombre,
+        correo: datos.correo,
+        telefono: datos.telefono,
+        contrasena: datos.contrasenaHash,
+        estado: 'activo',
+        tipo: 'normal',
+        // R-ACC-1: el rol de la cuenta es el único vínculo. El rol `empleado` no lleva permisos (R-ACC-3).
+        rolDirecto: { connect: { nombre: ROL_EMPLEADO } },
+        // CA-ADM-01-03: queda pendiente hasta que el empleado defina su contraseña con el enlace.
+        cambioContrasenaPendiente: true,
+      },
+      include: INCLUIR_RESUMEN,
     });
+    return aEntidad(creado);
   }
 
   async actualizarContacto(
@@ -157,51 +111,14 @@ export class EmpleadosRepository implements EmpleadosRepositoryPort {
     if (datos.nombre !== undefined) datosActualizar.nombre = datos.nombre;
     if (datos.telefono !== undefined) datosActualizar.telefono = datos.telefono;
 
-    const actualizado = await prisma.usuario.update({
-      where: { idUsuario },
-      data: datosActualizar,
-      include: {
-        sesiones: {
-          take: 1,
-          orderBy: { fechaUltimoAcceso: 'desc' },
-          select: { fechaUltimoAcceso: true },
-        },
-      },
-    });
-
-    return {
-      idUsuario: actualizado.idUsuario,
-      nombre: actualizado.nombre,
-      correo: actualizado.correo,
-      telefono: actualizado.telefono,
-      estado: actualizado.estado as EntidadEmpleado['estado'],
-      idRol: actualizado.idRol,
-      fechaCreacion: new Date(),
-      fechaUltimoAcceso: actualizado.sesiones[0]?.fechaUltimoAcceso ?? null,
-      primerAccesoPendiente: actualizado.cambioContrasenaPendiente,
-    };
+    // `updateMany` lleva el filtro de rol en la misma sentencia: no se puede editar a quien no es empleado.
+    await prisma.usuario.updateMany({ where: { idUsuario, ...DONDE_EMPLEADO }, data: datosActualizar });
+    const actualizado = await this.obtenerPorId(idUsuario);
+    if (!actualizado) throw new Error('El colaborador solicitado no existe.');
+    return actualizado;
   }
 
   async actualizarEstado(idUsuario: number, nuevoEstado: EntidadEmpleado['estado']): Promise<void> {
-    await prisma.usuario.update({
-      where: { idUsuario },
-      data: { estado: nuevoEstado },
-    });
-  }
-
-  async contarPermisos(idUsuario: number): Promise<number> {
-    const usuarioRol = await prisma.usuarioRol.findUnique({
-      where: { idUsuario },
-      select: { idRol: true },
-    });
-
-    if (!usuarioRol) return 0;
-
-    return prisma.asignacionPermiso.count({
-      where: {
-        idRol: usuarioRol.idRol,
-        permiso: { estado: 'activo' },
-      },
-    });
+    await prisma.usuario.updateMany({ where: { idUsuario, ...DONDE_EMPLEADO }, data: { estado: nuevoEstado } });
   }
 }

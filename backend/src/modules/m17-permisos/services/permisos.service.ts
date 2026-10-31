@@ -5,8 +5,10 @@ import {
   type CodigoPermiso,
   type FichaPermisosEmpleadoOutput,
   type ItemPermisoCatalogo,
+  type MisPermisosOutput,
 } from '../dtos/m17-permisos.dto';
 import type { EmpleadosRepositoryPort } from '../interfaces/empleados.interface';
+import type { GobernanzaAdminRepositoryPort } from '../interfaces/gobernanza.interface';
 import type { PermisosRepositoryPort } from '../interfaces/permisos.interface';
 import { EmpleadoError } from './empleados.service';
 
@@ -30,10 +32,14 @@ const DEPENDENCIAS_CONSULTA: Record<string, string> = {
   'asesoria.editar': 'asesoria.ver',
 };
 
+/** R-ACC-7: este permiso abre la puerta a repartir todos los demás; solo lo mueve el administrador. */
+const PERMISO_GESTIONAR_PERMISOS = 'seguridad.gestionar_permisos';
+
 export class PermisosService {
   constructor(
     private readonly permisosRepo: PermisosRepositoryPort,
     private readonly empleadosRepo: EmpleadosRepositoryPort,
+    private readonly gobernanzaRepo: GobernanzaAdminRepositoryPort,
   ) {}
 
   async obtenerMatriz(idEmpleado: number): Promise<FichaPermisosEmpleadoOutput> {
@@ -65,6 +71,34 @@ export class PermisosService {
     };
   }
 
+  /**
+   * R-ACC-9: lo que la persona puede hacer, para que la interfaz arme su menú. El administrador recibe todo el
+   * catálogo activo. Devuelve `null` si la cuenta no es de personal (el controlador responde el 404 opaco).
+   */
+  async misPermisos(idUsuario: number): Promise<MisPermisosOutput | null> {
+    const admin = await this.gobernanzaRepo.obtenerAdmin();
+    if (admin && admin.idUsuario === idUsuario) {
+      const catalogo = await this.permisosRepo.listarCatalogo();
+      return {
+        idUsuario,
+        nombre: admin.nombre,
+        esAdministrador: true,
+        permisos: catalogo.map((p) => p.nombre as CodigoPermiso),
+      };
+    }
+
+    const empleado = await this.empleadosRepo.obtenerPorId(idUsuario);
+    if (!empleado || empleado.estado !== 'activo') return null;
+
+    const permisos = await this.permisosRepo.obtenerPermisosUsuario(idUsuario);
+    return {
+      idUsuario,
+      nombre: empleado.nombre,
+      esAdministrador: false,
+      permisos: permisos as CodigoPermiso[],
+    };
+  }
+
   async actualizarPermisos(
     idEmpleado: number,
     permisosDeseados: CodigoPermiso[],
@@ -78,6 +112,17 @@ export class PermisosService {
       );
     }
 
+    // R-ACC-6: el administrador tiene facultades implícitas y no se edita.
+    const admin = await this.gobernanzaRepo.obtenerAdmin();
+    if (admin && admin.idUsuario === idEmpleado) {
+      throw new EmpleadoError(
+        CODIGOS_ERROR_M17.OPERACION_BLOQUEADA_ADMIN,
+        'Los permisos de la cuenta administradora no se modifican.',
+        403,
+      );
+    }
+
+    // R-ACC-6: quien no es empleado (un cliente, por ejemplo) se comporta como inexistente.
     const empleado = await this.empleadosRepo.obtenerPorId(idEmpleado);
     if (!empleado) {
       throw new EmpleadoError(
@@ -105,6 +150,25 @@ export class PermisosService {
       if (!conjuntoFinal.has(consulta) && conjuntoFinal.has(operacion)) {
         conjuntoFinal.delete(operacion);
         permisosRevocadosEnCascada.push(operacion as CodigoPermiso);
+      }
+    }
+
+    // R-ACC-7: quien no es el administrador solo mueve permisos que él mismo posee.
+    const esAdministrador = admin !== null && admin.idUsuario === actor.idUsuario;
+    if (!esAdministrador) {
+      const actuales = new Set(await this.permisosRepo.obtenerPermisosUsuario(idEmpleado));
+      const propios = new Set(await this.permisosRepo.obtenerPermisosUsuario(actor.idUsuario));
+      const cambiados = [
+        ...[...conjuntoFinal].filter((c) => !actuales.has(c)),
+        ...[...actuales].filter((c) => !conjuntoFinal.has(c)),
+      ];
+      const fueraDeAlcance = cambiados.some((c) => !propios.has(c) || c === PERMISO_GESTIONAR_PERMISOS);
+      if (fueraDeAlcance) {
+        throw new EmpleadoError(
+          CODIGOS_ERROR_M17.PERMISO_NO_CONCEDIBLE,
+          'Solo puede conceder o retirar permisos que usted mismo posee.',
+          403,
+        );
       }
     }
 

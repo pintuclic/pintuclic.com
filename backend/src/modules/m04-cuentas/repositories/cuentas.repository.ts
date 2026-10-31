@@ -9,13 +9,15 @@ import type {
   TipoUsuario,
 } from '@prisma/client';
 import { prisma } from '../../../core/db/client';
+import { esRolDePersonal } from '../../../core/utils/roles';
 
-export type UsuarioConRol = Usuario & { usuarioRol?: { idRol: number } | null };
+/** El rol de la cuenta es `usuario.id_rol` (M17 R-ACC-1): aquí viaja solo su nombre. */
+export type UsuarioConRol = Usuario & { rolDirecto?: { nombre: string } | null };
 
-export function esUsuarioAdministrativo(usuario: UsuarioConRol): boolean {
+/** M17 R-ACC-2: personal = rol `administrador` o `empleado`. Una cuenta empresa nunca lo es. */
+export function esUsuarioDePersonal(usuario: UsuarioConRol): boolean {
   if (usuario.tipo === 'empresa') return false;
-  const idRolEfectivo = usuario.idRol ?? usuario.usuarioRol?.idRol ?? null;
-  return idRolEfectivo !== null && idRolEfectivo !== 2 && idRolEfectivo !== 3;
+  return esRolDePersonal(usuario.rolDirecto?.nombre);
 }
 
 /** Cuenta empresa con su tipo de cliente y la política de descuento de ese tipo (M06 · D8). */
@@ -77,7 +79,7 @@ export class PrismaCuentasRepository implements CuentasRepository {
         },
       },
       include: {
-        usuarioRol: { select: { idRol: true } },
+        rolDirecto: { select: { nombre: true } },
       },
     });
   }
@@ -86,7 +88,7 @@ export class PrismaCuentasRepository implements CuentasRepository {
     return prisma.usuario.findUnique({
       where: { idUsuario },
       include: {
-        usuarioRol: { select: { idRol: true } },
+        rolDirecto: { select: { nombre: true } },
       },
     });
   }
@@ -96,7 +98,7 @@ export class PrismaCuentasRepository implements CuentasRepository {
       where: { idUsuario },
       include: {
         cuentaEmpresa: { include: INCLUIR_TIPO },
-        usuarioRol: { select: { idRol: true } },
+        rolDirecto: { select: { nombre: true } },
       },
     });
   }

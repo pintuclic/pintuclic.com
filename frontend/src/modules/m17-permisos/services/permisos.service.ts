@@ -4,6 +4,7 @@ import type { CodigoPermiso } from '../dtos/permisos.dto';
 import type {
   ActualizarPermisosRespuesta,
   FichaPermisosEmpleadoRespuesta,
+  MisPermisosRespuesta,
 } from '../interfaces/permisos.interface';
 
 /**
@@ -29,5 +30,14 @@ export async function actualizarPermisos(
     `/admin/empleados/${idUsuario}/permisos`,
     { permisos },
   );
+  return data.data;
+}
+
+/**
+ * R-ACC-9: qué puede hacer quien entró (el administrador recibe todo). Un cliente recibe el 404 opaco de siempre.
+ * Sirve para armar el menú; el control de acceso sigue siendo del servidor en cada petición.
+ */
+export async function obtenerMisPermisos(): Promise<MisPermisosRespuesta> {
+  const { data } = await apiClient.get<RespuestaExitosa<MisPermisosRespuesta>>('/admin/mis-permisos');
   return data.data;
 }

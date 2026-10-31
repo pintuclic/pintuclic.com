@@ -49,22 +49,17 @@ export class EmpleadosService {
       limite: query.limite,
     });
 
-    const resumenes: ResumenEmpleado[] = await Promise.all(
-      empleados.map(async (emp) => {
-        const cantidadPermisos = await this.empleadosRepo.contarPermisos(emp.idUsuario);
-        return {
-          idUsuario: emp.idUsuario,
-          nombre: emp.nombre,
-          correo: emp.correo,
-          telefono: emp.telefono,
-          estado: emp.estado,
-          fechaCreacion: emp.fechaCreacion.toISOString(),
-          fechaUltimoAcceso: emp.fechaUltimoAcceso ? emp.fechaUltimoAcceso.toISOString() : null,
-          cantidadPermisos,
-          primerAccesoPendiente: emp.primerAccesoPendiente,
-        };
-      }),
-    );
+    const resumenes: ResumenEmpleado[] = empleados.map((emp) => ({
+      idUsuario: emp.idUsuario,
+      nombre: emp.nombre,
+      correo: emp.correo,
+      telefono: emp.telefono,
+      estado: emp.estado,
+      fechaCreacion: emp.fechaCreacion.toISOString(),
+      fechaUltimoAcceso: emp.fechaUltimoAcceso ? emp.fechaUltimoAcceso.toISOString() : null,
+      cantidadPermisos: emp.cantidadPermisos,
+      primerAccesoPendiente: emp.primerAccesoPendiente,
+    }));
 
     const totalPaginas = Math.ceil(total / query.limite);
 

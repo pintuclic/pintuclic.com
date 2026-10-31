@@ -60,9 +60,14 @@ export interface AdminLayoutProps {
    * conoce ningún módulo.
    */
   navConteos?: Readonly<Record<string, ReadonlyArray<AdminNavConteo>>>;
+  /** Cómo se llama la persona en la cabecera ("Administrador", "Colaborador"…). Lo aporta quien monta el layout. */
+  etiquetaRol?: string;
+  /** Gobernanza de la cuenta y Configuración global en el menú del perfil: solo tienen sentido para la cuenta administradora. */
+  mostrarOpcionesDeAdministrador?: boolean;
 }
 
-const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
+/** Todas las secciones del panel; quien monta el layout decide cuáles ve cada persona. */
+export const ADMIN_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
   {
     label: 'Dashboard',
     href: '/admin',
@@ -193,8 +198,10 @@ const DEFAULT_NAV_ITEMS: ReadonlyArray<AdminNavItem> = [
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   children,
-  navItems = DEFAULT_NAV_ITEMS,
+  navItems = ADMIN_NAV_ITEMS,
   navConteos,
+  etiquetaRol = 'Administrador',
+  mostrarOpcionesDeAdministrador = true,
 }) => {
   const pathname = usePathname();
   const usuario = useAuthStore((s) => s.usuario);
@@ -282,9 +289,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     return pathname?.startsWith(item.href) ?? false;
   };
 
-  /** El título de la sección actual sale de la propia navegación: el ítem cuya ruta mejor coincide con la dirección. */
+  /**
+   * El título de la sección actual sale de la navegación: el ítem cuya ruta mejor coincide con la dirección. Se mira también
+   * en todas las secciones del panel, porque el menú de una persona puede no incluir la que escribió en la barra.
+   */
   const getBreadcrumbTitle = () => {
-    const coincidencias = navItems.filter((item) => isNavActive(item));
+    const coincidencias = [...navItems, ...ADMIN_NAV_ITEMS].filter((item) => isNavActive(item));
     const mejor = coincidencias.sort((x, y) => y.href.length - x.href.length)[0];
     return mejor?.label ?? 'Dashboard';
   };
@@ -455,7 +465,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     {nombreVisible}
                   </span>
                   <span className="font-sans text-[11px] text-neutral-medium">
-                    Administrador
+                    {etiquetaRol}
                   </span>
                 </span>
               </Button>
@@ -473,6 +483,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                       {correoVisible}
                     </p>
                   </div>
+                  {mostrarOpcionesDeAdministrador && (
                   <div className="py-1">
                     <Link
                       href="/admin/gobernanza"
@@ -491,6 +502,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                       <span>Configuración Global</span>
                     </Link>
                   </div>
+                  )}
                   <div className="border-t border-neutral-light/50 pt-1 flex flex-col gap-1">
                     <Link
                       href="/"

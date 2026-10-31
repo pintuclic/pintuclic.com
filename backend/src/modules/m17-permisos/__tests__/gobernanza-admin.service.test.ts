@@ -56,6 +56,7 @@ function crearMockGobernanza(): {
           idRol: 1,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          cantidadPermisos: 0,
           primerAccesoPendiente: false,
         });
       }
@@ -72,6 +73,7 @@ function crearMockGobernanza(): {
           idRol: 5,
           fechaCreacion: new Date(),
           fechaUltimoAcceso: null,
+          cantidadPermisos: 0,
           primerAccesoPendiente: false,
         });
       }
@@ -80,7 +82,6 @@ function crearMockGobernanza(): {
     crear: vi.fn().mockResolvedValue({} as unknown as EntidadEmpleado),
     actualizarContacto: vi.fn().mockResolvedValue({} as unknown as EntidadEmpleado),
     actualizarEstado: vi.fn().mockResolvedValue(undefined),
-    contarPermisos: vi.fn().mockResolvedValue(0),
   };
 
   const sesionService = {

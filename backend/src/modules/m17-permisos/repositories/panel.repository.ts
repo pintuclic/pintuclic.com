@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../../core/db/client';
+import { DONDE_EMPLEADO, DONDE_NO_PERSONAL } from '../../../core/utils/roles';
 import type { ClavePendientePanel, ProductoCotizado } from '../dtos/m17-panel-resumen.dto';
 import { ESTADOS_COTIZACION_PANEL } from '../dtos/m17-panel-resumen.dto';
 import type {
@@ -120,9 +121,9 @@ export class PanelRepository implements PanelRepositoryPort {
   async personas(): Promise<{ clientesNaturales: number; clientesEmpresa: number; colaboradores: number }> {
     const activo = { estado: 'activo' as const };
     const [clientesNaturales, clientesEmpresa, colaboradores] = await Promise.all([
-      prisma.usuario.count({ where: { ...activo, usuarioRol: null, tipo: 'normal' } }),
-      prisma.usuario.count({ where: { ...activo, usuarioRol: null, tipo: 'empresa' } }),
-      prisma.usuario.count({ where: { ...activo, usuarioRol: { isNot: null } } }),
+      prisma.usuario.count({ where: { ...activo, ...DONDE_NO_PERSONAL, tipo: 'normal' } }),
+      prisma.usuario.count({ where: { ...activo, ...DONDE_NO_PERSONAL, tipo: 'empresa' } }),
+      prisma.usuario.count({ where: { ...activo, ...DONDE_EMPLEADO } }),
     ]);
     return { clientesNaturales, clientesEmpresa, colaboradores };
   }

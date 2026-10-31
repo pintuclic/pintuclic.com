@@ -97,6 +97,7 @@ export const CODIGOS_ERROR_M17 = {
   CORREO_DUPLICADO: 'CORREO_DUPLICADO',
   PARAMETRO_INVALIDO: 'PARAMETRO_INVALIDO',
   OPERACION_BLOQUEADA_ADMIN: 'OPERACION_BLOQUEADA_ADMIN',
+  PERMISO_NO_CONCEDIBLE: 'PERMISO_NO_CONCEDIBLE',
   MOTIVO_REQUERIDO: 'MOTIVO_REQUERIDO',
   DATOS_CLIENTE_NO_EDITABLES: 'DATOS_CLIENTE_NO_EDITABLES',
   TOKEN_INVALIDO_O_EXPIRADO: 'TOKEN_INVALIDO_O_EXPIRADO',
@@ -230,6 +231,15 @@ export const actualizarPermisosEmpleadoOutputSchema = z.object({
   totalPermisosActivos: z.number().int().nonnegative(),
 });
 export type ActualizarPermisosEmpleadoOutput = z.infer<typeof actualizarPermisosEmpleadoOutputSchema>;
+
+/** GET /admin/mis-permisos (R-ACC-9). Exige sesión de personal, no un permiso concreto. */
+export const misPermisosOutputSchema = z.object({
+  idUsuario: identificadorUsuarioSchema,
+  nombre: z.string(),
+  esAdministrador: z.boolean(),
+  permisos: z.array(codigoPermisoSchema),
+});
+export type MisPermisosOutput = z.infer<typeof misPermisosOutputSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 5. CONTRATOS HU-ADM-04: GESTIÓN DE CLIENTES DESDE ADMINISTRACIÓN
