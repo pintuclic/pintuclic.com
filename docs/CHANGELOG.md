@@ -6,6 +6,28 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-31 · M09 · estado propio por línea (PR general)
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🧾 **Cada producto del pedido tiene estado.** Contrato y base de datos; el módulo va en un PR aparte, después de este.
+
+### Qué falla hoy
+- El estado de una línea solo existía como un rastro aparte del pedido: se veía en un panel, solo con el pedido en revisión, preparación o preparada, y el cliente no veía nada. Cuando el pedido salía de ahí, el estado de sus productos dejaba de verse.
+
+### Qué cambia (contratos `m09-cumplimiento` y `m08-ordenes`)
+- **Estado de línea siempre visible.** Se calcula al leer: la última marca mientras el pedido está en revisión, preparación o preparada, y el estado del pedido (despachada, entregada, cancelada, devuelta) después. Sin columna nueva en `linea_orden`.
+- **Preparada por línea (RF-CUM-05-06).** El empleado marca cada línea como preparada y el pedido pasa solo a «preparada» al quedar todas, como ya pasa de revisión a preparación. M08 deja de ofrecer a mano `en_preparacion` → `preparada`. Devolver un pedido preparado vuelve sus líneas a «disponible».
+- **El cliente ve cada producto (RF-CUM-01-13):** verificando disponibilidad, confirmado o rechazado, sin autor ni fecha y sin aviso por correo. El personal con `ventas.ver` ve el estado de cada línea en el detalle.
+- **Cuando falta un producto (RF-CUM-03-11 y 03-12):** arriba de la tarjeta de productos, y solo si hay un producto sin stock, el empleado puede contactar al cliente (queda registrado en el pedido) y pedir la cancelación. Esa petición crea una solicitud de postventa «iniciada por la tienda» con el motivo armado con los productos que faltan más una nota del empleado; la resuelve M11 como cualquier cancelación.
+- **Correo al cliente al cancelarse su pedido:** plantilla nueva `orden_cancelada` en M18, con el código y el motivo, para cualquier cancelación aprobada (también las que pide el cliente). El contrato de M08 ya prometía este correo y nunca existió; además hoy M08 no envía ningún correo de pedido en producción porque su adaptador está sin conectar.
+- **Base de datos 4.26:** `preparada` en `enum_estado_verificacion_linea`, `solicitud_postventa.id_empleado_inicia` y el tipo `orden_cancelada` (aditivo e idempotente).
+- Contratos de M08, M09, M11 y M18 y specs de M08 (§5), M09 (v3.1) y M11 al día.
+
+### Cómo se probó
+- `test:contracts` en verde; los dos contratos cargan, la lista de estados de línea coincide en ambos y el mapa del cliente cubre todos.
+- El esquema se aplica dos veces y sobre una base creada con el anterior (ver el PR).
+
+---
+
 ## [No publicado] - 2026-10-31
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🔐 **Permisos individuales por usuario y panel según los permisos: el módulo.** Entra como la rama `feature/m17-permisos-por-usuario`, sobre el contrato y la base de datos del PR general `chore/m17-permisos-usuario-bd` (que debe fusionarse antes).

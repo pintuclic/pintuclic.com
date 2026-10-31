@@ -693,6 +693,11 @@ INSERT INTO plantilla_notificacion (tipo, asunto, contenido_texto) VALUES
     'comprobante_venta',
     'Tu comprobante de compra · Pintu Clic',
     'Gracias por tu compra en Pintu Clic. Ya está listo el comprobante de tu pedido: puedes verlo, imprimirlo o guardarlo como PDF desde el enlace.'
+),
+(
+    'orden_cancelada',
+    'Tu pedido fue cancelado · Pintu Clic',
+    'Te escribimos para avisarte que tu pedido en Pintu Clic fue cancelado. Abajo encontrarás el motivo.'
 )
 ON CONFLICT (tipo) DO NOTHING;
 

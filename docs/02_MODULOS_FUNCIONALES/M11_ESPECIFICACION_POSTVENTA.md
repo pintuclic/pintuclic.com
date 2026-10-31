@@ -115,6 +115,7 @@ El módulo **M11 Postventa** gestiona el ciclo integral posterior a la confirmac
 | **RF-POS-01-01** | RF | Validación | El sistema debe verificar que la orden pertenezca al cliente autenticado. | M20 | Alta |
 | **RF-POS-01-02** | RF | Estado | El sistema debe permitir radicar cancelación únicamente si el estado de la orden es `orden_confirmada`, `revision_disponibilidad` o `en_preparacion`. | RN-POS-01 | Alta |
 | **RF-POS-01-03** | RF | Datos | El cliente debe ingresar un motivo obligatorio (mínimo 10 caracteres, máximo 500). | Definido | Alta |
+| **RF-POS-01-05** | RF | Origen | La tienda también puede radicar una cancelación a nombre del cliente cuando no puede surtir un producto (revisión del 31 de octubre de 2026). Aplica las mismas reglas de estado y unicidad, queda marcada como iniciada por la tienda con el empleado que la inició, y no pide datos bancarios en ese momento. | Definido | Alta |
 | **RF-POS-01-04** | RF | Unicidad | El sistema debe rechazar una nueva solicitud de cancelación si ya existe una solicitud en trámite para la misma orden. | Regla | Alta |
 
 #### Criterios de Aceptación (Gherkin)
@@ -197,6 +198,7 @@ El módulo **M11 Postventa** gestiona el ciclo integral posterior a la confirmac
 | **RF-POS-05-02** | RF | Rechazo | Si se rechaza, es obligatorio registrar el motivo técnico/legal del rechazo (mínimo 10 caracteres). | Auditoría | Alta |
 | **RF-POS-05-03** | RF | Transición Cancelación | Al aprobarse una solicitud de tipo `cancelacion`, la orden en M08 pasa automáticamente a estado `cancelado` (con autor y motivo). | M08 | Alta |
 | **RF-POS-05-04** | RF | Transición Devolución Total | Al aprobarse una devolución total de todos los ítems de la orden, la orden en M08 pasa a estado `devuelto`. | M08 | Alta |
+| **RF-POS-05-06** | RF | Aviso | Al aprobarse una cancelación, sea del cliente o de la tienda, el sistema debe enviarle al cliente un correo con el código del pedido y el motivo de la cancelación. Si se rechaza, no se envía nada. Un fallo del correo no deshace la aprobación. | Definido | Alta |
 | **RF-POS-05-05** | RF | Siguiente paso | La solicitud pasa a estado `aprobada` y habilita la fase de liquidación del reembolso. | Flujo | Alta |
 
 ---

@@ -18,8 +18,8 @@ import { z } from 'zod';
  *
  * ── Qué NO incluye ──────────────────────────────────────────────────────────
  *  Solicitud SOL, pasarela y confirmación del pago (M07) · carrito (M05) ·
- *  cotizaciones (M21) · verificación de disponibilidad por línea y paso automático
- *  a preparación (M09) · transporte (M10) · facturación (M12) · política, plazos y
+ *  cotizaciones (M21) · poner las marcas de cada línea y los pasos automáticos a
+ *  preparación y a preparada (M09; M08 solo LEE el estado de la línea, R15 y R16) · transporte (M10) · facturación (M12) · política, plazos y
  *  ejecución de cancelación, devolución y reembolso (M11) · plantillas de correo (M18).
  *
  * ── Reglas clave ────────────────────────────────────────────────────────────
@@ -44,7 +44,10 @@ import { z } from 'zod';
  *      `estadoActual`; si ya cambió, 409 ESTADO_CAMBIADO y no se sobrescribe.
  *  R9  Cancelar y devolver NO están habilitados: 409 OPERACION_NO_HABILITADA hasta que
  *      M11 defina la política (RF-POS-04-03). El cliente nunca cancela por sí mismo.
- *  R10 Correo al cliente solo al nacer la orden, al despacharla y al cancelarla (D05).
+ *  R10 Correo al cliente solo al nacer la orden, al despacharla y al cancelarla (D05). El de cancelación sale
+ *      cuando M11 aprueba una cancelación (M09 R20): el puerto de notificaciones suma `notificarOrdenCancelada` con el
+ *      código, el cliente y el motivo (plantilla `orden_cancelada` de M18). Hasta la revisión del 2026-10-31 estaba
+ *      prometido y no existía.
  *      Nunca al personal: el contador de la navegación es el único aviso (RF-ORD-05-04).
  *  R11 Las notas internas y los contactos son solo inserción: PUT/PATCH/DELETE → 405
  *      NOTA_INMUTABLE. Las notas jamás se devuelven al cliente.
@@ -55,6 +58,17 @@ import { z } from 'zod';
  *      audita (M20).
  *  R14 Una línea cuyo producto ya no está en el catálogo (`productoDisponible: false`)
  *      se muestra con sus datos copiados, sin enlace y con la nota de no disponible.
+ *  R15 Cada línea tiene un estado propio, derivado y nunca guardado en `linea_orden` (revisión 2026-10-31, M09 R17):
+ *      mientras la orden está en `revision_disponibilidad`, `en_preparacion` o `preparada` es la última marca que
+ *      M09 le puso (`pendiente`, `disponible`, `consiguiendo_stock`, `no_disponible` o `preparada`); sin marcas,
+ *      `pendiente` en revisión, `disponible` en preparación y `preparada` en preparada (órdenes que avanzaron antes
+ *      de existir las marcas: no se inventa historial). `orden_confirmada` → `pendiente`. Desde `despachado` la
+ *      línea hereda el estado de la orden: `despachada`, `entregada`, `cancelada`, `devuelta`. Es un solo
+ *      cálculo (ver `ESTADOS_LINEA`) que usan M08 y M09.
+ *  R16 El detalle del pedido trae el estado de cada línea. El personal con `ventas.ver` recibe `estadoLinea`
+ *      (sin autor, fecha ni historial: eso sigue siendo de M09 y de `ventas.gestionar`). El cliente recibe solo
+ *      `disponibilidad` (`verificando_disponibilidad`, `confirmado` o `rechazado`, ver
+ *      `DISPONIBILIDAD_POR_ESTADO_LINEA`), sin avisos por correo (R10 no cambia).
  *
  * ── Decisiones por defecto (el Tech Lead puede vetarlas) ────────────────────
  *  D1  Prefijo de rutas /api/v1/ordenes/... ; mis-pedidos para el cliente y gestion
@@ -139,12 +153,13 @@ export type MedioContacto = z.infer<typeof medioContactoSchema>;
  * (que puede partir de varios estados según la política y por eso no se lista).
  * `revision_disponibilidad` → `en_preparacion` tampoco se lista: solo la hace M09 (RF-CUM-03-10) al quedar todas las
  * líneas disponibles; pedirla a mano responde 409 TRANSICION_NO_PERMITIDA.
+ * `en_preparacion` → `preparada` tampoco se lista (revisión 2026-10-31): solo la hace M09 al quedar todas las líneas
+ * `preparada` (M09 R15); pedirla a mano responde 409 TRANSICION_NO_PERMITIDA.
  * `condicion` es lo que el servicio verifica además de la pareja desde → hacia.
  */
 export const TRANSICIONES_ESTADO = [
   { desde: 'orden_confirmada', hacia: 'revision_disponibilidad', condicion: 'Solo órdenes anteriores: las nuevas nacen ya en revision_disponibilidad' },
-  { desde: 'en_preparacion', hacia: 'preparada', condicion: null },
-  { desde: 'preparada', hacia: 'en_preparacion', condicion: 'Exige motivo; no se retrocede a revision_disponibilidad (RF-CUM-05-05)' },
+  { desde: 'preparada', hacia: 'en_preparacion', condicion: 'Exige motivo; no se retrocede a revision_disponibilidad (RF-CUM-05-05). Las líneas `preparada` vuelven a `disponible` (M09 R16)' },
   { desde: 'preparada', hacia: 'despachado', condicion: 'Solo modoEntrega = domicilio, o sin modo (orden anterior a la copia histórica)' },
   { desde: 'preparada', hacia: 'entregado', condicion: 'Solo modoEntrega = recogida, o sin modo' },
   { desde: 'despachado', hacia: 'entregado', condicion: 'Opcional: el personal confirma la llegada' },
@@ -222,6 +237,45 @@ export const descuentoOrdenSchema = z.object({
 });
 export type DescuentoOrden = z.infer<typeof descuentoOrdenSchema>;
 
+/**
+ * R15. Estado de una línea. Las cinco primeras son marcas de M09 (`pendiente` = sin marcas); las cuatro últimas las
+ * hereda de la orden desde que sale de la preparación. Se calcula al leer, no se guarda.
+ */
+export const ESTADOS_LINEA = [
+  'pendiente',
+  'disponible',
+  'consiguiendo_stock',
+  'no_disponible',
+  'preparada',
+  'despachada',
+  'entregada',
+  'cancelada',
+  'devuelta',
+] as const;
+export const estadoLineaSchema = z.enum(ESTADOS_LINEA);
+export type EstadoLinea = z.infer<typeof estadoLineaSchema>;
+
+/** R16. Lo que ve el cliente de cada línea. */
+export const DISPONIBILIDADES_CLIENTE = ['verificando_disponibilidad', 'confirmado', 'rechazado'] as const;
+export const disponibilidadClienteSchema = z.enum(DISPONIBILIDADES_CLIENTE);
+export type DisponibilidadCliente = z.infer<typeof disponibilidadClienteSchema>;
+
+/**
+ * R16. De estado de línea a lo que ve el cliente. `null` = no se muestra (la orden cancelada o devuelta ya lo dice
+ * todo). `consiguiendo_stock` es «verificando»: todavía no se sabe. `no_disponible` es «rechazado».
+ */
+export const DISPONIBILIDAD_POR_ESTADO_LINEA: Readonly<Record<EstadoLinea, DisponibilidadCliente | null>> = {
+  pendiente: 'verificando_disponibilidad',
+  consiguiendo_stock: 'verificando_disponibilidad',
+  disponible: 'confirmado',
+  preparada: 'confirmado',
+  despachada: 'confirmado',
+  entregada: 'confirmado',
+  no_disponible: 'rechazado',
+  cancelada: null,
+  devuelta: null,
+};
+
 export const lineaOrdenSchema = z.object({
   nombreProducto: z.string(),
   varianteCopia: z.string(),
@@ -233,6 +287,8 @@ export const lineaOrdenSchema = z.object({
   descuentos: z.array(descuentoOrdenSchema),
   /** R14. false → sin enlace a la ficha y con la nota de no disponible. */
   productoDisponible: z.boolean(),
+  /** R16. null cuando la orden está cancelada o devuelta. */
+  disponibilidad: disponibilidadClienteSchema.nullable(),
 });
 export type LineaOrden = z.infer<typeof lineaOrdenSchema>;
 
@@ -240,6 +296,8 @@ export type LineaOrden = z.infer<typeof lineaOrdenSchema>;
 export const lineaOrdenGestionSchema = lineaOrdenSchema.extend({
   esEntonado: z.boolean(),
   baseConsumida: z.string().nullable(),
+  /** R15 y R16. Solo el estado; el rastro con autor y fecha es de M09. */
+  estadoLinea: estadoLineaSchema,
 });
 export type LineaOrdenGestion = z.infer<typeof lineaOrdenGestionSchema>;
 

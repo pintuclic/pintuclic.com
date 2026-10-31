@@ -152,6 +152,8 @@ enum TipoComunicacion {
   alerta_servicio_ia
   /// M12 · R9: aviso al cliente con el enlace a su comprobante de venta
   comprobante_venta
+  /// M18 · v4.26: aviso al cliente con el motivo cuando se cancela su pedido
+  orden_cancelada
 
   @@map("enum_tipo_comunicacion")
 }
@@ -434,6 +436,7 @@ model Usuario {
   // M11 Relaciones (Postventa)
   solicitudesPostventa SolicitudPostventa[] @relation("SolicitudesPostventaUsuario")
   solicitudesPostventaResueltas SolicitudPostventa[] @relation("SolicitudesPostventaResueltas")
+  solicitudesPostventaIniciadas SolicitudPostventa[] @relation("SolicitudesPostventaIniciadas")
   historialPostventaAutor HistorialEstadoPostventa[]
   verificacionesLinea     VerificacionLineaOrden[]
 
@@ -1783,6 +1786,7 @@ model SolicitudPostventa {
   observacionesResolucion  String?                 @map("observaciones_resolucion")
   motivoRechazo            MotivoRechazoPostventa? @map("motivo_rechazo")
   idEmpleadoResuelve       Int?                    @map("id_empleado_resuelve")
+  idEmpleadoInicia         Int?                    @map("id_empleado_inicia")
   totalReembolso           Decimal                 @default(0) @map("total_reembolso") @db.Decimal(12, 2)
   metodoReembolso          MetodoReembolso?        @map("metodo_reembolso")
   referenciaReembolso      String?                 @map("referencia_reembolso") @db.VarChar(100)
@@ -1796,6 +1800,7 @@ model SolicitudPostventa {
   orden            Orden                      @relation(fields: [idOrden], references: [idOrden], onUpdate: Cascade, onDelete: Restrict, map: "fk_postventa_orden")
   usuario          Usuario                    @relation("SolicitudesPostventaUsuario", fields: [idUsuario], references: [idUsuario], onUpdate: Cascade, onDelete: Restrict, map: "fk_postventa_usuario")
   empleadoResuelve Usuario?                   @relation("SolicitudesPostventaResueltas", fields: [idEmpleadoResuelve], references: [idUsuario], onUpdate: Cascade, onDelete: SetNull, map: "fk_postventa_empleado")
+  empleadoInicia   Usuario?                   @relation("SolicitudesPostventaIniciadas", fields: [idEmpleadoInicia], references: [idUsuario], onUpdate: Cascade, onDelete: SetNull, map: "fk_postventa_empleado_inicia")
   lineas           LineaSolicitudPostventa[]
   historial        HistorialEstadoPostventa[]
 
@@ -1849,6 +1854,7 @@ enum EstadoVerificacionLinea {
   disponible
   consiguiendo_stock
   no_disponible
+  preparada
 
   @@map("enum_estado_verificacion_linea")
 }

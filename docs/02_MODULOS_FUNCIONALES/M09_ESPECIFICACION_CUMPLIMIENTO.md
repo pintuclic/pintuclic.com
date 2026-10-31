@@ -8,11 +8,11 @@ Plataforma de comercio electrónico
 
 M09 Cumplimiento y preparación
 
-| Versión | 3.0 |
+| Versión | 3.1 |
 | :---- | :---- |
 | Fecha | 25 de septiembre de 2026 |
-| Qué cambia | La entrevista no tocó este módulo: lo que cambia viene de fuera. Se reescribe la indicación de la base a consumir con el vocabulario de M01, donde la base dejó de ser una clase de color, y nace la verificación del combo, que llega armado y cuya existencia ya se descontó al generarse la orden, de modo que el empleado comprueba el paquete y no sus componentes. Se retira la consecución de existencias: el negocio confirmó que Pintu Clic es una libreta de pedidos y que es la tienda quien maneja la existencia, de modo que la mercancía siempre se consigue y el caso extremo se resuelve por comunicación directa, fuera del sistema. Desaparecen HU-CUM-02 y HU-CUM-04 con sus requisitos. Se cierran además los tres huecos del avance automático, del retroceso desde preparada y del efecto de una corrección tardía. Nace HU-CUM-06, la hoja de preparación: hasta ahora el módulo decía cómo se registra el inicio y el fin de la preparación, pero no qué mira el empleado mientras la hace. El 29 de octubre de 2026 el PO ajusta el módulo: es una mejora de M08 y debe ser liviano para no cargar al empleado al confirmar el envío; la disponibilidad por línea pasa a tres marcas (disponible, consiguiendo stock y no disponible) sin registrar cantidades. Donde este documento y `contracts/m09-cumplimiento.contract.ts` difieran, manda el contrato. |
-| Contenido | 4 historias con requisitos · 20 requisitos funcionales · 1 no funcional · 24 criterios de aceptación |
+| Qué cambia | La entrevista no tocó este módulo: lo que cambia viene de fuera. Se reescribe la indicación de la base a consumir con el vocabulario de M01, donde la base dejó de ser una clase de color, y nace la verificación del combo, que llega armado y cuya existencia ya se descontó al generarse la orden, de modo que el empleado comprueba el paquete y no sus componentes. Se retira la consecución de existencias: el negocio confirmó que Pintu Clic es una libreta de pedidos y que es la tienda quien maneja la existencia, de modo que la mercancía siempre se consigue y el caso extremo se resuelve por comunicación directa, fuera del sistema. Desaparecen HU-CUM-02 y HU-CUM-04 con sus requisitos. Se cierran además los tres huecos del avance automático, del retroceso desde preparada y del efecto de una corrección tardía. Nace HU-CUM-06, la hoja de preparación: hasta ahora el módulo decía cómo se registra el inicio y el fin de la preparación, pero no qué mira el empleado mientras la hace. El 29 de octubre de 2026 el PO ajusta el módulo: es una mejora de M08 y debe ser liviano para no cargar al empleado al confirmar el envío; la disponibilidad por línea pasa a tres marcas (disponible, consiguiendo stock y no disponible) sin registrar cantidades. El 31 de octubre de 2026 se corrige un hueco de diseño: la línea no tenía estado propio y solo el pedido lo tenía. Ahora cada producto del pedido tiene su estado, la preparación también se marca por línea (la orden pasa sola a «preparada» al quedar todas) y el cliente ve en qué va cada uno de sus productos (nacen RF-CUM-01-13 y RF-CUM-05-06). Cuando un producto no está, el empleado puede contactar al cliente y pedir la cancelación del pedido desde la misma línea, y el cliente recibe un correo con el motivo cuando se aprueba (nacen RF-CUM-03-11 y RF-CUM-03-12; plantilla nueva en M18). Donde este documento y `contracts/m09-cumplimiento.contract.ts` difieran, manda el contrato. |
+| Contenido | 4 historias con requisitos · 24 requisitos funcionales · 1 no funcional · 30 criterios de aceptación |
 | Módulos analizados | M09 Cumplimiento y preparación |
 
 # 1\. Lo que falta definir
@@ -44,6 +44,7 @@ Ninguno. Los de la versión anterior que afectaban a este módulo se cerraron co
 | RF-CUM-01-09 | RF | Entonado | El sistema debe indicar, cuando la línea corresponda a un color de carta, qué variante de base debe consumirse y qué color hay que preparar sobre ella, conforme a RF-CAT-12-05. La variante nunca es la del color, que no tiene variante propia. | **Deducido** | **Alta** |
 | RF-CUM-01-12 | RF | Verificación | El sistema debe presentar la línea de un combo como una unidad ya armada, cuya verificación consiste en comprobar que el paquete existe y no en verificar sus componentes. Su existencia se descontó al generarse la orden por RF-CAT-13-03, de modo que aquí no vuelve a tocarse. | **Deducido** | **Media** |
 | RF-CUM-01-10 | RF | Control de acceso | El sistema debe reservar al permiso «Gestión de pedidos» todas las operaciones de este módulo: la consulta y el registro de la verificación, el avance de la orden y el registro de la preparación. | **Deducido** | **Alta** |
+| RF-CUM-01-13 | RF | Visibilidad | El sistema debe mostrar el estado de cada producto de un pedido, tanto al personal como al cliente, en cualquier momento de la vida del pedido y no solo durante la revisión. Al cliente se le dice, por producto, si se está verificando la disponibilidad, si está confirmado o si fue rechazado, sin indicar quién lo marcó ni cuándo. | **Definido** | **Alta** |
 | RNF-CUM-01-01 | RNF | Usabilidad | El registro de la verificación debe poder realizarse desde un dispositivo móvil, por producirse físicamente en el punto donde está la mercancía y no ante un escritorio. | **Deducido** | **Media** |
 
 **Criterios de aceptación**
@@ -60,6 +61,7 @@ Ninguno. Los de la versión anterior que afectaban a este módulo se cerraron co
 | CA-CUM-01-08 | Dado que verifico la mitad de las líneas y cierro sesión, cuando vuelvo a la orden, entonces el sistema conserva lo registrado y me permite continuar. |
 | CA-CUM-01-09 | Dado que soy un empleado sin permiso de gestión de pedidos, cuando intento registrar una verificación, entonces el sistema rechaza la operación en el servidor. |
 | CA-CUM-01-10 | Dado que corrijo una verificación con la preparación ya iniciada, cuando guardo la corrección, entonces la orden sigue en preparación y no retrocede. |
+| CA-CUM-01-11 | Dado que un pedido tiene tres productos y marqué uno como no disponible y otro como consiguiendo stock, cuando el cliente abre su pedido, entonces ve uno rechazado, otro verificando disponibilidad y el tercero confirmado, sin autor ni fecha. |
 
 ### HU-CUM-03 — Integridad del despacho
 
@@ -74,6 +76,8 @@ Ninguno. Los de la versión anterior que afectaban a este módulo se cerraron co
 | RF-CUM-03-03 | RF | Visibilidad | El sistema debe mostrar qué líneas retienen el avance de una orden y permitir consultar el conjunto de órdenes retenidas con el motivo de cada retención. | **Definido** | **Alta** |
 | RF-CUM-03-07 | RF | Trazabilidad | El sistema debe registrar el momento en que una orden alcanza la disponibilidad completa. | **Deducido** | **Media** |
 | RF-CUM-03-10 | RF | Integridad | El sistema debe hacer avanzar la orden a preparación de forma automática en cuanto el empleado confirme la última línea como disponible, sin exigir una acción adicional. Un botón que solo admite una respuesta no aporta control y sí retrasa la operación. | **Definido** | **Alta** |
+| RF-CUM-03-11 | RF | Cancelación | El sistema debe permitir al empleado pedir la cancelación de un pedido cuando una de sus líneas está marcada como no disponible. La petición compone el motivo con los productos que faltan más una nota opcional del empleado, queda como una solicitud de cancelación iniciada por la tienda y la resuelve el módulo de postventa. Al aprobarse, el cliente recibe un correo con el motivo. | **Definido** | **Alta** |
+| RF-CUM-03-12 | RF | Contacto | El sistema debe ofrecer, una sola vez y arriba de los productos del pedido, contactar al cliente por correo o teléfono, y dejar constancia del contacto en el pedido. Ese botón y el de cancelar el pedido solo aparecen mientras haya al menos un producto consiguiendo stock o no disponible (el de cancelar, no disponible). | **Definido** | **Media** |
 
 **Criterios de aceptación**
 
@@ -85,6 +89,9 @@ Ninguno. Los de la versión anterior que afectaban a este módulo se cerraron co
 | CA-CUM-03-04 | Dado que soy administrador, cuando intento hacer avanzar una orden con una línea sin disponibilidad, entonces el sistema lo impide igual que a cualquier empleado. |
 | CA-CUM-03-05 | Dado que confirmo la disponibilidad de la última línea pendiente, cuando la orden queda completa, entonces pasa a preparación sin que yo pulse nada más y consta el momento en que ocurrió. |
 | CA-CUM-03-06 | Dado que quiero saber qué órdenes están detenidas, cuando consulto la bandeja de retenidas, entonces veo cada una con el motivo de su retención. |
+| CA-CUM-03-07 | Dado que una línea está no disponible y el cliente ya no quiere el pedido, cuando pido la cancelación con una nota, entonces se crea una solicitud de cancelación que dice que la inició la tienda, el pedido no cambia hasta que se resuelva, y el sistema me muestra el texto que leerá el cliente antes de confirmar. |
+| CA-CUM-03-08 | Dado que se aprueba esa cancelación, cuando el pedido pasa a cancelado, entonces el cliente recibe un correo con el código del pedido y el motivo; y si se rechaza, no recibe ningún correo. |
+| CA-CUM-03-09 | Dado que ya hay una cancelación en trámite sobre el pedido o que ninguna línea está no disponible, cuando intento pedir otra, entonces el sistema lo impide e indica el motivo. |
 
 ### HU-CUM-05 — Preparación del pedido
 
@@ -97,6 +104,7 @@ Ninguno. Los de la versión anterior que afectaban a este módulo se cerraron co
 | RF-CUM-05-01 | RF | Preparación | El sistema debe permitir registrar el inicio y la finalización de la preparación de un pedido, conservando el empleado responsable y ambos momentos, y debe permitir consultar las órdenes en preparación y las ya preparadas. | **Definido** | **Media** |
 | RF-CUM-05-04 | RF | Integridad | El sistema debe impedir iniciar la preparación de una orden que no tenga la disponibilidad de todas sus líneas confirmada, e impedir registrar la finalización de una preparación que no haya sido iniciada. | **Deducido** | **Alta** |
 | RF-CUM-05-05 | RF | Preparación | El sistema debe permitir devolver una orden preparada únicamente a preparación, exigiendo un motivo y registrando al autor. No se admite retroceder a la revisión de disponibilidad: lo ya verificado no se vuelve a verificar. | **Definido** | **Media** |
+| RF-CUM-05-06 | RF | Preparación | El sistema debe permitir marcar cada línea como preparada cuando el empleado la alista, solo con la orden en preparación, y hacer pasar la orden a «preparada» de forma automática en cuanto la última línea quede preparada. Al devolver una orden preparada a preparación, las líneas preparadas vuelven a «disponible» para volver a prepararlas. | **Definido** | **Alta** |
 
 **Criterios de aceptación**
 
@@ -107,6 +115,8 @@ Ninguno. Los de la versión anterior que afectaban a este módulo se cerraron co
 | CA-CUM-05-03 | Dado que terminé de preparar un pedido, cuando registro la finalización, entonces queda marcado como listo para entregar. |
 | CA-CUM-05-04 | Dado que una preparación no ha sido iniciada, cuando intento registrar su finalización, entonces el sistema lo impide. |
 | CA-CUM-05-05 | Dado que devuelvo un pedido preparado a un estado anterior sin indicar motivo, cuando guardo, entonces el sistema lo impide; cuando lo indico, entonces el único destino posible es preparación y consta quién lo hizo, cuándo y por qué. |
+| CA-CUM-05-06 | Dado que una orden está en preparación con tres líneas, cuando marco las tres como preparadas, entonces la orden pasa sola a «preparada» con mi identificador y el momento, sin que pulse nada más. |
+| CA-CUM-05-07 | Dado que una orden está en revisión de disponibilidad, cuando intento marcar una línea como preparada, entonces el sistema lo impide; y dado que devuelvo una orden preparada a preparación, entonces sus líneas vuelven a «disponible». |
 
 ### HU-CUM-06 — Tener a mano lo que hay que recoger
 

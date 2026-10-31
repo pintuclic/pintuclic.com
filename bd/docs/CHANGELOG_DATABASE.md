@@ -10,6 +10,17 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.27] - 2026-10-31
+### Esquema 4.26 (98 Tablas) - M09: la marca «preparada» por línea de orden
+- **Alcance General:** PR general de la revisión de M09 (contrato `contracts/m09-cumplimiento.contract.ts`, R15 a R17). Cambio aditivo e idempotente: un valor de ENUM; no altera tablas ni datos.
+  - **`enum_estado_verificacion_linea`** gana `preparada` (la línea ya está alistada en la bodega). `ALTER TYPE … ADD VALUE IF NOT EXISTS`, como el resto de ENUM ampliados del esquema; el valor no se usa dentro del propio script.
+  - **Sin columna nueva en `linea_orden`:** el estado de la línea se calcula al leer a partir del último registro de `verificacion_linea_orden` y del estado de la orden (D15). Las órdenes que ya estaban en preparación sin marcas no se tocan: su estado se deduce de la orden.
+  - **`solicitud_postventa.id_empleado_inicia`** (M11, `INT NULL`, FK a `usuario`, `ON DELETE SET NULL`): el empleado que abrió una cancelación en nombre de la tienda (falta de stock, M09 R18). `NULL` = la pidió el cliente. `ADD COLUMN IF NOT EXISTS`: no toca las filas existentes.
+  - **`enum_tipo_comunicacion`** gana `orden_cancelada` (M18): aviso al cliente con el motivo cuando se cancela su pedido. El seed suma la fila de la plantilla; en una base existente el correo sale igual (el envío trae un texto por defecto) pero la plantilla no aparece para editar hasta correr el seed.
+  - **Prisma:** `EstadoVerificacionLinea.preparada`, `TipoComunicacion.orden_cancelada` y `SolicitudPostventa.idEmpleadoInicia` con su relación.
+
+---
+
 ## [v3.26] - 2026-10-30
 ### Esquema 4.25 (98 Tablas) - M17: permisos individuales por usuario y fecha de creación de la cuenta
 - **Alcance General:** PR general de la revisión del modelo de acceso (contrato `contracts/m17-permisos.contract.ts`, R-ACC-1 a R-ACC-9; ADR-013, que reemplaza a ADR-006). Cambio aditivo, idempotente: lo aplica el despliegue sin perder datos.
