@@ -6,6 +6,26 @@ Todas las modificaciones, nuevas funcionalidades y refactorizaciones del proyect
 > **Formato de Versiones:** `[vMAJOR.MINOR.PATCH]` - `AAAA-MM-DD`  
 > **Stack tecnológico oficial:** Express 5 + Prisma 6 + PostgreSQL + Next.js 15 + React 19 + Tailwind CSS 4 + Zustand 5
 
+## [No publicado] - 2026-10-31 · M09 · estado propio por línea (módulo)
+- **Autor:** DanExl24 (@DanExl24)
+- **Hito:** 🧾 **Implementación** de lo definido en el PR general de abajo, en M09, M08, M11 y M18 (autorizado).
+
+### Qué hace ahora
+- **Cada producto del pedido muestra su estado** en la lista de «Productos» (una sola lista: se fusionó la tarjeta «Revisión de disponibilidad»). El cliente ve verificando disponibilidad, confirmado o rechazado; el personal, el estado propio y qué lee el cliente.
+- **Preparada por línea:** al marcar preparada la última línea el pedido pasa solo a «Alistado». M08 ya no ofrece ese paso a mano. Devolver el pedido a preparación vuelve sus líneas a «disponible».
+- **Cuando falta un producto:** arriba de la tarjeta de productos aparecen, solo entonces, «Contactar al cliente» (deja constancia en el pedido) y «Cancelar pedido» (pide la cancelación a postventa, con el texto exacto que leerá el cliente y una nota opcional).
+- **Correo `orden_cancelada`** al aprobarse cualquier cancelación, con asunto e introducción editables en el panel. M08 conecta por fin su aviso de cancelación a M18.
+- La lista de chequeo se puede **consultar en cualquier estado** del pedido; marcar y la hoja siguen limitados a revisión, preparación y preparada.
+
+### Cómo se probó
+- Backend y frontend: lint, tipos, cero `any` y `test:contracts` en verde. Suites completas: backend 1242 pruebas y frontend 877 (una de M05 se agota por tiempo bajo carga y pasa sola).
+- **PostgreSQL real:** 39 pruebas de integración de M09 y M08, entre ellas el ciclo preparada, el reinicio al devolver, la cancelación con M11 real y el aviso.
+- **Pila real con un SMTP falso local** (nada salió de la máquina): 40 comprobaciones con sesiones de administrador, empleado y cliente, incluido el correo recibido con su asunto, motivo, nota y frase de reembolso.
+- **Navegador (administrador):** marcar un producto sin stock, aparición de los dos botones, diálogo con la vista previa, solicitud creada y botón «Cancelar pedido» oculto.
+- No probado: empleado con permisos parciales en el navegador, la vista del cliente en el navegador, «Contactar al cliente» en pantalla ni el despliegue en el VPS.
+
+---
+
 ## [No publicado] - 2026-10-31 · M09 · estado propio por línea (PR general)
 - **Autor:** DanExl24 (@DanExl24)
 - **Hito:** 🧾 **Cada producto del pedido tiene estado.** Contrato y base de datos; el módulo va en un PR aparte, después de este.

@@ -173,6 +173,11 @@ export const historialEstadoPostventaSchema = z.object({
 });
 export type HistorialEstadoPostventa = z.infer<typeof historialEstadoPostventaSchema>;
 
+/** R-POS-A. Quién abrió el trámite: el cliente, o la tienda por una cancelación (p. ej. falta de stock). */
+export const ORIGENES_SOLICITUD = ['cliente', 'tienda'] as const;
+export const origenSolicitudSchema = z.enum(ORIGENES_SOLICITUD);
+export type OrigenSolicitud = z.infer<typeof origenSolicitudSchema>;
+
 export const solicitudPostventaResumenSchema = z.object({
   idSolicitud: z.number().int().positive(),
   codigo: codigoPostventaSchema,
@@ -181,6 +186,8 @@ export const solicitudPostventaResumenSchema = z.object({
   nombreCliente: z.string(),
   tipo: tipoPostventaSchema,
   estado: estadoPostventaSchema,
+  /** R-POS-A. `tienda` solo ocurre en cancelaciones. */
+  iniciadaPor: origenSolicitudSchema,
   totalReembolso: importeSchema,
   totalItems: z.number().int().nonnegative(),
   fechaSolicitud: fechaHoraSchema,

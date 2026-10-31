@@ -34,18 +34,27 @@ export const ESTADOS_CUMPLIMIENTO = ['revision_disponibilidad', 'en_preparacion'
 export const estadoCumplimientoSchema = z.enum(ESTADOS_CUMPLIMIENTO);
 export type EstadoCumplimiento = z.infer<typeof estadoCumplimientoSchema>;
 
-/** R2. Lo que el empleado puede marcar en una línea. */
-export const ESTADOS_MARCA = ['disponible', 'consiguiendo_stock', 'no_disponible'] as const;
+/** R2. Lo que el empleado puede marcar en una línea. `preparada` solo con la orden en preparación (R15). */
+export const ESTADOS_MARCA = ['disponible', 'consiguiendo_stock', 'no_disponible', 'preparada'] as const;
 export const estadoMarcaSchema = z.enum(ESTADOS_MARCA);
 export type EstadoMarca = z.infer<typeof estadoMarcaSchema>;
 
-/** R2. Estado de una línea: su última marca, o `pendiente` si nadie la ha revisado (no se puede marcar a mano). */
-export const ESTADOS_LINEA = ['pendiente', ...ESTADOS_MARCA] as const;
+/** R17. Lo que la línea hereda de la orden cuando sale de la preparación; nunca se marca. */
+export const ESTADOS_LINEA_HEREDADOS = ['despachada', 'entregada', 'cancelada', 'devuelta'] as const;
+
+/**
+ * R17. Estado de una línea: su última marca, o `pendiente` si nadie la ha revisado (no se puede marcar a mano), o el
+ * heredado de la orden. Se calcula al leer. Es la misma lista que `ESTADOS_LINEA` del contrato de M08.
+ */
+export const ESTADOS_LINEA = ['pendiente', ...ESTADOS_MARCA, ...ESTADOS_LINEA_HEREDADOS] as const;
 export const estadoLineaSchema = z.enum(ESTADOS_LINEA);
 export type EstadoLinea = z.infer<typeof estadoLineaSchema>;
 
-/** R7. Texto fijo del historial de M08 cuando la orden avanza sola. */
+/** R7. Texto fijo del historial de M08 cuando la orden avanza sola a preparación. */
 export const MOTIVO_AVANCE_AUTOMATICO = 'Disponibilidad confirmada en todas las líneas';
+
+/** R15. Texto fijo del historial de M08 cuando la orden avanza sola a preparada. */
+export const MOTIVO_AVANCE_PREPARADA = 'Preparación completa en todas las líneas';
 
 /** Tope de líneas que una petición puede traer. */
 export const MAX_LINEAS_POR_PETICION = 200;
@@ -71,21 +80,34 @@ export const lineaVerificacionSchema = z.object({
   esEntonado: z.boolean(),
   /** Base que se consume cuando la línea es entonada; null en cualquier otro caso. */
   baseConsumida: z.string().nullable(),
-  /** Es el del último registro de `historial`; `pendiente` si no hay ninguno. */
+  /** R17. El del último registro de `historial`; sin registros, el que corresponde al estado de la orden. */
   estado: estadoLineaSchema,
   /** Del más antiguo al más reciente. Vacío mientras nadie la haya marcado. */
   historial: z.array(registroVerificacionSchema),
 });
 export type LineaVerificacion = z.infer<typeof lineaVerificacionSchema>;
 
+/** R18. Una solicitud de cancelación en trámite sobre la orden (de M11). */
+export const tramiteCancelacionSchema = z.object({
+  /** Código de la solicitud en M11, `DEV-AAAA-NNNNN`. */
+  codigo: z.string().regex(/^DEV-\d{4}-\d{5}$/),
+  estado: z.enum(['solicitada', 'en_revision']),
+  iniciadaPor: z.enum(['cliente', 'tienda']),
+  fecha: fechaHoraSchema,
+});
+export type TramiteCancelacion = z.infer<typeof tramiteCancelacionSchema>;
+
 export const verificacionOrdenSchema = z.object({
   codigo: codigoOrdenSchema,
-  estado: estadoCumplimientoSchema,
-  /** Líneas que no están `disponible`: pendientes, consiguiendo stock o no disponibles. */
+  /** R4. La verificación se consulta en cualquier estado de la orden; solo se marca en `ESTADOS_CUMPLIMIENTO`. */
+  estado: estadoOrdenSchema,
+  /** Líneas pendientes, consiguiendo stock o no disponibles. Las `disponible`, `preparada` y heredadas no cuentan. */
   lineasSinConfirmar: z.number().int().nonnegative(),
-  /** true cuando todas las líneas están `disponible`. */
+  /** true cuando `lineasSinConfirmar` es 0. */
   completa: z.boolean(),
   lineas: z.array(lineaVerificacionSchema),
+  /** R18. La solicitud de cancelación en trámite, o null si no hay ninguna. */
+  cancelacion: tramiteCancelacionSchema.nullable(),
 });
 export type VerificacionOrden = z.infer<typeof verificacionOrdenSchema>;
 
@@ -93,7 +115,7 @@ export type VerificacionOrden = z.infer<typeof verificacionOrdenSchema>;
 export const motivoRetencionSchema = z.object({
   /** Producto y presentación de la línea. */
   descripcion: z.string(),
-  estado: estadoLineaSchema.exclude(['disponible']),
+  estado: z.enum(['pendiente', 'consiguiendo_stock', 'no_disponible']),
 });
 export type MotivoRetencion = z.infer<typeof motivoRetencionSchema>;
 
@@ -182,6 +204,15 @@ export const verificarLineasRequestSchema = z
   });
 export type VerificarLineasRequest = z.infer<typeof verificarLineasRequestSchema>;
 
+/** R18. Nota que el empleado añade al motivo; el cliente la lee en el correo (D19). */
+export const MAX_NOTA_CANCELACION = 300;
+
+/** POST /cumplimiento/ordenes/:codigo/cancelacion (RF-CUM-03-11). */
+export const solicitarCancelacionRequestSchema = z.object({
+  nota: z.string().trim().min(1, 'La nota no puede estar vacía').max(MAX_NOTA_CANCELACION, `Máximo ${MAX_NOTA_CANCELACION} caracteres`).optional(),
+});
+export type SolicitarCancelacionRequest = z.infer<typeof solicitarCancelacionRequestSchema>;
+
 /* ───────────────────────────────────────────────────────────────────────────
  * 4. ERRORES
  * ─────────────────────────────────────────────────────────────────────────── */
@@ -190,6 +221,10 @@ export const CODIGOS_ERROR_M09 = {
   RECURSO_NO_DISPONIBLE: 'RECURSO_NO_DISPONIBLE',
   PARAMETRO_INVALIDO: 'PARAMETRO_INVALIDO',
   ORDEN_FUERA_DE_CUMPLIMIENTO: 'ORDEN_FUERA_DE_CUMPLIMIENTO',
+  MARCA_NO_PERMITIDA: 'MARCA_NO_PERMITIDA',
+  ORDEN_NO_CANCELABLE: 'ORDEN_NO_CANCELABLE',
+  SIN_LINEAS_NO_DISPONIBLES: 'SIN_LINEAS_NO_DISPONIBLES',
+  SOLICITUD_DUPLICADA: 'SOLICITUD_DUPLICADA',
   ESTADO_CAMBIADO: 'ESTADO_CAMBIADO',
   ERROR_INTERNO: 'ERROR_INTERNO',
 } as const;
@@ -197,6 +232,10 @@ export const codigoErrorM09Schema = z.enum([
   CODIGOS_ERROR_M09.RECURSO_NO_DISPONIBLE,
   CODIGOS_ERROR_M09.PARAMETRO_INVALIDO,
   CODIGOS_ERROR_M09.ORDEN_FUERA_DE_CUMPLIMIENTO,
+  CODIGOS_ERROR_M09.MARCA_NO_PERMITIDA,
+  CODIGOS_ERROR_M09.ORDEN_NO_CANCELABLE,
+  CODIGOS_ERROR_M09.SIN_LINEAS_NO_DISPONIBLES,
+  CODIGOS_ERROR_M09.SOLICITUD_DUPLICADA,
   CODIGOS_ERROR_M09.ESTADO_CAMBIADO,
   CODIGOS_ERROR_M09.ERROR_INTERNO,
 ]);
@@ -214,8 +253,10 @@ export type ErrorResponseEnvelope = z.infer<typeof errorResponseEnvelopeSchema>;
 /**
  * Códigos HTTP por error:
  *  404 RECURSO_NO_DISPONIBLE (inexistente, sin permiso o sesión de cliente) · 400 PARAMETRO_INVALIDO (también
- *  un `numeroLinea` que la orden no tiene: details lo indica) · 409 ORDEN_FUERA_DE_CUMPLIMIENTO (R4),
- *  ESTADO_CAMBIADO (R7) · 500 ERROR_INTERNO.
+ *  un `numeroLinea` que la orden no tiene: details lo indica) · 409 ORDEN_FUERA_DE_CUMPLIMIENTO (R4: marcar o pedir
+ *  la hoja fuera de revisión, preparación o preparada), MARCA_NO_PERMITIDA (R15: `preparada` en revisión;
+ *  details lista las líneas), ORDEN_NO_CANCELABLE, SIN_LINEAS_NO_DISPONIBLES, SOLICITUD_DUPLICADA (R18),
+ *  ESTADO_CAMBIADO (R7, R15) · 500 ERROR_INTERNO.
  */
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -230,19 +271,26 @@ export const retenidasResponseEnvelopeSchema = z.object({
 });
 export type RetenidasResponseEnvelope = z.infer<typeof retenidasResponseEnvelopeSchema>;
 
-/** GET /cumplimiento/ordenes/:codigo/verificacion */
+/** GET /cumplimiento/ordenes/:codigo/verificacion. Responde en cualquier estado de la orden (R4). */
 export const verificacionResponseEnvelopeSchema = z.object({
   success: z.literal(true),
   data: verificacionOrdenSchema,
 });
 export type VerificacionResponseEnvelope = z.infer<typeof verificacionResponseEnvelopeSchema>;
 
-/** PUT /cumplimiento/ordenes/:codigo/verificacion. `avanzo: true` = esta petición movió la orden a preparación (R7). */
+/** PUT /cumplimiento/ordenes/:codigo/verificacion. `avanzo: true` = esta petición movió la orden: a preparación (R7) o a preparada (R15). */
 export const verificarLineasResponseEnvelopeSchema = z.object({
   success: z.literal(true),
   data: z.object({ verificacion: verificacionOrdenSchema, avanzo: z.boolean() }),
 });
 export type VerificarLineasResponseEnvelope = z.infer<typeof verificarLineasResponseEnvelopeSchema>;
+
+/** POST /cumplimiento/ordenes/:codigo/cancelacion. Devuelve la solicitud creada en M11 (R18). */
+export const solicitarCancelacionResponseEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: z.object({ cancelacion: tramiteCancelacionSchema }),
+});
+export type SolicitarCancelacionResponseEnvelope = z.infer<typeof solicitarCancelacionResponseEnvelopeSchema>;
 
 /** GET /cumplimiento/ordenes/:codigo/hoja */
 export const hojaResponseEnvelopeSchema = z.object({
@@ -260,4 +308,5 @@ export const ENDPOINTS_M09 = [
   { metodo: 'GET', ruta: '/cumplimiento/ordenes/:codigo/verificacion', acceso: 'ventas.gestionar', hu: 'HU-CUM-01' },
   { metodo: 'PUT', ruta: '/cumplimiento/ordenes/:codigo/verificacion', acceso: 'ventas.gestionar', hu: 'HU-CUM-01, 03' },
   { metodo: 'GET', ruta: '/cumplimiento/ordenes/:codigo/hoja', acceso: 'ventas.gestionar', hu: 'HU-CUM-06' },
+  { metodo: 'POST', ruta: '/cumplimiento/ordenes/:codigo/cancelacion', acceso: 'ventas.gestionar', hu: 'HU-CUM-03' },
 ] as const;

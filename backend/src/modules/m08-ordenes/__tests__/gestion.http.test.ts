@@ -56,6 +56,7 @@ function detalle(codigo: string, estado: EstadoOrden, sobrescribir: Partial<Deta
         descuentos: [{ ordenAplicacion: 1, origen: 'Promoción', porcentaje: 10, importe: 10000 }],
         esEntonado: true,
         baseConsumida: 'Base Deep 1 gal',
+        ultimaMarca: null,
       },
     ],
     historial: [
@@ -123,6 +124,7 @@ class RepoMemoria implements GestionRepository, EstadosRepository {
 
   async enTransaccion<T>(trabajo: (tx: EstadosTx) => Promise<T>): Promise<T> {
     return trabajo({
+      reiniciarMarcasPreparadas: async () => undefined,
       buscarOrden: async (codigo) => {
         const o = this.ordenes.find((x) => x.codigo === codigo);
         return o ? { codigo: o.codigo, estado: o.estado, modoEntrega: o.modoEntrega, idUsuario: o.idUsuario } : null;

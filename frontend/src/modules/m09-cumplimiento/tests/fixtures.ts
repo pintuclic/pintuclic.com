@@ -16,13 +16,14 @@ export function lineaVerificacion(sobrescribir: Partial<LineaVerificacion> = {})
 }
 
 export function verificacion(lineas: LineaVerificacion[], sobrescribir: Partial<VerificacionOrden> = {}): VerificacionOrden {
-  const sinConfirmar = lineas.filter((l) => l.estado !== 'disponible').length;
+  const sinConfirmar = lineas.filter((l) => l.estado === 'pendiente' || l.estado === 'consiguiendo_stock' || l.estado === 'no_disponible').length;
   return {
     codigo: 'PC-2026-00001',
     estado: 'revision_disponibilidad',
     lineasSinConfirmar: sinConfirmar,
     completa: sinConfirmar === 0,
     lineas,
+    cancelacion: null,
     ...sobrescribir,
   };
 }

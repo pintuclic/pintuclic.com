@@ -5,6 +5,7 @@ import { requirePermission } from '../../core/middlewares/autorizacion.middlewar
 import type { AutorizacionService } from '../m20-seguridad/services/autorizacion.service';
 import type { AuditoriaPort } from '../m20-seguridad/interfaces/auditoria.port';
 import type { PostventaServicePort } from './interfaces/postventa.interface';
+import type { NotificacionesOrdenPort } from '../m08-ordenes/interfaces/notificaciones-orden.port';
 import { PrismaPostventaRepository } from './repositories/postventa.repository';
 import { PrismaOrdenesAdapterM11 } from './adapters/ordenes.adapter';
 import { PostventaService } from './services/postventa.service';
@@ -43,6 +44,8 @@ export interface DependenciasModuloM11 {
   prisma?: PrismaClient | undefined;
   auditoria?: AuditoriaPort | undefined;
   service?: PostventaServicePort | undefined;
+  /** R-POS-B: por dónde sale el aviso al cliente al aprobarse una cancelación (M08 lo ofrece, M18 lo envía). */
+  avisos?: Pick<NotificacionesOrdenPort, 'notificarOrdenCancelada'> | undefined;
 }
 
 export function construirModuloM11(
@@ -56,7 +59,7 @@ export function construirModuloM11(
   const prisma = deps.prisma ?? new PrismaClient();
   const repo = new PrismaPostventaRepository(prisma);
   const ordenesPort = new PrismaOrdenesAdapterM11(prisma);
-  const service = deps.service ?? new PostventaService(repo, ordenesPort, deps.auditoria);
+  const service = deps.service ?? new PostventaService(repo, ordenesPort, deps.auditoria, undefined, deps.avisos);
   const controller = new PostventaController(service);
 
   const router = Router();

@@ -1,10 +1,10 @@
 import { AxiosError, type AxiosResponse } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const api = vi.hoisted(() => ({ obtenerVerificacion: vi.fn(), marcarLineas: vi.fn() }));
+const api = vi.hoisted(() => ({ obtenerVerificacion: vi.fn(), marcarLineas: vi.fn(), solicitarCancelacion: vi.fn() }));
 vi.mock('../services/cumplimiento-api', () => api);
 
-import { AVISO_AVANZO } from '../services/presentacion';
+import { AVISO_AVANZO, AVISO_AVANZO_PREPARADA } from '../services/presentacion';
 import { useCumplimientoStore } from '../store/cumplimientoStore';
 import { lineaVerificacion, verificacion } from './fixtures';
 
@@ -23,7 +23,96 @@ describe('store de M09', () => {
   beforeEach(() => {
     api.obtenerVerificacion.mockReset();
     api.marcarLineas.mockReset();
+    api.solicitarCancelacion.mockReset();
     useCumplimientoStore.getState().limpiar();
+  });
+
+  it('cada marca guardada suma uno a «guardados», para que el detalle del pedido se vuelva a pedir', async () => {
+    api.obtenerVerificacion.mockResolvedValue(verificacion(TRES()));
+    await useCumplimientoStore.getState().cargar('PC-2026-00001');
+    api.marcarLineas.mockResolvedValue({ verificacion: verificacion(TRES()), avanzo: false });
+
+    expect(useCumplimientoStore.getState().guardados).toBe(0);
+    await useCumplimientoStore.getState().marcar([{ numeroLinea: 3, estado: 'disponible' }]);
+    await useCumplimientoStore.getState().marcar([{ numeroLinea: 2, estado: 'disponible' }]);
+
+    expect(useCumplimientoStore.getState().guardados).toBe(2);
+  });
+
+  it('una marca que falla no suma a «guardados»', async () => {
+    api.obtenerVerificacion.mockResolvedValue(verificacion(TRES()));
+    await useCumplimientoStore.getState().cargar('PC-2026-00001');
+    api.marcarLineas.mockRejectedValue(errorDeApi('No se pudo.'));
+
+    await useCumplimientoStore.getState().marcar([{ numeroLinea: 3, estado: 'disponible' }]);
+
+    expect(useCumplimientoStore.getState().guardados).toBe(0);
+  });
+
+  it('cuando las marcas dejan todo preparado el aviso es el de «preparada», no el de preparación', async () => {
+    const enPreparacion = [1, 2, 3].map((n) => lineaVerificacion({ numeroLinea: n, estado: 'disponible' }));
+    api.obtenerVerificacion.mockResolvedValue(verificacion(enPreparacion, { estado: 'en_preparacion' }));
+    await useCumplimientoStore.getState().cargar('PC-2026-00001');
+    const preparadas = [1, 2, 3].map((n) => lineaVerificacion({ numeroLinea: n, estado: 'preparada' }));
+    api.marcarLineas.mockResolvedValue({ verificacion: verificacion(preparadas, { estado: 'preparada' }), avanzo: true });
+
+    const avanzo = await useCumplimientoStore.getState().marcarTodas('preparada');
+
+    expect(avanzo).toBe(true);
+    expect(useCumplimientoStore.getState().aviso).toBe(AVISO_AVANZO_PREPARADA);
+  });
+
+  describe('pedir la cancelación (R18)', () => {
+    const TRAMITE = { codigo: 'DEV-2026-00012', estado: 'solicitada', iniciadaPor: 'tienda', fecha: '2026-10-31T10:00:00.000Z' } as const;
+
+    it('guarda la solicitud en la lista de chequeo y avisa con su código', async () => {
+      api.obtenerVerificacion.mockResolvedValue(verificacion([lineaVerificacion({ estado: 'no_disponible' })]));
+      await useCumplimientoStore.getState().cargar('PC-2026-00001');
+      api.solicitarCancelacion.mockResolvedValue(TRAMITE);
+
+      const ok = await useCumplimientoStore.getState().pedirCancelacion('Llega a fin de mes');
+
+      const s = useCumplimientoStore.getState();
+      expect(ok).toBe(true);
+      expect(api.solicitarCancelacion).toHaveBeenCalledWith('PC-2026-00001', 'Llega a fin de mes');
+      expect(s.verificacion?.cancelacion).toEqual(TRAMITE);
+      expect(s.aviso).toContain('DEV-2026-00012');
+      expect(s.solicitando).toBe(false);
+    });
+
+    it('si falla muestra el mensaje del servidor y la lista queda sin cancelación', async () => {
+      api.obtenerVerificacion.mockResolvedValue(verificacion([lineaVerificacion({ estado: 'no_disponible' })]));
+      await useCumplimientoStore.getState().cargar('PC-2026-00001');
+      api.solicitarCancelacion.mockRejectedValue(errorDeApi('Ya existe una solicitud en trámite (DEV-2026-00009) para este pedido.', 'SOLICITUD_DUPLICADA'));
+
+      const ok = await useCumplimientoStore.getState().pedirCancelacion();
+
+      const s = useCumplimientoStore.getState();
+      expect(ok).toBe(false);
+      expect(s.error).toBe('Ya existe una solicitud en trámite (DEV-2026-00009) para este pedido.');
+      expect(s.verificacion?.cancelacion).toBeNull();
+      expect(s.solicitando).toBe(false);
+    });
+
+    it('no deja pedirla dos veces a la vez', async () => {
+      api.obtenerVerificacion.mockResolvedValue(verificacion([lineaVerificacion({ estado: 'no_disponible' })]));
+      await useCumplimientoStore.getState().cargar('PC-2026-00001');
+      let liberar: () => void = () => undefined;
+      api.solicitarCancelacion.mockImplementation(() => new Promise((resolver) => (liberar = () => resolver(TRAMITE))));
+
+      const primera = useCumplimientoStore.getState().pedirCancelacion();
+      const segunda = await useCumplimientoStore.getState().pedirCancelacion();
+      liberar();
+      await primera;
+
+      expect(segunda).toBe(false);
+      expect(api.solicitarCancelacion).toHaveBeenCalledTimes(1);
+    });
+
+    it('sin un pedido cargado no hace nada', async () => {
+      expect(await useCumplimientoStore.getState().pedirCancelacion()).toBe(false);
+      expect(api.solicitarCancelacion).not.toHaveBeenCalled();
+    });
   });
 
   it('cargar trae la lista de chequeo del pedido', async () => {

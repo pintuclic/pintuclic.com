@@ -170,6 +170,41 @@ export function htmlComprobanteVenta(intro: string, nombre: string, numero: stri
   `.trim();
 }
 
+/** Convierte el motivo (texto plano con saltos de línea) en HTML escapado que conserva los saltos. */
+function motivoAHtml(motivo: string): string {
+  return escaparHtml(motivo.trim()).replace(/\r?\n/g, '<br/>');
+}
+
+const FRASE_REEMBOLSO = 'Si ya realizaste el pago, nuestro equipo se pondrá en contacto contigo para gestionar el reembolso.';
+
+/** M11 · R-POS-B: el pedido se canceló. El motivo y la frase del reembolso van fijos: el panel solo edita asunto e introducción. */
+export function textoOrdenCancelada(intro: string, nombre: string, codigoOrden: string, motivo: string, origen: 'tienda' | 'cliente'): string {
+  return [
+    `Hola, ${nombre}.`,
+    '',
+    intro,
+    '',
+    `Pedido: ${codigoOrden}`,
+    `${origen === 'cliente' ? 'Motivo que indicaste' : 'Motivo'}: ${motivo.trim()}`,
+    '',
+    FRASE_REEMBOLSO,
+  ].join('\n');
+}
+
+export function htmlOrdenCancelada(intro: string, nombre: string, codigoOrden: string, motivo: string, origen: 'tienda' | 'cliente'): string {
+  return `
+    <div style="${CAJA_ESTILO}">
+      <h2 style="color: #0B2D6B; margin-top: 0;">Tu pedido fue cancelado</h2>
+      <p>Hola, ${escaparHtml(nombre)}.</p>
+      ${introAHtml(intro)}
+      <p style="font-size: 13px; color: #4B5563;">Pedido: <strong>${escaparHtml(codigoOrden)}</strong></p>
+      <p style="font-size: 13px; color: #4B5563;">${origen === 'cliente' ? 'Motivo que indicaste' : 'Motivo'}:</p>
+      <p style="font-size: 14px; background: #F3F4F6; border-radius: 6px; padding: 12px;">${motivoAHtml(motivo)}</p>
+      <p style="font-size: 13px; color: #4B5563;">${escaparHtml(FRASE_REEMBOLSO)}</p>
+    </div>
+  `.trim();
+}
+
 export function textoDictamenEmpresa(intro: string, aprobada: boolean, motivo?: string): string {
   const motivoLimpio = motivo?.trim();
   return [

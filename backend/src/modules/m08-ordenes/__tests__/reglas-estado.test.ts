@@ -8,7 +8,9 @@ const CASOS: Caso[] = [
   ['orden_confirmada', 'revision_disponibilidad', null, 'ok'],
   ['revision_disponibilidad', 'en_preparacion', null, 'NO_PERMITIDA'],
   ['revision_disponibilidad', 'en_preparacion', 'domicilio', 'NO_PERMITIDA'],
-  ['en_preparacion', 'preparada', null, 'ok'],
+  // Solo la hace M09 al quedar todas las líneas preparadas: pedirla a mano no se admite, ni siquiera al administrador.
+  ['en_preparacion', 'preparada', null, 'NO_PERMITIDA'],
+  ['en_preparacion', 'preparada', 'domicilio', 'NO_PERMITIDA'],
   ['preparada', 'en_preparacion', null, 'ok'],
   ['preparada', 'despachado', 'domicilio', 'ok'],
   ['preparada', 'despachado', null, 'ok'],

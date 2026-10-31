@@ -59,7 +59,14 @@ export class PrismaConsultaClienteRepository implements ConsultaClienteRepositor
     const fila = await prisma.orden.findUnique({
       where: { codigoVisible: codigo },
       include: {
-        lineas: { orderBy: { idLineaOrden: 'asc' }, include: { descuentos: true } },
+        lineas: {
+          orderBy: { idLineaOrden: 'asc' },
+          include: {
+            descuentos: true,
+            // R15: solo importa la última marca de M09.
+            verificaciones: { orderBy: { idVerificacionLineaOrden: 'desc' }, take: 1, select: { estado: true } },
+          },
+        },
         historial: { orderBy: [{ fecha: 'asc' }, { idHistorialEstadoOrden: 'asc' }] },
       },
     });
@@ -84,6 +91,7 @@ export class PrismaConsultaClienteRepository implements ConsultaClienteRepositor
         precioInicial: linea.precioInicial?.toNumber() ?? null,
         precioAplicado: linea.precioAplicado.toNumber(),
         idVarianteRef: linea.idVarianteRef,
+        ultimaMarca: linea.verificaciones[0]?.estado ?? null,
         descuentos: linea.descuentos.map((d) => ({
           ordenAplicacion: d.ordenAplicacion,
           origen: d.origen,

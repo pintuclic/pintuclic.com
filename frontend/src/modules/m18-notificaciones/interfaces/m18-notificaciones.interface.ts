@@ -4,7 +4,10 @@ export type TipoComunicacion =
   | 'activacion_empleado'
   | 'cambio_correo_otp'
   | 'cambio_correo_confirmado'
-  | 'dictamen_empresa';
+  | 'dictamen_empresa'
+  | 'alerta_servicio_ia'
+  | 'comprobante_venta'
+  | 'orden_cancelada';
 
 export type EstadoEnvio = 'pendiente' | 'enviado' | 'fallido';
 

@@ -2,13 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   hojaResponseEnvelopeSchema,
   MOTIVO_AVANCE_AUTOMATICO,
+  MOTIVO_AVANCE_PREPARADA,
   retenidasResponseEnvelopeSchema,
+  solicitarCancelacionResponseEnvelopeSchema,
   verificacionResponseEnvelopeSchema,
   verificarLineasResponseEnvelopeSchema,
   type EstadoMarca,
   type EstadoOrden,
 } from '../dtos/m09-cumplimiento.dto';
-import { CumplimientoService } from '../services/cumplimiento.service';
+import { CumplimientoError, CumplimientoService } from '../services/cumplimiento.service';
 import { AHORA, linea, ordenDe, RepoMemoria } from './repo-memoria';
 
 const CODIGO = 'PC-2026-00001';
@@ -124,13 +126,16 @@ describe('CumplimientoService (HU-CUM-01, 03, 05 y 06)', () => {
     });
 
     it.each<EstadoOrden>(['orden_confirmada', 'despachado', 'entregado', 'cancelado', 'devuelto'])(
-      'una orden en %s responde ORDEN_FUERA_DE_CUMPLIMIENTO en las tres operaciones (R4)',
+      'una orden en %s responde ORDEN_FUERA_DE_CUMPLIMIENTO al marcar y al pedir la hoja, pero se puede consultar (R4)',
       async (estado) => {
         repo.cargar(ordenDe('PC-2026-00002', estado));
 
-        await expect(servicio.verificacion('PC-2026-00002')).rejects.toMatchObject({ codigo: 'ORDEN_FUERA_DE_CUMPLIMIENTO', statusCode: 409 });
-        await expect(servicio.marcar('PC-2026-00002', marcas([1, 'disponible']), EMPLEADO)).rejects.toMatchObject({ statusCode: 409 });
+        await expect(servicio.marcar('PC-2026-00002', marcas([1, 'disponible']), EMPLEADO)).rejects.toMatchObject({
+          codigo: 'ORDEN_FUERA_DE_CUMPLIMIENTO',
+          statusCode: 409,
+        });
         await expect(servicio.hoja('PC-2026-00002')).rejects.toMatchObject({ codigo: 'ORDEN_FUERA_DE_CUMPLIMIENTO' });
+        expect((await servicio.verificacion('PC-2026-00002')).estado).toBe(estado);
         expect(repo.escrituras).toBe(0);
       },
     );
@@ -224,6 +229,248 @@ describe('CumplimientoService (HU-CUM-01, 03, 05 y 06)', () => {
       expect(r.avanzo).toBe(true);
       expect(estadoDeLaOrden()).toBe('en_preparacion');
       consola.mockRestore();
+    });
+  });
+
+  describe('preparada por línea y segundo avance automático (R15)', () => {
+    function enPreparacion(): void {
+      repo.cargar(ordenDe('PC-2026-00010', 'en_preparacion'));
+    }
+
+    it('una orden en preparación muestra sus líneas disponibles aunque nadie las haya marcado (R17)', async () => {
+      enPreparacion();
+
+      const v = await servicio.verificacion('PC-2026-00010');
+
+      expect(v.lineas.map((l) => l.estado)).toEqual(['disponible', 'disponible', 'disponible']);
+      expect(v).toMatchObject({ estado: 'en_preparacion', completa: true });
+    });
+
+    it('marcar preparada una línea no mueve la orden mientras falten otras (RF-CUM-05-06)', async () => {
+      enPreparacion();
+
+      const r = await servicio.marcar('PC-2026-00010', marcas([1, 'preparada']), EMPLEADO);
+
+      expect(r.avanzo).toBe(false);
+      expect(r.verificacion.lineas.map((l) => l.estado)).toEqual(['preparada', 'disponible', 'disponible']);
+      expect(repo.ordenes.get('PC-2026-00010')?.estado).toBe('en_preparacion');
+      expect(repo.historial).toHaveLength(0);
+    });
+
+    it('al quedar todas preparadas pasa sola a preparada, con quien marcó la última, su motivo y el evento (CA-CUM-05-06)', async () => {
+      enPreparacion();
+      await servicio.marcar('PC-2026-00010', marcas([1, 'preparada'], [2, 'preparada']), EMPLEADO);
+
+      const r = await servicio.marcar('PC-2026-00010', marcas([3, 'preparada']), { idUsuario: 22 });
+
+      expect(verificarLineasResponseEnvelopeSchema.safeParse({ success: true, data: r }).success).toBe(true);
+      expect(r.avanzo).toBe(true);
+      expect(r.verificacion).toMatchObject({ estado: 'preparada', completa: true });
+      expect(repo.historial).toEqual([
+        { codigo: 'PC-2026-00010', estadoAnterior: 'en_preparacion', estadoNuevo: 'preparada', idUsuarioAutor: 22, motivo: MOTIVO_AVANCE_PREPARADA },
+      ]);
+      expect(eventos.emitirCambioEstado).toHaveBeenCalledWith({
+        codigo: 'PC-2026-00010',
+        idUsuario: 7,
+        estadoAnterior: 'en_preparacion',
+        estadoNuevo: 'preparada',
+        idUsuarioAutor: 22,
+        fecha: AHORA,
+      });
+    });
+
+    it('«marcar todas preparadas» en una sola petición también la mueve', async () => {
+      enPreparacion();
+
+      const r = await servicio.marcar('PC-2026-00010', marcas([1, 'preparada'], [2, 'preparada'], [3, 'preparada']), EMPLEADO);
+
+      expect(r.avanzo).toBe(true);
+      expect(repo.ordenes.get('PC-2026-00010')?.estado).toBe('preparada');
+    });
+
+    it('con una línea consiguiendo stock tras una corrección, no avanza aunque las demás estén preparadas', async () => {
+      enPreparacion();
+
+      const r = await servicio.marcar('PC-2026-00010', marcas([1, 'preparada'], [2, 'preparada'], [3, 'consiguiendo_stock']), EMPLEADO);
+
+      expect(r.avanzo).toBe(false);
+      expect(repo.ordenes.get('PC-2026-00010')?.estado).toBe('en_preparacion');
+    });
+
+    it('con la orden en revisión, marcar preparada responde 409 MARCA_NO_PERMITIDA, lista las líneas y no guarda nada', async () => {
+      await expect(servicio.marcar(CODIGO, marcas([1, 'disponible'], [2, 'preparada']), EMPLEADO)).rejects.toMatchObject({
+        codigo: 'MARCA_NO_PERMITIDA',
+        statusCode: 409,
+        details: { lineas: [2] },
+      });
+
+      expect(repo.escrituras).toBe(0);
+      expect(estadoDeLaOrden()).toBe('revision_disponibilidad');
+    });
+
+    it('completar la disponibilidad y la preparación son dos pasos distintos: una petición no encadena ambos', async () => {
+      const r = await servicio.marcar(CODIGO, marcas([1, 'disponible'], [2, 'disponible'], [3, 'disponible']), EMPLEADO);
+
+      expect(r.verificacion.estado).toBe('en_preparacion');
+      expect(repo.historial).toHaveLength(1);
+    });
+
+    it('si otra persona la cambió justo antes del avance a preparada responde ESTADO_CAMBIADO y no guarda las marcas (R15)', async () => {
+      enPreparacion();
+      repo.perderCarrera = true;
+
+      await expect(
+        servicio.marcar('PC-2026-00010', marcas([1, 'preparada'], [2, 'preparada'], [3, 'preparada']), EMPLEADO),
+      ).rejects.toMatchObject({ codigo: 'ESTADO_CAMBIADO', statusCode: 409 });
+
+      expect(repo.ordenes.get('PC-2026-00010')?.lineas.every((l) => l.registros.length === 0)).toBe(true);
+      expect(repo.ordenes.get('PC-2026-00010')?.estado).toBe('en_preparacion');
+      expect(eventos.emitirCambioEstado).not.toHaveBeenCalled();
+    });
+
+    it('corregir con la orden ya preparada no la devuelve: eso es de M08, con motivo (R6)', async () => {
+      repo.cargar(ordenDe('PC-2026-00011', 'preparada'));
+
+      const r = await servicio.marcar('PC-2026-00011', marcas([1, 'no_disponible']), EMPLEADO);
+
+      expect(r.avanzo).toBe(false);
+      expect(r.verificacion).toMatchObject({ estado: 'preparada', completa: false, lineasSinConfirmar: 1 });
+      expect(repo.historial).toHaveLength(0);
+    });
+  });
+
+  describe('pedir la cancelación cuando falta un producto (R18)', () => {
+    let abiertas: Array<{ idEmpleado: number; codigoOrden: string; motivo: string }>;
+    let conCancelaciones: CumplimientoService;
+
+    beforeEach(() => {
+      abiertas = [];
+      conCancelaciones = new CumplimientoService(repo, eventos, { ahora: () => AHORA }, {
+        solicitarPorTienda: async (idEmpleado, codigoOrden, motivo) => {
+          abiertas.push({ idEmpleado, codigoOrden, motivo });
+          return { codigo: 'DEV-2026-00012', fecha: new Date('2026-10-31T10:00:00Z') };
+        },
+      });
+    });
+
+    it('abre la cancelación con los productos sin stock y la nota, y devuelve la solicitud como iniciada por la tienda (CA-CUM-03-07)', async () => {
+      await servicio.marcar(CODIGO, marcas([1, 'no_disponible'], [2, 'disponible'], [3, 'no_disponible']), EMPLEADO);
+
+      const r = await conCancelaciones.solicitarCancelacion(CODIGO, { nota: 'Llega a fin de mes' }, EMPLEADO);
+
+      expect(solicitarCancelacionResponseEnvelopeSchema.safeParse({ success: true, data: { cancelacion: r } }).success).toBe(true);
+      expect(r).toEqual({ codigo: 'DEV-2026-00012', estado: 'solicitada', iniciadaPor: 'tienda', fecha: '2026-10-31T10:00:00.000Z' });
+      expect(abiertas).toEqual([
+        {
+          idEmpleado: 21,
+          codigoOrden: CODIGO,
+          motivo: 'Sin existencias de: Vinilo Tipo 1, Galón (2 unidades); Rodillo felpa, Unidad (3 unidades).\nNota: Llega a fin de mes',
+        },
+      ]);
+    });
+
+    it('no cancela el pedido ni toca sus marcas: solo pide (D17)', async () => {
+      await servicio.marcar(CODIGO, marcas([1, 'no_disponible']), EMPLEADO);
+      const escrituras = repo.escrituras;
+
+      await conCancelaciones.solicitarCancelacion(CODIGO, {}, EMPLEADO);
+
+      expect(estadoDeLaOrden()).toBe('revision_disponibilidad');
+      expect(repo.escrituras).toBe(escrituras);
+      expect(repo.historial).toHaveLength(0);
+    });
+
+    it('sin ninguna línea no disponible responde 409 SIN_LINEAS_NO_DISPONIBLES y no abre nada', async () => {
+      await servicio.marcar(CODIGO, marcas([1, 'consiguiendo_stock'], [2, 'disponible']), EMPLEADO);
+
+      await expect(conCancelaciones.solicitarCancelacion(CODIGO, {}, EMPLEADO)).rejects.toMatchObject({
+        codigo: 'SIN_LINEAS_NO_DISPONIBLES',
+        statusCode: 409,
+      });
+      expect(abiertas).toHaveLength(0);
+    });
+
+    it.each<EstadoOrden>(['orden_confirmada', 'preparada', 'despachado', 'entregado', 'cancelado', 'devuelto'])(
+      'con la orden en %s responde 409 ORDEN_NO_CANCELABLE y no abre nada',
+      async (estado) => {
+        repo.cargar(ordenDe('PC-2026-00020', estado));
+
+        await expect(conCancelaciones.solicitarCancelacion('PC-2026-00020', {}, EMPLEADO)).rejects.toMatchObject({
+          codigo: 'ORDEN_NO_CANCELABLE',
+          statusCode: 409,
+        });
+        expect(abiertas).toHaveLength(0);
+      },
+    );
+
+    it('también se puede pedir con la orden en preparación si una corrección dejó una línea no disponible', async () => {
+      repo.cargar(ordenDe('PC-2026-00021', 'en_preparacion'));
+      await servicio.marcar('PC-2026-00021', marcas([2, 'no_disponible']), EMPLEADO);
+
+      const r = await conCancelaciones.solicitarCancelacion('PC-2026-00021', {}, EMPLEADO);
+
+      expect(r.codigo).toBe('DEV-2026-00012');
+      expect(abiertas[0]?.motivo).toBe('Sin existencias de: Brocha 4", Unidad (1 unidad).');
+    });
+
+    it('una orden inexistente responde 404 opaco', async () => {
+      await expect(conCancelaciones.solicitarCancelacion('PC-2026-99999', {}, EMPLEADO)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('si M11 rechaza (por ejemplo, ya hay una solicitud en trámite) el error de M11 llega tal cual', async () => {
+      await servicio.marcar(CODIGO, marcas([1, 'no_disponible']), EMPLEADO);
+      const duplicada = new CumplimientoService(repo, eventos, { ahora: () => AHORA }, {
+        solicitarPorTienda: async () => {
+          throw new CumplimientoError('Ya existe una solicitud en trámite.', 'SOLICITUD_DUPLICADA', 409);
+        },
+      });
+
+      await expect(duplicada.solicitarCancelacion(CODIGO, {}, EMPLEADO)).rejects.toMatchObject({ codigo: 'SOLICITUD_DUPLICADA', statusCode: 409 });
+    });
+
+    it('la verificación informa de la cancelación en trámite para que la pantalla oculte el botón (CA-CUM-03-09)', async () => {
+      repo.ordenes.get(CODIGO)!.cancelacion = {
+        codigo: 'DEV-2026-00012',
+        estado: 'solicitada',
+        iniciadaPor: 'tienda',
+        fecha: new Date('2026-10-31T10:00:00Z'),
+      };
+
+      const v = await servicio.verificacion(CODIGO);
+
+      expect(v.cancelacion).toMatchObject({ codigo: 'DEV-2026-00012', iniciadaPor: 'tienda' });
+    });
+  });
+
+  describe('la verificación se consulta en cualquier estado (R4)', () => {
+    it.each<[EstadoOrden, string]>([
+      ['orden_confirmada', 'pendiente'],
+      ['despachado', 'despachada'],
+      ['entregado', 'entregada'],
+      ['cancelado', 'cancelada'],
+      ['devuelto', 'devuelta'],
+    ])('una orden en %s se puede consultar y sus líneas están %s', async (estado, esperado) => {
+      repo.cargar(ordenDe('PC-2026-00030', estado));
+
+      const v = await servicio.verificacion('PC-2026-00030');
+
+      expect(verificacionResponseEnvelopeSchema.safeParse({ success: true, data: v }).success).toBe(true);
+      expect(v.estado).toBe(estado);
+      expect(v.lineas.every((l) => l.estado === esperado)).toBe(true);
+    });
+
+    it('conserva el rastro de quién marcó qué aunque la orden ya salió', async () => {
+      await servicio.marcar(CODIGO, marcas([1, 'no_disponible']), EMPLEADO);
+      await servicio.marcar(CODIGO, marcas([1, 'disponible'], [2, 'disponible'], [3, 'disponible']), { idUsuario: 22 });
+      repo.ordenes.get(CODIGO)!.estado = 'despachado';
+
+      const v = await servicio.verificacion(CODIGO);
+
+      expect(v.lineas[0]?.historial.map((h) => [h.estado, h.autor])).toEqual([
+        ['no_disponible', 'Luis Gómez'],
+        ['disponible', 'Marta Ruiz'],
+      ]);
+      expect(v.lineas[0]?.estado).toBe('despachada');
     });
   });
 

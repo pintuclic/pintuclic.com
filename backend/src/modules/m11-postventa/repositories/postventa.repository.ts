@@ -74,6 +74,8 @@ export interface PostventaRepositoryPort {
       totalReembolso: number;
       datosBancarios?: DatosBancariosInput | undefined;
       evidenciaUrls?: string[] | undefined;
+      /** M11 R-POS-A: el empleado que la abrió en nombre de la tienda; sin valor = la pidió el cliente. */
+      idEmpleadoInicia?: number | undefined;
       lineas: Array<{
         idLineaOrden: number;
         cantidad: number;
@@ -237,6 +239,8 @@ export class PrismaPostventaRepository implements PostventaRepositoryPort {
       totalReembolso: number;
       datosBancarios?: DatosBancariosInput | undefined;
       evidenciaUrls?: string[] | undefined;
+      /** M11 R-POS-A: el empleado que la abrió en nombre de la tienda; sin valor = la pidió el cliente. */
+      idEmpleadoInicia?: number | undefined;
       lineas: Array<{
         idLineaOrden: number;
         cantidad: number;
@@ -258,6 +262,7 @@ export class PrismaPostventaRepository implements PostventaRepositoryPort {
         estado: datos.estado,
         motivoGeneral: datos.motivoGeneral,
         totalReembolso: datos.totalReembolso,
+        idEmpleadoInicia: datos.idEmpleadoInicia ?? null,
         datosBancarios: datos.datosBancarios ? (datos.datosBancarios as Prisma.InputJsonValue) : Prisma.JsonNull,
         evidenciaUrls: datos.evidenciaUrls ? (datos.evidenciaUrls as Prisma.InputJsonValue) : Prisma.JsonNull,
         lineas: {
@@ -273,8 +278,8 @@ export class PrismaPostventaRepository implements PostventaRepositoryPort {
           create: {
             estadoAnterior: null,
             estadoNuevo: datos.estado,
-            idUsuarioAutor: datos.idUsuario,
-            motivo: 'Solicitud radicada por el cliente',
+            idUsuarioAutor: datos.idEmpleadoInicia ?? datos.idUsuario,
+            motivo: datos.idEmpleadoInicia ? 'Solicitud radicada por la tienda' : 'Solicitud radicada por el cliente',
           },
         },
       },

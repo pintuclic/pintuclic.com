@@ -105,7 +105,14 @@ export class PrismaGestionRepository implements GestionRepository {
       where: { codigoVisible: codigo },
       include: {
         usuario: { select: { idUsuario: true, nombre: true, correo: true, telefono: true } },
-        lineas: { orderBy: { idLineaOrden: 'asc' }, include: { descuentos: true } },
+        lineas: {
+          orderBy: { idLineaOrden: 'asc' },
+          include: {
+            descuentos: true,
+            // R15: solo importa la última marca de M09.
+            verificaciones: { orderBy: { idVerificacionLineaOrden: 'desc' }, take: 1, select: { estado: true } },
+          },
+        },
         historial: {
           orderBy: [{ fecha: 'asc' }, { idHistorialEstadoOrden: 'asc' }],
           include: { autor: { select: { nombre: true } } },
@@ -147,6 +154,7 @@ export class PrismaGestionRepository implements GestionRepository {
         precioInicial: linea.precioInicial?.toNumber() ?? null,
         precioAplicado: linea.precioAplicado.toNumber(),
         idVarianteRef: linea.idVarianteRef,
+        ultimaMarca: linea.verificaciones[0]?.estado ?? null,
         esEntonado: linea.esEntonado,
         baseConsumida: linea.baseConsumida,
         descuentos: linea.descuentos.map((d) => ({

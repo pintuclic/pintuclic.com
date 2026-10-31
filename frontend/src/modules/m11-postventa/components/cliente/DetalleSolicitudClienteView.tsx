@@ -82,6 +82,7 @@ export function DetalleSolicitudClienteView({ codigo }: { codigo: string }) {
                     <p className="text-xs text-neutral-medium">
                       Radicada el {formatearFecha(solicitud.fechaSolicitud)} ·{' '}
                       {ETIQUETA_TIPO_POSTVENTA[solicitud.tipo]}
+                      {solicitud.iniciadaPor === 'tienda' ? ' · La abrió la tienda' : ''}
                     </p>
                   </div>
                   <EstadoPostventaBadge estado={solicitud.estado} />

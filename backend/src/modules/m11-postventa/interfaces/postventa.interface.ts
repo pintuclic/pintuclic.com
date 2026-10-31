@@ -18,6 +18,16 @@ export interface PostventaServicePort {
     input: SolicitarCancelacionRequest
   ): Promise<SolicitudPostventaDetalle>;
 
+  /**
+   * R-POS-A (contrato de M11, revisión 2026-10-31): la tienda abre una cancelación en nombre del cliente dueño del pedido
+   * (M09 R18). Mismas reglas de estado y unicidad que la del cliente; no lleva datos bancarios.
+   */
+  solicitarCancelacionPorTienda(
+    idEmpleado: number,
+    codigoOrden: string,
+    motivo: string
+  ): Promise<SolicitudPostventaDetalle>;
+
   solicitarDevolucion(
     idUsuario: number,
     input: SolicitarDevolucionRequest

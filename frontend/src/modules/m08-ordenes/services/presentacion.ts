@@ -1,6 +1,13 @@
 import type { BadgeVariant } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
-import { ESTADOS_FINALIZADOS, ESTADOS_ORDEN, type EstadoOrden, type ModoEntrega } from '../dtos/m08-ordenes.dto';
+import {
+  ESTADOS_FINALIZADOS,
+  ESTADOS_ORDEN,
+  type DisponibilidadCliente,
+  type EstadoLinea,
+  type EstadoOrden,
+  type ModoEntrega,
+} from '../dtos/m08-ordenes.dto';
 
 /** Estados que esperan atención del personal, en el orden del ciclo (los de la bandeja y su contador). */
 export const ESTADOS_EN_CURSO: readonly EstadoOrden[] = ESTADOS_ORDEN.filter((e) => !ESTADOS_FINALIZADOS.includes(e));
@@ -15,6 +22,54 @@ export const ETIQUETA_ESTADO: Record<EstadoOrden, string> = {
   cancelado: 'Cancelado',
   devuelto: 'Devuelto',
 };
+
+/** Estado de cada producto del pedido, como lo lee el personal (contrato de M08, R15). */
+export const ETIQUETA_ESTADO_LINEA: Record<EstadoLinea, string> = {
+  pendiente: 'Sin revisar',
+  disponible: 'Disponible',
+  consiguiendo_stock: 'Consiguiendo stock',
+  no_disponible: 'No disponible',
+  preparada: 'Preparada',
+  despachada: 'Despachada',
+  entregada: 'Entregada',
+  cancelada: 'Cancelada',
+  devuelta: 'Devuelta',
+};
+
+/** Rojo lo que falta, ámbar lo que se está consiguiendo, verde lo que ya salió bien, gris lo que aún no se mira. */
+export function varianteEstadoLinea(estado: EstadoLinea): BadgeVariant {
+  switch (estado) {
+    case 'disponible':
+    case 'preparada':
+    case 'despachada':
+    case 'entregada':
+      return 'success';
+    case 'consiguiendo_stock':
+      return 'sponsored';
+    case 'no_disponible':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
+/** Lo que el cliente lee de cada producto de su pedido (contrato de M08, R16). */
+export const ETIQUETA_DISPONIBILIDAD: Record<DisponibilidadCliente, string> = {
+  verificando_disponibilidad: 'Verificando disponibilidad',
+  confirmado: 'Confirmado',
+  rechazado: 'Rechazado',
+};
+
+export function varianteDisponibilidad(disponibilidad: DisponibilidadCliente): BadgeVariant {
+  switch (disponibilidad) {
+    case 'confirmado':
+      return 'success';
+    case 'rechazado':
+      return 'danger';
+    default:
+      return 'sponsored';
+  }
+}
 
 export const ETIQUETA_MODO_ENTREGA: Record<ModoEntrega, string> = {
   domicilio: 'Envío a domicilio',

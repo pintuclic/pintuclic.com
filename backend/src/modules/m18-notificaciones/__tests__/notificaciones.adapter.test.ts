@@ -153,6 +153,103 @@ describe('SmtpNotificacionesAdapter · Envío de correos transaccionales por SMT
     expect(args.html).not.toContain('<b>Laura</b>');
   });
 
+  describe('M11 · R-POS-B: aviso de pedido cancelado', () => {
+    const datos = {
+      nombre: 'Laura',
+      codigoOrden: 'PC-2026-00001',
+      motivo: 'Sin existencias de: Vinilo Blanco, Galón (2 unidades).\nNota: Llega a fin de mes',
+      origen: 'tienda' as const,
+    };
+
+    it('lleva el código, el motivo con sus saltos de línea y la frase del reembolso, sin importes ni enlace de pago', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter);
+
+      await adapter.notificarOrdenCancelada('cliente@gmail.com', datos);
+
+      expect(sendMailMock).toHaveBeenCalledOnce();
+      const args = sendMailMock.mock.calls[0]?.[0];
+      expect(args.to).toBe('cliente@gmail.com');
+      expect(args.subject).toBe('Tu pedido fue cancelado · Pintu Clic');
+      expect(args.text).toContain('Pedido: PC-2026-00001');
+      expect(args.text).toContain('Motivo: Sin existencias de: Vinilo Blanco, Galón (2 unidades).\nNota: Llega a fin de mes');
+      expect(args.text).toContain('nuestro equipo se pondrá en contacto contigo para gestionar el reembolso');
+      expect(args.html).toContain('Sin existencias de: Vinilo Blanco, Galón (2 unidades).<br/>Nota: Llega a fin de mes');
+      expect(`${args.text}${args.html}`).not.toMatch(/\$|total|precio|tarjeta|cuenta bancaria/i);
+    });
+
+    it('si fue el cliente quien la pidió, el motivo se presenta como suyo', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter);
+
+      await adapter.notificarOrdenCancelada('cliente@gmail.com', { ...datos, origen: 'cliente', motivo: 'Me equivoqué de color' });
+
+      const args = sendMailMock.mock.calls[0]?.[0];
+      expect(args.text).toContain('Motivo que indicaste: Me equivoqué de color');
+    });
+
+    it('escapa el nombre y el motivo: nada de lo que escribió el personal o el cliente se ejecuta como HTML', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter);
+
+      await adapter.notificarOrdenCancelada('cliente@gmail.com', {
+        ...datos,
+        nombre: '<b>Laura</b>',
+        motivo: '<script>alert("x")</script>',
+      });
+
+      const args = sendMailMock.mock.calls[0]?.[0];
+      expect(args.html).not.toContain('<script>');
+      expect(args.html).not.toContain('<b>Laura</b>');
+      expect(args.html).toContain('&lt;script&gt;');
+    });
+
+    it('usa el asunto y la introducción que el administrador editó, y deja fijos el motivo y el reembolso', async () => {
+      const { transporter, sendMailMock } = crearTransporteMock();
+      const plantillas = {
+        obtenerPorTipo: vi.fn().mockResolvedValue({
+          tipo: 'orden_cancelada',
+          asunto: 'Cancelamos tu pedido',
+          contenidoTexto: 'Lamentamos informarte lo siguiente.',
+          fechaActualizacion: new Date(),
+        }),
+      } as unknown as PlantillasRepositoryPort;
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter, undefined, undefined, plantillas);
+
+      await adapter.notificarOrdenCancelada('cliente@gmail.com', datos);
+
+      const args = sendMailMock.mock.calls[0]?.[0];
+      expect(args.subject).toBe('Cancelamos tu pedido');
+      expect(args.text).toContain('Lamentamos informarte lo siguiente.');
+      expect(args.text).toContain('Pedido: PC-2026-00001');
+      expect(args.text).toContain('reembolso');
+    });
+
+    it('queda registrado como «orden_cancelada» en el registro de envíos', async () => {
+      const { transporter } = crearTransporteMock();
+      const { registro, registrarResultadoMock } = crearRegistroMock();
+      const adapter = new SmtpNotificacionesAdapter(configBase, transporter, registro);
+
+      await adapter.notificarOrdenCancelada('cliente@gmail.com', datos);
+
+      expect(registrarResultadoMock).toHaveBeenCalledWith(expect.objectContaining({ tipo: 'orden_cancelada', estado: 'enviado' }));
+    });
+
+    it('el adaptador en memoria deja el aviso con sus datos, para las pruebas de los módulos', async () => {
+      const memoria = new MemoriaNotificacionesAdapter();
+
+      await memoria.notificarOrdenCancelada('cliente@gmail.com', datos);
+
+      expect(memoria.obtenerEventos()).toEqual([
+        expect.objectContaining({ tipo: 'orden_cancelada', destinatario: 'cliente@gmail.com', metadatos: datos }),
+      ]);
+    });
+
+    it('el adaptador apagado no envía nada', async () => {
+      await expect(new NoOpNotificacionesAdapter().notificarOrdenCancelada()).resolves.toBeUndefined();
+    });
+  });
+
   it('selecciona el adaptador correcto según las variables de entorno', () => {
     const { transporter } = crearTransporteMock();
 
