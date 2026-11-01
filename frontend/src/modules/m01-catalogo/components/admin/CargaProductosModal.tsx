@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Download, FileSpreadsheet } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Download, FileSpreadsheet, Plus, X } from 'lucide-react';
 import { Alert, Badge, Button, Checkbox, FileInput, Modal, type BadgeVariant } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
 import { MAXIMO_FILAS_ARCHIVO_PRODUCTOS, type FilaProductoCarga, type ProductoCarga } from '../../dtos/m01-catalogo-carga-masiva.dto';
+import { MAXIMO_IMAGENES_PRODUCTO } from '../../dtos/m01-catalogo-productos.dto';
 import {
   armarInformeProductos,
   cargaProductosApi,
@@ -13,7 +14,9 @@ import {
   NOMBRE_PLANTILLA_PRODUCTOS,
   type ResultadoCarga,
 } from '../../services/carga-productos-api';
-import { conAlgoQueRevisar } from '../../services/carga-productos-bloques';
+import { leerImagen, validarImagen } from '../../services/archivos';
+import { imagenesApi } from '../../services/catalogo-api';
+import { claveDeProducto, conAlgoQueRevisar } from '../../services/carga-productos-bloques';
 import { leerLibroProductos, LibroInvalidoError, type LecturaLibro } from '../../services/carga-productos';
 import { leerErrorCatalogo } from '../../services/mensaje-error';
 
@@ -34,9 +37,40 @@ const ETIQUETA: Record<ProductoCarga['resultado'], { texto: string; variante: Ba
 
 const plural = (n: number, uno: string, varios: string): string => `${n} ${n === 1 ? uno : varios}`;
 
-const TarjetaProducto: React.FC<{ producto: ProductoCarga }> = ({ producto }) => {
+/** Miniatura de una imagen elegida; libera su URL temporal al quitarse. */
+const Miniatura: React.FC<{ archivo: File; esPrincipal: boolean; onQuitar: () => void }> = ({ archivo, esPrincipal, onQuitar }) => {
+  const url = useMemo(() => URL.createObjectURL(archivo), [archivo]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  return (
+    <li className="relative h-16 w-16 overflow-hidden rounded-card border border-neutral-light">
+      {/* eslint-disable-next-line @next/next/no-img-element -- vista previa local (blob:) */}
+      <img src={url} alt={archivo.name} className="h-full w-full object-cover" />
+      {esPrincipal && <span className="absolute bottom-0 left-0 right-0 bg-corporate/80 text-center text-[10px] text-neutral-white">Principal</span>}
+      <button
+        type="button"
+        onClick={onQuitar}
+        aria-label={`Quitar ${archivo.name}`}
+        className="absolute right-0 top-0 rounded-bl bg-neutral-black/70 p-0.5 text-neutral-white"
+      >
+        <X className="h-3 w-3" aria-hidden="true" />
+      </button>
+    </li>
+  );
+};
+
+interface TarjetaProps {
+  producto: ProductoCarga;
+  /** Imágenes elegidas para este producto; solo se pueden cambiar mientras el producto está por crear. */
+  imagenes: File[];
+  editable: boolean;
+  onAgregar: (archivos: File[]) => void;
+  onQuitar: (indice: number) => void;
+}
+
+const TarjetaProducto: React.FC<TarjetaProps> = ({ producto, imagenes, editable, onAgregar, onQuitar }) => {
   const etiqueta = ETIQUETA[producto.resultado];
   const conError = producto.resultado === 'rechazado';
+  const entrada = useRef<HTMLInputElement>(null);
   return (
     <li className={`rounded-card border p-3 ${conError ? 'border-danger bg-danger/5' : 'border-neutral-light bg-neutral-white'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -68,6 +102,40 @@ const TarjetaProducto: React.FC<{ producto: ProductoCarga }> = ({ producto }) =>
           </li>
         ))}
       </ul>
+      {(editable || imagenes.length > 0) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <ul className="flex flex-wrap gap-2" aria-label={`Imágenes de ${producto.producto}`}>
+            {imagenes.map((archivo, i) => (
+              <Miniatura key={`${archivo.name}-${archivo.size}-${i}`} archivo={archivo} esPrincipal={i === 0} onQuitar={() => onQuitar(i)} />
+            ))}
+          </ul>
+          {editable && imagenes.length < MAXIMO_IMAGENES_PRODUCTO && (
+            <>
+              <button
+                type="button"
+                onClick={() => entrada.current?.click()}
+                aria-label={`Agregar imágenes a ${producto.producto}`}
+                title="Agregar imágenes"
+                className="flex h-16 w-16 items-center justify-center rounded-card border-2 border-dashed border-neutral-medium text-neutral-medium transition-colors hover:border-action hover:text-action"
+              >
+                <Plus className="h-6 w-6" aria-hidden="true" />
+              </button>
+              <input
+                ref={entrada}
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                tabIndex={-1}
+                onChange={(e) => {
+                  onAgregar(Array.from(e.target.files ?? []));
+                  e.target.value = '';
+                }}
+              />
+            </>
+          )}
+        </div>
+      )}
     </li>
   );
 };
@@ -86,6 +154,9 @@ export const CargaProductosModal: React.FC<CargaProductosModalProps> = ({ onClos
   const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
   const [descargando, setDescargando] = useState(false);
   const [soloErrores, setSoloErrores] = useState(false);
+  // Imágenes elegidas por producto (clave marca+producto). Se suben después de crearlos, cuando ya tienen id.
+  const [imagenes, setImagenes] = useState<Record<string, File[]>>({});
+  const [avisosImagenes, setAvisosImagenes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const ocupado = trabajo !== null;
@@ -121,6 +192,8 @@ export const CargaProductosModal: React.FC<CargaProductosModalProps> = ({ onClos
     setResultado(null);
     setError(null);
     setSoloErrores(false);
+    setImagenes({});
+    setAvisosImagenes([]);
     if (nuevo === null) return;
     setTrabajo('leyendo');
     try {
@@ -134,12 +207,44 @@ export const CargaProductosModal: React.FC<CargaProductosModalProps> = ({ onClos
     }
   };
 
+  const agregarImagenes = (clave: string, nuevas: File[]) => {
+    const problemas: string[] = [];
+    const validas = nuevas.filter((f) => {
+      const invalido = validarImagen(f);
+      if (invalido !== null) problemas.push(`${f.name}: ${invalido}`);
+      return invalido === null;
+    });
+    setAvisosImagenes(problemas);
+    setImagenes((previas) => ({ ...previas, [clave]: [...(previas[clave] ?? []), ...validas].slice(0, MAXIMO_IMAGENES_PRODUCTO) }));
+  };
+
+  const quitarImagen = (clave: string, indice: number) =>
+    setImagenes((previas) => ({ ...previas, [clave]: (previas[clave] ?? []).filter((_, i) => i !== indice) }));
+
+  /** Sube las imágenes elegidas a cada producto ya creado, de a una. La primera queda como principal. */
+  const subirImagenes = async (productos: readonly ProductoCarga[]) => {
+    const problemas: string[] = [];
+    for (const p of productos) {
+      if (p.resultado !== 'creado' || p.idProducto === null) continue;
+      for (const archivo of imagenes[claveDeProducto(p)] ?? []) {
+        try {
+          await imagenesApi.subir(p.idProducto, await leerImagen(archivo));
+        } catch (err: unknown) {
+          problemas.push(`${p.producto} · ${archivo.name}: ${leerErrorCatalogo(err, 'no se pudo subir').message}`);
+        }
+      }
+    }
+    setAvisosImagenes(problemas);
+  };
+
   const cargar = async () => {
     if (lectura === null) return;
     setError(null);
     setTrabajo('cargando');
     try {
-      setResultado(await cargaProductosApi.aplicar(lectura.filas, (hechos, total) => setProgreso({ hechos, total })));
+      const aplicada = await cargaProductosApi.aplicar(lectura.filas, (hechos, total) => setProgreso({ hechos, total }));
+      setResultado(aplicada);
+      await subirImagenes(aplicada.productos);
     } catch (err: unknown) {
       setError(leerErrorCatalogo(err, 'No se pudo completar la carga. Revise cuáles productos se crearon antes de repetirla.').message);
     } finally {
@@ -265,13 +370,29 @@ export const CargaProductosModal: React.FC<CargaProductosModalProps> = ({ onClos
             ) : (
               <ul className="max-h-96 space-y-2 overflow-y-auto pr-1" aria-label="Productos de la carga">
                 {visibles.map((p) => (
-                  <TarjetaProducto key={`${p.marca}|${p.producto}`} producto={p} />
+                  <TarjetaProducto
+                    key={claveDeProducto(p)}
+                    producto={p}
+                    imagenes={imagenes[claveDeProducto(p)] ?? []}
+                    editable={resultado === null && p.resultado === 'por_crear' && !ocupado}
+                    onAgregar={(archivos) => agregarImagenes(claveDeProducto(p), archivos)}
+                    onQuitar={(i) => quitarImagen(claveDeProducto(p), i)}
+                  />
                 ))}
               </ul>
             )}
+            {avisosImagenes.length > 0 && (
+              <Alert variant="warning" title={resultado !== null ? 'Algunas imágenes no se subieron: agréguelas desde el producto' : 'Imágenes que no se pueden usar'}>
+                <ul className="list-disc pl-5">
+                  {avisosImagenes.slice(0, FILAS_DE_ERROR_VISIBLES).map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+              </Alert>
+            )}
             {resultado !== null && resultado.balance.productosNuevos > 0 && (
               <Alert variant="info">
-                Los productos nacen sin publicar y con existencia 0. Agregue sus imágenes y publíquelos desde cada producto.
+                Los productos nacen sin publicar y con existencia 0. Los que no tienen imagen necesitan una antes de publicarse: agréguela desde cada producto.
               </Alert>
             )}
           </section>
