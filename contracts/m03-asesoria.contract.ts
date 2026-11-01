@@ -32,8 +32,9 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *            área cubre una cantidad (`cobertura`). En `cantidad` el área no se escribe:
  *            se toman las medidas de la superficie y se calcula (K12-K14).
  *  HU-ASE-03 Simulador virtual de color: el color elegido en el abanico, aplicado a las
- *            paredes de unos ambientes ilustrados que trae el propio sitio, en varios
- *            puntos de vista. NUNCA recibe fotos del usuario (HU-ASE-07 sigue retirada).
+ *            paredes de unos ambientes de muestra —fotografías propias del sitio, con la
+ *            pared transparente—, en varios puntos de vista. NUNCA recibe fotos del
+ *            usuario (HU-ASE-07 sigue retirada).
  *            Ocupa la pestaña «En tu espacio» que M01 dejó reservada (M01 · P6).
  *  HU-ASE-05 Asistente virtual: responde las necesidades del cliente sobre pintura,
  *            preparación de superficies, aplicación y productos del catálogo, y sugiere
@@ -52,8 +53,11 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *      idea, E1-E3 ya están entregados y funcionando.
  *  E5  Simulador de color (HU-ASE-03), acordado con el Tech Lead el 2026-10-29, después de
  *      E1-E4. Entra entero en el frontend: no añade endpoints, ni tablas, ni llamadas a la
- *      IA, y no depende de fotos ni de contenido externo, porque los ambientes se dibujan
- *      por código (S3).
+ *      IA.
+ *      CAMBIO 2026-10-31 (S3, S4, S12, Q12): el PO decidió sustituir las ilustraciones SVG
+ *      por fotografías de ambientes con la pared transparente, tomadas del repositorio
+ *      anterior. Siguen siendo del sitio —ninguna es del usuario—, pero el simulador vuelve a
+ *      depender de archivos de imagen. El visto bueno del Tech Lead se da al revisar el PR.
  *
  * ── Qué NO hace ─────────────────────────────────────────────────────────────
  *  · No implementa `EscalamientoConsultasPort` de M15, ni cola, ni criterio de escalamiento,
@@ -64,8 +68,8 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *  · No construye HU-ASE-04 (correspondencia entre color simulado y catálogo): queda fuera
  *    de este contrato, tal como estaba.
  *  · El simulador no repinta muebles, pisos, techos ni carpintería: solo las paredes. Todo
- *    lo demás de la ilustración son tonos fijos (S3). No hay fotografías, ni propias ni del
- *    usuario.
+ *    lo demás de la foto queda como es (S3). Las fotografías son las del propio sitio (S12);
+ *    ninguna es del usuario.
  *  · No filtra ni pagina el catálogo por su cuenta: el botón del cuestionario lleva al
  *    catálogo de M02, que ya resuelve filtros, orden y páginas.
  *  · No crea ni edita productos, variantes, medidas ni rendimientos: eso es de M01. M03
@@ -298,7 +302,7 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *
  * ── Reglas del simulador de color (HU-ASE-03) ───────────────────────────────
  *  S1  QUÉ ES. Una vista del color YA ELEGIDO en el abanico, pintado sobre las paredes de
- *      unos ambientes ilustrados que vienen con el sitio. No es una herramienta de
+ *      unos ambientes de muestra, fotografías que vienen con el sitio. No es una herramienta de
  *      diseño: no se eligen colores libres, no se suben fotos y no se pinta a mano.
  *      La entrada es un `ColorPaleta` de M01; no hay ninguna otra.
  *  S2  DÓNDE VIVE. Reemplaza el componente `AmbientesColor` de la pestaña «En tu espacio»
@@ -306,34 +310,34 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *      de M03 y le pasa el color, sin tocar nada más de su página. Mismo trato que la
  *      calculadora en la ficha de producto (K15). Sin color elegido, el simulador dibuja la
  *      invitación a elegir uno y nada más.
- *  S3  CÓMO SE DIBUJA. Cada ambiente es una ILUSTRACIÓN SVG hecha por código, un componente
- *      de React, y se pinta en el navegador. La pared es una forma con `fill` igual al color
- *      elegido; encima van capas de luz y sombra (degradados semitransparentes) para que no
- *      se vea plana; el piso, los muebles y las ventanas son tonos neutros fijos que NO
- *      cambian con el color. Cambiar de color es cambiar un atributo: sin red, sin
- *      imágenes que descargar y sin servidor.
- *      **Por qué SVG y no canvas:** el SVG es declarativo, escala sin perder nitidez, lleva
- *      su propio texto accesible (`role="img"` y `aria-label`) y se puede comprobar en las
- *      pruebas como cualquier otro componente. El canvas es un lienzo mudo: habría que
- *      redibujarlo a mano en cada cambio y sin nada que un lector de pantalla pueda leer.
+ *  S3  CÓMO SE PINTA. Cada ambiente es una FOTOGRAFÍA con la pared TRANSPARENTE: un archivo
+ *      WebP con canal alfa, propio del sitio (S12). El color elegido se aplica como
+ *      `background-color` del `<img>` y se ve a través de la pared; los muebles, el piso, las
+ *      ventanas y los objetos son píxeles opacos que NO cambian con el color. Las sombras y
+ *      las luces de la pared son píxeles semitransparentes de la propia foto, de modo que el
+ *      color no queda plano. No se usa `mix-blend-mode` ni capas encima de la foto. Cambiar
+ *      de color es cambiar un atributo de estilo: sin canvas, sin servidor y sin volver a
+ *      pedir la imagen.
+ *      **Por qué `background-color` y no canvas:** es declarativo, no hay nada que redibujar
+ *      en cada cambio y el `<img>` lleva su propio texto accesible (`alt`).
  *      **Por qué en el navegador y no en el servidor**, habiendo `sharp`: la gracia es ir
  *      saltando de color en color y ver el cambio al instante. Una petición por color pone
  *      una espera en el único momento que importa.
- *  S4  CONSECUENCIA CONOCIDA, Y SE DICE: es una ilustración, no una fotografía. El mockup de
- *      Pintuco muestra una foto real; esto se verá como un dibujo limpio de una habitación.
- *      Es el precio de no depender de fotos ni de nadie que las produzca. La luz se modela
- *      con capas blancas y negras de poca opacidad —no con mezclas que oscurezcan el
- *      color—, de modo que un tono claro sigue viéndose claro y uno oscuro, oscuro. El PO
- *      valida el aspecto cuando lo vea (Q12), igual que valida los guiones del asistente.
+ *  S4  CONSECUENCIA CONOCIDA, Y SE DICE: la calidad depende de la foto. El color solo se ve
+ *      donde la foto es transparente: una pared mal recortada deja un borde, o un resto del
+ *      tono original, y las sombras semitransparentes se mezclan con el color elegido, así
+ *      que un tono muy oscuro o muy claro puede verse algo distinto de su hexadecimal. Por
+ *      eso existe el aviso fijo de S7. Es el precio de volver a las fotos (Q12); a cambio
+ *      el resultado se acerca al mockup de Pintuco. El PO valida el aspecto cuando lo vea.
  *  S5  LOS AMBIENTES. Lista fija y ordenada, declarada en el módulo (`services/ambientes.ts`),
  *      igual que las superficies de la calculadora (K13): contenido sin regla de negocio que
  *      no merece tabla ni endpoint. Cada ambiente lleva `id`, nombre visible, `tipo`
- *      (`interior` | `exterior`) y texto alternativo; el dibujo es un componente asociado a
- *      ese `id`. Son PUNTOS DE VISTA de espacios de una casa: una misma sala vista de frente
- *      y desde una esquina cuenta como dos. Añadir uno es una entrada en la lista y un
- *      componente, nada más (Q11).
- *  S6  EL SELECTOR DE PUNTO DE VISTA. Bajo la imagen, una fila de miniaturas con el rótulo
- *      «Selecciona el ambiente:». Cada miniatura es el MISMO dibujo en pequeño, ya pintado con
+ *      (`interior` | `exterior`) y texto alternativo, más la ruta de su foto (`imagen`) y la
+ *      parte de ella que se conserva al recortarla a la caja de la vista (`encuadre`). Son
+ *      ESPACIOS de una casa: sala, cocina, habitación, baño y fachada. Añadir uno es una
+ *      entrada en la lista y una foto en `public/images/ambientes/`, nada más (Q11).
+ *  S6  EL SELECTOR DE AMBIENTE. Bajo la imagen, una fila de miniaturas con el rótulo
+ *      «Selecciona el ambiente:». Cada miniatura es la MISMA foto en pequeño, ya pintada con
  *      el color elegido, de modo que se ve cómo quedaría en cada vista antes de entrar en
  *      ella. Es un GRUPO DE RADIO de verdad: `<input type="radio">` ocultos con `sr-only`
  *      dentro de etiquetas con estilo, como las tarjetas de superficie de la calculadora. El
@@ -347,8 +351,9 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *  S8  EL COLOR SIEMPRE IDENTIFICADO. En una esquina de la imagen, el nombre y el código del
  *      color («Sol De La Tarde · NRO96T»), para que no haya duda de qué se está mirando. El
  *      rótulo se lee sobre su propio color con el contraste del core (S11).
- *  S9  ACCESIBILIDAD Y MOVIMIENTO. Cada dibujo es `role="img"` con un `aria-label` que dice
- *      el espacio y el color («Sala de frente, pintada en Sol De La Tarde»). El cambio de
+ *  S9  ACCESIBILIDAD Y MOVIMIENTO. La foto grande es un `<img>` con un `alt` que dice el
+ *      espacio y el color («Sala con un sofá, con las paredes pintadas en Sol De La Tarde»);
+ *      las miniaturas llevan `alt=""` porque ya tienen su nombre visible. El cambio de
  *      color se anima con una transición corta que se apaga con `prefers-reduced-motion`.
  *      Si el color no fuera un `#RRGGBB` válido no se pinta nada y se muestra la invitación
  *      a elegir uno (S2): la paleta tiene que seguir funcionando pase lo que pase.
@@ -358,6 +363,15 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *  S11 LO ÚNICO QUE NECESITA DE FUERA. El ayudante de contraste del core (`colorDeTexto`),
  *      para que el rótulo de S8 se lea sobre cualquier color. Hoy vive en M01 y M03 no puede
  *      importarlo (ver «Fuera del módulo»).
+ *  S12 LAS FOTOS. Cinco WebP de 1024 × 1024 con canal alfa en `frontend/public/images/
+ *      ambientes/`: `sala`, `cocina`, `habitacion`, `bano` y `fachada`. El alfa se exporta SIN
+ *      pérdida: es lo que deja pasar el color, y una foto aplanada dejaría de pintarse sin
+ *      avisar. Una prueba comprueba que cada archivo existe y conserva el alfa. Pesan ≈1 MB
+ *      en conjunto. Salieron de los PNG del repositorio anterior (`pintuclic`, rama `develop`,
+ *      `m01-catalogo/assets/ambientes`), convertidos a WebP: frente al PNG, la diferencia
+ *      media de color es menor de 1,3 sobre 255 y la del alfa es cero.
+ *      ⚠️ La procedencia y la licencia de esas fotos no constan: el walkthrough del
+ *      repositorio anterior las llama «PNG editados» a partir de fotografías (Q13).
  *
  * ── Reglas del asistente (HU-ASE-05) ────────────────────────────────────────
  *  H1  Público, sin sesión. El servidor no guarda la conversación: el frontend envía el
@@ -542,10 +556,15 @@ import { ambienteSchema, productoPublicoTarjetaSchema } from './m01-catalogo-pro
  *      mockup enseña siete miniaturas. Como se dibujan por código, cada uno cuesta un
  *      componente: si el PO quiere más o distintos, se piden por su nombre.
  *      RESUELTA 2026-10-29: el PO no especificó cuántos y se construyeron esos seis.
- *  Q12 SIMULADOR · Aspecto. El mockup muestra una fotografía y esto será una ilustración (S4).
- *      El PO debe ver el resultado y decir si le sirve; si exige fotografía, cambia el
- *      contrato entero, porque vuelve la dependencia de fotos y máscaras que este diseño
- *      evita a propósito.
+ *      CAMBIADA 2026-10-31: con las fotografías (S12) son cinco espacios —sala, cocina,
+ *      habitación, baño y fachada— y los seis dibujos SVG se retiran.
+ *  Q12 SIMULADOR · Aspecto. El mockup muestra una fotografía y esto era una ilustración.
+ *      RESUELTA 2026-10-31: el PO exigió fotografía. El contrato cambió en S1, S3-S6, S9 y S12
+ *      y se retiró la ilustración. Es el costo que esta pregunta advertía: vuelve la
+ *      dependencia de fotos y de paredes transparentes, asumida a propósito.
+ *  Q13 SIMULADOR · Procedencia y licencia de las cinco fotos (S12). Vienen del repositorio
+ *      anterior y no consta quién las produjo ni con qué permiso se publican. El PO o el Tech
+ *      Lead deben confirmarlo antes de desplegar. ABIERTA.
  *  Q10 El PO dice que M02 ya corrigió sus filtros, pero `origin/main` (324a947, 2026-10-26) no
  *      trae ningún cambio de M02 posterior al PR #62 y `idAcabado` no existe en su contrato ni
  *      en su código. Si la corrección está en una rama sin fusionar, hay que fusionarla antes
@@ -1119,20 +1138,29 @@ export const ADVERTENCIA_SIMULADOR =
 export const tipoAmbienteSimuladorSchema = z.enum(['interior', 'exterior']);
 export type TipoAmbienteSimulador = z.infer<typeof tipoAmbienteSimuladorSchema>;
 
+/** S5: qué parte de la foto se conserva cuando se recorta a la caja de la vista. */
+export const encuadreAmbienteSimuladorSchema = z.enum(['arriba', 'centro', 'abajo']);
+export type EncuadreAmbienteSimulador = z.infer<typeof encuadreAmbienteSimuladorSchema>;
+
 /**
  * S5 — Un ambiente de muestra. Es contenido fijo del módulo, no un recurso de la API.
  *
- * El dibujo NO se declara aquí: es un componente de React asociado a este `id` (S3). Esta
- * forma solo fija lo que hace falta para listarlo, seleccionarlo y describirlo.
+ * La foto se declara por su ruta pública (`imagen`, S12); el color lo aplica el navegador
+ * sobre su pared transparente (S3). Esta forma fija lo que hace falta para listarlo,
+ * seleccionarlo, describirlo y mostrarlo.
  */
 export const ambienteSimuladorSchema = z.object({
-  /** Clave estable del punto de vista: `sala-frente`, `alcoba`, `fachada`. */
+  /** Clave estable del espacio: `sala`, `cocina`, `fachada`. */
   id: z.string().regex(/^[a-z0-9-]+$/),
-  /** Nombre visible bajo la miniatura: «Sala», «Alcoba», «Fachada». */
+  /** Nombre visible bajo la miniatura: «Sala», «Baño», «Fachada». */
   nombre: z.string().min(1),
   tipo: tipoAmbienteSimuladorSchema,
-  /** Describe el espacio y el punto de vista, no el color: el color lo añade el simulador (S9). */
+  /** Describe el espacio, no el color: el color lo añade el simulador (S9). */
   alt: z.string().min(1),
+  /** S12: ruta pública de la foto WebP con la pared transparente. */
+  imagen: z.string().regex(/^\/images\/ambientes\/[a-z0-9-]+\.webp$/),
+  /** S5: dónde está lo importante de la foto, para no recortarlo. */
+  encuadre: encuadreAmbienteSimuladorSchema,
 });
 export type AmbienteSimulador = z.infer<typeof ambienteSimuladorSchema>;
 

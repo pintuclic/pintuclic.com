@@ -158,7 +158,7 @@ export function areaDeMedidas(ancho: string, ladoMayor: string, repeticiones: st
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
- * SIMULADOR DE COLOR (HU-ASE-03, S1-S11)
+ * SIMULADOR DE COLOR (HU-ASE-03, S1-S12)
  *
  * Espejo de la sección 9 de `contracts/m03-asesoria.contract.ts`. No hay endpoints: el
  * simulador vive entero en el navegador, así que estos esquemas fijan la forma del catálogo
@@ -173,12 +173,18 @@ export const ADVERTENCIA_SIMULADOR =
 export const tipoAmbienteSimuladorSchema = z.enum(['interior', 'exterior']);
 export type TipoAmbienteSimulador = z.infer<typeof tipoAmbienteSimuladorSchema>;
 
-/** S5: un ambiente de muestra. El dibujo no se declara aquí: es un componente asociado al `id`. */
+/** S5: qué parte de la foto se conserva cuando se recorta a la caja de la vista. */
+export const encuadreAmbienteSimuladorSchema = z.enum(['arriba', 'centro', 'abajo']);
+export type EncuadreAmbienteSimulador = z.infer<typeof encuadreAmbienteSimuladorSchema>;
+
+/** S5: un ambiente de muestra. La foto se declara por su ruta pública (S12); el color lo aplica el navegador (S3). */
 export const ambienteSimuladorSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   nombre: z.string().min(1),
   tipo: tipoAmbienteSimuladorSchema,
   alt: z.string().min(1),
+  imagen: z.string().regex(/^\/images\/ambientes\/[a-z0-9-]+\.webp$/),
+  encuadre: encuadreAmbienteSimuladorSchema,
 });
 export type AmbienteSimulador = z.infer<typeof ambienteSimuladorSchema>;
 
