@@ -167,7 +167,7 @@ function FormularioNatural({
       {errorServidor && <Alert variant="error">{errorServidor}</Alert>}
       <Input id="reg-nombre" label="Nombre completo" autoComplete="name" placeholder="Ej. Juan Pérez" error={errors.nombre?.message} {...register('nombre')} />
       <Input id="reg-correo" label="Correo electrónico" type="email" autoComplete="email" placeholder="correo@ejemplo.com" error={errors.correo?.message} {...register('correo')} />
-      <Input id="reg-telefono" label="Teléfono (WhatsApp)" type="tel" autoComplete="tel" placeholder="300 000 0000" error={errors.telefono?.message} {...register('telefono')} />
+      <Input id="reg-telefono" label="Teléfono (WhatsApp)" type="tel" autoComplete="tel" placeholder="3000000000" error={errors.telefono?.message} {...register('telefono')} />
       <PasswordInput id="reg-contrasena" label="Contraseña" autoComplete="new-password" placeholder="Mínimo 12 caracteres" helperText="Entre 12 y 128 caracteres." error={errors.contrasena?.message} {...register('contrasena')} />
       <Checkbox id="reg-terminos" label={TERMINOS} checked={watch('aceptaTerminos')} error={errors.aceptaTerminos?.message} {...register('aceptaTerminos')} />
       <Button type="submit" fullWidth isLoading={isSubmitting}>
@@ -214,7 +214,7 @@ function FormularioEmpresa({ onRegistrado }: { onRegistrado: () => void }) {
       <Input id="emp-nombre" label="Nombre Empresa" autoComplete="organization" placeholder="Ej. PintuClic" error={errors.nombreEmpresa?.message} {...register('nombreEmpresa')} />
       <Input id="emp-representante" label="Nombre Representante Legal" autoComplete="name" placeholder="Ej. Juan Pérez" error={errors.nombreRepresentante?.message} {...register('nombreRepresentante')} />
       <Input id="emp-correo" label="Correo electrónico" type="email" autoComplete="email" placeholder="correo@ejemplo.com" error={errors.correoEmpresarial?.message} {...register('correoEmpresarial')} />
-      <Input id="emp-telefono" label="Teléfono" type="tel" autoComplete="tel" placeholder="300 000 0000" error={errors.telefono?.message} {...register('telefono')} />
+      <Input id="emp-telefono" label="Teléfono" type="tel" autoComplete="tel" placeholder="3000000000" error={errors.telefono?.message} {...register('telefono')} />
       <Input id="emp-nit" label="NIT" placeholder="Ej. 899.999.068-1" error={errors.nit?.message} {...register('nit')} />
       <PasswordInput id="emp-contrasena" label="Contraseña" autoComplete="new-password" placeholder="Mínimo 12 caracteres" helperText="Entre 12 y 128 caracteres." error={errors.contrasena?.message} {...register('contrasena')} />
       <Checkbox id="emp-terminos" label={TERMINOS} checked={watch('aceptaTerminos')} error={errors.aceptaTerminos?.message} {...register('aceptaTerminos')} />

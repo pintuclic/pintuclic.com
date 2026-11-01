@@ -111,7 +111,7 @@ describe('Registro (HU-CUE-01 / HU-CUE-03)', () => {
 
   it('usa los textos del mockup y un solo campo de contraseña', () => {
     expect(salida).toContain('Ej. Juan Pérez');
-    expect(salida).toContain('300 000 0000');
+    expect(salida).toContain('3000000000');
     expect(salida).toContain('Términos y Condiciones');
     expect(salida.match(/type="password"/g)).toHaveLength(1);
     expect(salida).not.toContain('Confirmar contraseña');
