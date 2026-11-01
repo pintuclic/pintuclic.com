@@ -24,7 +24,7 @@ import {
   type SolicitudAdmin,
   type TerminosWompi,
 } from '../dtos/m07-checkout.dto';
-import type { CheckoutRepositoryPort, IntentoGuardado, Pagina, SolicitudGuardada } from '../interfaces/checkout.interface';
+import type { CheckoutRepositoryPort, IntentoGuardado, PaginaPagos, SolicitudGuardada } from '../interfaces/checkout.interface';
 import { errores, OrdenDefinitivaError, PasarelaNoDisponibleError } from './checkout-error';
 import {
   aCentavos,
@@ -234,7 +234,7 @@ export class CheckoutService {
 
   /* ── Panel ────────────────────────────────────────────────────────────── */
 
-  async listar(filtros: ListarSolicitudesAdminRequest): Promise<Pagina<SolicitudAdmin>> {
+  async listar(filtros: ListarSolicitudesAdminRequest): Promise<PaginaPagos<SolicitudAdmin>> {
     const p = await this.dep.repo.listar(filtros);
     return { ...p, items: p.items.map((s) => this.aAdmin(s)) };
   }

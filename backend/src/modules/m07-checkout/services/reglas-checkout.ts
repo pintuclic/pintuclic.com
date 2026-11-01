@@ -28,6 +28,20 @@ export function anioColombia(fecha: Date): number {
   return Number(new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_COLOMBIA, year: 'numeric' }).format(fecha));
 }
 
+const UN_DIA_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * R18: el periodo `desde`–`hasta` (días de Colombia, ambos incluidos) como instantes: desde las 00:00 del
+ * primer día hasta antes de las 00:00 del día siguiente al último. Colombia no tiene horario de verano: UTC−5.
+ */
+export function rangoDiasColombia(desde?: string, hasta?: string): { gte?: Date; lt?: Date } | null {
+  if (desde === undefined && hasta === undefined) return null;
+  return {
+    ...(desde === undefined ? {} : { gte: new Date(`${desde}T00:00:00-05:00`) }),
+    ...(hasta === undefined ? {} : { lt: new Date(new Date(`${hasta}T00:00:00-05:00`).getTime() + UN_DIA_MS) }),
+  };
+}
+
 /** `SOL-2026-00001`: el mismo formato que el código de la orden (R4 de M08). */
 export function formatearCodigo(anio: number, numero: number): string {
   return `SOL-${anio}-${String(numero).padStart(5, '0')}`;

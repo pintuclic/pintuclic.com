@@ -16,12 +16,12 @@ import type {
   CheckoutRepositoryPort,
   IntentoGuardado,
   IntentoNuevo,
-  Pagina,
+  PaginaPagos,
   SolicitudGuardada,
   SolicitudNueva,
 } from '../../interfaces/checkout.interface';
 import { PasarelaNoDisponibleError } from '../../services/checkout-error';
-import { formatearCodigo } from '../../services/reglas-checkout';
+import { formatearCodigo, rangoDiasColombia } from '../../services/reglas-checkout';
 
 export function lineaCarrito(cambios: Partial<LineaCarrito> & { subtotal?: number } = {}): LineaCarrito {
   const { subtotal = 100_000, ...resto } = cambios;
@@ -289,8 +289,22 @@ export class RepoMemoria implements CheckoutRepositoryPort {
   async abiertasParaRevisar(): Promise<SolicitudGuardada[]> {
     return structuredClone(this.solicitudes.filter((s) => s.estado === 'en_pago' || s.estado === 'rechazada'));
   }
-  async listar(f: ListarSolicitudesAdminRequest): Promise<Pagina<SolicitudGuardada>> {
-    const items = this.solicitudes.filter((s) => f.estado === undefined || s.estado === f.estado);
-    return { items: structuredClone(items), pagina: f.pagina, limite: f.limite, total: items.length };
+  async listar(f: ListarSolicitudesAdminRequest): Promise<PaginaPagos<SolicitudGuardada>> {
+    const periodo = rangoDiasColombia(f.desde, f.hasta);
+    const items = this.solicitudes.filter(
+      (s) =>
+        (f.estado === undefined || s.estado === f.estado) &&
+        (f.idCliente === undefined || s.idUsuario === f.idCliente) &&
+        (periodo?.gte === undefined || s.fechaCreacion >= periodo.gte) &&
+        (periodo?.lt === undefined || s.fechaCreacion < periodo.lt),
+    );
+    const pagadas = items.filter((s) => s.transaccionPagoId !== null);
+    return {
+      items: structuredClone(items),
+      pagina: f.pagina,
+      limite: f.limite,
+      total: items.length,
+      resumen: { cantidad: items.length, pagadas: pagadas.length, totalPagado: pagadas.reduce((t, s) => t + s.total, 0) },
+    };
   }
 }

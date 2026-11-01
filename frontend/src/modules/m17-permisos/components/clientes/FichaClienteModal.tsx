@@ -3,7 +3,10 @@
 import React from 'react';
 import { Calendar, FileText, Lock, ShoppingBag, User } from 'lucide-react';
 import { Badge, Button, Modal } from '@/core/components';
+import { PagosClienteResumen } from '@/modules/m07-checkout/components/PagosClienteResumen';
 import type { FichaClienteRespuesta } from '../../interfaces/clientes-admin.interface';
+import { puedeVerRuta } from '../../services/acceso-panel';
+import { useAccesoStore } from '../../store/accesoStore';
 
 export interface FichaClienteModalProps {
   cliente: FichaClienteRespuesta | null;
@@ -16,7 +19,11 @@ export const FichaClienteModal: React.FC<FichaClienteModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const acceso = useAccesoStore((s) => s.acceso);
   if (!cliente) return null;
+
+  // Los pagos piden `ventas.ver` (M07 · R16): sin ese permiso la sección no se muestra ni se consulta.
+  const verPagos = acceso !== null && puedeVerRuta('/admin/pagos', acceso);
 
   const ordenesRecientes = cliente.ordenesRecientes ?? [];
   const cotizacionesRecientes = cliente.cotizacionesRecientes ?? [];
@@ -104,6 +111,11 @@ export const FichaClienteModal: React.FC<FichaClienteModalProps> = ({
             pueden ser modificados directamente por la administración.
           </span>
         </div>
+
+        {/* ================================================================== */}
+        {/* PAGOS DEL CLIENTE CON FILTRO DE PERIODO (M07 · R18)                */}
+        {/* ================================================================== */}
+        {verPagos && <PagosClienteResumen idCliente={cliente.idUsuario} />}
 
         {/* ================================================================== */}
         {/* 2. ÓRDENES RECIENTES                                               */}

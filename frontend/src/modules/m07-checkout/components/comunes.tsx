@@ -81,6 +81,15 @@ export function ResumenCompra({ lineas, subtotal, descuento, envio, total, child
   );
 }
 
+/** Botón-píldora de los filtros del panel (estado y periodo). */
+export function clasePildora(activo: boolean): string {
+  return `inline-flex min-h-9 items-center rounded-full border px-3 font-title text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
+    activo
+      ? 'border-action bg-action text-neutral-white'
+      : 'border-neutral-light bg-neutral-white text-neutral-dark hover:border-action hover:text-action'
+  }`;
+}
+
 export function FiltrosEstado({ actual, enlace }: { actual: EstadoSolicitud | null; enlace: (e: EstadoSolicitud | null) => string }) {
   return (
     <nav aria-label="Filtrar por estado" className="flex flex-wrap gap-2">
@@ -91,11 +100,7 @@ export function FiltrosEstado({ actual, enlace }: { actual: EstadoSolicitud | nu
             key={f.etiqueta}
             href={enlace(f.valor)}
             aria-current={activo ? 'page' : undefined}
-            className={`inline-flex min-h-9 items-center rounded-full border px-3 font-title text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 ${
-              activo
-                ? 'border-action bg-action text-neutral-white'
-                : 'border-neutral-light bg-neutral-white text-neutral-dark hover:border-action hover:text-action'
-            }`}
+            className={clasePildora(activo)}
           >
             {f.etiqueta}
           </Link>
