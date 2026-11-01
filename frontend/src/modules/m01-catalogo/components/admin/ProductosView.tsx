@@ -322,7 +322,15 @@ export const ProductosView: React.FC = () => {
       )}
       {lista.datos !== null && <Paginador paginacion={lista.datos.paginacion} onCambiar={setPagina} />}
 
-      {cargaMasiva && <CargaProductosModal onClose={() => setCargaMasiva(false)} />}
+      {cargaMasiva && (
+        <CargaProductosModal
+          onClose={() => setCargaMasiva(false)}
+          onCargados={(n) => {
+            exito(`Se cargaron ${n} ${n === 1 ? 'producto' : 'productos'}. Están sin publicar: agregue sus imágenes y publíquelos.`);
+            lista.recargar();
+          }}
+        />
+      )}
 
       {formulario !== null && referencias !== null && (
         <ProductoFormModal

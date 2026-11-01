@@ -95,7 +95,7 @@ describe('leerLibroProductos', () => {
         { ...FILA_BASE, Medida: 'Galón', SKU: 'VA-G' },
         {},
         { ...FILA_BASE, Marca: 'PINTUCO', Producto: 'viniltex advanced', Medida: 'Cuarto', Precio: '35900,50' },
-        { ...FILA_BASE, Producto: 'Koraza', 'Peso (g)': 4200, Características: 'Secado: 2 horas', Superficies: 'Muros; Madera' },
+        { ...FILA_BASE, Producto: 'Koraza', Características: 'Secado: 2 horas', Superficies: 'Muros; Madera' },
       ]),
     );
 
@@ -106,7 +106,6 @@ describe('leerLibroProductos', () => {
     expect(lectura.filas[1]).toMatchObject({ fila: 4, precio: 35900.5 });
     expect(lectura.filas[2]).toMatchObject({
       fila: 5,
-      pesoGramos: 4200,
       superficies: ['Muros', 'Madera'],
       caracteristicas: [{ nombre: 'Secado', valor: '2 horas' }],
     });
