@@ -183,7 +183,7 @@ export function DireccionForm({ inicial, onGuardar, onCancelar }: DireccionFormP
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Input id="dir-nombre" label="Nombre y apellido de quien recibe" autoComplete="name" error={errors.nombreApellido?.message} {...register('nombreApellido')} />
-        <Input id="dir-telefono" label="Teléfono de contacto" type="tel" autoComplete="tel" placeholder="300 000 0000" error={errors.telefono?.message} {...register('telefono')} />
+        <Input id="dir-telefono" label="Teléfono de contacto" type="tel" autoComplete="tel" placeholder="3000000000" error={errors.telefono?.message} {...register('telefono')} />
       </div>
       <div className="flex flex-wrap justify-end gap-3 pt-2">
         <Button type="button" variant="ghost" onClick={onCancelar}>

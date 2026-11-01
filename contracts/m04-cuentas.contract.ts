@@ -36,7 +36,7 @@ export const telefonoSchema = z
   .string()
   .trim()
   .min(7, 'El teléfono debe tener al menos 7 dígitos')
-  .max(20, 'El teléfono no puede exceder 20 caracteres')
+  .max(10, 'El teléfono no puede exceder 10 caracteres')
   .regex(/^[0-9+\s()-]+$/, 'El teléfono solo debe contener números o caracteres de marcado');
 
 export const nombreSchema = z

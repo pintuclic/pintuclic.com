@@ -87,7 +87,7 @@ describe('M04 Frontend — teléfono de la dirección (regla transversal)', () =
   };
 
   it('acepta un número con formato', () => {
-    expect(direccionClienteFormSchema.safeParse({ ...base, telefono: '300 123 4567' }).success).toBe(true);
+    expect(direccionClienteFormSchema.safeParse({ ...base, telefono: '601-234567' }).success).toBe(true);
   });
 
   it('rechaza letras o símbolos con un mensaje que dice qué falta', () => {
@@ -100,7 +100,7 @@ describe('M04 Frontend — teléfono de la dirección (regla transversal)', () =
 describe('M04 Frontend — formularios de Google OAuth (HU-CUE-02)', () => {
   it('exige teléfono, contraseña de 12+ caracteres coincidente y aceptación de términos al completar registro', () => {
     const valido = {
-      telefono: '300 456 7890',
+      telefono: '3004567890',
       contrasena: 'ClaveFederada2026!',
       confirmarContrasena: 'ClaveFederada2026!',
       aceptaTerminos: true,

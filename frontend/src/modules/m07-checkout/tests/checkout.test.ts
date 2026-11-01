@@ -63,7 +63,7 @@ describe('M07 · formulario de pago', () => {
         direccion: 'Calle 10 # 5-20',
         barrio: 'Centro',
         nombreRecibe: 'Ana Pérez',
-        telefonoRecibe: '300 123 4567',
+        telefonoRecibe: '3001234567',
       }).success,
     ).toBe(true);
   });
