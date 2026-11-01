@@ -165,12 +165,31 @@ export const reintentarPagoRequestSchema = z.object({
 });
 export type ReintentarPagoRequest = z.infer<typeof reintentarPagoRequestSchema>;
 
+/** R18: un día del calendario de Colombia (America/Bogota), `AAAA-MM-DD`. */
+export const diaColombiaSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use el formato AAAA-MM-DD')
+  .refine((v) => {
+    const dia = new Date(`${v}T00:00:00Z`);
+    return !Number.isNaN(dia.getTime()) && dia.toISOString().slice(0, 10) === v;
+  }, 'La fecha no existe');
+
 /** GET /admin/pagos */
-export const listarSolicitudesAdminRequestSchema = paginacionQuerySchema.extend({
-  estado: estadoSolicitudSchema.optional(),
-  /** Código SOL, código de orden PC, o nombre / correo del cliente. */
-  busqueda: z.string().trim().max(100).optional(),
-});
+export const listarSolicitudesAdminRequestSchema = paginacionQuerySchema
+  .extend({
+    estado: estadoSolicitudSchema.optional(),
+    /** Código SOL, código de orden PC, o nombre / correo del cliente. */
+    busqueda: z.string().trim().max(100).optional(),
+    /** R18: periodo por el día en que se creó la compra; los dos extremos se incluyen. */
+    desde: diaColombiaSchema.optional(),
+    hasta: diaColombiaSchema.optional(),
+    /** R18: solo las compras de ese cliente (enlace desde su ficha en el panel). */
+    idCliente: z.coerce.number().int().positive().optional(),
+  })
+  .refine((v) => v.desde === undefined || v.hasta === undefined || v.desde <= v.hasta, {
+    message: 'La fecha inicial no puede ser posterior a la final',
+    path: ['desde'],
+  });
 export type ListarSolicitudesAdminRequest = z.infer<typeof listarSolicitudesAdminRequestSchema>;
 
 /**
@@ -292,7 +311,20 @@ export const solicitudAdminSchema = solicitudSchema.extend({
 export type SolicitudAdmin = z.infer<typeof solicitudAdminSchema>;
 export const solicitudAdminResponseEnvelopeSchema = respuestaUno(solicitudAdminSchema);
 export type SolicitudAdminResponseEnvelope = z.infer<typeof solicitudAdminResponseEnvelopeSchema>;
-export const listarSolicitudesResponseEnvelopeSchema = respuestaPaginada(solicitudAdminSchema);
+/** R18: cifras de TODAS las compras que cumplen los filtros (no solo las de la página). */
+export const resumenPagosSchema = z.object({
+  /** Compras que cumplen los filtros. */
+  cantidad: z.number().int().nonnegative(),
+  /** De ellas, las que tienen un pago aprobado por Wompi. */
+  pagadas: z.number().int().nonnegative(),
+  /** Lo que se cobró en las pagadas (total con IVA y envío). */
+  totalPagado: dineroSchema,
+});
+export type ResumenPagos = z.infer<typeof resumenPagosSchema>;
+
+export const listarSolicitudesResponseEnvelopeSchema = respuestaPaginada(solicitudAdminSchema).extend({
+  resumen: resumenPagosSchema,
+});
 export type ListarSolicitudesResponseEnvelope = z.infer<typeof listarSolicitudesResponseEnvelopeSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -428,7 +460,7 @@ export interface PasarelaPagoPort {
  *  POST /eventos                         evento transaction.updated → 200 vacío
  *
  *  Panel (montaje: /api/v1/admin/pagos) — sesión + permiso (R16)
- *  GET  /                                lista (?estado, ?busqueda)               ventas.ver
+ *  GET  /                                lista (?estado, ?busqueda, ?desde, ?hasta, ?idCliente) + resumen (R18)  ventas.ver
  *  GET  /:codigo                         detalle con intentos y cliente           ventas.ver
  *  POST /:codigo/consultar-wompi         pedir a Wompi el estado real (R5)        ventas.gestionar
  *  POST /:codigo/reintentar-orden        volver a encolar la orden (R6)           ventas.gestionar

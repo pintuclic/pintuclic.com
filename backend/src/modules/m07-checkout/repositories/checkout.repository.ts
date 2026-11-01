@@ -8,11 +8,11 @@ import type {
   DescuentoCongelado,
   IntentoGuardado,
   IntentoNuevo,
-  Pagina,
+  PaginaPagos,
   SolicitudGuardada,
   SolicitudNueva,
 } from '../interfaces/checkout.interface';
-import { formatearCodigo } from '../services/reglas-checkout';
+import { formatearCodigo, rangoDiasColombia } from '../services/reglas-checkout';
 
 const LIMITES_TRANSACCION = { maxWait: 5_000, timeout: 15_000 } as const;
 
@@ -294,10 +294,13 @@ export class CheckoutRepository implements CheckoutRepositoryPort {
     return filas.map(aSolicitud);
   }
 
-  async listar(filtros: ListarSolicitudesAdminRequest): Promise<Pagina<SolicitudGuardada>> {
+  async listar(filtros: ListarSolicitudesAdminRequest): Promise<PaginaPagos<SolicitudGuardada>> {
     const busqueda = filtros.busqueda?.trim();
+    const periodo = rangoDiasColombia(filtros.desde, filtros.hasta);
     const where: Prisma.SolicitudCompraWhereInput = {
       ...(filtros.estado === undefined ? {} : { estado: filtros.estado }),
+      ...(filtros.idCliente === undefined ? {} : { idUsuario: filtros.idCliente }),
+      ...(periodo === null ? {} : { fechaCreacion: periodo }),
       ...(busqueda === undefined || busqueda === ''
         ? {}
         : {
@@ -309,7 +312,7 @@ export class CheckoutRepository implements CheckoutRepositoryPort {
             ],
           }),
     };
-    const [total, filas] = await prisma.$transaction([
+    const [total, filas, pagadas] = await prisma.$transaction([
       prisma.solicitudCompra.count({ where }),
       prisma.solicitudCompra.findMany({
         where,
@@ -318,7 +321,19 @@ export class CheckoutRepository implements CheckoutRepositoryPort {
         take: filtros.limite,
         include: INCLUIR,
       }),
+      // Pagada = tiene un APPROVED de Wompi (D3), aunque la orden aún no exista o haya quedado en revisión.
+      prisma.solicitudCompra.aggregate({
+        where: { AND: [where, { transaccionPagoId: { not: null } }] },
+        _count: { _all: true },
+        _sum: { total: true },
+      }),
     ]);
-    return { items: filas.map(aSolicitud), pagina: filtros.pagina, limite: filtros.limite, total };
+    return {
+      items: filas.map(aSolicitud),
+      pagina: filtros.pagina,
+      limite: filtros.limite,
+      total,
+      resumen: { cantidad: total, pagadas: pagadas._count._all, totalPagado: Number(pagadas._sum.total ?? 0) },
+    };
   }
 }

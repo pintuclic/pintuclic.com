@@ -2,7 +2,23 @@ import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 import { pagoFormSchema, reintentoFormSchema } from '../dtos/formularios.dto';
 import { codigoDeError, mensajeDeError, pagoEnCursoDeError, revalidacionDeError } from '../services/checkout-api';
-import { compraDirectaDeUrl, estadoDeUrl, pasoDe, sigueEnCurso, textoEnvio } from '../services/textos-checkout';
+import {
+  compraDirectaDeUrl,
+  diaDeUrl,
+  estadoDeUrl,
+  hoyColombia,
+  idDeUrl,
+  mesCompleto,
+  mesDe,
+  pasoDe,
+  periodoDeUrl,
+  periodoRapidoDe,
+  rangoDePeriodo,
+  sigueEnCurso,
+  textoEnvio,
+  textoPeriodo,
+  ultimosMeses,
+} from '../services/textos-checkout';
 
 function errorApi(status: number, code: string, details: unknown): AxiosError {
   const response = {
@@ -107,5 +123,54 @@ describe('M07 · compra directa desde la ficha (R17)', () => {
     expect(compraDirectaDeUrl(new URLSearchParams('idVariante=4&cantidad=99999'))?.cantidad).toBe(9_999);
     expect(compraDirectaDeUrl(new URLSearchParams('cupon=PINTA10'))).toBeNull();
     expect(compraDirectaDeUrl(new URLSearchParams('idVariante=abc'))).toBeNull();
+  });
+});
+
+describe('M07 · periodo del panel de pagos (R18)', () => {
+  it('hoy se cuenta en Colombia aunque en UTC ya sea el día siguiente', () => {
+    expect(hoyColombia(new Date('2026-10-29T02:10:00Z'))).toBe('2026-10-28');
+    expect(hoyColombia(new Date('2026-10-29T05:00:00Z'))).toBe('2026-10-29');
+  });
+
+  it('traduce los botones rápidos a desde y hasta', () => {
+    const hoy = '2026-03-02';
+    expect(rangoDePeriodo('hoy', hoy)).toEqual({ desde: '2026-03-02', hasta: '2026-03-02' });
+    expect(rangoDePeriodo('ayer', hoy)).toEqual({ desde: '2026-03-01', hasta: '2026-03-01' });
+    expect(rangoDePeriodo('ultimos7', hoy)).toEqual({ desde: '2026-02-24', hasta: '2026-03-02' });
+    expect(rangoDePeriodo('esteMes', hoy)).toEqual({ desde: '2026-03-01', hasta: '2026-03-02' });
+    expect(rangoDePeriodo('mesAnterior', hoy)).toEqual({ desde: '2026-02-01', hasta: '2026-02-28' });
+    expect(rangoDePeriodo('mesAnterior', '2026-01-15')).toEqual({ desde: '2025-12-01', hasta: '2025-12-31' });
+  });
+
+  it('un mes completo respeta los bisiestos y se reconoce de vuelta', () => {
+    expect(mesCompleto('2028-02')).toEqual({ desde: '2028-02-01', hasta: '2028-02-29' });
+    expect(mesDe({ desde: '2026-10-01', hasta: '2026-10-31' })).toBe('2026-10');
+    expect(mesDe({ desde: '2026-10-01', hasta: '2026-10-30' })).toBeNull();
+    expect(periodoRapidoDe({ desde: '2026-10-28', hasta: '2026-10-28' }, '2026-10-28')).toBe('hoy');
+    expect(periodoRapidoDe({ desde: '2026-10-01', hasta: '2026-10-15' }, '2026-10-28')).toBeNull();
+  });
+
+  it('lee de la URL solo fechas reales y descarta un final anterior al inicio', () => {
+    expect(diaDeUrl('2026-02-30')).toBeNull();
+    expect(diaDeUrl('28/10/2026')).toBeNull();
+    expect(periodoDeUrl(new URLSearchParams('desde=2026-10-10&hasta=2026-10-01'))).toEqual({ desde: '2026-10-10', hasta: null });
+    expect(periodoDeUrl(new URLSearchParams(''))).toEqual({ desde: null, hasta: null });
+    expect(idDeUrl('7')).toBe(7);
+    expect(idDeUrl('-1')).toBeNull();
+    expect(idDeUrl(null)).toBeNull();
+  });
+
+  it('la lista de meses va del actual hacia atrás, cruzando el año', () => {
+    const meses = ultimosMeses('2026-02-10', 3);
+    expect(meses.map((m) => m.value)).toEqual(['2026-02', '2026-01', '2025-12']);
+    expect(meses[0]?.label).toMatch(/febrero/i);
+    expect(ultimosMeses('2026-10-31')).toHaveLength(24);
+  });
+
+  it('describe el periodo en palabras', () => {
+    expect(textoPeriodo({ desde: null, hasta: null })).toBe('Todas las fechas');
+    expect(textoPeriodo({ desde: '2026-10-28', hasta: '2026-10-28' })).toMatch(/28/);
+    expect(textoPeriodo({ desde: '2026-10-01', hasta: null })).toMatch(/^Desde /);
+    expect(textoPeriodo({ desde: '2026-10-01', hasta: '2026-10-31' })).toContain('–');
   });
 });

@@ -119,4 +119,24 @@ describe('M07 · HTTP', () => {
     expect((await pedir('POST', '/admin/pagos/SOL-2026-00001/consultar-wompi', LECTOR)).status).toBe(404);
     expect((await pedir('POST', '/admin/pagos/SOL-2026-00001/consultar-wompi', GESTOR)).status).toBe(200);
   });
+
+  it('R18: filtra por periodo de Colombia y por cliente, y el resumen cuenta todo lo filtrado', async () => {
+    const leer = async (q: string) => {
+      const r = await pedir('GET', `/admin/pagos${q}`, LECTOR);
+      expect(r.status).toBe(200);
+      const sobre = listarSolicitudesResponseEnvelopeSchema.parse(r.cuerpo);
+      expect(sobre.resumen.cantidad).toBe(sobre.pagination.total);
+      return sobre;
+    };
+    const todas = await leer('');
+    expect(todas.pagination.total).toBeGreaterThan(0);
+    // La compra se creó el 27 de octubre a las 10:00 en Colombia.
+    expect((await leer('?desde=2026-10-27&hasta=2026-10-27')).pagination.total).toBe(todas.pagination.total);
+    expect((await leer('?desde=2026-10-28')).pagination.total).toBe(0);
+    expect((await leer('?hasta=2026-10-26')).resumen).toEqual({ cantidad: 0, pagadas: 0, totalPagado: 0 });
+    expect((await leer(`?idCliente=${CLIENTE}`)).pagination.total).toBe(todas.pagination.total);
+    expect((await leer('?idCliente=999')).pagination.total).toBe(0);
+    expect((await pedir('GET', '/admin/pagos?desde=2026-10-28&hasta=2026-10-27', LECTOR)).status).toBe(400);
+    expect((await pedir('GET', '/admin/pagos?desde=2026-02-30', LECTOR)).status).toBe(400);
+  });
 });

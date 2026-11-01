@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { celularNequiSchema, crearSolicitudRequestSchema, prepararCheckoutRequestSchema } from '../dtos/m07-checkout.dto';
+import {
+  celularNequiSchema,
+  crearSolicitudRequestSchema,
+  listarSolicitudesAdminRequestSchema,
+  prepararCheckoutRequestSchema,
+} from '../dtos/m07-checkout.dto';
 import { checksumEsperado, firmaEventoValida, firmaIntegridad } from '../services/firmas-wompi';
 import {
   aCentavos,
@@ -11,6 +16,7 @@ import {
   formatearCodigo,
   origenDeLineas,
   proximoReintento,
+  rangoDiasColombia,
   referenciaIntento,
   textoDireccion,
 } from '../services/reglas-checkout';
@@ -139,5 +145,27 @@ describe('M07 · reglas', () => {
     expect(proximoReintento(1, ahora)?.toISOString()).toBe('2026-10-27T15:01:00.000Z');
     expect(proximoReintento(2, ahora)?.toISOString()).toBe('2026-10-27T15:05:00.000Z');
     expect(proximoReintento(7, ahora)).toBeNull();
+  });
+});
+
+describe('M07 · periodo del panel (R18)', () => {
+  it('un día de Colombia va de las 00:00 a antes de las 00:00 del día siguiente (UTC−5)', () => {
+    expect(rangoDiasColombia('2026-10-01', '2026-10-31')).toEqual({
+      gte: new Date('2026-10-01T05:00:00.000Z'),
+      lt: new Date('2026-11-01T05:00:00.000Z'),
+    });
+    expect(rangoDiasColombia(undefined, '2026-12-31')).toEqual({ lt: new Date('2027-01-01T05:00:00.000Z') });
+    expect(rangoDiasColombia()).toBeNull();
+  });
+
+  it('valida las fechas, el orden del rango y el cliente', () => {
+    const base = { pagina: '1', limite: '20' };
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, desde: '2026-10-01', hasta: '2026-10-01' }).success).toBe(true);
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, desde: '2026-10-02', hasta: '2026-10-01' }).success).toBe(false);
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, desde: '2026-13-01' }).success).toBe(false);
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, hasta: '01/10/2026' }).success).toBe(false);
+    const r = listarSolicitudesAdminRequestSchema.safeParse({ ...base, idCliente: '7' });
+    expect(r.success && r.data.idCliente).toBe(7);
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, idCliente: '0' }).success).toBe(false);
   });
 });

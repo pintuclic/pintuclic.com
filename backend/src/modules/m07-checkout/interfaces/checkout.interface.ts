@@ -4,6 +4,7 @@ import type {
   ListarSolicitudesAdminRequest,
   ModoEntrega,
   OrigenSolicitud,
+  ResumenPagos,
 } from '../dtos/m07-checkout.dto';
 
 /** Un descuento congelado de una línea (lo que pasa a `linea_orden_descuento`). */
@@ -121,6 +122,11 @@ export interface Pagina<T> {
   total: number;
 }
 
+/** R18: la página de pagos del panel con las cifras de todo lo filtrado. */
+export interface PaginaPagos<T> extends Pagina<T> {
+  resumen: ResumenPagos;
+}
+
 export interface CheckoutRepositoryPort {
   /** R2 d: toma el siguiente consecutivo `solicitud` y guarda la solicitud con sus líneas en una transacción. */
   crear(nueva: SolicitudNueva, anio: number): Promise<SolicitudGuardada>;
@@ -145,5 +151,6 @@ export interface CheckoutRepositoryPort {
   pendientesDeOrden(ahora: Date, limite: number): Promise<SolicitudGuardada[]>;
   /** R3, R5: abiertas (`en_pago` o `rechazada`) para revisar su pago o su vencimiento. */
   abiertasParaRevisar(limite: number): Promise<SolicitudGuardada[]>;
-  listar(filtros: ListarSolicitudesAdminRequest): Promise<Pagina<SolicitudGuardada>>;
+  /** R18: filtra por estado, búsqueda, periodo y cliente; el resumen cuenta todo lo filtrado. */
+  listar(filtros: ListarSolicitudesAdminRequest): Promise<PaginaPagos<SolicitudGuardada>>;
 }

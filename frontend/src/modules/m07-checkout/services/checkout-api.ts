@@ -7,6 +7,7 @@ import type {
   EstadoSolicitud,
   PrepararCheckout,
   ReintentarPagoRequest,
+  ResumenPagos,
   Solicitud,
   SolicitudAdmin,
 } from '../dtos/m07-checkout.dto';
@@ -20,6 +21,7 @@ interface SobrePagina {
   success: boolean;
   data: SolicitudAdmin[];
   pagination: { pagina: number; limite: number; total: number; totalPaginas: number };
+  resumen: ResumenPagos;
 }
 
 export interface PaginaSolicitudes {
@@ -27,12 +29,19 @@ export interface PaginaSolicitudes {
   pagina: number;
   totalPaginas: number;
   total: number;
+  /** R18: cifras de todo lo filtrado, no solo de esta página. */
+  resumen: ResumenPagos;
 }
 
 export interface FiltroPagos {
   estado: EstadoSolicitud | null;
   pagina: number;
   busqueda: string;
+  /** R18: días de Colombia `AAAA-MM-DD`, ambos incluidos; null = sin límite. */
+  desde?: string | null;
+  hasta?: string | null;
+  idCliente?: number | null;
+  limite?: number;
 }
 
 /** Rutas del cliente (`/checkout`) y del panel (`/admin/pagos`). La sesión viaja en cookie HttpOnly. */
@@ -72,13 +81,22 @@ export const checkoutApi = {
       await apiClient.get<SobrePagina>('/admin/pagos', {
         params: {
           pagina: f.pagina,
-          limite: 20,
+          limite: f.limite ?? 20,
           ...(f.estado === null ? {} : { estado: f.estado }),
           ...(f.busqueda.trim() === '' ? {} : { busqueda: f.busqueda.trim() }),
+          ...(f.desde == null ? {} : { desde: f.desde }),
+          ...(f.hasta == null ? {} : { hasta: f.hasta }),
+          ...(f.idCliente == null ? {} : { idCliente: f.idCliente }),
         },
       })
     ).data;
-    return { items: s.data, pagina: s.pagination.pagina, totalPaginas: s.pagination.totalPaginas, total: s.pagination.total };
+    return {
+      items: s.data,
+      pagina: s.pagination.pagina,
+      totalPaginas: s.pagination.totalPaginas,
+      total: s.pagination.total,
+      resumen: s.resumen,
+    };
   },
 
   obtenerAdmin: async (codigo: string): Promise<SolicitudAdmin> =>
