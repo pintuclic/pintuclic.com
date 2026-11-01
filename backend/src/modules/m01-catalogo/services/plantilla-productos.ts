@@ -66,6 +66,25 @@ function listaDesde(hoja: ExcelJS.Worksheet, indiceColumna: number, rango: strin
   }
 }
 
+/**
+ * Columnas que admiten varios valores separados por `;`: Excel no deja elegir varios en una lista,
+ * así que la lista ayuda a elegir uno y el aviso es informativo para no bloquear los valores combinados.
+ */
+function listaMultiple(hoja: ExcelJS.Worksheet, indiceColumna: number, rango: string | null, nombre: string): void {
+  if (rango === null) return;
+  for (let fila = 2; fila <= FILAS_CON_LISTAS; fila += 1) {
+    hoja.getCell(fila, indiceColumna).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: [rango],
+      showErrorMessage: true,
+      errorStyle: 'information',
+      errorTitle: `Varios valores en ${nombre}`,
+      error: `La lista permite elegir uno. Para varios, escríbalos separados por punto y coma (;) con los nombres de la hoja «${HOJA_CATALOGOS}». Pulse Aceptar para conservar lo escrito.`,
+    };
+  }
+}
+
 function listaFija(hoja: ExcelJS.Worksheet, indiceColumna: number, opciones: string): void {
   for (let fila = 2; fila <= FILAS_CON_LISTAS; fila += 1) {
     hoja.getCell(fila, indiceColumna).dataValidation = {
@@ -91,7 +110,8 @@ const INSTRUCCIONES: readonly string[] = [
   '   las hojas «Catálogos» y «Colores» muestran todo lo que existe hoy. Si algo no existe, créelo antes en el catálogo.',
   '4. Obligatorios: Marca, Categoría, Subcategoría, Producto, Medida y Precio.',
   '5. Uso interior y Uso exterior: Sí o No.',
-  '6. Superficies, Acabados, Bases y Colores de fábrica: varios valores separados por punto y coma (;).',
+  '6. Superficies, Acabados, Bases y Colores de fábrica: varios valores separados por punto y coma (;). La lista de la celda deja elegir',
+  '   uno; para agregar más, escríbalos a continuación con ; (Excel avisa, pulse Aceptar). Los nombres están en «Catálogos» y «Colores».',
   '7. Características: pares «Nombre: valor» separados por punto y coma. Ejemplo:  Secado: 2 horas; Rendimiento: 35 m² por galón.',
   '   El valor no puede llevar punto y coma.',
   '8. Un recubrimiento exige Línea y Tipo de resina. Las Bases exigen al menos un Acabado.',
@@ -137,9 +157,9 @@ export async function construirPlantillaProductos(cat: CatalogosPlantilla): Prom
   const rMedidas = escribirColumna(catalogos, 7, 'Medidas', ordenar(cat.medidas.map((m) => m.nombre)));
   escribirColumna(catalogos, 8, 'Medida del tipo', cat.medidas.map((m) => `${m.tipo} › ${m.nombre}`).sort());
   const rResinas = escribirColumna(catalogos, 9, 'Tipos de resina', ordenar(cat.tiposResina));
-  escribirColumna(catalogos, 10, 'Superficies', ordenar(cat.superficies));
-  escribirColumna(catalogos, 11, 'Acabados', ordenar(cat.acabados));
-  escribirColumna(catalogos, 12, 'Bases', ordenar(cat.bases));
+  const rSuperficies = escribirColumna(catalogos, 10, 'Superficies', ordenar(cat.superficies));
+  const rAcabados = escribirColumna(catalogos, 11, 'Acabados', ordenar(cat.acabados));
+  const rBases = escribirColumna(catalogos, 12, 'Bases', ordenar(cat.bases));
   estilizarEncabezado(catalogos.getRow(1));
 
   const colores = libro.addWorksheet(HOJA_COLORES);
@@ -158,6 +178,16 @@ export async function construirPlantillaProductos(cat: CatalogosPlantilla): Prom
   listaDesde(productos, columna('Subcategoría'), rSubcategorias, 'Esa subcategoría no está en el catálogo.');
   listaDesde(productos, columna('Medida'), rMedidas, 'Esa medida no está en el catálogo.');
   listaDesde(productos, columna('Tipo de resina'), rResinas, 'Ese tipo de resina no está en el catálogo.');
+  listaMultiple(productos, columna('Superficies'), rSuperficies, 'Superficies');
+  listaMultiple(productos, columna('Acabados'), rAcabados, 'Acabados');
+  listaMultiple(productos, columna('Bases'), rBases, 'Bases');
+  const nombresColor = ordenar(cat.colores.map((c) => c.nombre));
+  listaMultiple(
+    productos,
+    columna('Colores de fábrica'),
+    nombresColor.length === 0 ? null : `'${HOJA_COLORES}'!$B$2:$B$${cat.colores.length + 1}`,
+    'Colores de fábrica',
+  );
   listaFija(productos, columna('Uso interior'), 'Sí,No');
   listaFija(productos, columna('Uso exterior'), 'Sí,No');
   listaFija(productos, columna('Calidad (1 a 3)'), '1,2,3');

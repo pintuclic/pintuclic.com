@@ -81,6 +81,16 @@ describe('plantilla de la carga masiva de productos · D3', () => {
     expect(hoja?.getCell('A2002').dataValidation).toBeUndefined();
   });
 
+  it('superficies, acabados, bases y colores de fábrica tienen lista y no bloquean varios valores con «;»', async () => {
+    const hoja = (await abrir()).getWorksheet(HOJA_PRODUCTOS);
+    const col = (titulo: (typeof COLUMNAS_PLANTILLA_PRODUCTOS)[number]) =>
+      hoja?.getCell(2, COLUMNAS_PLANTILLA_PRODUCTOS.indexOf(titulo) + 1).dataValidation;
+    expect(col('Superficies')).toMatchObject({ type: 'list', formulae: [`'${HOJA_CATALOGOS}'!$J$2:$J$3`], errorStyle: 'information' });
+    expect(col('Acabados')).toMatchObject({ type: 'list', formulae: [`'${HOJA_CATALOGOS}'!$K$2:$K$3`], errorStyle: 'information' });
+    expect(col('Bases')).toMatchObject({ type: 'list', formulae: [`'${HOJA_CATALOGOS}'!$L$2:$L$3`], errorStyle: 'information' });
+    expect(col('Colores de fábrica')).toMatchObject({ type: 'list', formulae: [`'${HOJA_COLORES}'!$B$2:$B$3`], errorStyle: 'information' });
+  });
+
   it('C10: un nombre de catálogo que parece fórmula se neutraliza', async () => {
     const hoja = (await abrir()).getWorksheet(HOJA_COLORES);
     const nombres = [hoja?.getCell('B2').value, hoja?.getCell('B3').value];
