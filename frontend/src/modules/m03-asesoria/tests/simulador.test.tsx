@@ -153,14 +153,14 @@ describe('FotoAmbiente · cada ambiente pintado (S3, S9)', () => {
     describe(ambiente.id, () => {
       const html = renderToStaticMarkup(<FotoAmbiente ambiente={ambiente} color={COLOR_PRUEBA} etiqueta={ambiente.alt} />);
 
-      it('es un <img> de su foto, con su texto alternativo', () => {
-        // React 19 antepone un <link rel="preload"> al <img>; en el SSR real lo lleva al <head>.
+      it('es una imagen de su foto, con su texto alternativo', () => {
+        // React 19 antepone un preload de la imagen; en el SSR real lo lleva al head.
         expect(html.match(/<img /g)).toHaveLength(1);
         expect(html).toContain(`src="${ambiente.imagen}"`);
         expect(html).toContain(`alt="${ambiente.alt}"`);
       });
 
-      it('el color es el fondo del propio <img>: se ve por la pared transparente', () => {
+      it('el color es el fondo de la propia imagen: se ve por la pared transparente', () => {
         expect(html).toContain(`background-color:${COLOR_PRUEBA}`);
         expect(html.match(new RegExp(COLOR_PRUEBA, 'gi'))).toHaveLength(1);
       });

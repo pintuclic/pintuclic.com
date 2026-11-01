@@ -22,7 +22,7 @@ export interface FotoAmbienteProps {
 /**
  * Un ambiente del simulador: la fotografía con la pared transparente, y el color detrás (S3).
  *
- * El color es el `background-color` del propio `<img>`: se ve a través de los píxeles
+ * El color es el `background-color` de la propia imagen: se ve a través de los píxeles
  * transparentes de la pared, mientras que muebles, ventanas y objetos son opacos y no cambian.
  * Las sombras de la pared son píxeles semitransparentes de la foto, así que no hace falta ninguna
  * capa encima ni `mix-blend-mode`. Cambiar de color es cambiar ese estilo: la imagen no se vuelve
