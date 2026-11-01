@@ -178,11 +178,11 @@ export const footer: Omit<FooterProps, 'contact' | 'socials'> = {
     },
   ],
   contactTitle: 'Contacto',
-  // M07: Wompi es la única pasarela y Nequi el único medio de pago habilitado. Si se habilitan tarjetas, se suman aquí.
+  // M07: Wompi es la única pasarela. Nequi va directo y el resto por la página de pago de Wompi (R19).
   payments: {
     title: 'Pagos seguros',
     gateway: 'Procesados por Wompi',
-    methods: ['Nequi'],
+    methods: ['Nequi', 'Tarjetas', 'PSE', 'Daviplata'],
   },
   legalLinks: [
     { label: 'Términos y condiciones', href: '/terminos-y-condiciones' },

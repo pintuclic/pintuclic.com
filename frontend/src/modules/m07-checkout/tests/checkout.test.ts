@@ -16,8 +16,10 @@ import {
   rangoDePeriodo,
   sigueEnCurso,
   textoEnvio,
+  etiquetaMedio,
   textoPeriodo,
   ultimosMeses,
+  urlPaginaWompi,
 } from '../services/textos-checkout';
 
 function errorApi(status: number, code: string, details: unknown): AxiosError {
@@ -38,6 +40,7 @@ const base = {
   apartamentoCasa: '',
   nombreRecibe: '',
   telefonoRecibe: '',
+  medio: 'nequi' as const,
   celularNequi: '3991111111',
   aceptaReglamento: true,
   aceptaDatos: true,
@@ -68,9 +71,16 @@ describe('M07 · formulario de pago', () => {
     ).toBe(true);
   });
 
-  it('R4: el reintento pide celular y casillas', () => {
-    expect(reintentoFormSchema.safeParse({ celularNequi: '3992222222', aceptaReglamento: true, aceptaDatos: true }).success).toBe(true);
-    expect(reintentoFormSchema.safeParse({ celularNequi: '3992222222', aceptaReglamento: false, aceptaDatos: true }).success).toBe(false);
+  it('R4: el reintento con Nequi pide celular y casillas', () => {
+    expect(reintentoFormSchema.safeParse({ medio: 'nequi', celularNequi: '3992222222', aceptaReglamento: true, aceptaDatos: true }).success).toBe(true);
+    expect(reintentoFormSchema.safeParse({ medio: 'nequi', celularNequi: '3992222222', aceptaReglamento: false, aceptaDatos: true }).success).toBe(false);
+  });
+
+  it('R19: en la página de Wompi no se pide celular ni casillas', () => {
+    expect(pagoFormSchema.safeParse({ ...base, medio: 'pagina_wompi', celularNequi: '', aceptaReglamento: false, aceptaDatos: false }).success).toBe(true);
+    expect(reintentoFormSchema.safeParse({ medio: 'pagina_wompi', celularNequi: '', aceptaReglamento: false, aceptaDatos: false }).success).toBe(true);
+    const sinCelular = pagoFormSchema.safeParse({ ...base, celularNequi: '' });
+    expect(sinCelular.error?.issues.map((i) => i.path[0])).toEqual(['celularNequi']);
   });
 });
 
@@ -100,7 +110,7 @@ describe('M07 · errores de la API', () => {
 
 describe('M07 · textos', () => {
   it('la pantalla sigue preguntando mientras Nequi no responde o el pedido no existe', () => {
-    expect(sigueEnCurso({ estado: 'en_pago', intentos: [{ numero: 1, estadoWompi: 'PENDING', celularEnmascarado: '', motivo: null, fecha: '' }] })).toBe(true);
+    expect(sigueEnCurso({ estado: 'en_pago', intentos: [{ numero: 1, estadoWompi: 'PENDING', medio: 'nequi', metodo: null, celularEnmascarado: '', motivo: null, fecha: '' }] })).toBe(true);
     expect(sigueEnCurso({ estado: 'pagada', intentos: [] })).toBe(true);
     expect(sigueEnCurso({ estado: 'rechazada', intentos: [] })).toBe(false);
     expect(sigueEnCurso({ estado: 'completada', intentos: [] })).toBe(false);
@@ -172,5 +182,50 @@ describe('M07 · periodo del panel de pagos (R18)', () => {
     expect(textoPeriodo({ desde: '2026-10-28', hasta: '2026-10-28' })).toMatch(/28/);
     expect(textoPeriodo({ desde: '2026-10-01', hasta: null })).toMatch(/^Desde /);
     expect(textoPeriodo({ desde: '2026-10-01', hasta: '2026-10-31' })).toContain('–');
+  });
+});
+
+describe('M07 · página de pago de Wompi (R19)', () => {
+  const pago = {
+    llavePublica: 'pub_test_abc',
+    referencia: 'SOL-2026-00010-1',
+    montoEnCentavos: 1_600_000,
+    moneda: 'COP' as const,
+    venceEn: '2026-11-01T15:30:00.000Z',
+    firmaIntegridad: 'f1rma',
+    correo: 'ana@correo.co',
+    nombre: 'Ana Pérez',
+  };
+
+  it('arma el enlace a checkout.wompi.co con los datos firmados y la vuelta a la compra', () => {
+    const url = new URL(urlPaginaWompi(pago, 'https://pintuclic.com/checkout/SOL-2026-00010'));
+    expect(`${url.origin}${url.pathname}`).toBe('https://checkout.wompi.co/p/');
+    const q = url.searchParams;
+    expect(q.get('public-key')).toBe('pub_test_abc');
+    expect(q.get('currency')).toBe('COP');
+    expect(q.get('amount-in-cents')).toBe('1600000');
+    expect(q.get('reference')).toBe('SOL-2026-00010-1');
+    expect(q.get('signature:integrity')).toBe('f1rma');
+    expect(q.get('expiration-time')).toBe('2026-11-01T15:30:00.000Z');
+    expect(q.get('redirect-url')).toBe('https://pintuclic.com/checkout/SOL-2026-00010');
+    expect(q.get('customer-data:email')).toBe('ana@correo.co');
+    expect(q.get('customer-data:full-name')).toBe('Ana Pérez');
+  });
+
+  it('en desarrollo no manda la vuelta a localhost, que el firewall de Wompi bloquea', () => {
+    expect(new URL(urlPaginaWompi(pago, 'http://localhost:3001/checkout/SOL-2026-00010')).searchParams.has('redirect-url')).toBe(false);
+    expect(new URL(urlPaginaWompi(pago, 'http://127.0.0.1:3001/checkout/SOL-2026-00010')).searchParams.has('redirect-url')).toBe(false);
+    expect(new URL(urlPaginaWompi(pago, 'https://pintuclic.com/checkout/SOL-2026-00010')).searchParams.get('redirect-url')).toBe(
+      'https://pintuclic.com/checkout/SOL-2026-00010',
+    );
+  });
+
+  it('nombra el medio con que se pagó', () => {
+    expect(etiquetaMedio({ medio: 'pagina_wompi', metodo: 'CARD' })).toBe('Tarjeta');
+    expect(etiquetaMedio({ medio: 'pagina_wompi', metodo: 'PSE' })).toBe('PSE');
+    expect(etiquetaMedio({ medio: 'pagina_wompi', metodo: 'DAVIPLATA' })).toBe('Daviplata');
+    expect(etiquetaMedio({ medio: 'pagina_wompi', metodo: null })).toBe('Página de Wompi');
+    expect(etiquetaMedio({ medio: 'nequi', metodo: null })).toBe('Nequi');
+    expect(etiquetaMedio({ medio: 'pagina_wompi', metodo: 'OTRO_NUEVO' })).toBe('OTRO_NUEVO');
   });
 });

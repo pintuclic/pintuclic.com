@@ -84,7 +84,7 @@ export function PagosAdminView() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Pagos"
-        subtitle="Compras con Nequi por Wompi. Filtra por periodo, revisa las que quedaron en revisión o pagadas sin pedido y concílialas con Wompi."
+        subtitle="Compras pagadas por Wompi: Nequi, tarjeta, PSE, Daviplata y más. Filtra por periodo, revisa las que quedaron en revisión o pagadas sin pedido y concílialas con Wompi."
       />
 
       {idCliente !== null && (

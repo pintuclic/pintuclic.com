@@ -10,6 +10,16 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.28] - 2026-11-01
+### Esquema 4.27 (98 Tablas) - M07: más medios de pago con la página de Wompi
+- **Alcance General:** M07 (contrato `contracts/m07-checkout.contract.ts`, R19). Además de Nequi directo, el cliente puede pagar en el Web Checkout de Wompi (tarjeta, PSE, Daviplata y los demás medios habilitados en la cuenta). Cambio aditivo e idempotente: no borra ni reescribe datos.
+  - **`intento_pago.medio`** (`VARCHAR(20) NOT NULL DEFAULT 'nequi'`, `CHECK` en `nequi` o `pagina_wompi`): cómo se intentó cobrar. Las filas existentes quedan como `nequi`, que es lo que eran.
+  - **`intento_pago.metodo_wompi`** (`VARCHAR(40) NULL`): el `payment_method_type` de la transacción en Wompi (CARD, PSE, DAVIPLATA, NEQUI…). Se llena al conocer la transacción.
+  - **`intento_pago.celular_enmascarado`** deja de ser obligatorio: la página de Wompi no usa el celular de Nequi.
+  - **Prisma:** `IntentoPago.medio`, `IntentoPago.metodoWompi` y `celularEnmascarado` opcional.
+
+---
+
 ## [v3.27] - 2026-10-31
 ### Esquema 4.26 (98 Tablas) - M09: la marca «preparada» por línea de orden
 - **Alcance General:** PR general de la revisión de M09 (contrato `contracts/m09-cumplimiento.contract.ts`, R15 a R17). Cambio aditivo e idempotente: un valor de ENUM; no altera tablas ni datos.

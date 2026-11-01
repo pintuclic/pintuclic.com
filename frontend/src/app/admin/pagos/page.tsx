@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'Pagos — Panel Administrativo — Pintu Clic',
 };
 
-/** M07 · Compras con Nequi por Wompi. Filtros y búsqueda en la URL; el permiso lo resuelve el servidor. */
+/** M07 · Compras pagadas por Wompi (Nequi y la página de pago de Wompi). Filtros y búsqueda en la URL; el permiso lo resuelve el servidor. */
 export default function PagosAdminPage() {
   return (
     <Suspense fallback={null}>

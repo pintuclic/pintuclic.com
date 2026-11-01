@@ -71,13 +71,13 @@ import type { SolicitudPagadaInput } from './m08-ordenes.contract';
  *      e) Si el cálculo trae un cupón aplicado, lo registra en M06 (`registrarUsoCupon`, referencia = código
  *         SOL). Si M06 responde `registrado: false` → la solicitud queda cancelada y responde 409
  *         CUPON_NO_DISPONIBLE con el motivo; el cliente vuelve al carrito, que ya muestra el motivo.
- *      f) Crea el intento 1 en Wompi (R11). Si Wompi no responde o rechaza la petición → la solicitud queda
+ *      f) Crea el intento 1: con Nequi, en Wompi (R11); con la página de Wompi, solo el intento (R19). Si Wompi no responde o rechaza la petición → la solicitud queda
  *         rechazada, se puede reintentar, y responde 503 PASARELA_NO_DISPONIBLE.
  *      g) Responde 201 con la solicitud en `en_pago`.
  *  R3  VIGENCIA: VIGENCIA_SOLICITUD_MINUTOS desde que se crea. Mientras el último intento esté PENDING en
  *      Wompi, la solicitud NO vence. Vencer o cancelar libera el cupón (`liberarUsoCupon`). El vencimiento
  *      se aplica al consultarla y en la tarea de la cola (R6); no hace falta un cron aparte.
- *  R4  REINTENTAR (POST /:codigo/reintentar): solo `rechazada` y vigente; puede cambiar el celular. Como
+ *  R4  REINTENTAR (POST /:codigo/reintentar): solo `rechazada` y vigente; puede cambiar el celular o el medio (R19). Como
  *      máximo MAXIMO_INTENTOS_PAGO intentos por solicitud; después → 409 LIMITE_INTENTOS y el cliente
  *      empieza otra desde el carrito. El precio no se recalcula: se cobra lo congelado.
  *  R5  CONFIRMACIÓN. Wompi avisa por POST /checkout/wompi/eventos (evento `transaction.updated`):
@@ -138,6 +138,27 @@ import type { SolicitudPagadaInput } from './m08-ordenes.contract';
  *      con el subtotal y el total que el cliente vio. Mismas reglas R1–R16, con estas diferencias: sin cupón
  *      (D9), origen `carrito` (RF-ORD-01-03 solo distingue carrito o cotización), y un combo pedido por encima
  *      de su tope responde 409 PRODUCTO_NO_DISPONIBLE. La solicitud queda marcada `compraDirecta`.
+ *  R19 PÁGINA DE PAGO DE WOMPI (Web Checkout): además de Nequi directo (R11), el cliente puede pagar en la
+ *      página de Wompi (`medio = pagina_wompi`) con tarjeta, PSE, Daviplata y los demás medios que la cuenta de
+ *      Wompi tenga habilitados; M07 no elige cuáles. El intento nace PENDING sin transacción y sin celular ni
+ *      tokens de aceptación (los pide Wompi en su página). La respuesta trae `pagoWompi`: llave pública,
+ *      referencia del intento, monto en centavos, moneda, vencimiento (`venceEn` de la solicitud, en
+ *      `expiration-time`) y la firma de integridad SHA-256 de referencia + monto + moneda + vencimiento +
+ *      secreto de integridad, calculada en el backend. La pantalla arma el enlace a
+ *      https://checkout.wompi.co/p/ con esos datos, el correo y nombre del cliente y `redirect-url` =
+ *      /checkout/<SOL> de la tienda, y lleva al cliente allí. Al volver, el `id` de la URL NO se usa para
+ *      decidir nada: el backend busca la transacción en Wompi por la referencia del intento (GET
+ *      /transactions?reference=, llave privada; si hay varias, gana la APPROVED, si no la más reciente) y
+ *      aplica R5 b y R6 como con Nequi. El evento de R5 también la encuentra por referencia. En la página el
+ *      cliente puede probar otro medio tras un rechazo, con la misma referencia: por eso una solicitud `rechazada`
+ *      cuyo último intento es de la página se sigue consultando; un PENDING nuevo la devuelve a `en_pago` y un
+ *      APPROVED sigue R6.
+ *      Pago en curso (R2 c, R3): un intento Nequi PENDING, o uno de la página de Wompi PENDING que YA tiene
+ *      transacción. Uno de la página sin transacción no está en curso: la solicitud se puede cancelar y vence;
+ *      si el cliente paga después, R8. `pagoWompi` solo viene mientras la solicitud está `en_pago`, el último
+ *      intento es de la página, no tiene transacción y la solicitud no ha vencido; en las demás, null. Cada
+ *      intento guarda con qué medio pagó (`metodo`, el `payment_method_type` de Wompi: CARD, PSE, DAVIPLATA,
+ *      NEQUI, BANCOLOMBIA_TRANSFER…). Un intento ya APPROVED no se cambia por otra transacción no aprobada.
  *  R18 FILTROS DEL PANEL: la lista de pagos se filtra por periodo (`desde`, `hasta`: días de Colombia,
  *      America/Bogota, ambos incluidos, por la fecha en que se creó la compra) y por cliente (`idCliente`),
  *      combinables con `estado` y `busqueda`. La pantalla ofrece hoy, ayer, últimos 7 días, este mes, mes
@@ -151,21 +172,24 @@ import type { SolicitudPagadaInput } from './m08-ordenes.contract';
  *   /checkout?idVariante=…&idColor=…&cantidad=… (R17); sin sesión, pide iniciarla y vuelve allí (P9).
  *  /checkout: pasos Carrito → Pago → Orden (Stepper del Core Kit). Columna principal: "¿Cómo quieres
  *   recibirlo?" (Envío a domicilio con la dirección precargada y editable / Recoger en el almacén),
- *   "Paga con Nequi" (celular y el aviso "Necesitas la app de Nequi en este celular") y las dos casillas
- *   de Wompi. Columna lateral fija: líneas compactas, subtotal, descuentos, envío ("Gratis" si es 0),
- *   total con IVA incluido y el botón verde "Pagar con Nequi" (`primary-conversion`). Sellos de pago seguro.
+ *   "¿Cómo quieres pagar?": "Nequi" (celular, el aviso "Necesitas la app de Nequi en este celular" y las dos
+ *   casillas de Wompi) o "Tarjeta, PSE, Daviplata y más" (R19: sin más campos; se paga en la página de
+ *   Wompi). Columna lateral fija: líneas compactas, subtotal, descuentos, envío ("Gratis" si es 0),
+ *   total con IVA incluido y el botón verde "Pagar con Nequi" o "Ir a pagar" (`primary-conversion`). Sellos de pago seguro.
  *  /checkout/:codigo: "Revisa tu celular y acepta el pago en Nequi" con un indicador de espera y la
  *   consulta cada INTERVALO_CONSULTA_PANTALLA_SEGUNDOS. Aprobado y orden creada: "¡Compra confirmada!" con
  *   el código del pedido y el enlace a "Mis pedidos" (M08). Pagada sin orden aún: "Recibimos tu pago,
  *   estamos registrando tu pedido". Rechazado: el motivo en palabras simples, "Intentar de nuevo" y
- *   "Volver al carrito". Vencida o cancelada: aviso y "Volver al carrito".
+ *   "Volver al carrito". Vencida o cancelada: aviso y "Volver al carrito". Con `pagoWompi` (R19): "Completa tu
+ *   pago en Wompi" con "Ir a pagar" y "Cancelar compra"; al volver de Wompi, "Estamos confirmando tu pago".
  *  /admin/pagos: lista con filtros (estado y búsqueda por código SOL, código de orden o cliente, en la URL)
  *   y detalle con los intentos (estado de Wompi, fecha, id de transacción) y los botones "Consultar en
  *   Wompi" y "Reintentar crear el pedido".
  *
  * ── Decisiones por defecto (el Tech Lead puede vetarlas) ────────────────────
- *  D1  Wompi con Nequi como único medio (decidido con el equipo). Sin tarjetas, PSE ni efectivo.
- *  D2  Integración por API (no Web Checkout), para ofrecer solo Nequi y quedarse en el sitio.
+ *  D1  Wompi como única pasarela. Nequi por API (R11) y, desde R19, los demás medios en la página de Wompi.
+ *  D2  Nequi sigue por API para que el cliente no salga del sitio; tarjetas, PSE, Daviplata y el resto van por
+ *      el Web Checkout de Wompi, que maneja los datos sensibles y los pasos de cada banco (R19).
  *  D3  RF-CHK-05-04 (pago directo verificado por un empleado) se reduce a conciliar: el personal solo
  *      pide a Wompi el estado real. No hay pagos fuera de Wompi.
  *  D4  Vigencia de 30 minutos; como máximo 3 intentos por solicitud.
@@ -262,6 +286,10 @@ export type OrigenSolicitud = z.infer<typeof origenSolicitudSchema>;
 export const estadoWompiSchema = z.enum(['PENDING', 'APPROVED', 'DECLINED', 'ERROR', 'VOIDED']);
 export type EstadoWompi = z.infer<typeof estadoWompiSchema>;
 
+/** R19: cómo paga el cliente: Nequi directo (R11) o la página de pago de Wompi. */
+export const medioPagoSchema = z.enum(['nequi', 'pagina_wompi']);
+export type MedioPago = z.infer<typeof medioPagoSchema>;
+
 /** R12: celular colombiano registrado en Nequi. */
 export const celularNequiSchema = z
   .string()
@@ -329,8 +357,15 @@ export const crearSolicitudRequestSchema = z
     modoEntrega: modoEntregaSchema,
     /** Obligatoria con `domicilio`; null con `recogida`. */
     direccion: direccionEntregaSchema.nullable(),
-    celularNequi: celularNequiSchema,
-    aceptaciones: aceptacionesWompiSchema,
+    /** R19: sin él, Nequi. */
+    medio: medioPagoSchema.default('nequi'),
+    /** Obligatorios con Nequi (R12, R13); la página de Wompi los pide en su lado. */
+    celularNequi: celularNequiSchema.optional(),
+    aceptaciones: aceptacionesWompiSchema.optional(),
+  })
+  .refine((v) => v.medio !== 'nequi' || (v.celularNequi !== undefined && v.aceptaciones !== undefined), {
+    message: 'Escribe tu celular de Nequi y acepta los términos de Wompi',
+    path: ['celularNequi'],
   })
   .refine((v) => v.modoEntrega !== 'domicilio' || v.direccion !== null, {
     message: 'Escribe la dirección de entrega',
@@ -343,10 +378,16 @@ export const crearSolicitudRequestSchema = z
 export type CrearSolicitudRequest = z.infer<typeof crearSolicitudRequestSchema>;
 
 /** POST /checkout/solicitudes/:codigo/reintentar (R4). */
-export const reintentarPagoRequestSchema = z.object({
-  celularNequi: celularNequiSchema,
-  aceptaciones: aceptacionesWompiSchema,
-});
+export const reintentarPagoRequestSchema = z
+  .object({
+    medio: medioPagoSchema.default('nequi'),
+    celularNequi: celularNequiSchema.optional(),
+    aceptaciones: aceptacionesWompiSchema.optional(),
+  })
+  .refine((v) => v.medio !== 'nequi' || (v.celularNequi !== undefined && v.aceptaciones !== undefined), {
+    message: 'Escribe tu celular de Nequi y acepta los términos de Wompi',
+    path: ['celularNequi'],
+  });
 export type ReintentarPagoRequest = z.infer<typeof reintentarPagoRequestSchema>;
 
 /** R18: un día del calendario de Colombia (America/Bogota), `AAAA-MM-DD`. */
@@ -449,13 +490,32 @@ export type LineaSolicitud = z.infer<typeof lineaSolicitudSchema>;
 export const intentoPagoSchema = z.object({
   numero: z.number().int().min(1).max(MAXIMO_INTENTOS_PAGO),
   estadoWompi: estadoWompiSchema,
-  /** R12: `*** *** 1111`. */
-  celularEnmascarado: z.string(),
+  /** R19 */
+  medio: medioPagoSchema,
+  /** R19: `payment_method_type` de Wompi (CARD, PSE, DAVIPLATA, NEQUI…); null mientras no hay transacción. */
+  metodo: z.string().nullable(),
+  /** R12: `*** *** 1111`; null en la página de Wompi. */
+  celularEnmascarado: z.string().nullable(),
   /** Mensaje en palabras simples cuando Wompi lo rechaza; null en los demás. */
   motivo: z.string().nullable(),
   fecha: fechaHoraSchema,
 });
 export type IntentoPago = z.infer<typeof intentoPagoSchema>;
+
+/** R19: lo que la pantalla necesita para llevar al cliente a https://checkout.wompi.co/p/. */
+export const pagoWompiSchema = z.object({
+  llavePublica: z.string(),
+  referencia: z.string(),
+  montoEnCentavos: z.number().int().positive(),
+  moneda: z.literal('COP'),
+  /** `expiration-time`: ISO 8601 en UTC; es el `venceEn` de la solicitud. */
+  venceEn: fechaHoraSchema,
+  /** `signature:integrity`, firmada en el backend con el vencimiento. */
+  firmaIntegridad: z.string(),
+  correo: z.string(),
+  nombre: z.string(),
+});
+export type PagoWompi = z.infer<typeof pagoWompiSchema>;
 
 export const solicitudSchema = z.object({
   codigo: codigoSolicitudSchema,
@@ -478,6 +538,8 @@ export const solicitudSchema = z.object({
   /** R17: se pagó desde la ficha, sin el carrito. */
   compraDirecta: z.boolean(),
   creadaEn: fechaHoraSchema,
+  /** R19: para ir (o volver) a pagar en la página de Wompi; null si no aplica. */
+  pagoWompi: pagoWompiSchema.nullable(),
 });
 export type Solicitud = z.infer<typeof solicitudSchema>;
 export const solicitudResponseEnvelopeSchema = respuestaUno(solicitudSchema);
@@ -608,6 +670,17 @@ export interface OrdenesCheckoutPort {
 }
 
 /** Cliente de Wompi (adaptador del módulo; en pruebas, uno en memoria). */
+export interface TransaccionWompi {
+  idTransaccion: string;
+  estado: EstadoWompi;
+  referencia: string;
+  montoEnCentavos: number;
+  moneda: string;
+  mensaje: string | null;
+  /** R19: `payment_method_type`. */
+  metodo: string | null;
+}
+
 export interface PasarelaPagoPort {
   terminos(): Promise<TerminosWompi>;
   crearTransaccionNequi(entrada: {
@@ -618,14 +691,14 @@ export interface PasarelaPagoPort {
     tokenAceptacion: string;
     tokenDatosPersonales: string;
   }): Promise<{ idTransaccion: string; estado: EstadoWompi }>;
-  consultarTransaccion(idTransaccion: string): Promise<{
-    idTransaccion: string;
-    estado: EstadoWompi;
-    referencia: string;
-    montoEnCentavos: number;
-    moneda: string;
-    mensaje: string | null;
-  }>;
+  consultarTransaccion(idTransaccion: string): Promise<TransaccionWompi>;
+  /** R19: la transacción de una referencia (la APPROVED si hay, si no la más reciente); null si no hay. */
+  buscarPorReferencia(referencia: string): Promise<TransaccionWompi | null>;
+  /** R19: llave pública y firma de integridad con vencimiento para la página de Wompi. */
+  datosPaginaPago(entrada: { referencia: string; montoEnCentavos: number; venceEn: Date }): {
+    llavePublica: string;
+    firmaIntegridad: string;
+  };
   /** R5 a: valida el checksum del evento sobre el cuerpo recibido, antes de Zod. */
   firmaValida(cuerpo: unknown, checksumCabecera: string | null): boolean;
 }
@@ -637,7 +710,7 @@ export interface PasarelaPagoPort {
  *  GET  /preparar                        datos de la pantalla /checkout (?codigoCupon)
  *  POST /solicitudes                     iniciar el pago (R2)                     → 201 solicitud
  *  GET  /solicitudes/:codigo             estado de una mía (R5, consulta a Wompi de respaldo)
- *  POST /solicitudes/:codigo/reintentar  nuevo intento con Nequi (R4)
+ *  POST /solicitudes/:codigo/reintentar  nuevo intento con Nequi o la página de Wompi (R4, R19)
  *  POST /solicitudes/:codigo/cancelar    cancelar si no hay pago en curso (R3)
  *
  *  Wompi (montaje: /api/v1/checkout/wompi) — sin sesión; firma del evento (R5)

@@ -24,6 +24,14 @@ import {
 const sha = (t: string): string => createHash('sha256').update(t).digest('hex');
 
 describe('M07 · firmas de Wompi', () => {
+  it('R19: con vencimiento, la firma concatena la fecha entre la moneda y el secreto (ejemplo de Wompi)', () => {
+    const secreto = 'prod_integrity_Z5mMke9x0k8gpErbDqwrJXMqsI6SFli6';
+    expect(firmaIntegridad('sk8-438k4-xmxm392-sn2m', 2490000, 'COP', secreto, '2023-06-09T20:28:50.000Z')).toBe(
+      sha('sk8-438k4-xmxm392-sn2m2490000COP2023-06-09T20:28:50.000Zprod_integrity_Z5mMke9x0k8gpErbDqwrJXMqsI6SFli6'),
+    );
+    expect(firmaIntegridad('R-1', 100, 'COP', 's')).toBe(sha('R-1100COPs'));
+  });
+
   it('R11: la firma de integridad es SHA-256 de referencia + centavos + moneda + secreto', () => {
     expect(firmaIntegridad('SOL-2026-00001-1', 4990000, 'COP', 'test_integrity_x')).toBe(
       sha('SOL-2026-00001-14990000COPtest_integrity_x'),

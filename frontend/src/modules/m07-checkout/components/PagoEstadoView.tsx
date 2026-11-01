@@ -3,14 +3,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CircleCheck, Loader2, Smartphone } from 'lucide-react';
+import { CircleCheck, CreditCard, Loader2, Smartphone } from 'lucide-react';
 import { Alert, Button, ButtonLink, Checkbox, Container, Input, Skeleton, Stepper } from '@/core/components';
 import { avisarCarritoActualizado } from '@/core/utils/eventos-carrito';
-import { INTERVALO_CONSULTA_PANTALLA_SEGUNDOS, MAXIMO_INTENTOS_PAGO, type Solicitud, type TerminosWompi } from '../dtos/m07-checkout.dto';
+import {
+  INTERVALO_CONSULTA_PANTALLA_SEGUNDOS,
+  MAXIMO_INTENTOS_PAGO,
+  type PagoWompi,
+  type Solicitud,
+  type TerminosWompi,
+} from '../dtos/m07-checkout.dto';
 import { reintentoFormSchema, type ReintentoFormData, type ReintentoFormEntrada } from '../dtos/formularios.dto';
 import { checkoutApi, mensajeDeError } from '../services/checkout-api';
-import { PASOS_COMPRA, PASOS_COMPRA_DIRECTA, pasoDe, sigueEnCurso } from '../services/textos-checkout';
-import { EstadoSolicitudBadge, ResumenCompra, type LineaResumen } from './comunes';
+import { PASOS_COMPRA, PASOS_COMPRA_DIRECTA, etiquetaMedio, pasoDe, sigueEnCurso, urlPaginaWompi } from '../services/textos-checkout';
+import { AvisoPaginaWompi, EstadoSolicitudBadge, ResumenCompra, SelectorMedioPago, type LineaResumen } from './comunes';
+
+/** R19: a la página de Wompi; vuelve a esta misma compra. */
+function irAWompi(codigo: string, p: PagoWompi): void {
+  window.location.assign(urlPaginaWompi(p, `${window.location.origin}/checkout/${codigo}`));
+}
 
 function lineasDe(s: Solicitud): LineaResumen[] {
   return s.lineas.map((l, i) => ({
@@ -23,7 +34,7 @@ function lineasDe(s: Solicitud): LineaResumen[] {
   }));
 }
 
-/** Reintentar con Nequi (R4): celular y las dos casillas de Wompi. */
+/** Reintentar (R4) con Nequi (celular y las dos casillas de Wompi) o en la página de Wompi (R19). */
 function Reintento({ solicitud, onListo }: { solicitud: Solicitud; onListo: (s: Solicitud) => void }) {
   const [terminos, setTerminos] = useState<TerminosWompi | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +42,13 @@ function Reintento({ solicitud, onListo }: { solicitud: Solicitud; onListo: (s: 
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ReintentoFormEntrada, unknown, ReintentoFormData>({
     resolver: zodResolver(reintentoFormSchema),
-    defaultValues: { celularNequi: '', aceptaReglamento: false, aceptaDatos: false },
+    defaultValues: { medio: solicitud.intentos.at(-1)?.medio ?? 'nequi', celularNequi: '', aceptaReglamento: false, aceptaDatos: false },
   });
+  const medio = watch('medio');
   // La casilla del Core Kit dibuja la marca con `checked`.
   const aceptaReglamento = watch('aceptaReglamento');
   const aceptaDatos = watch('aceptaDatos');
@@ -52,15 +65,24 @@ function Reintento({ solicitud, onListo }: { solicitud: Solicitud; onListo: (s: 
   }, []);
 
   const reintentar = async (f: ReintentoFormData): Promise<void> => {
-    if (terminos === null) return;
+    if (f.medio === 'nequi' && terminos === null) return;
     setError(null);
     try {
-      onListo(
-        await checkoutApi.reintentar(solicitud.codigo, {
-          celularNequi: f.celularNequi,
-          aceptaciones: { tokenAceptacion: terminos.tokenAceptacion, tokenDatosPersonales: terminos.tokenDatosPersonales, aceptaTerminos: true },
-        }),
+      const s = await checkoutApi.reintentar(
+        solicitud.codigo,
+        f.medio === 'nequi' && terminos !== null
+          ? {
+              medio: 'nequi',
+              celularNequi: f.celularNequi,
+              aceptaciones: { tokenAceptacion: terminos.tokenAceptacion, tokenDatosPersonales: terminos.tokenDatosPersonales, aceptaTerminos: true },
+            }
+          : { medio: 'pagina_wompi' },
       );
+      if (s.pagoWompi !== null) {
+        irAWompi(s.codigo, s.pagoWompi);
+        return;
+      }
+      onListo(s);
     } catch (err: unknown) {
       setError(mensajeDeError(err, 'No fue posible reintentar el pago.'));
     }
@@ -69,59 +91,75 @@ function Reintento({ solicitud, onListo }: { solicitud: Solicitud; onListo: (s: 
   return (
     <form onSubmit={(e) => void handleSubmit(reintentar)(e)} noValidate className="space-y-4">
       {error !== null && <Alert variant="error">{error}</Alert>}
-      <Input
-        id="celularNequi"
-        label="Celular de Nequi"
-        type="tel"
-        inputMode="numeric"
-        leftIcon={<Smartphone aria-hidden className="h-4 w-4" />}
-        error={errors.celularNequi?.message}
-        {...register('celularNequi')}
-      />
-      {terminos !== null && (
+      <SelectorMedioPago valor={medio} onCambiar={(m) => setValue('medio', m, { shouldValidate: false })} />
+      {medio === 'pagina_wompi' ? (
+        <AvisoPaginaWompi />
+      ) : (
         <>
-          <Checkbox
-            id="aceptaReglamento"
-            label={
-              <>
-                Acepto el{' '}
-                <a href={terminos.enlaceReglamento} target="_blank" rel="noopener noreferrer" className="font-semibold text-action underline">
-                  reglamento de Wompi
-                </a>
-                .
-              </>
-            }
-            error={errors.aceptaReglamento?.message}
-            checked={aceptaReglamento}
-            {...register('aceptaReglamento')}
+          <Input
+            id="celularNequi"
+            label="Celular de Nequi"
+            type="tel"
+            inputMode="numeric"
+            leftIcon={<Smartphone aria-hidden className="h-4 w-4" />}
+            error={errors.celularNequi?.message}
+            {...register('celularNequi')}
           />
-          <Checkbox
-            id="aceptaDatos"
-            label={
-              <>
-                Autorizo el{' '}
-                <a href={terminos.enlaceDatosPersonales} target="_blank" rel="noopener noreferrer" className="font-semibold text-action underline">
-                  tratamiento de mis datos personales
-                </a>{' '}
-                por Wompi.
-              </>
-            }
-            error={errors.aceptaDatos?.message}
-            checked={aceptaDatos}
-            {...register('aceptaDatos')}
-          />
+          {terminos !== null && (
+            <>
+              <Checkbox
+                id="aceptaReglamento"
+                label={
+                  <>
+                    Acepto el{' '}
+                    <a href={terminos.enlaceReglamento} target="_blank" rel="noopener noreferrer" className="font-semibold text-action underline">
+                      reglamento de Wompi
+                    </a>
+                    .
+                  </>
+                }
+                error={errors.aceptaReglamento?.message}
+                checked={aceptaReglamento}
+                {...register('aceptaReglamento')}
+              />
+              <Checkbox
+                id="aceptaDatos"
+                label={
+                  <>
+                    Autorizo el{' '}
+                    <a href={terminos.enlaceDatosPersonales} target="_blank" rel="noopener noreferrer" className="font-semibold text-action underline">
+                      tratamiento de mis datos personales
+                    </a>{' '}
+                    por Wompi.
+                  </>
+                }
+                error={errors.aceptaDatos?.message}
+                checked={aceptaDatos}
+                {...register('aceptaDatos')}
+              />
         </>
       )}
-      <Button type="submit" variant="primary-conversion" fullWidth isLoading={isSubmitting} disabled={terminos === null}>
-        Intentar de nuevo con Nequi
+        </>
+      )}
+      <Button
+        type="submit"
+        variant="primary-conversion"
+        fullWidth
+        isLoading={isSubmitting}
+        disabled={medio === 'nequi' && terminos === null}
+      >
+        {medio === 'nequi' ? 'Intentar de nuevo con Nequi' : 'Ir a pagar de nuevo'}
       </Button>
     </form>
   );
 }
 
-/** /checkout/:codigo: espera la respuesta de Nequi y muestra el resultado (R3–R8). */
+/** /checkout/:codigo: espera la respuesta de Nequi o de la página de Wompi y muestra el resultado (R3–R8, R19). */
 export function PagoEstadoView({ codigo }: { codigo: string }) {
   const [s, setS] = useState<Solicitud | null>(null);
+  // R19: Wompi vuelve con `?id=`. Solo cambia el texto: el resultado lo decide el backend consultando a Wompi.
+  const [volvioDeWompi, setVolvioDeWompi] = useState(false);
+  useEffect(() => setVolvioDeWompi(new URLSearchParams(window.location.search).has('id')), []);
   const [noDisponible, setNoDisponible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState(false);
@@ -198,7 +236,49 @@ export function PagoEstadoView({ codigo }: { codigo: string }) {
         <section aria-live="polite" className="space-y-4 rounded-card border border-neutral-light/70 bg-neutral-white p-6 shadow-card">
           {error !== null && <Alert variant="error">{error}</Alert>}
 
-          {s.estado === 'en_pago' && (
+          {s.estado === 'en_pago' && s.pagoWompi !== null && (
+            <div className="space-y-4 text-center">
+              {volvioDeWompi ? (
+                <>
+                  <Loader2 aria-hidden className="mx-auto h-10 w-10 animate-spin text-action" />
+                  <h2 className="font-title text-xl font-bold text-corporate">Estamos confirmando tu pago con Wompi</h2>
+                  <p className="text-sm text-neutral-dark">
+                    Si ya pagaste, esto tarda unos segundos y la página se actualiza sola. Si no alcanzaste a pagar, vuelve a la
+                    página de Wompi.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <CreditCard aria-hidden className="mx-auto h-10 w-10 text-action" />
+                  <h2 className="font-title text-xl font-bold text-corporate">Completa tu pago en Wompi</h2>
+                  <p className="text-sm text-neutral-dark">
+                    Paga con tarjeta, PSE, Daviplata u otro medio en la página segura de Wompi. Al terminar, vuelves aquí.
+                  </p>
+                </>
+              )}
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button variant={volvioDeWompi ? 'outline' : 'primary-conversion'} onClick={() => s.pagoWompi !== null && irAWompi(s.codigo, s.pagoWompi)}>
+                  Ir a pagar
+                </Button>
+                <Button variant="ghost" isLoading={cancelando} onClick={() => void cancelar()}>
+                  Cancelar compra
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {s.estado === 'en_pago' && s.pagoWompi === null && ultimo?.medio === 'pagina_wompi' && (
+            <div className="space-y-3 text-center">
+              <Loader2 aria-hidden className="mx-auto h-10 w-10 animate-spin text-action" />
+              <h2 className="font-title text-xl font-bold text-corporate">Estamos confirmando tu pago</h2>
+              <p className="text-sm text-neutral-dark">
+                Tu pago con {etiquetaMedio(ultimo)} está en proceso. Algunos bancos tardan unos minutos en confirmarlo; esta página
+                se actualiza sola.
+              </p>
+            </div>
+          )}
+
+          {s.estado === 'en_pago' && ultimo?.medio !== 'pagina_wompi' && (
             <div className="space-y-3 text-center">
               <Loader2 aria-hidden className="mx-auto h-10 w-10 animate-spin text-action" />
               <h2 className="font-title text-xl font-bold text-corporate">Revisa tu celular y acepta el pago en Nequi</h2>
@@ -243,7 +323,7 @@ export function PagoEstadoView({ codigo }: { codigo: string }) {
           {s.estado === 'rechazada' && (
             <div className="space-y-4">
               <Alert variant="error" title="El pago no se completó">
-                {ultimo?.motivo ?? 'Nequi no aprobó el pago.'}
+                {ultimo?.motivo ?? 'El pago no fue aprobado.'}
               </Alert>
               {s.intentos.length < MAXIMO_INTENTOS_PAGO ? (
                 <Reintento solicitud={s} onListo={setS} />

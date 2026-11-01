@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CreditCard, ShieldCheck, Smartphone } from 'lucide-react';
 import { Badge, Button } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
-import type { EstadoSolicitud } from '../dtos/m07-checkout.dto';
+import type { EstadoSolicitud, MedioPago } from '../dtos/m07-checkout.dto';
 import { ETIQUETA_ESTADO, FILTROS_ESTADO, VARIANTE_ESTADO, textoEnvio } from '../services/textos-checkout';
 
 export function EstadoSolicitudBadge({ estado }: { estado: EstadoSolicitud }) {
@@ -75,9 +75,48 @@ export function ResumenCompra({ lineas, subtotal, descuento, envio, total, child
       {children}
       <p className="flex items-center justify-center gap-1.5 text-xs text-neutral-medium">
         <ShieldCheck aria-hidden className="h-4 w-4 text-conversion" />
-        Pago seguro con Nequi a través de Wompi
+        Pago seguro a través de Wompi
       </p>
     </section>
+  );
+}
+
+/** R19: Nequi directo o la página de pago de Wompi (tarjeta, PSE, Daviplata y más). */
+export function SelectorMedioPago({ valor, onCambiar }: { valor: MedioPago; onCambiar: (m: MedioPago) => void }) {
+  return (
+    <div role="group" aria-label="Medio de pago" className="grid gap-3 sm:grid-cols-2">
+      <Button
+        type="button"
+        variant="selection"
+        selected={valor === 'nequi'}
+        aria-pressed={valor === 'nequi'}
+        onClick={() => onCambiar('nequi')}
+        leftIcon={<Smartphone aria-hidden className="h-5 w-5" />}
+      >
+        Nequi
+      </Button>
+      <Button
+        type="button"
+        variant="selection"
+        selected={valor === 'pagina_wompi'}
+        aria-pressed={valor === 'pagina_wompi'}
+        onClick={() => onCambiar('pagina_wompi')}
+        leftIcon={<CreditCard aria-hidden className="h-5 w-5" />}
+      >
+        Tarjeta, PSE, Daviplata y más
+      </Button>
+    </div>
+  );
+}
+
+/** Lo que verá el cliente al elegir la página de Wompi (R19). */
+export function AvisoPaginaWompi() {
+  return (
+    <p className="rounded-input border border-neutral-light bg-neutral-lightest p-3 text-sm text-neutral-dark">
+      Te llevaremos a la página segura de <span className="font-semibold">Wompi</span> para pagar con tarjeta de crédito o
+      débito, PSE, Daviplata, Bancolombia y otros medios. Tus datos de pago los recibe Wompi, no Pintu Clic. Al terminar,
+      vuelves a esta tienda.
+    </p>
   );
 }
 
