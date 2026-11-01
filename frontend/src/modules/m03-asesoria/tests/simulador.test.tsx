@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { EscenaAmbiente, ESCENAS } from '../components/publico/simulador/EscenaAmbiente';
+import { FotoAmbiente } from '../components/publico/simulador/FotoAmbiente';
 import { SimuladorColor } from '../components/publico/simulador/SimuladorColor';
 import {
   ADVERTENCIA_SIMULADOR,
@@ -11,29 +11,51 @@ import {
   simuladorInputSchema,
 } from '../dtos/m03-asesoria.dto';
 import { AMBIENTE_POR_DEFECTO, AMBIENTES, ambientePorId } from '../services/ambientes';
-import { aPuntos, puntoEnPlano, rectanguloEnPlano, rectPuntos, type PlanoPared } from '../services/geometria-escenas';
 import { leyendaDeVista, rotuloDeColor, sePuedeSimular, textoAccesible } from '../services/simulador';
 
 const RAIZ = resolve(__dirname, '../../../../../');
+const CARPETA_FOTOS = resolve(RAIZ, 'frontend/public/images/ambientes');
 
-/** Un color que NINGÚN mueble usa, para poder afirmar que solo la pared lo lleva. */
+/** Un color que NINGUNA foto trae de fábrica, para poder afirmar que el que se ve es el elegido. */
 const COLOR_PRUEBA = '#123456';
-
-/** Los dibujos de ambiente, y solo ellos: los iconos también son <svg>. */
-const ESCENA = 'viewBox="0 0 800 500"';
 
 const SOL = { hexadecimal: '#FFC785', nombre: 'Sol De La Tarde', codigo: 'NRO96T' };
 const AZUL = { hexadecimal: '#1F3A93', nombre: 'Azul Profundo', codigo: null };
 
-describe('simulador · el DTO es espejo del contrato (S7)', () => {
+/** La ruta pública de una foto (`/images/ambientes/sala.webp`) en el disco. */
+const archivoDe = (imagen: string): string => resolve(RAIZ, 'frontend/public', `.${imagen}`);
+
+/** Lee la cabecera de un WebP extendido (VP8X): si lleva canal alfa y cuánto mide. */
+function cabeceraWebp(ruta: string): { formato: string; alfa: boolean; ancho: number; alto: number } {
+  const b = readFileSync(ruta);
+  const esWebp = b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP';
+  const extendido = b.toString('ascii', 12, 16) === 'VP8X';
+  return {
+    formato: esWebp ? 'webp' : 'otro',
+    // Solo el formato extendido declara el alfa; sin él, la foto no tiene transparencia.
+    alfa: esWebp && extendido && ((b[20] ?? 0) & 0x10) !== 0,
+    ancho: extendido ? 1 + b.readUIntLE(24, 3) : 0,
+    alto: extendido ? 1 + b.readUIntLE(27, 3) : 0,
+  };
+}
+
+describe('simulador · el DTO es espejo del contrato (S5, S7)', () => {
+  const contrato = readFileSync(resolve(RAIZ, 'contracts/m03-asesoria.contract.ts'), 'utf8');
+
   it('el aviso del DTO es idéntico al del contrato', () => {
-    const contrato = readFileSync(resolve(RAIZ, 'contracts/m03-asesoria.contract.ts'), 'utf8');
     expect(contrato).toContain(ADVERTENCIA_SIMULADOR);
   });
 
   it('el aviso habla de referencia y no promete el resultado', () => {
     expect(ADVERTENCIA_SIMULADOR.toLowerCase()).toContain('referencia');
     expect(ADVERTENCIA_SIMULADOR.toLowerCase()).not.toContain('así se verá');
+  });
+
+  it('el esquema del ambiente lleva la foto y el encuadre, igual que el contrato', () => {
+    expect(contrato).toContain("imagen: z.string().regex(/^\\/images\\/ambientes\\/[a-z0-9-]+\\.webp$/)");
+    expect(contrato).toContain("z.enum(['arriba', 'centro', 'abajo'])");
+    expect(ambienteSimuladorSchema.shape).toHaveProperty('imagen');
+    expect(ambienteSimuladorSchema.shape).toHaveProperty('encuadre');
   });
 
   it('el simulador solo acepta un #RRGGBB', () => {
@@ -49,17 +71,13 @@ describe('simulador · catálogo de ambientes (S5)', () => {
     for (const a of AMBIENTES) expect(ambienteSimuladorSchema.safeParse(a).success, a.id).toBe(true);
   });
 
-  it('ofrece los seis puntos de vista acordados, en ese orden', () => {
-    expect(AMBIENTES.map((a) => a.id)).toEqual(['sala-frente', 'sala-esquina', 'alcoba', 'comedor', 'estudio', 'fachada']);
+  it('ofrece los cinco espacios acordados, en ese orden', () => {
+    expect(AMBIENTES.map((a) => a.id)).toEqual(['sala', 'cocina', 'habitacion', 'bano', 'fachada']);
   });
 
   it('tiene interiores y una fachada exterior', () => {
-    expect(AMBIENTES.some((a) => a.tipo === 'interior')).toBe(true);
+    expect(AMBIENTES.filter((a) => a.tipo === 'interior')).toHaveLength(4);
     expect(AMBIENTES.filter((a) => a.tipo === 'exterior').map((a) => a.id)).toEqual(['fachada']);
-  });
-
-  it('cada ambiente tiene su dibujo y cada dibujo su ambiente', () => {
-    expect(Object.keys(ESCENAS).sort()).toEqual(AMBIENTES.map((a) => a.id).sort());
   });
 
   it('el ambiente de arranque existe', () => {
@@ -68,11 +86,37 @@ describe('simulador · catálogo de ambientes (S5)', () => {
 
   it('un id desconocido cae en el primero y la pantalla nunca se queda sin imagen', () => {
     expect(ambientePorId('no-existe').id).toBe(AMBIENTES[0]?.id);
-    expect(ambientePorId('alcoba').id).toBe('alcoba');
+    expect(ambientePorId('bano').id).toBe('bano');
   });
 
   it('el texto alternativo describe el espacio, no el color', () => {
     for (const a of AMBIENTES) expect(a.alt).not.toMatch(/#|pintad/i);
+  });
+});
+
+describe('simulador · las fotos (S3, S12)', () => {
+  for (const ambiente of AMBIENTES) {
+    describe(ambiente.id, () => {
+      it('su archivo existe', () => {
+        expect(existsSync(archivoDe(ambiente.imagen)), ambiente.imagen).toBe(true);
+      });
+
+      it('es un WebP con canal alfa: sin él la pared no dejaría ver el color', () => {
+        const cab = cabeceraWebp(archivoDe(ambiente.imagen));
+        expect(cab.formato).toBe('webp');
+        expect(cab.alfa, `${ambiente.imagen} perdió su transparencia`).toBe(true);
+      });
+
+      it('mide 1024 × 1024', () => {
+        const cab = cabeceraWebp(archivoDe(ambiente.imagen));
+        expect([cab.ancho, cab.alto]).toEqual([1024, 1024]);
+      });
+    });
+  }
+
+  it('no sobra ninguna foto sin ambiente', () => {
+    const enDisco = readdirSync(CARPETA_FOTOS).filter((f) => f.endsWith('.webp')).sort();
+    expect(enDisco).toEqual(AMBIENTES.map((a) => a.imagen.split('/').pop() as string).sort());
   });
 });
 
@@ -91,118 +135,77 @@ describe('simulador · textos y reglas (S2, S7, S8, S9)', () => {
   });
 
   it('el texto accesible dice el espacio y el color', () => {
-    const t = textoAccesible({ alt: 'Sala de frente' }, SOL);
-    expect(t).toContain('Sala de frente');
+    const t = textoAccesible({ alt: 'Sala con un sofá' }, SOL);
+    expect(t).toContain('Sala con un sofá');
     expect(t).toContain('Sol De La Tarde');
   });
 
   it('la leyenda dice «así se vería», nunca «así se verá»', () => {
-    const l = leyendaDeVista({ nombre: 'Alcoba' }, SOL);
+    const l = leyendaDeVista({ nombre: 'Baño' }, SOL);
     expect(l).toContain('Así se vería');
     expect(l).toContain('aproximadamente');
     expect(l.toLowerCase()).not.toContain('así se verá');
   });
 });
 
-describe('simulador · geometría de los planos en perspectiva', () => {
-  const PLANO: PlanoPared = { x0: 0, x1: 470, arriba0: 10, arriba1: 60, abajo0: 440, abajo1: 380 };
-
-  it('las esquinas del plano caen donde se declaran', () => {
-    expect(puntoEnPlano(PLANO, 0, 0)).toEqual({ x: 0, y: 10 });
-    expect(puntoEnPlano(PLANO, 1, 0)).toEqual({ x: 470, y: 60 });
-    expect(puntoEnPlano(PLANO, 0, 1)).toEqual({ x: 0, y: 440 });
-    expect(puntoEnPlano(PLANO, 1, 1)).toEqual({ x: 470, y: 380 });
-  });
-
-  it('el centro del plano es el promedio de sus esquinas', () => {
-    const c = puntoEnPlano(PLANO, 0.5, 0.5);
-    expect(c.x).toBeCloseTo(235, 6);
-    expect(c.y).toBeCloseTo((35 + 410) / 2, 6);
-  });
-
-  it('un rectángulo dentro del plano queda dentro del plano', () => {
-    for (const p of rectanguloEnPlano(PLANO, 0.2, 0.6, 0.15, 0.7)) {
-      expect(p.x).toBeGreaterThanOrEqual(PLANO.x0);
-      expect(p.x).toBeLessThanOrEqual(PLANO.x1);
-      expect(p.y).toBeGreaterThanOrEqual(Math.min(PLANO.arriba0, PLANO.arriba1));
-      expect(p.y).toBeLessThanOrEqual(Math.max(PLANO.abajo0, PLANO.abajo1));
-    }
-  });
-
-  it('los puntos se serializan para un <polygon>', () => {
-    expect(rectPuntos(0, 0, 800, 340)).toBe('0,0 800,0 800,340 0,340');
-    expect(aPuntos([{ x: 1.26, y: 2.04 }])).toBe('1.3,2');
-  });
-});
-
-describe('simulador · cada ambiente dibujado (S3, S4)', () => {
+describe('FotoAmbiente · cada ambiente pintado (S3, S9)', () => {
   for (const ambiente of AMBIENTES) {
     describe(ambiente.id, () => {
-      const html = renderToStaticMarkup(<EscenaAmbiente idAmbiente={ambiente.id} color={COLOR_PRUEBA} etiqueta={ambiente.alt} />);
+      const html = renderToStaticMarkup(<FotoAmbiente ambiente={ambiente} color={COLOR_PRUEBA} etiqueta={ambiente.alt} />);
 
-      it('es un SVG con su texto accesible', () => {
-        expect(html.startsWith('<svg')).toBe(true);
-        expect(html).toContain('role="img"');
-        expect(html).toContain(`aria-label="${ambiente.alt}"`);
+      it('es una imagen de su foto, con su texto alternativo', () => {
+        // React 19 antepone un preload de la imagen; en el SSR real lo lleva al head.
+        expect(html.match(/<img /g)).toHaveLength(1);
+        expect(html).toContain(`src="${ambiente.imagen}"`);
+        expect(html).toContain(`alt="${ambiente.alt}"`);
       });
 
-      it('SOLO la pared lleva el color: aparece únicamente como relleno de pared', () => {
-        const apariciones = html.match(new RegExp(COLOR_PRUEBA, 'gi')) ?? [];
-        const comoPared = html.match(new RegExp(`style="fill:${COLOR_PRUEBA}"`, 'gi')) ?? [];
-        expect(apariciones.length).toBeGreaterThan(0);
-        expect(apariciones.length).toBe(comoPared.length);
+      it('el color es el fondo de la propia imagen: se ve por la pared transparente', () => {
+        expect(html).toContain(`background-color:${COLOR_PRUEBA}`);
+        expect(html.match(new RegExp(COLOR_PRUEBA, 'gi'))).toHaveLength(1);
       });
 
-      it('no usa imágenes ni mezclas que oscurezcan el color', () => {
-        expect(html).not.toMatch(/<image|<img|href=|multiply|mix-blend/i);
+      it('no pone nada encima de la foto ni mezcla que altere el color', () => {
+        expect(html).not.toMatch(/mix-blend|<svg|<canvas|<div|opacity|filter/i);
       });
 
-      it('no deja un degradado sin definir', () => {
-        const definidos = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
-        const usados = [...html.matchAll(/url\(#([^)]+)\)/g)].map((m) => m[1]);
-        expect(usados.length).toBeGreaterThan(0);
-        for (const u of usados) expect(definidos.has(u), `falta el degradado ${u}`).toBe(true);
+      it('recorta según su encuadre', () => {
+        const clase = { arriba: 'object-top', centro: 'object-center', abajo: 'object-bottom' }[ambiente.encuadre];
+        expect(html).toContain(clase);
       });
 
-      it('sin etiqueta es decorativo y se oculta a los lectores de pantalla', () => {
-        const mini = renderToStaticMarkup(<EscenaAmbiente idAmbiente={ambiente.id} color={COLOR_PRUEBA} />);
-        expect(mini).toContain('aria-hidden="true"');
-        expect(mini).not.toContain('role="img"');
+      it('anima el cambio de color y lo apaga con prefers-reduced-motion (S9)', () => {
+        expect(html).toContain('transition-colors');
+        expect(html).toContain('motion-reduce:transition-none');
+      });
+
+      it('sin etiqueta es decorativa: alt vacío para los lectores de pantalla', () => {
+        const mini = renderToStaticMarkup(<FotoAmbiente ambiente={ambiente} color={COLOR_PRUEBA} />);
+        expect(mini).toContain('alt=""');
       });
     });
   }
 
-  it('al repetir una escena en la página, sus identificadores no chocan', () => {
-    const html = renderToStaticMarkup(
-      <>
-        <EscenaAmbiente idAmbiente="sala-frente" color={COLOR_PRUEBA} />
-        <EscenaAmbiente idAmbiente="sala-frente" color="#654321" />
-      </>,
-    );
-    const ids = [...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
-    expect(ids.length).toBeGreaterThan(5);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  it('un ambiente desconocido no rompe: dibuja el lienzo vacío', () => {
-    const html = renderToStaticMarkup(<EscenaAmbiente idAmbiente="no-existe" color={COLOR_PRUEBA} />);
-    expect(html).toContain('<svg');
-    expect(html).not.toContain('data-pared');
+  it('cambiar de color solo cambia el estilo: la foto es la misma', () => {
+    const a = renderToStaticMarkup(<FotoAmbiente ambiente={AMBIENTES[0]!} color="#123456" />);
+    const b = renderToStaticMarkup(<FotoAmbiente ambiente={AMBIENTES[0]!} color="#654321" />);
+    expect(a).not.toBe(b);
+    expect(a.replace('#123456', '#654321')).toBe(b);
   });
 });
 
 describe('SimuladorColor (S1, S2, S6, S7, S8)', () => {
-  it('sin color invita a elegir uno y no dibuja nada', () => {
+  it('sin color invita a elegir uno y no pone ninguna foto', () => {
     const html = renderToStaticMarkup(<SimuladorColor color={null} />);
     expect(html).toContain('data-testid="simulador-invitacion"');
     expect(html).toContain('Elige un color');
-    expect(html).not.toContain(ESCENA);
+    expect(html).not.toContain('<img');
   });
 
-  it('con un hexadecimal inválido tampoco dibuja nada (S9)', () => {
+  it('con un hexadecimal inválido tampoco pone ninguna foto (S9)', () => {
     const html = renderToStaticMarkup(<SimuladorColor color={{ hexadecimal: 'azul', nombre: 'Azul', codigo: null }} />);
     expect(html).toContain('data-testid="simulador-invitacion"');
-    expect(html).not.toContain(ESCENA);
+    expect(html).not.toContain('<img');
   });
 
   describe('con un color', () => {
@@ -238,14 +241,17 @@ describe('SimuladorColor (S1, S2, S6, S7, S8)', () => {
       expect(html).toContain('Así se vería');
     });
 
-    it('la imagen grande tiene texto accesible con el espacio y el color (S9)', () => {
-      expect(html).toContain('role="img"');
+    it('la foto grande tiene texto accesible con el espacio y el color (S9)', () => {
       expect(html).toContain('con las paredes pintadas en Sol De La Tarde');
     });
 
-    it('dibuja la vista grande y una miniatura por ambiente, todas con el color', () => {
-      expect(html.split(ESCENA).length - 1).toBe(AMBIENTES.length + 1);
-      expect(html).toContain('fill:#FFC785');
+    it('las miniaturas son decorativas: ya tienen su nombre visible (S9)', () => {
+      expect(html.match(/alt=""/g)).toHaveLength(AMBIENTES.length);
+    });
+
+    it('pone la foto grande y una miniatura por ambiente, todas con el color', () => {
+      expect(html.match(/<img /g)).toHaveLength(AMBIENTES.length + 1);
+      expect(html.match(/background-color:#FFC785/g)).toHaveLength(AMBIENTES.length + 1);
     });
   });
 });

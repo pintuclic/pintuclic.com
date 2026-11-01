@@ -6,7 +6,7 @@ import { colorDeTexto, esColorMuyClaro } from '@/core/utils/color-muestra';
 import { ADVERTENCIA_SIMULADOR, type AmbienteSimulador } from '../../../dtos/m03-asesoria.dto';
 import { AMBIENTE_POR_DEFECTO, AMBIENTES, ambientePorId } from '../../../services/ambientes';
 import { leyendaDeVista, rotuloDeColor, sePuedeSimular, textoAccesible } from '../../../services/simulador';
-import { EscenaAmbiente } from './EscenaAmbiente';
+import { FotoAmbiente } from './FotoAmbiente';
 
 export interface SimuladorColorProps {
   /**
@@ -19,9 +19,9 @@ export interface SimuladorColorProps {
 /**
  * HU-ASE-03 — Simulador de color (contrato M03 · S1-S11).
  *
- * El color elegido en la paleta, pintado sobre las paredes de unos ambientes ilustrados, en
- * varios puntos de vista. Vive entero en el navegador: no llama a ningún servicio, ni a la IA, y
- * cambiar de color o de ambiente no espera a la red.
+ * El color elegido en la paleta, pintado sobre las paredes de unas fotografías de ambientes del
+ * sitio (la pared es transparente y el color se ve a través de ella, S3). Vive entero en el
+ * navegador: no llama a ningún servicio, ni a la IA, y cambiar de color no vuelve a pedir la foto.
  *
  * Ocupa la pestaña «En tu espacio» de `/paleta-de-color` (M01 · P6). Mientras no haya color
  * elegido, o si el que llega no es un `#RRGGBB`, no dibuja nada salvo la invitación a elegir uno.
@@ -36,15 +36,15 @@ export function SimuladorColor({ color }: SimuladorColorProps) {
   const colorSimulado = { hexadecimal: color.hexadecimal, nombre: color.nombre, codigo: color.codigo };
 
   return (
-    // El panel de la paleta es ancho; sin tope, la ilustración llenaría la pantalla de lado a lado
-    // y empujaría el selector y el aviso fuera de la vista.
-    <div className="mx-auto max-w-4xl space-y-3" data-testid="simulador-color">
+    // El panel de la paleta es ancho; sin tope, la foto llenaría la pantalla de lado a lado y
+    // empujaría el selector y el aviso fuera de la vista. Las fotos son cuadradas: 5/4 recorta lo mínimo.
+    <div className="mx-auto max-w-2xl space-y-3" data-testid="simulador-color">
       <div className="relative overflow-hidden rounded-card border border-neutral-light bg-neutral-lightest">
-        <EscenaAmbiente
-          idAmbiente={ambiente.id}
+        <FotoAmbiente
+          ambiente={ambiente}
           color={color.hexadecimal}
           etiqueta={textoAccesible(ambiente, color)}
-          className="block aspect-[8/5] w-full"
+          className="block aspect-[5/4] w-full"
         />
         {/* S8: el color siempre identificado, legible sobre su propio color. */}
         <p
@@ -61,7 +61,7 @@ export function SimuladorColor({ color }: SimuladorColorProps) {
         {leyendaDeVista(ambiente, color)}
       </p>
 
-      {/* S6: un grupo de radio de verdad; cada miniatura es el mismo dibujo ya pintado. */}
+      {/* S6: un grupo de radio de verdad; cada miniatura es la misma foto ya pintada. */}
       {/* `min-w-0`: un fieldset mide por defecto lo que mide su contenido, y la fila de miniaturas se saldría de la pantalla en vez de desplazarse. */}
       <fieldset className="min-w-0">
         <legend className="mb-2 font-title text-sm font-semibold text-corporate">Selecciona el ambiente:</legend>
@@ -119,7 +119,7 @@ function Miniatura({
           activo ? 'border-action' : 'border-neutral-light group-hover:border-action/50'
         }`}
       >
-        <EscenaAmbiente idAmbiente={ambiente.id} color={color.hexadecimal} className="block aspect-[8/5] w-full" />
+        <FotoAmbiente ambiente={ambiente} color={color.hexadecimal} className="block aspect-[5/4] w-full" />
         {activo && (
           <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-action text-neutral-white">
             <Check className="h-3.5 w-3.5" aria-hidden="true" />
