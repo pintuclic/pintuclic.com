@@ -103,7 +103,13 @@ const TarjetaProducto: React.FC<TarjetaProps> = ({ producto, imagenes, editable,
         ))}
       </ul>
       {(editable || imagenes.length > 0) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-3 space-y-1">
+          <p className="font-sans text-xs text-neutral-medium">
+            {imagenes.length === 0
+              ? 'Imágenes del producto: pulse «Agregar imágenes» para elegir las fotos (la primera será la principal). Se suben al cargar el producto.'
+              : `${imagenes.length} ${imagenes.length === 1 ? 'imagen' : 'imágenes'} del producto${editable ? ': se suben al cargar el producto.' : '.'}`}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
           <ul className="flex flex-wrap gap-2" aria-label={`Imágenes de ${producto.producto}`}>
             {imagenes.map((archivo, i) => (
               <Miniatura key={`${archivo.name}-${archivo.size}-${i}`} archivo={archivo} esPrincipal={i === 0} onQuitar={() => onQuitar(i)} />
@@ -116,9 +122,10 @@ const TarjetaProducto: React.FC<TarjetaProps> = ({ producto, imagenes, editable,
                 onClick={() => entrada.current?.click()}
                 aria-label={`Agregar imágenes a ${producto.producto}`}
                 title="Agregar imágenes"
-                className="flex h-16 w-16 items-center justify-center rounded-card border-2 border-dashed border-neutral-medium text-neutral-medium transition-colors hover:border-action hover:text-action"
+                className="flex h-16 min-w-16 flex-col items-center justify-center gap-0.5 rounded-card border-2 border-dashed border-neutral-medium px-2 text-neutral-medium transition-colors hover:border-action hover:text-action"
               >
-                <Plus className="h-6 w-6" aria-hidden="true" />
+                <Plus className="h-5 w-5" aria-hidden="true" />
+                <span className="text-center font-sans text-[11px] leading-tight">Agregar imágenes</span>
               </button>
               <input
                 ref={entrada}
@@ -134,6 +141,7 @@ const TarjetaProducto: React.FC<TarjetaProps> = ({ producto, imagenes, editable,
               />
             </>
           )}
+          </div>
         </div>
       )}
     </li>
