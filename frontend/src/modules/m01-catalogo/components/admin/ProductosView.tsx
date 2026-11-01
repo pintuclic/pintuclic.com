@@ -2,7 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, Images, ListPlus, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
+import { Eye, EyeOff, FileSpreadsheet, Images, ListPlus, Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import { Alert, Badge, Button, Input, Select } from '@/core/components';
 import type { ClaseColor, ProductoResumen } from '../../dtos/m01-catalogo-productos.dto';
 import { useCargar, useRetardo } from '../../hooks/useCargar';
@@ -21,6 +21,7 @@ import {
   type Aviso,
 } from './comunes';
 import { SelectorBuscable } from './campos';
+import { CargaProductosModal } from './CargaProductosModal';
 import { ImagenesModal } from './ImagenesModal';
 import { ProductoFormModal } from './ProductoFormModal';
 import { VariantesModal } from './VariantesModal';
@@ -72,6 +73,7 @@ export const ProductosView: React.FC = () => {
   const [formulario, setFormulario] = useState<{ idProducto: number | null } | null>(null);
   const [imagenes, setImagenes] = useState<{ idProducto: number; seguir: boolean } | null>(null);
   const [variantes, setVariantes] = useState<number | null>(null);
+  const [cargaMasiva, setCargaMasiva] = useState(false);
   const [aDesactivar, setADesactivar] = useState<ProductoResumen | null>(null);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const cerrarAviso = useCallback(() => setAviso(null), []);
@@ -108,14 +110,23 @@ export const ProductosView: React.FC = () => {
             Un producto se publica cuando tiene al menos una variante activa. La clase de color se calcula sola.
           </p>
         </div>
-        <Button
-          variant="primary-action"
-          disabled={referencias === null}
-          leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
-          onClick={() => setFormulario({ idProducto: null })}
-        >
-          Nuevo producto
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            leftIcon={<FileSpreadsheet className="h-4 w-4" aria-hidden="true" />}
+            onClick={() => setCargaMasiva(true)}
+          >
+            Cargar desde Excel
+          </Button>
+          <Button
+            variant="primary-action"
+            disabled={referencias === null}
+            leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+            onClick={() => setFormulario({ idProducto: null })}
+          >
+            Nuevo producto
+          </Button>
+        </div>
       </div>
 
       <AvisoAccion aviso={aviso} onCerrar={cerrarAviso} />
@@ -310,6 +321,8 @@ export const ProductosView: React.FC = () => {
         </div>
       )}
       {lista.datos !== null && <Paginador paginacion={lista.datos.paginacion} onCambiar={setPagina} />}
+
+      {cargaMasiva && <CargaProductosModal onClose={() => setCargaMasiva(false)} />}
 
       {formulario !== null && referencias !== null && (
         <ProductoFormModal
