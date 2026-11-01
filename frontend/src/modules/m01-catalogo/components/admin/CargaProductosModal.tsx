@@ -4,7 +4,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, FileSpreadsheet, Plus, X } from 'lucide-react';
 import { Alert, Badge, Button, Checkbox, FileInput, Modal, type BadgeVariant } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
-import { MAXIMO_FILAS_ARCHIVO_PRODUCTOS, type FilaProductoCarga, type ProductoCarga } from '../../dtos/m01-catalogo-carga-masiva.dto';
+import {
+  MAXIMO_FILAS_ARCHIVO_PRODUCTOS,
+  type CatalogoNuevo,
+  type FilaProductoCarga,
+  type ProductoCarga,
+} from '../../dtos/m01-catalogo-carga-masiva.dto';
 import { MAXIMO_IMAGENES_PRODUCTO } from '../../dtos/m01-catalogo-productos.dto';
 import {
   armarInformeProductos,
@@ -33,6 +38,17 @@ const ETIQUETA: Record<ProductoCarga['resultado'], { texto: string; variante: Ba
   creado: { texto: 'Creado', variante: 'success' },
   ya_existe: { texto: 'Ya existe', variante: 'neutral' },
   rechazado: { texto: 'Con error', variante: 'danger' },
+};
+
+const ROTULO_NUEVO: Record<CatalogoNuevo['tipo'], string> = {
+  marca: 'marca',
+  linea: 'línea',
+  categoria: 'categoría',
+  subcategoria: 'subcategoría',
+  superficie: 'superficie',
+  acabado: 'acabado',
+  base: 'base',
+  tipo_resina: 'tipo de resina',
 };
 
 const plural = (n: number, uno: string, varios: string): string => `${n} ${n === 1 ? uno : varios}`;
@@ -86,6 +102,13 @@ const TarjetaProducto: React.FC<TarjetaProps> = ({ producto, imagenes, editable,
       </div>
       {producto.detalle !== null && (
         <p className={`mt-2 font-sans text-sm ${conError ? 'text-danger' : 'text-neutral-medium'}`}>{producto.detalle}</p>
+      )}
+      {producto.nuevos.length > 0 && (
+        <p className="mt-2 font-sans text-sm text-neutral-dark">
+          {producto.resultado === 'creado' ? 'Se creó también en el catálogo: ' : 'Se creará también en el catálogo: '}
+          {producto.nuevos.map((n) => `${ROTULO_NUEVO[n.tipo]} «${n.nombre}»`).join(', ')}.
+          {producto.nuevos.some((n) => n.tipo === 'marca') && ' La marca queda sin logotipo: súbalo después en Marcas.'}
+        </p>
       )}
       <ul className="mt-2 divide-y divide-neutral-light font-sans text-sm text-neutral-dark">
         {producto.variantes.map((v) => (

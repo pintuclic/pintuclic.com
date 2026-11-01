@@ -18,7 +18,7 @@ import { z } from 'zod';
  *
  * QUÉ NO HACE
  *  · No actualiza nada: un producto que ya existe se reporta y no se toca (C1, C3).
- *  · No crea marcas, líneas, categorías, medidas, acabados, bases, superficies, resinas ni colores: deben existir (C9).
+ *  · No crea medidas ni colores: necesitan datos que el Excel no trae (tipo y valor; hexadecimal y acabado) y deben existir (C9).
  *  · No lleva imágenes, combos ni existencia inicial (C6).
  *  · No publica: los productos nacen sin publicar (C6).
  *
@@ -43,8 +43,15 @@ import { z } from 'zod';
  *      sus filas van en el mismo bloque). Un producto con más filas que el bloque se rechaza (`producto_demasiado_grande`).
  *      Archivo: máximo 2 000 filas y 5 MB.
  *  C9  POR NOMBRE, NO POR ID. Marca, línea, categoría, subcategoría, medida, acabados, bases, superficies, colores de
- *      fábrica y resina se escriben por su nombre, ignorando tildes y mayúsculas. Si el nombre no existe, está inactivo
- *      o es ambiguo, la fila se rechaza con su motivo.
+ *      fábrica y resina se escriben por su nombre, ignorando tildes y mayúsculas. Si el nombre está inactivo o es
+ *      ambiguo, la fila se rechaza con su motivo. Si no existe: medida y color se rechazan; los demás se crean (C16).
+ *  C16 CATÁLOGOS NUEVOS. Una marca, línea, categoría, subcategoría, superficie, acabado, base o tipo de resina que no
+ *      existe se CREA activo junto con el producto, dentro de su misma transacción (C5): si el producto se rechaza, no
+ *      queda nada creado. La vista previa lo anuncia en `nuevos` sin escribir (C7). La línea nace de la marca de la fila
+ *      y la subcategoría de su categoría. No se crean los inactivos: la fila se rechaza para no duplicarlos. La marca
+ *      exige logotipo (R9) y el Excel no lo trae: nace con uno transparente provisional y se avisa para que se suba
+ *      después desde Marcas. Como crea catálogo, exige el mismo permiso `catalogo.crear` (C11). Una marca nueva no tiene
+ *      colores, así que sus colores de fábrica se rechazan.
  *  C10 FÓRMULAS. Una celda que empieza por `=`, `+`, `-` o `@` se trata como texto; en el informe de errores se prefija
  *      con `'` para que Excel no la ejecute (D4 de M13).
  *  C11 PERMISO. Todo exige `catalogo.crear` (como importar colores). Sin sesión o sin permiso: 404 RECURSO_NO_DISPONIBLE.
@@ -192,6 +199,20 @@ export const MOTIVOS_RECHAZO_PRODUCTO = [
   'dato_invalido',
   'producto_rechazado',
 ] as const;
+/** C16: lo que la carga crea además del producto cuando su nombre no existe en el catálogo. */
+export const TIPOS_CATALOGO_NUEVO = [
+  'marca',
+  'linea',
+  'categoria',
+  'subcategoria',
+  'superficie',
+  'acabado',
+  'base',
+  'tipo_resina',
+] as const;
+export const catalogoNuevoSchema = z.object({ tipo: z.enum(TIPOS_CATALOGO_NUEVO), nombre: z.string() });
+export type CatalogoNuevo = z.infer<typeof catalogoNuevoSchema>;
+
 export const motivoRechazoProductoSchema = z.enum(MOTIVOS_RECHAZO_PRODUCTO);
 export type MotivoRechazoProducto = z.infer<typeof motivoRechazoProductoSchema>;
 
@@ -220,6 +241,8 @@ export const productoCargaSchema = z.object({
   detalle: z.string().nullable(),
   /** Solo cuando ya se creó (aplicar) o ya existía. */
   idProducto: z.number().int().positive().nullable(),
+  /** C16: marcas, líneas, categorías… que se crearán (o se crearon) con este producto porque no existían. */
+  nuevos: z.array(catalogoNuevoSchema),
   variantes: z.array(varianteCargaSchema),
 });
 export type ProductoCarga = z.infer<typeof productoCargaSchema>;

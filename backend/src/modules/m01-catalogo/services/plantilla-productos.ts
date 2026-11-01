@@ -70,7 +70,7 @@ function listaDesde(hoja: ExcelJS.Worksheet, indiceColumna: number, rango: strin
  * Columnas que admiten varios valores separados por `;`: Excel no deja elegir varios en una lista,
  * así que la lista ayuda a elegir uno y el aviso es informativo para no bloquear los valores combinados.
  */
-function listaMultiple(hoja: ExcelJS.Worksheet, indiceColumna: number, rango: string | null, nombre: string): void {
+function listaMultiple(hoja: ExcelJS.Worksheet, indiceColumna: number, rango: string | null, nombre: string, seCrea = true): void {
   if (rango === null) return;
   for (let fila = 2; fila <= FILAS_CON_LISTAS; fila += 1) {
     hoja.getCell(fila, indiceColumna).dataValidation = {
@@ -80,7 +80,9 @@ function listaMultiple(hoja: ExcelJS.Worksheet, indiceColumna: number, rango: st
       showErrorMessage: true,
       errorStyle: 'information',
       errorTitle: `Varios valores en ${nombre}`,
-      error: `La lista permite elegir uno. Para varios, escríbalos separados por punto y coma (;) con los nombres de la hoja «${HOJA_CATALOGOS}». Pulse Aceptar para conservar lo escrito.`,
+      error: `La lista permite elegir uno. Para varios, escríbalos separados por punto y coma (;). ${
+        seCrea ? 'Lo que no esté en la lista se creará al cargar.' : 'Deben existir en la hoja «Colores».'
+      } Pulse Aceptar para conservar lo escrito.`,
     };
   }
 }
@@ -107,7 +109,10 @@ const INSTRUCCIONES: readonly string[] = [
   '2. Las filas con la misma Marca y el mismo Producto forman un solo producto. Repita en cada una los datos del producto',
   '   (línea, categoría, descripción, usos, superficies, acabados, bases, colores, características y ficha): deben ser iguales.',
   '3. Marca, línea, categoría, subcategoría, medida y tipo de resina se escriben por su NOMBRE. Elíjalos de la lista de cada celda;',
-  '   las hojas «Catálogos» y «Colores» muestran todo lo que existe hoy. Si algo no existe, créelo antes en el catálogo.',
+  '   las hojas «Catálogos» y «Colores» muestran todo lo que existe hoy.',
+  '   Si una marca, línea, categoría, subcategoría, superficie, acabado, base o tipo de resina NO existe, se CREA al cargar (la marca',
+  '   sin logotipo: súbalo después en Marcas). Las MEDIDAS y los COLORES no se crean solos: deben existir, o el producto se rechaza.',
+  '   Escriba cada nombre igual en todas las filas; no se distinguen mayúsculas ni tildes. Un nombre inactivo en el catálogo se rechaza.',
   '4. Obligatorios: Marca, Categoría, Subcategoría, Producto, Medida y Precio.',
   '5. Uso interior y Uso exterior: Sí o No.',
   '6. Superficies, Acabados, Bases y Colores de fábrica: varios valores separados por punto y coma (;). La lista de la celda deja elegir',
@@ -118,7 +123,7 @@ const INSTRUCCIONES: readonly string[] = [
   '9. Si deja el SKU vacío, el sistema lo genera.',
   '',
   'Qué pasa al subirlo',
-  '· Primero verá la lista de productos que se van a crear, con los errores fila por fila. Nada se guarda todavía.',
+  '· Primero verá la lista de productos que se van a crear (y lo nuevo del catálogo que se creará), con los errores fila por fila. Nada se guarda todavía.',
   '· Después aparece el botón para cargarlos. Los productos que ya existen no se modifican.',
   '· Los productos nacen SIN PUBLICAR y con existencia 0. Las imágenes y la publicación se hacen después, desde cada producto.',
   '',
@@ -172,12 +177,12 @@ export async function construirPlantillaProductos(cat: CatalogosPlantilla): Prom
   colores.getColumn(2).width = 40;
 
   const columna = (titulo: (typeof COLUMNAS_PLANTILLA_PRODUCTOS)[number]): number => COLUMNAS_PLANTILLA_PRODUCTOS.indexOf(titulo) + 1;
-  listaDesde(productos, columna('Marca'), rMarcas, 'Esa marca no está en el catálogo. Elíjala de la lista o créela antes.');
-  listaDesde(productos, columna('Línea'), rLineas, 'Esa línea no está en el catálogo.');
-  listaDesde(productos, columna('Categoría'), rCategorias, 'Esa categoría no está en el catálogo.');
-  listaDesde(productos, columna('Subcategoría'), rSubcategorias, 'Esa subcategoría no está en el catálogo.');
-  listaDesde(productos, columna('Medida'), rMedidas, 'Esa medida no está en el catálogo.');
-  listaDesde(productos, columna('Tipo de resina'), rResinas, 'Ese tipo de resina no está en el catálogo.');
+  listaDesde(productos, columna('Marca'), rMarcas, 'Esa marca no está en el catálogo: se creará al cargar, sin logotipo (súbalo después en Marcas).');
+  listaDesde(productos, columna('Línea'), rLineas, 'Esa línea no está en el catálogo: se creará al cargar.');
+  listaDesde(productos, columna('Categoría'), rCategorias, 'Esa categoría no está en el catálogo: se creará al cargar.');
+  listaDesde(productos, columna('Subcategoría'), rSubcategorias, 'Esa subcategoría no está en el catálogo: se creará al cargar.');
+  listaDesde(productos, columna('Medida'), rMedidas, 'Esa medida no está en el catálogo y NO se crea sola: el producto será rechazado. Elíjala de la lista.');
+  listaDesde(productos, columna('Tipo de resina'), rResinas, 'Ese tipo de resina no está en el catálogo: se creará al cargar.');
   listaMultiple(productos, columna('Superficies'), rSuperficies, 'Superficies');
   listaMultiple(productos, columna('Acabados'), rAcabados, 'Acabados');
   listaMultiple(productos, columna('Bases'), rBases, 'Bases');
@@ -187,6 +192,7 @@ export async function construirPlantillaProductos(cat: CatalogosPlantilla): Prom
     columna('Colores de fábrica'),
     nombresColor.length === 0 ? null : `'${HOJA_COLORES}'!$B$2:$B$${cat.colores.length + 1}`,
     'Colores de fábrica',
+    false,
   );
   listaFija(productos, columna('Uso interior'), 'Sí,No');
   listaFija(productos, columna('Uso exterior'), 'Sí,No');

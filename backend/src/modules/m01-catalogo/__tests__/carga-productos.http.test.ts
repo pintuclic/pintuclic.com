@@ -12,6 +12,7 @@ const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.s
 
 describe.skipIf(URL_BD === undefined)('M01 · carga masiva de productos: plantilla (HTTP + PostgreSQL)', () => {
   let servidor: ServidorPrueba;
+  let prisma: (typeof import('../../../core/db/client'))['prisma'];
   const auditoria = { registrarAccesoDenegado: vi.fn() };
 
   const pedir = (actor: string | null) =>
@@ -23,6 +24,7 @@ describe.skipIf(URL_BD === undefined)('M01 · carga masiva de productos: plantil
     process.env.DATABASE_URL = URL_BD ?? '';
     const { levantarServidor } = await import('./helpers/servidor-prueba.js');
     servidor = await levantarServidor(auditoria);
+    ({ prisma } = await import('../../../core/db/client.js'));
   });
 
   afterAll(async () => {
@@ -142,6 +144,98 @@ describe.skipIf(URL_BD === undefined)('M01 · carga masiva de productos: plantil
       const producto = (r.cuerpo as { data: { productos: Array<{ resultado: string; motivo: string }> } }).data.productos[0];
       expect(producto).toMatchObject({ resultado: 'rechazado', motivo: 'producto_rechazado' });
       expect((await buscar(malo)).data).toHaveLength(0);
+    });
+
+    describe('C16 · crea lo que no existe', () => {
+      const sufijo = Date.now();
+      const nueva = `Marca carga ${sufijo}`;
+      const filaNueva = (cambios: Record<string, unknown> = {}) =>
+        fila({
+          marca: nueva,
+          linea: `Línea carga ${sufijo}`,
+          categoria: `Categoría carga ${sufijo}`,
+          subcategoria: `Subcategoría carga ${sufijo}`,
+          producto: `Producto nuevo ${sufijo}`,
+          superficies: [`Superficie carga ${sufijo}`],
+          acabados: [`Acabado carga ${sufijo}`],
+          bases: [`Base carga ${sufijo}`],
+          tipoResina: `Resina carga ${sufijo}`,
+          ...cambios,
+        });
+
+      it('la vista previa anuncia lo nuevo y no crea nada', async () => {
+        const r = await servidor.peticion('admin', 'POST', '/productos/importar/previsualizar', { filas: [filaNueva()] });
+        const producto = (r.cuerpo as { data: { productos: Array<{ resultado: string; nuevos: Array<{ tipo: string }> }> } }).data.productos[0];
+        expect(producto?.resultado).toBe('por_crear');
+        expect(producto?.nuevos.map((n) => n.tipo)).toEqual([
+          'marca',
+          'linea',
+          'categoria',
+          'subcategoria',
+          'superficie',
+          'acabado',
+          'base',
+          'tipo_resina',
+        ]);
+        expect(await prisma.marca.count({ where: { nombre: nueva } })).toBe(0);
+        expect(await prisma.categoria.count({ where: { nombre: `Categoría carga ${sufijo}` } })).toBe(0);
+      });
+
+      it('aplicar crea la marca (con logotipo provisional), línea, categoría, subcategoría, superficie, acabado, base y resina; repetir no duplica', async () => {
+        const r = await servidor.peticion('admin', 'POST', '/productos/importar/aplicar', { filas: [filaNueva()] });
+        const creado = (r.cuerpo as { data: { productos: Array<{ resultado: string; idProducto: number }> } }).data.productos[0];
+        expect(creado?.resultado).toBe('creado');
+
+        const marca = await prisma.marca.findUniqueOrThrow({ where: { nombre: nueva } });
+        expect(marca.estado).toBe('activo');
+        expect(marca.logotipoMimeType).toBe('image/png');
+        expect(Buffer.from(marca.logotipo).subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(true);
+        const producto = await prisma.producto.findUniqueOrThrow({
+          where: { idProducto: creado?.idProducto ?? 0 },
+          include: { linea: true, subcategoria: { include: { categoria: true } }, superficies: true, acabados: true, bases: true, ficha: true },
+        });
+        expect(producto.idMarca).toBe(marca.idMarca);
+        expect(producto.linea?.idMarca).toBe(marca.idMarca);
+        expect(producto.linea?.nombre).toBe(`Línea carga ${sufijo}`);
+        expect(producto.subcategoria.nombre).toBe(`Subcategoría carga ${sufijo}`);
+        expect(producto.subcategoria.categoria.nombre).toBe(`Categoría carga ${sufijo}`);
+        expect([producto.superficies.length, producto.acabados.length, producto.bases.length]).toEqual([1, 1, 1]);
+        expect(producto.ficha?.idTipoResina).toBeGreaterThan(0);
+
+        // Un segundo producto del archivo reutiliza lo recién creado en vez de duplicarlo.
+        const otro = await servidor.peticion('admin', 'POST', '/productos/importar/aplicar', {
+          filas: [filaNueva({ producto: `Producto hermano ${sufijo}`, marca: nueva.toUpperCase() })],
+        });
+        expect((otro.cuerpo as { data: { productos: Array<{ resultado: string; nuevos: unknown[] }> } }).data.productos[0]).toMatchObject({
+          resultado: 'creado',
+          nuevos: [],
+        });
+        expect(await prisma.marca.count({ where: { nombre: { equals: nueva, mode: 'insensitive' } } })).toBe(1);
+        expect(await prisma.linea.count({ where: { idMarca: marca.idMarca } })).toBe(1);
+        expect(await prisma.categoria.count({ where: { nombre: `Categoría carga ${sufijo}` } })).toBe(1);
+      });
+
+      it('si el producto se rechaza no queda creada ninguna marca ni categoría a medias', async () => {
+        const marcaFallida = `Marca fallida ${sufijo}`;
+        const r = await servidor.peticion('admin', 'POST', '/productos/importar/aplicar', {
+          filas: [filaNueva({ marca: marcaFallida, categoria: `Categoría fallida ${sufijo}`, medida: 'medida que no existe' })],
+        });
+        expect((r.cuerpo as { data: { productos: Array<{ resultado: string }> } }).data.productos[0]?.resultado).toBe('rechazado');
+        expect(await prisma.marca.count({ where: { nombre: marcaFallida } })).toBe(0);
+        expect(await prisma.categoria.count({ where: { nombre: `Categoría fallida ${sufijo}` } })).toBe(0);
+      });
+
+      it('un registro inactivo no se duplica: se rechaza avisando que está inactivo', async () => {
+        const dormida = `Marca dormida ${sufijo}`;
+        await prisma.marca.create({
+          data: { nombre: dormida, logotipo: Buffer.from([0x89]), logotipoMimeType: 'image/png', estado: 'inactivo' },
+        });
+        const r = await servidor.peticion('admin', 'POST', '/productos/importar/aplicar', { filas: [filaNueva({ marca: dormida })] });
+        const producto = (r.cuerpo as { data: { productos: Array<{ resultado: string; detalle: string }> } }).data.productos[0];
+        expect(producto?.resultado).toBe('rechazado');
+        expect(producto?.detalle).toContain('inactivo');
+        expect(await prisma.marca.count({ where: { nombre: dormida } })).toBe(1);
+      });
     });
 
     it('sin permiso de crear, sin sesión o un cliente: 404; un cuerpo mal formado: 400', async () => {

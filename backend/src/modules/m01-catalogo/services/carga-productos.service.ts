@@ -1,5 +1,6 @@
 import {
   type BalanceCargaProductos,
+  type CatalogoNuevo,
   type CargarProductosRequest,
   type CargarProductosResponse,
   type FilaProductoCarga,
@@ -12,10 +13,11 @@ import type {
   CargaProductosRepositoryPort,
   CatalogosCarga,
   ColorCarga,
+  ProductoCargaDatos,
+  Referencia,
   RegistroCarga,
   VarianteNuevaDatos,
 } from '../interfaces/carga-productos.interface';
-import type { CrearProductoDatos } from '../interfaces/productos.interface';
 import { esViolacionUnica } from './catalogo-base.service';
 
 /** C2 / C9: sin tildes, sin mayúsculas y sin espacios sobrantes. */
@@ -31,7 +33,7 @@ interface Rechazo {
 type Resolucion<T> = { ok: true; valor: T } | { ok: false; rechazo: Rechazo };
 
 interface PlanProducto {
-  producto: CrearProductoDatos;
+  producto: ProductoCargaDatos;
   variantes: VarianteNuevaDatos[];
 }
 
@@ -42,18 +44,36 @@ interface Evaluado {
 
 type ResultadoProceso = CargarProductosResponse['data'];
 
-/** Busca un nombre entre los registros ya filtrados al ámbito que le toca (marca, categoría…). */
-function buscar(registros: readonly RegistroCarga[], nombre: string): Resolucion<RegistroCarga> | 'ninguno' {
-  const clave = normalizar(nombre);
-  const hallados = registros.filter((r) => normalizar(r.nombre) === clave);
-  const [primero] = hallados;
-  if (primero === undefined) return 'ninguno';
-  if (hallados.length > 1) {
-    return { ok: false, rechazo: { motivo: 'nombre_ambiguo', detalle: `«${nombre}» coincide con más de un registro.` } };
-  }
-  return { ok: true, valor: primero };
+/** C16: un registro que este producto va a crear. `clave` lo identifica entre productos del mismo archivo. */
+interface Alta extends CatalogoNuevo {
+  clave: string;
 }
 
+type Hallazgo = { tipo: 'activo'; registro: RegistroCarga } | { tipo: 'ambiguo' } | { tipo: 'inactivo' } | { tipo: 'ninguno' };
+
+/** Busca un nombre entre los registros ya filtrados al ámbito que le toca (marca, categoría…). */
+function hallar(registros: readonly RegistroCarga[], nombre: string): Hallazgo {
+  const clave = normalizar(nombre);
+  const coinciden = registros.filter((r) => normalizar(r.nombre) === clave);
+  const activos = coinciden.filter((r) => r.activo);
+  const [activo] = activos;
+  if (activos.length > 1) return { tipo: 'ambiguo' };
+  if (activo !== undefined) return { tipo: 'activo', registro: activo };
+  return coinciden.length > 0 ? { tipo: 'inactivo' } : { tipo: 'ninguno' };
+}
+
+const rechazo = (motivo: MotivoRechazoProducto, detalle: string): { ok: false; rechazo: Rechazo } => ({
+  ok: false,
+  rechazo: { motivo, detalle },
+});
+
+const ambiguo = (nombre: string, fila: number): { ok: false; rechazo: Rechazo } =>
+  rechazo('nombre_ambiguo', `Fila ${fila}: «${nombre}» coincide con más de un registro.`);
+
+const inactivo = (motivo: MotivoRechazoProducto, quien: string, nombre: string, fila: number): { ok: false; rechazo: Rechazo } =>
+  rechazo(motivo, `Fila ${fila}: ${quien} «${nombre}» existe pero está inactivo; actívelo en el catálogo antes de cargar.`);
+
+/** Para lo que la carga NO crea (medida, color): el nombre debe existir y estar activo. */
 function resolver(
   registros: readonly RegistroCarga[],
   nombre: string,
@@ -61,11 +81,11 @@ function resolver(
   quien: string,
   fila: number,
 ): Resolucion<RegistroCarga> {
-  const r = buscar(registros, nombre);
-  if (r === 'ninguno') {
-    return { ok: false, rechazo: { motivo, detalle: `Fila ${fila}: ${quien} «${nombre}» no existe o está inactivo.` } };
-  }
-  return r.ok ? r : { ok: false, rechazo: { motivo: r.rechazo.motivo, detalle: `Fila ${fila}: ${r.rechazo.detalle}` } };
+  const h = hallar(registros, nombre);
+  if (h.tipo === 'activo') return { ok: true, valor: h.registro };
+  if (h.tipo === 'ambiguo') return ambiguo(nombre, fila);
+  if (h.tipo === 'inactivo') return inactivo(motivo, quien, nombre, fila);
+  return rechazo(motivo, `Fila ${fila}: ${quien} «${nombre}» no existe.`);
 }
 
 function resolverLista(
@@ -83,6 +103,68 @@ function resolverLista(
   }
   return { ok: true, valor: [...ids] };
 }
+
+/** Lo que se necesita para resolver o crear un registro de catálogo (C16). */
+interface Creable {
+  registros: readonly RegistroCarga[];
+  nombre: string;
+  tipo: CatalogoNuevo['tipo'];
+  /** Dónde vive el nombre: '' si es global, la marca para una línea, la categoría para una subcategoría. */
+  ambito: string;
+  motivo: MotivoRechazoProducto;
+  quien: string;
+  fila: number;
+  /** Largo máximo de la columna en la base de datos. */
+  largo: number;
+}
+
+/**
+ * C16: el nombre se resuelve a un registro existente o, si no existe, a uno por crear. Un nombre repetido dentro del
+ * archivo se crea una sola vez, con la grafía de la primera fila que lo trajo.
+ */
+function resolverOCrear(ctx: Contexto, altas: Alta[], c: Creable): Resolucion<Referencia> {
+  const h = hallar(c.registros, c.nombre);
+  if (h.tipo === 'activo') return { ok: true, valor: { id: h.registro.id } };
+  if (h.tipo === 'ambiguo') return ambiguo(c.nombre, c.fila);
+  if (h.tipo === 'inactivo') return inactivo(c.motivo, c.quien, c.nombre, c.fila);
+
+  const limpio = c.nombre.trim().replace(/\s+/g, ' ');
+  if (limpio.length > c.largo) {
+    return rechazo('dato_invalido', `Fila ${c.fila}: ${c.quien} «${limpio}» supera los ${c.largo} caracteres.`);
+  }
+  const clave = `${c.tipo}|${c.ambito}|${normalizar(limpio)}`;
+  const delProducto = altas.find((a) => a.clave === clave);
+  if (delProducto !== undefined) return { ok: true, valor: { nuevo: delProducto.nombre } };
+  const deOtroProducto = ctx.pendientes.get(clave);
+  if (deOtroProducto !== undefined) return { ok: true, valor: { nuevo: deOtroProducto } };
+  altas.push({ tipo: c.tipo, nombre: limpio, clave });
+  return { ok: true, valor: { nuevo: limpio } };
+}
+
+/** Una lista de nombres a referencias, sin repetir el mismo registro. */
+function resolverListaOCrear(
+  ctx: Contexto,
+  altas: Alta[],
+  nombres: readonly string[],
+  base: Omit<Creable, 'nombre'>,
+): Resolucion<Referencia[]> {
+  const vistas = new Set<string>();
+  const referencias: Referencia[] = [];
+  for (const nombre of nombres) {
+    const r = resolverOCrear(ctx, altas, { ...base, nombre });
+    if (!r.ok) return r;
+    const huella = 'id' in r.valor ? `id:${r.valor.id}` : `nuevo:${normalizar(r.valor.nuevo)}`;
+    if (vistas.has(huella)) continue;
+    vistas.add(huella);
+    referencias.push(r.valor);
+  }
+  return { ok: true, valor: referencias };
+}
+
+/** Ids de relleno que solo sirven para que el esquema del alta manual valide la forma del producto. */
+const RELLENO = 1_000_000_000;
+const idDeRelleno = (r: Referencia, indice = 0): number => ('id' in r ? r.id : RELLENO + indice);
+const idsDeRelleno = (refs: readonly Referencia[]): number[] => refs.map((r, i) => idDeRelleno(r, i));
 
 const claveProducto = (f: FilaProductoCarga): string => `${normalizar(f.marca)}|${normalizar(f.producto)}`;
 
@@ -121,6 +203,8 @@ interface Contexto {
   /** SKU y códigos de las variantes ya aceptadas en este bloque (repetidos en el archivo). */
   skusAceptados: Map<string, number>;
   codigosAceptados: Map<string, number>;
+  /** C16: lo que los productos ya aceptados de este archivo van a crear (clave → nombre con que se creará). */
+  pendientes: Map<string, string>;
 }
 
 /** HU-CAT-02 / HU-CAT-03 en bloque: carga masiva de productos con variantes (contrato `m01-catalogo-carga-masiva`). */
@@ -147,8 +231,8 @@ export class CargaProductosService {
     const idsMarca = new Set<number>();
     for (const filas of grupos.values()) {
       const [primera] = filas;
-      const marca = primera === undefined ? 'ninguno' : buscar(catalogos.marcas, primera.marca);
-      if (marca !== 'ninguno' && marca.ok) idsMarca.add(marca.valor.id);
+      const marca = primera === undefined ? null : hallar(catalogos.marcas, primera.marca);
+      if (marca?.tipo === 'activo') idsMarca.add(marca.registro.id);
     }
     const marcas = [...idsMarca];
     const conValor = (t: string | null): t is string => nuloSiVacio(t) !== null;
@@ -166,6 +250,7 @@ export class CargaProductosService {
       codigosEnBase,
       skusAceptados: new Map(),
       codigosAceptados: new Map(),
+      pendientes: new Map(),
     };
 
     const resultado: ProductoCarga[] = [];
@@ -205,6 +290,7 @@ export class CargaProductosService {
       subcategoria: primera.subcategoria,
       linea: primera.linea,
       idProducto: null,
+      nuevos: [] as CatalogoNuevo[],
     };
     const variantesVista = filas.map(
       (f): VarianteCarga => ({
@@ -222,10 +308,21 @@ export class CargaProductosService {
       plan: null,
     });
 
-    const marca = resolver(ctx.catalogos.marcas, primera.marca, 'marca_no_encontrada', 'la marca', primera.fila);
+    const altas: Alta[] = [];
+    const marca = resolverOCrear(ctx, altas, {
+      registros: ctx.catalogos.marcas,
+      nombre: primera.marca,
+      tipo: 'marca',
+      ambito: '',
+      motivo: 'marca_no_encontrada',
+      quien: 'la marca',
+      fila: primera.fila,
+      largo: 100,
+    });
     if (!marca.ok) return rechazado(marca.rechazo);
 
-    const idExistente = ctx.existentes.get(`${marca.valor.id}|${normalizar(primera.producto)}`);
+    // Una marca que se va a crear no puede tener productos todavía.
+    const idExistente = 'id' in marca.valor ? ctx.existentes.get(`${marca.valor.id}|${normalizar(primera.producto)}`) : undefined;
     if (idExistente !== undefined) {
       return {
         vista: {
@@ -248,7 +345,7 @@ export class CargaProductosService {
       });
     }
 
-    const producto = this.armarProducto(primera, marca.valor.id, ctx);
+    const producto = this.armarProducto(primera, marca.valor, altas, ctx);
     if (!producto.ok) return rechazado(producto.rechazo);
 
     const variantes = this.armarVariantes(filas, variantesVista, ctx);
@@ -262,53 +359,104 @@ export class CargaProductosService {
       if (v.sku !== null) ctx.skusAceptados.set(v.sku.toLowerCase(), primera.fila);
       if (v.codigoProveedor !== null) ctx.codigosAceptados.set(v.codigoProveedor.toLowerCase(), primera.fila);
     }
+    // Solo un producto aceptado deja "reservado" lo que va a crear: los siguientes del archivo lo reutilizan (C16).
+    for (const a of altas) ctx.pendientes.set(a.clave, a.nombre);
     return {
-      vista: { ...base, resultado: 'por_crear', motivo: null, detalle: null, variantes: variantesVista },
+      vista: {
+        ...base,
+        resultado: 'por_crear',
+        motivo: null,
+        detalle: null,
+        nuevos: altas.map(({ tipo, nombre }) => ({ tipo, nombre })),
+        variantes: variantesVista,
+      },
       plan: { producto: producto.valor, variantes: variantes.valor },
     };
   }
 
-  /** Resuelve los nombres del producto y aplica P1 a P3 con el mismo esquema del alta manual (C4). */
-  private armarProducto(f: FilaProductoCarga, idMarca: number, ctx: Contexto): Resolucion<CrearProductoDatos> {
+  /**
+   * Resuelve los nombres del producto (existentes o por crear, C16) y aplica P1 a P3 con el mismo esquema del alta
+   * manual (C4).
+   */
+  private armarProducto(f: FilaProductoCarga, marca: Referencia, altas: Alta[], ctx: Contexto): Resolucion<ProductoCargaDatos> {
     const { catalogos, colores } = ctx;
-    const fallo = (motivo: MotivoRechazoProducto, detalle: string): Resolucion<never> => ({ ok: false, rechazo: { motivo, detalle } });
+    const fallo = (motivo: MotivoRechazoProducto, detalle: string): Resolucion<never> => rechazo(motivo, detalle);
+    const idMarca = 'id' in marca ? marca.id : null;
 
-    let idLinea: number | null = null;
+    let linea: Referencia | null = null;
     const nombreLinea = nuloSiVacio(f.linea);
     if (nombreLinea !== null) {
-      const linea = resolver(
-        catalogos.lineas.filter((l) => l.idMarca === idMarca),
-        nombreLinea,
-        'linea_no_encontrada',
-        'la línea de esa marca',
-        f.fila,
-      );
-      if (!linea.ok) {
-        const deOtra = catalogos.lineas.some((l) => l.idMarca !== idMarca && normalizar(l.nombre) === normalizar(nombreLinea));
-        return deOtra ? fallo('linea_de_otra_marca', `Fila ${f.fila}: la línea «${nombreLinea}» no es de la marca «${f.marca}».`) : linea;
-      }
-      idLinea = linea.valor.id;
+      const r = resolverOCrear(ctx, altas, {
+        registros: idMarca === null ? [] : catalogos.lineas.filter((l) => l.idMarca === idMarca),
+        nombre: nombreLinea,
+        tipo: 'linea',
+        ambito: normalizar(f.marca),
+        motivo: 'linea_no_encontrada',
+        quien: 'la línea de esa marca',
+        fila: f.fila,
+        largo: 100,
+      });
+      if (!r.ok) return r;
+      linea = r.valor;
     }
 
-    const categoria = resolver(catalogos.categorias, f.categoria, 'categoria_no_encontrada', 'la categoría', f.fila);
+    const categoria = resolverOCrear(ctx, altas, {
+      registros: catalogos.categorias,
+      nombre: f.categoria,
+      tipo: 'categoria',
+      ambito: '',
+      motivo: 'categoria_no_encontrada',
+      quien: 'la categoría',
+      fila: f.fila,
+      largo: 100,
+    });
     if (!categoria.ok) return categoria;
-    const subcategoria = resolver(
-      catalogos.subcategorias.filter((s) => s.idCategoria === categoria.valor.id),
-      f.subcategoria,
-      'subcategoria_no_encontrada',
-      `la subcategoría de «${f.categoria}»`,
-      f.fila,
-    );
+    const idCategoria = 'id' in categoria.valor ? categoria.valor.id : null;
+    const subcategoria = resolverOCrear(ctx, altas, {
+      registros: idCategoria === null ? [] : catalogos.subcategorias.filter((s) => s.idCategoria === idCategoria),
+      nombre: f.subcategoria,
+      tipo: 'subcategoria',
+      ambito: normalizar(f.categoria),
+      motivo: 'subcategoria_no_encontrada',
+      quien: `la subcategoría de «${f.categoria}»`,
+      fila: f.fila,
+      largo: 100,
+    });
     if (!subcategoria.ok) return subcategoria;
 
-    const superficies = resolverLista(catalogos.superficies, f.superficies, 'superficie_no_encontrada', 'la superficie', f.fila);
+    const superficies = resolverListaOCrear(ctx, altas, f.superficies, {
+      registros: catalogos.superficies,
+      tipo: 'superficie',
+      ambito: '',
+      motivo: 'superficie_no_encontrada',
+      quien: 'la superficie',
+      fila: f.fila,
+      largo: 100,
+    });
     if (!superficies.ok) return superficies;
-    const acabados = resolverLista(catalogos.acabados, f.acabados, 'acabado_no_encontrado', 'el acabado', f.fila);
+    const acabados = resolverListaOCrear(ctx, altas, f.acabados, {
+      registros: catalogos.acabados,
+      tipo: 'acabado',
+      ambito: '',
+      motivo: 'acabado_no_encontrado',
+      quien: 'el acabado',
+      fila: f.fila,
+      largo: 50,
+    });
     if (!acabados.ok) return acabados;
-    const bases = resolverLista(catalogos.bases, f.bases, 'base_no_encontrada', 'la base', f.fila);
+    const bases = resolverListaOCrear(ctx, altas, f.bases, {
+      registros: catalogos.bases,
+      tipo: 'base',
+      ambito: '',
+      motivo: 'base_no_encontrada',
+      quien: 'la base',
+      fila: f.fila,
+      largo: 50,
+    });
     if (!bases.ok) return bases;
+    // Los colores no se crean (necesitan hexadecimal y acabado): una marca nueva no tiene ninguno.
     const coloresFabrica = resolverLista(
-      colores.filter((c) => c.idMarca === idMarca),
+      idMarca === null ? [] : colores.filter((c) => c.idMarca === idMarca),
       f.coloresFabrica,
       'color_no_encontrado',
       'el color de esa marca',
@@ -321,18 +469,27 @@ export class CargaProductosService {
       return fallo('caracteristica_repetida', `Fila ${f.fila}: hay características con el nombre repetido.`);
     }
 
-    let idTipoResina: number | null = null;
+    let resina: Referencia | null = null;
     const nombreResina = nuloSiVacio(f.tipoResina);
     if (nombreResina !== null) {
-      const resina = resolver(catalogos.tiposResina, nombreResina, 'resina_no_encontrada', 'el tipo de resina', f.fila);
-      if (!resina.ok) return resina;
-      idTipoResina = resina.valor.id;
+      const r = resolverOCrear(ctx, altas, {
+        registros: catalogos.tiposResina,
+        nombre: nombreResina,
+        tipo: 'tipo_resina',
+        ambito: '',
+        motivo: 'resina_no_encontrada',
+        quien: 'el tipo de resina',
+        fila: f.fila,
+        largo: 100,
+      });
+      if (!r.ok) return r;
+      resina = r.valor;
     } else if (f.tipoCalidad !== null || f.rendimientoMin !== null || f.rendimientoMax !== null || f.manos !== null) {
       return fallo('dato_invalido', `Fila ${f.fila}: la calidad, el rendimiento y las manos exigen el tipo de resina.`);
     }
 
-    const conFicha = idTipoResina !== null;
-    if (conFicha && idLinea === null) {
+    const conFicha = resina !== null;
+    if (conFicha && linea === null) {
       return fallo('recubrimiento_sin_linea', `Fila ${f.fila}: un recubrimiento (con tipo de resina) exige línea.`);
     }
     if (!conFicha && (acabados.valor.length > 0 || bases.valor.length > 0 || coloresFabrica.valor.length > 0)) {
@@ -343,26 +500,26 @@ export class CargaProductosService {
     }
 
     const parseado = crearProductoRequestSchema.safeParse({
-      idMarca,
-      idLinea,
-      idSubcategoria: subcategoria.valor.id,
+      idMarca: idDeRelleno(marca),
+      idLinea: linea === null ? null : idDeRelleno(linea),
+      idSubcategoria: idDeRelleno(subcategoria.valor),
       nombre: f.producto,
       descripcion: nuloSiVacio(f.descripcion),
       usoInterior: f.usoInterior,
       usoExterior: f.usoExterior,
       ficha:
-        idTipoResina === null
+        resina === null
           ? null
           : {
-              idTipoResina,
+              idTipoResina: idDeRelleno(resina),
               tipoCalidad: f.tipoCalidad,
               rendimientoMin: f.rendimientoMin,
               rendimientoMax: f.rendimientoMax,
               manos: f.manos,
             },
-      idsSuperficies: superficies.valor,
-      idsAcabados: acabados.valor,
-      idsBases: bases.valor,
+      idsSuperficies: idsDeRelleno(superficies.valor),
+      idsAcabados: idsDeRelleno(acabados.valor),
+      idsBases: idsDeRelleno(bases.valor),
       idsColoresFabrica: coloresFabrica.valor,
       caracteristicas: f.caracteristicas.map((c, orden) => ({ nombre: c.nombre, valor: c.valor, orden })),
     });
@@ -373,28 +530,28 @@ export class CargaProductosService {
     return {
       ok: true,
       valor: {
-        idMarca: d.idMarca,
-        idLinea: d.idLinea ?? null,
-        idSubcategoria: d.idSubcategoria,
+        marca,
+        linea,
+        categoria: categoria.valor,
+        subcategoria: subcategoria.valor,
         nombre: d.nombre,
         descripcion: d.descripcion ?? null,
         usoInterior: d.usoInterior,
         usoExterior: d.usoExterior,
-        idCategoriaComplementaria: null,
         ficha:
-          d.ficha === null || d.ficha === undefined
+          resina === null || d.ficha === null || d.ficha === undefined
             ? null
             : {
-                idTipoResina: d.ficha.idTipoResina,
+                tipoResina: resina,
                 tipoCalidad: d.ficha.tipoCalidad ?? null,
                 rendimientoMin: d.ficha.rendimientoMin ?? null,
                 rendimientoMax: d.ficha.rendimientoMax ?? null,
                 manos: d.ficha.manos ?? null,
               },
-        idsSuperficies: d.idsSuperficies,
-        idsAcabados: d.idsAcabados,
-        idsBases: d.idsBases,
-        idsColoresFabrica: d.idsColoresFabrica,
+        superficies: superficies.valor,
+        acabados: acabados.valor,
+        bases: bases.valor,
+        idsColoresFabrica: coloresFabrica.valor,
         caracteristicas: d.caracteristicas,
       },
     };
@@ -481,6 +638,7 @@ function rechazarTodo(vista: ProductoCarga, rechazo: Rechazo): ProductoCarga {
     resultado: 'rechazado',
     motivo: rechazo.motivo,
     detalle: rechazo.detalle,
+    nuevos: [],
     variantes: vista.variantes.map((v) => ({
       ...v,
       resultado: 'rechazada' as const,

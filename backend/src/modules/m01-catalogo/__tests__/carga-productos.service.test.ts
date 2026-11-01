@@ -4,36 +4,39 @@ import type {
   CargaProductosRepositoryPort,
   CatalogosCarga,
   ColorCarga,
+  ProductoCargaDatos,
   ProductoExistenteCarga,
   VarianteNuevaDatos,
 } from '../interfaces/carga-productos.interface';
-import type { CrearProductoDatos } from '../interfaces/productos.interface';
 import { CargaProductosService, normalizar } from '../services/carga-productos.service';
 
 const CATALOGOS: CatalogosCarga = {
   marcas: [
-    { id: 1, nombre: 'Pintuco' },
-    { id: 2, nombre: 'Sika' },
+    { id: 1, nombre: 'Pintuco', activo: true },
+    { id: 2, nombre: 'Sika', activo: true },
+    { id: 3, nombre: 'Marca dormida', activo: false },
   ],
   lineas: [
-    { id: 10, idMarca: 1, nombre: 'Viniltex' },
-    { id: 11, idMarca: 2, nombre: 'Sikalastic' },
+    { id: 10, idMarca: 1, nombre: 'Viniltex', activo: true },
+    { id: 11, idMarca: 2, nombre: 'Sikalastic', activo: true },
+    { id: 12, idMarca: 1, nombre: 'Linea dormida', activo: false },
   ],
-  categorias: [{ id: 100, nombre: 'Pinturas' }],
-  subcategorias: [{ id: 1000, idCategoria: 100, nombre: 'Vinilos' }],
+  categorias: [{ id: 100, nombre: 'Pinturas', activo: true }],
+  subcategorias: [{ id: 1000, idCategoria: 100, nombre: 'Vinilos', activo: true }],
   medidas: [
-    { id: 5, nombre: 'Galón' },
-    { id: 6, nombre: 'Cuarto' },
+    { id: 5, nombre: 'Galón', activo: true },
+    { id: 6, nombre: 'Cuarto', activo: true },
+    { id: 7, nombre: 'Medida dormida', activo: false },
   ],
-  superficies: [{ id: 20, nombre: 'Muros' }],
-  acabados: [{ id: 30, nombre: 'Mate' }],
-  bases: [{ id: 40, nombre: 'Pastel' }],
-  tiposResina: [{ id: 50, nombre: 'Acrílica' }],
+  superficies: [{ id: 20, nombre: 'Muros', activo: true }],
+  acabados: [{ id: 30, nombre: 'Mate', activo: true }],
+  bases: [{ id: 40, nombre: 'Pastel', activo: true }],
+  tiposResina: [{ id: 50, nombre: 'Acrílica', activo: true }],
 };
-const COLORES: ColorCarga[] = [{ id: 60, idMarca: 1, nombre: 'Rojo Colonial' }];
+const COLORES: ColorCarga[] = [{ id: 60, idMarca: 1, nombre: 'Rojo Colonial', activo: true }];
 
 class RepoMemoria implements CargaProductosRepositoryPort {
-  creados: Array<{ producto: CrearProductoDatos; variantes: readonly VarianteNuevaDatos[] }> = [];
+  creados: Array<{ producto: ProductoCargaDatos; variantes: readonly VarianteNuevaDatos[] }> = [];
   productos: ProductoExistenteCarga[] = [];
   skus = new Set<string>();
   fallarConUnico = false;
@@ -42,7 +45,7 @@ class RepoMemoria implements CargaProductosRepositoryPort {
   productosDeMarcas = async (): Promise<ProductoExistenteCarga[]> => this.productos;
   skusExistentes = async (): Promise<Set<string>> => this.skus;
   codigosProveedorExistentes = async (): Promise<Set<string>> => new Set();
-  crearProductoConVariantes = async (producto: CrearProductoDatos, variantes: readonly VarianteNuevaDatos[]): Promise<number> => {
+  crearProductoConVariantes = async (producto: ProductoCargaDatos, variantes: readonly VarianteNuevaDatos[]): Promise<number> => {
     if (this.fallarConUnico) throw Object.assign(new Error('unique'), { code: 'P2002' });
     this.creados.push({ producto, variantes });
     return 900 + this.creados.length;
@@ -120,19 +123,13 @@ describe('carga masiva de productos · servicio', () => {
     expect(repo.creados).toHaveLength(0);
   });
 
-  it('C9: un nombre que no existe rechaza el producto con su motivo y el resto sigue', async () => {
+  it('C9: una medida que no existe rechaza el producto con su motivo y el resto sigue', async () => {
     const { repo, servicio: s } = servicio();
-    const r = await s.aplicar({ filas: [fila({ marca: 'Marca fantasma' }), fila({ producto: 'Otro' })] });
+    const r = await s.aplicar({ filas: [fila({ medida: 'Medida fantasma' }), fila({ producto: 'Otro' })] });
     expect(r.productos.map((p) => p.resultado)).toEqual(['rechazado', 'creado']);
-    expect(r.productos[0]).toMatchObject({ motivo: 'marca_no_encontrada' });
-    expect(r.productos[0]?.detalle).toContain('Marca fantasma');
+    expect(r.productos[0]?.variantes[0]).toMatchObject({ motivo: 'medida_no_encontrada' });
+    expect(r.productos[0]?.variantes[0]?.detalle).toContain('Medida fantasma');
     expect(repo.creados).toHaveLength(1);
-  });
-
-  it('P1: una línea de otra marca se rechaza con su motivo', async () => {
-    const { servicio: s } = servicio();
-    const r = await s.previsualizar({ filas: [fila({ linea: 'Sikalastic' })] });
-    expect(r.productos[0]).toMatchObject({ resultado: 'rechazado', motivo: 'linea_de_otra_marca' });
   });
 
   it('P2 / P3: recubrimiento sin línea, acabados sin ficha y bases sin acabado se rechazan', async () => {
@@ -168,11 +165,13 @@ describe('carga masiva de productos · servicio', () => {
     });
     expect(r.productos[0]).toMatchObject({ resultado: 'creado' });
     expect(repo.creados[0]?.producto).toMatchObject({
-      idLinea: 10,
-      ficha: { idTipoResina: 50, tipoCalidad: 1, rendimientoMin: 30, rendimientoMax: 40, manos: 2 },
-      idsSuperficies: [20],
-      idsAcabados: [30],
-      idsBases: [40],
+      marca: { id: 1 },
+      linea: { id: 10 },
+      subcategoria: { id: 1000 },
+      ficha: { tipoResina: { id: 50 }, tipoCalidad: 1, rendimientoMin: 30, rendimientoMax: 40, manos: 2 },
+      superficies: [{ id: 20 }],
+      acabados: [{ id: 30 }],
+      bases: [{ id: 40 }],
       idsColoresFabrica: [60],
       caracteristicas: [{ nombre: 'Secado', valor: '2 horas', orden: 0 }],
     });
@@ -219,5 +218,119 @@ describe('carga masiva de productos · servicio', () => {
     const r = await s.aplicar({ filas: [fila()] });
     expect(r.productos[0]).toMatchObject({ resultado: 'rechazado', motivo: 'producto_rechazado' });
     expect(r.balance.productosRechazados).toBe(1);
+  });
+
+  describe('C16 · lo que no existe en el catálogo se crea con el producto', () => {
+    it('anuncia en la vista previa la marca, línea, categoría y subcategoría nuevas, y no escribe', async () => {
+      const { repo, servicio: s } = servicio();
+      const r = await s.previsualizar({
+        filas: [fila({ marca: 'Marca nueva', linea: 'Línea nueva', categoria: 'Categoría nueva', subcategoria: 'Sub nueva' })],
+      });
+      expect(r.productos[0]).toMatchObject({ resultado: 'por_crear' });
+      expect(r.productos[0]?.nuevos).toEqual([
+        { tipo: 'marca', nombre: 'Marca nueva' },
+        { tipo: 'linea', nombre: 'Línea nueva' },
+        { tipo: 'categoria', nombre: 'Categoría nueva' },
+        { tipo: 'subcategoria', nombre: 'Sub nueva' },
+      ]);
+      expect(repo.creados).toHaveLength(0);
+    });
+
+    it('aplicar entrega al repositorio el nombre de lo nuevo y el id de lo que ya existe', async () => {
+      const { repo, servicio: s } = servicio();
+      const r = await s.aplicar({
+        filas: [
+          fila({
+            linea: 'Línea nueva',
+            subcategoria: 'Sub nueva',
+            tipoResina: 'Resina nueva',
+            superficies: ['Muros', 'Superficie nueva'],
+            acabados: ['Acabado nuevo'],
+            bases: ['Base nueva'],
+          }),
+        ],
+      });
+      expect(r.productos[0]).toMatchObject({ resultado: 'creado' });
+      expect(repo.creados[0]?.producto).toMatchObject({
+        marca: { id: 1 },
+        linea: { nuevo: 'Línea nueva' },
+        categoria: { id: 100 },
+        subcategoria: { nuevo: 'Sub nueva' },
+        ficha: { tipoResina: { nuevo: 'Resina nueva' } },
+        superficies: [{ id: 20 }, { nuevo: 'Superficie nueva' }],
+        acabados: [{ nuevo: 'Acabado nuevo' }],
+        bases: [{ nuevo: 'Base nueva' }],
+      });
+    });
+
+    it('un nombre nuevo repetido en otros productos del archivo se anuncia una vez y conserva la primera grafía', async () => {
+      const { repo, servicio: s } = servicio();
+      const r = await s.aplicar({
+        filas: [
+          fila({ producto: 'A', marca: 'Marca Nueva', linea: 'Línea X' }),
+          fila({ producto: 'B', marca: 'MARCA NUEVA', linea: 'linea x' }),
+        ],
+      });
+      expect(r.productos.map((p) => p.resultado)).toEqual(['creado', 'creado']);
+      expect(r.productos[0]?.nuevos.map((n) => n.tipo)).toEqual(['marca', 'linea']);
+      expect(r.productos[1]?.nuevos).toEqual([]);
+      expect(repo.creados[1]?.producto).toMatchObject({ marca: { nuevo: 'Marca Nueva' }, linea: { nuevo: 'Línea X' } });
+    });
+
+    it('la misma línea en otra marca no estorba: se crea para esta marca', async () => {
+      const { servicio: s } = servicio();
+      const r = await s.previsualizar({ filas: [fila({ linea: 'Sikalastic' })] });
+      expect(r.productos[0]).toMatchObject({ resultado: 'por_crear', nuevos: [{ tipo: 'linea', nombre: 'Sikalastic' }] });
+    });
+
+    it('un registro inactivo no se duplica: la fila se rechaza y se dice que está inactivo', async () => {
+      const { servicio: s } = servicio();
+      const r = await s.previsualizar({
+        filas: [
+          fila({ producto: 'A', marca: 'Marca dormida' }),
+          fila({ producto: 'B', linea: 'Linea dormida' }),
+          fila({ producto: 'C', medida: 'Medida dormida' }),
+        ],
+      });
+      expect(r.productos.map((p) => p.resultado)).toEqual(['rechazado', 'rechazado', 'rechazado']);
+      expect(r.productos[0]?.motivo).toBe('marca_no_encontrada');
+      expect(r.productos[0]?.detalle).toContain('inactivo');
+      expect(r.productos[1]?.motivo).toBe('linea_no_encontrada');
+      expect(r.productos[2]?.variantes[0]?.detalle).toContain('inactivo');
+    });
+
+    it('no crea medidas ni colores, y una marca nueva no puede traer colores de fábrica', async () => {
+      const { servicio: s } = servicio();
+      const r = await s.previsualizar({
+        filas: [
+          fila({ producto: 'A', medida: 'Medida nueva' }),
+          fila({ producto: 'B', linea: 'Viniltex', tipoResina: 'Acrílica', coloresFabrica: ['Color nuevo'] }),
+          fila({ producto: 'C', marca: 'Marca nueva', linea: 'L', tipoResina: 'Acrílica', coloresFabrica: ['Rojo Colonial'] }),
+        ],
+      });
+      expect(r.productos.map((p) => p.resultado)).toEqual(['rechazado', 'rechazado', 'rechazado']);
+      expect(r.productos[0]?.variantes[0]?.motivo).toBe('medida_no_encontrada');
+      expect(r.productos[1]?.motivo).toBe('color_no_encontrado');
+      expect(r.productos[2]?.motivo).toBe('color_no_encontrado');
+    });
+
+    it('un nombre nuevo más largo que la columna se rechaza en vez de fallar al escribir', async () => {
+      const { servicio: s } = servicio();
+      const r = await s.previsualizar({ filas: [fila({ tipoResina: 'R'.repeat(101), linea: 'Viniltex' }), fila({ producto: 'B', acabados: ['A'.repeat(51)] })] });
+      expect(r.productos[0]).toMatchObject({ resultado: 'rechazado', motivo: 'dato_invalido' });
+      expect(r.productos[1]).toMatchObject({ resultado: 'rechazado', motivo: 'dato_invalido' });
+    });
+
+    it('un producto rechazado por otra razón no anuncia ni reserva nada', async () => {
+      const { servicio: s } = servicio();
+      const r = await s.previsualizar({
+        filas: [
+          fila({ producto: 'A', marca: 'Marca nueva', medida: 'Medida fantasma' }),
+          fila({ producto: 'B', marca: 'Marca nueva' }),
+        ],
+      });
+      expect(r.productos[0]).toMatchObject({ resultado: 'rechazado', nuevos: [] });
+      expect(r.productos[1]?.nuevos).toEqual([{ tipo: 'marca', nombre: 'Marca nueva' }]);
+    });
   });
 });

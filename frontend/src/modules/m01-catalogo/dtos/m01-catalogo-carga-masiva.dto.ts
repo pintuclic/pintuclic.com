@@ -125,6 +125,20 @@ export const MOTIVOS_RECHAZO_PRODUCTO = [
   'dato_invalido',
   'producto_rechazado',
 ] as const;
+/** C16: lo que la carga crea además del producto cuando su nombre no existe en el catálogo. */
+export const TIPOS_CATALOGO_NUEVO = [
+  'marca',
+  'linea',
+  'categoria',
+  'subcategoria',
+  'superficie',
+  'acabado',
+  'base',
+  'tipo_resina',
+] as const;
+export const catalogoNuevoSchema = z.object({ tipo: z.enum(TIPOS_CATALOGO_NUEVO), nombre: z.string() });
+export type CatalogoNuevo = z.infer<typeof catalogoNuevoSchema>;
+
 export const motivoRechazoProductoSchema = z.enum(MOTIVOS_RECHAZO_PRODUCTO);
 export type MotivoRechazoProducto = z.infer<typeof motivoRechazoProductoSchema>;
 
@@ -153,6 +167,8 @@ export const productoCargaSchema = z.object({
   detalle: z.string().nullable(),
   /** Solo cuando ya se creó (aplicar) o ya existía. */
   idProducto: z.number().int().positive().nullable(),
+  /** C16: marcas, líneas, categorías… que se crearán (o se crearon) con este producto porque no existían. */
+  nuevos: z.array(catalogoNuevoSchema),
   variantes: z.array(varianteCargaSchema),
 });
 export type ProductoCarga = z.infer<typeof productoCargaSchema>;

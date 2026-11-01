@@ -42,6 +42,7 @@ function producto(resultado: ProductoCarga['resultado'], variantes: number, extr
     motivo: null,
     detalle: null,
     idProducto: null,
+    nuevos: [],
     variantes: Array.from({ length: variantes }, (_, i) => ({
       fila: i + 2,
       medida: `M${i}`,

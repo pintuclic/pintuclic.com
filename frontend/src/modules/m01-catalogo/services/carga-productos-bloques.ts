@@ -45,6 +45,7 @@ export function dividirEnBloquesDeProductos(
         motivo: 'producto_demasiado_grande',
         detalle: `El producto tiene ${grupo.length} filas y el máximo es ${maximo}.`,
         idProducto: null,
+        nuevos: [],
         variantes: grupo.map((f) => ({
           fila: f.fila,
           medida: f.medida,
