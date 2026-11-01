@@ -13,6 +13,7 @@ import {
   ENCABEZADOS_INFORME,
   filasDelInforme,
 } from './carga-productos-bloques';
+import { leerErrorCatalogo } from './mensaje-error';
 
 const BASE = '/admin/catalogo';
 export const NOMBRE_PLANTILLA_PRODUCTOS = 'plantilla-productos.xlsx';
@@ -27,6 +28,38 @@ async function errorLegible(err: unknown): Promise<unknown> {
     return esRespuestaError(cuerpo) ? new Error(cuerpo.error.message) : err;
   } catch {
     return err;
+  }
+}
+
+/**
+ * Dice POR QUÉ falló una llamada al servidor, no solo que falló. `accion` completa la frase: «No se pudo revisar el
+ * archivo». Si el servidor explicó el motivo, se muestra tal cual; si no, se deduce del código HTTP.
+ */
+export function explicarFalloDeCarga(err: unknown, accion: string): string {
+  const e = leerErrorCatalogo(err, '');
+  if (isAxiosError<unknown>(err)) {
+    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
+      return `${accion}: el servidor tardó demasiado en responder. Intente de nuevo; si el archivo es muy grande, divídalo.`;
+    }
+    if (err.response === undefined) {
+      return `${accion}: no hay conexión con el servidor. Revise su internet e intente de nuevo.`;
+    }
+  }
+  if (e.code !== null && e.message !== '') return `${accion}: ${e.message}`;
+  switch (e.status) {
+    case 401:
+      return `${accion}: su sesión venció. Vuelva a iniciar sesión.`;
+    case 403:
+    case 404:
+      return `${accion}: su sesión venció o no tiene permiso para crear productos (código ${e.status}).`;
+    case 413:
+      return `${accion}: el archivo es demasiado grande para enviarlo al servidor (código 413). Divídalo en varios.`;
+    case 429:
+      return `${accion}: demasiadas solicitudes seguidas (código 429). Espere un momento e intente de nuevo.`;
+    case null:
+      return `${accion}: ocurrió un error inesperado${err instanceof Error && err.message !== '' ? ` (${err.message})` : ''}.`;
+    default:
+      return `${accion}: ${e.status >= 500 ? 'el servidor tuvo un error interno' : 'el servidor rechazó la solicitud'} (código ${e.status}). Intente de nuevo; si persiste, avise a soporte.`;
   }
 }
 

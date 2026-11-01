@@ -14,6 +14,7 @@ import { MAXIMO_IMAGENES_PRODUCTO } from '../../dtos/m01-catalogo-productos.dto'
 import {
   armarInformeProductos,
   cargaProductosApi,
+  explicarFalloDeCarga,
   guardarArchivoXlsx,
   NOMBRE_INFORME_PRODUCTOS,
   NOMBRE_PLANTILLA_PRODUCTOS,
@@ -23,7 +24,6 @@ import { leerImagen, validarImagen } from '../../services/archivos';
 import { imagenesApi } from '../../services/catalogo-api';
 import { claveDeProducto, conAlgoQueRevisar } from '../../services/carga-productos-bloques';
 import { leerLibroProductos, LibroInvalidoError, type LecturaLibro } from '../../services/carga-productos';
-import { leerErrorCatalogo } from '../../services/mensaje-error';
 
 export interface CargaProductosModalProps {
   onClose: () => void;
@@ -198,7 +198,7 @@ export const CargaProductosModal: React.FC<CargaProductosModalProps> = ({ onClos
     try {
       guardarArchivoXlsx(await cargaProductosApi.descargarPlantilla(), NOMBRE_PLANTILLA_PRODUCTOS);
     } catch (err: unknown) {
-      setError(leerErrorCatalogo(err, 'No se pudo descargar la plantilla.').message);
+      setError(explicarFalloDeCarga(err, 'No se pudo descargar la plantilla'));
     } finally {
       setDescargando(false);
     }
@@ -209,7 +209,7 @@ export const CargaProductosModal: React.FC<CargaProductosModalProps> = ({ onClos
     try {
       setRevision(await cargaProductosApi.previsualizar(filas, (hechos, total) => setProgreso({ hechos, total })));
     } catch (err: unknown) {
-      setError(leerErrorCatalogo(err, 'No se pudo revisar el archivo.').message);
+      setError(explicarFalloDeCarga(err, 'No se pudo revisar el archivo'));
     } finally {
       setTrabajo(null);
       setProgreso(null);
@@ -228,11 +228,15 @@ export const CargaProductosModal: React.FC<CargaProductosModalProps> = ({ onClos
     if (nuevo === null) return;
     setTrabajo('leyendo');
     try {
-      const leido = await leerLibroProductos(await nuevo.arrayBuffer());
+      const leido = await leerLibroProductos(await nuevo.arrayBuffer(), nuevo.name);
       setLectura(leido);
       if (leido.filas.length > 0) await revisar(leido.filas);
     } catch (err: unknown) {
-      setError(err instanceof LibroInvalidoError ? err.message : 'No se pudo leer el archivo. Suba el Excel (.xlsx) de la plantilla.');
+      setError(
+        err instanceof LibroInvalidoError
+          ? err.message
+          : `No se pudo leer el archivo «${nuevo.name}»${err instanceof Error && err.message !== '' ? `: ${err.message}` : ''}. Suba el Excel (.xlsx) de la plantilla.`,
+      );
     } finally {
       setTrabajo(null);
     }
@@ -261,7 +265,7 @@ export const CargaProductosModal: React.FC<CargaProductosModalProps> = ({ onClos
         try {
           await imagenesApi.subir(p.idProducto, await leerImagen(archivo));
         } catch (err: unknown) {
-          problemas.push(`${p.producto} · ${archivo.name}: ${leerErrorCatalogo(err, 'no se pudo subir').message}`);
+          problemas.push(`${p.producto} · ${archivo.name}: ${explicarFalloDeCarga(err, 'no se pudo subir')}`);
         }
       }
     }
@@ -277,7 +281,7 @@ export const CargaProductosModal: React.FC<CargaProductosModalProps> = ({ onClos
       setResultado(aplicada);
       await subirImagenes(aplicada.productos);
     } catch (err: unknown) {
-      setError(leerErrorCatalogo(err, 'No se pudo completar la carga. Revise cuáles productos se crearon antes de repetirla.').message);
+      setError(`${explicarFalloDeCarga(err, 'No se pudo completar la carga')} Revise cuáles productos se crearon antes de repetirla.`);
     } finally {
       setTrabajo(null);
       setProgreso(null);

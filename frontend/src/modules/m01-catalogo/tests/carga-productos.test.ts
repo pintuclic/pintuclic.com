@@ -145,4 +145,56 @@ describe('leerLibroProductos', () => {
     await expect(leerLibroProductos(new TextEncoder().encode('no soy un excel').buffer as ArrayBuffer)).rejects.toThrow(/No se pudo abrir/);
     await expect(leerLibroProductos(new ArrayBuffer(5 * 1024 * 1024 + 1))).rejects.toThrow(/5 MB/);
   });
+
+  describe('dice exactamente por qué no se puede cargar el archivo', () => {
+    const buffer = async (wb: ExcelJS.Workbook) => (await wb.xlsx.writeBuffer()) as ArrayBuffer;
+
+    it('por la extensión: .xls, .csv u otra cosa', async () => {
+      const datos = await libro([FILA_BASE]);
+      await expect(leerLibroProductos(datos, 'productos.xls')).rejects.toThrow(/«productos\.xls» es un Excel antiguo/);
+      await expect(leerLibroProductos(datos, 'productos.csv')).rejects.toThrow(/\.csv/);
+      await expect(leerLibroProductos(datos, 'foto.png')).rejects.toThrow(/\.png, no un Excel/);
+      await expect(leerLibroProductos(datos, 'productos.xlsx')).resolves.toBeDefined();
+    });
+
+    it('por estar vacío o pesar de más, con el tamaño real', async () => {
+      await expect(leerLibroProductos(new ArrayBuffer(0))).rejects.toThrow(/vacío \(0 bytes\)/);
+      await expect(leerLibroProductos(new ArrayBuffer(6 * 1024 * 1024))).rejects.toThrow(/pesa 6\.0 MB/);
+    });
+
+    it('por no abrirse, con el detalle técnico', async () => {
+      await expect(leerLibroProductos(new TextEncoder().encode('no soy un excel').buffer as ArrayBuffer)).rejects.toThrow(
+        /dañado o tiene contraseña.*Detalle técnico/,
+      );
+    });
+
+    it('por faltar la hoja «Productos» (y qué hojas trae) o la hoja de versión', async () => {
+      const sinProductos = new ExcelJS.Workbook();
+      sinProductos.addWorksheet('Hoja1').addRow(['hola']);
+      await expect(leerLibroProductos(await buffer(sinProductos))).rejects.toThrow(/Falta la hoja «Productos».*«Hoja1»/);
+
+      const sinMeta = new ExcelJS.Workbook();
+      sinMeta.addWorksheet('Productos').addRow([...COLUMNAS_PLANTILLA_PRODUCTOS]);
+      await expect(leerLibroProductos(await buffer(sinMeta))).rejects.toThrow(/hoja oculta de versión/);
+    });
+
+    it('por la versión, diciendo cuál trae y cuál es la actual', async () => {
+      await expect(leerLibroProductos(await libro([FILA_BASE], VERSION_PLANTILLA_PRODUCTOS + 1))).rejects.toThrow(
+        new RegExp(`versión ${VERSION_PLANTILLA_PRODUCTOS + 1}; la actual es la ${VERSION_PLANTILLA_PRODUCTOS}`),
+      );
+    });
+
+    it('por un encabezado cambiado, con la columna y lo que encontró', async () => {
+      const roto = new ExcelJS.Workbook();
+      roto.addWorksheet('Productos').addRow(['Marca', 'Otra cosa']);
+      roto.addWorksheet('meta').getCell('B1').value = VERSION_PLANTILLA_PRODUCTOS;
+      await expect(leerLibroProductos(await buffer(roto))).rejects.toThrow(
+        /columna B de la fila 1: se esperaba «Línea» y se encontró «Otra cosa»/,
+      );
+    });
+
+    it('por no traer ninguna fila con datos', async () => {
+      await expect(leerLibroProductos(await libro([]))).rejects.toThrow(/ninguna fila con datos/);
+    });
+  });
 });

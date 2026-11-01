@@ -186,21 +186,51 @@ const tituloDeCampo = (campo: string): string => TITULO_POR_CAMPO[campo] ?? camp
 
 /* ── El libro completo ───────────────────────────────────────────────────── */
 
-function exigirPlantilla(hoja: Worksheet | undefined, meta: Worksheet | undefined): Worksheet {
-  if (hoja === undefined || meta === undefined) {
-    throw new LibroInvalidoError('El archivo no es la plantilla de productos. Descargue la plantilla y úsela tal como viene.');
+function exigirPlantilla(hoja: Worksheet | undefined, meta: Worksheet | undefined, hojas: readonly string[]): Worksheet {
+  if (hoja === undefined) {
+    throw new LibroInvalidoError(
+      `Falta la hoja «${HOJA_PRODUCTOS}». El archivo tiene ${hojas.length === 0 ? 'ninguna hoja' : `las hojas ${hojas.map((h) => `«${h}»`).join(', ')}`}. ` +
+        'Descargue la plantilla y úsela tal como viene.',
+    );
   }
-  const version = Number(meta.getCell('B1').value);
-  if (version !== VERSION_PLANTILLA_PRODUCTOS) {
-    throw new LibroInvalidoError('La plantilla es de otra versión. Descargue la plantilla actual y pase los datos a ella.');
+  if (meta === undefined) {
+    throw new LibroInvalidoError(
+      'Falta la hoja oculta de versión de la plantilla: el archivo no viene de la plantilla de Pintu Clic o se borró esa hoja. Descargue la plantilla de nuevo.',
+    );
   }
-  const encabezados = COLUMNAS_PLANTILLA_PRODUCTOS.map((_, i) => textoDeCelda(hoja.getCell(1, i + 1).value));
-  const distinto = COLUMNAS_PLANTILLA_PRODUCTOS.find((titulo, i) => titulo !== encabezados[i]);
-  if (distinto !== undefined) {
-    throw new LibroInvalidoError(`Falta la columna «${distinto}» o está en otro lugar. No cambie los encabezados de la plantilla.`);
+  const crudo = textoDeCelda(meta.getCell('B1').value);
+  if (Number(crudo) !== VERSION_PLANTILLA_PRODUCTOS) {
+    throw new LibroInvalidoError(
+      `La plantilla es de otra versión (${crudo === '' ? 'sin versión' : `versión ${crudo}`}; la actual es la ${VERSION_PLANTILLA_PRODUCTOS}). ` +
+        'Descargue la plantilla actual y pase los datos a ella.',
+    );
+  }
+  const indice = COLUMNAS_PLANTILLA_PRODUCTOS.findIndex((titulo, i) => titulo !== textoDeCelda(hoja.getCell(1, i + 1).value));
+  if (indice !== -1) {
+    const encontrado = textoDeCelda(hoja.getCell(1, indice + 1).value);
+    throw new LibroInvalidoError(
+      `Encabezado incorrecto en la columna ${hoja.getColumn(indice + 1).letter} de la fila 1: se esperaba «${COLUMNAS_PLANTILLA_PRODUCTOS[indice]}» y ` +
+        `${encontrado === '' ? 'la celda está vacía' : `se encontró «${encontrado}»`}. No cambie los encabezados de la plantilla ni su orden.`,
+    );
   }
   return hoja;
 }
+
+/** Lo que se sabe del archivo antes de abrirlo: su extensión no deja pasar un .xls, .csv, .pdf… como si fuera la plantilla. */
+function exigirExtension(nombre: string): void {
+  const extension = /\.([^./\\]+)$/.exec(nombre)?.[1]?.toLowerCase();
+  if (extension === 'xlsx') return;
+  const que: Record<string, string> = {
+    xls: 'un Excel antiguo (.xls). Ábralo en Excel y guárdelo como «Libro de Excel (.xlsx)»',
+    csv: 'un archivo de texto (.csv). Use la plantilla .xlsx descargada',
+    xlsm: 'un libro con macros (.xlsm). Guárdelo como «Libro de Excel (.xlsx)»',
+    ods: 'una hoja de LibreOffice (.ods). Guárdela como Excel (.xlsx)',
+  };
+  const explicacion = extension === undefined ? 'un archivo sin extensión .xlsx' : (que[extension] ?? `un archivo .${extension}, no un Excel (.xlsx)`);
+  throw new LibroInvalidoError(`«${nombre}» es ${explicacion}.`);
+}
+
+const megas = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
 const filaVacia = (hoja: Worksheet, numero: number): boolean =>
   COLUMNAS_PLANTILLA_PRODUCTOS.every((_, i) => textoDeCelda(hoja.getCell(numero, i + 1).value) === '');
@@ -215,19 +245,32 @@ function contarProductos(filas: readonly FilaProductoCarga[]): number {
  * Lee la plantilla llenada. Valida el archivo entero (versión, encabezados, tamaño, número de filas) y cada fila por
  * separado: una fila mala no impide leer las demás. No habla con el servidor.
  */
-export async function leerLibroProductos(datos: ArrayBuffer): Promise<LecturaLibro> {
+export async function leerLibroProductos(datos: ArrayBuffer, nombre?: string): Promise<LecturaLibro> {
+  if (nombre !== undefined) exigirExtension(nombre);
+  if (datos.byteLength === 0) {
+    throw new LibroInvalidoError('El archivo está vacío (0 bytes). Vuelva a guardarlo desde Excel e inténtelo de nuevo.');
+  }
   if (datos.byteLength > MAXIMO_BYTES_ARCHIVO_PRODUCTOS) {
-    throw new LibroInvalidoError('El archivo pesa más de 5 MB. Divídalo en varios.');
+    throw new LibroInvalidoError(
+      `El archivo pesa ${megas(datos.byteLength)} y el máximo es ${megas(MAXIMO_BYTES_ARCHIVO_PRODUCTOS)} (5 MB). Divídalo en varios.`,
+    );
   }
   // La librería es pesada: solo se descarga cuando alguien sube un archivo.
   const { default: ExcelJS } = await import('exceljs');
   const libro = new ExcelJS.Workbook();
   try {
     await libro.xlsx.load(datos);
-  } catch {
-    throw new LibroInvalidoError('No se pudo abrir el archivo. Suba el Excel (.xlsx) de la plantilla.');
+  } catch (err: unknown) {
+    const tecnico = err instanceof Error && err.message !== '' ? ` Detalle técnico: ${err.message}.` : '';
+    throw new LibroInvalidoError(
+      `No se pudo abrir el archivo: no es un Excel (.xlsx) válido, está dañado o tiene contraseña. Suba el Excel de la plantilla.${tecnico}`,
+    );
   }
-  const hoja = exigirPlantilla(libro.getWorksheet(HOJA_PRODUCTOS), libro.getWorksheet(HOJA_META));
+  const hoja = exigirPlantilla(
+    libro.getWorksheet(HOJA_PRODUCTOS),
+    libro.getWorksheet(HOJA_META),
+    libro.worksheets.filter((h) => h.state === 'visible').map((h) => h.name),
+  );
 
   const filas: FilaProductoCarga[] = [];
   const errores: ErrorLecturaFila[] = [];
@@ -241,6 +284,9 @@ export async function leerLibroProductos(datos: ArrayBuffer): Promise<LecturaLib
     const lectura = leerFila(hoja, numero);
     if (lectura.ok) filas.push(lectura.valor);
     else errores.push({ fila: numero, mensaje: lectura.mensaje });
+  }
+  if (conDatos === 0) {
+    throw new LibroInvalidoError(`La hoja «${HOJA_PRODUCTOS}» no tiene ninguna fila con datos (se leen desde la fila 2). Llene la plantilla y vuelva a subirla.`);
   }
   return { filas, errores, productos: contarProductos(filas) };
 }
