@@ -2,6 +2,7 @@ import type {
   EstadoSolicitud,
   EstadoWompi,
   ListarSolicitudesAdminRequest,
+  MedioPago,
   ModoEntrega,
   OrigenSolicitud,
   ResumenPagos,
@@ -40,7 +41,12 @@ export interface IntentoGuardado {
   idTransaccion: string | null;
   estado: EstadoWompi;
   montoCentavos: number;
-  celularEnmascarado: string;
+  /** R19 */
+  medio: MedioPago;
+  /** R19: `payment_method_type` de Wompi; null sin transacción. */
+  metodo: string | null;
+  /** R12: null en la página de Wompi. */
+  celularEnmascarado: string | null;
   mensaje: string | null;
   ultimaConsulta: Date | null;
   fechaCreacion: Date;
@@ -110,10 +116,11 @@ export interface IntentoNuevo {
   numero: number;
   referencia: string;
   montoCentavos: number;
-  celularEnmascarado: string;
+  medio: MedioPago;
+  celularEnmascarado: string | null;
 }
 
-export type CambiosIntento = Partial<Pick<IntentoGuardado, 'estado' | 'idTransaccion' | 'mensaje' | 'ultimaConsulta'>>;
+export type CambiosIntento = Partial<Pick<IntentoGuardado, 'estado' | 'idTransaccion' | 'metodo' | 'mensaje' | 'ultimaConsulta'>>;
 
 export interface Pagina<T> {
   items: T[];

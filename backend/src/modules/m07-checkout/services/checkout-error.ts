@@ -69,6 +69,9 @@ export const errores = {
       { motivo: motivo ?? 'cupon_no_valido' },
     ),
   estado: (mensaje: string): CheckoutError => new CheckoutError('ESTADO_NO_PERMITE', mensaje, 409),
+  /** R19: Nequi sin celular o sin aceptaciones (el esquema ya lo impide; aquí por si llega por otro camino). */
+  datosNequi: (): CheckoutError =>
+    new CheckoutError('PARAMETRO_INVALIDO', 'Escribe tu celular de Nequi y acepta los términos de Wompi.', 400),
   vencida: (): CheckoutError =>
     new CheckoutError('SOLICITUD_VENCIDA', 'Esta compra venció. Vuelve al carrito para empezar de nuevo.', 409),
   limiteIntentos: (): CheckoutError =>

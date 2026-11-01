@@ -10,7 +10,7 @@ import { Alert, Button, ButtonLink, Checkbox, Container, Input, Skeleton, Steppe
 import { formatCOP } from '@/core/utils/moneda';
 import type { CambioRevalidacion } from '@/modules/m05-carrito/dtos/m05-carrito.dto';
 import { pantallaDe, textoCambio } from '@/modules/m05-carrito/services/textos-carrito';
-import type { ModoEntrega, PrepararCheckout } from '../dtos/m07-checkout.dto';
+import type { MedioPago, ModoEntrega, PrepararCheckout } from '../dtos/m07-checkout.dto';
 import { pagoFormSchema, type PagoFormData, type PagoFormEntrada } from '../dtos/formularios.dto';
 import {
   checkoutApi,
@@ -20,8 +20,8 @@ import {
   requiereSesion,
   revalidacionDeError,
 } from '../services/checkout-api';
-import { compraDirectaDeUrl, PASOS_COMPRA, PASOS_COMPRA_DIRECTA } from '../services/textos-checkout';
-import { ResumenCompra, type LineaResumen } from './comunes';
+import { compraDirectaDeUrl, PASOS_COMPRA, PASOS_COMPRA_DIRECTA, urlPaginaWompi } from '../services/textos-checkout';
+import { AvisoPaginaWompi, ResumenCompra, SelectorMedioPago, type LineaResumen } from './comunes';
 
 const VACIO: PagoFormEntrada = {
   modoEntrega: 'domicilio',
@@ -30,6 +30,7 @@ const VACIO: PagoFormEntrada = {
   apartamentoCasa: '',
   nombreRecibe: '',
   telefonoRecibe: '',
+  medio: 'nequi',
   celularNequi: '',
   aceptaReglamento: false,
   aceptaDatos: false,
@@ -47,8 +48,9 @@ function lineasDe(p: PrepararCheckout): LineaResumen[] {
 }
 
 /**
- * /checkout: entrega, celular de Nequi, términos de Wompi y resumen con el botón de pagar (contrato M07 · R2). Con
- * `?idVariante=…` paga solo ese producto desde la ficha, sin el carrito (R17).
+ * /checkout: entrega, medio de pago (Nequi con su celular y los términos de Wompi, o la página de Wompi, R19) y
+ * resumen con el botón de pagar (contrato M07 · R2). Con `?idVariante=…` paga solo ese producto desde la ficha,
+ * sin el carrito (R17).
  */
 export function CheckoutView() {
   const router = useRouter();
@@ -69,6 +71,7 @@ export function CheckoutView() {
     formState: { errors, isSubmitting },
   } = useForm<PagoFormEntrada, unknown, PagoFormData>({ resolver: zodResolver(pagoFormSchema), defaultValues: VACIO });
   const modo = watch('modoEntrega');
+  const medio = watch('medio');
   // La casilla del Core Kit dibuja la marca con `checked`.
   const aceptaReglamento = watch('aceptaReglamento');
   const aceptaDatos = watch('aceptaDatos');
@@ -104,6 +107,7 @@ export function CheckoutView() {
 
   const pagar = async (f: PagoFormData): Promise<void> => {
     if (datos === null || datos.terminos === null) return;
+    const terminos = datos.terminos;
     setError(null);
     setCambios([]);
     try {
@@ -121,13 +125,23 @@ export function CheckoutView() {
                 telefonoRecibe: f.telefonoRecibe,
               }
             : null,
-        celularNequi: f.celularNequi,
-        aceptaciones: {
-          tokenAceptacion: datos.terminos.tokenAceptacion,
-          tokenDatosPersonales: datos.terminos.tokenDatosPersonales,
-          aceptaTerminos: true,
-        },
+        ...(f.medio === 'nequi'
+          ? {
+              medio: 'nequi' as const,
+              celularNequi: f.celularNequi,
+              aceptaciones: {
+                tokenAceptacion: terminos.tokenAceptacion,
+                tokenDatosPersonales: terminos.tokenDatosPersonales,
+                aceptaTerminos: true as const,
+              },
+            }
+          : { medio: 'pagina_wompi' as const }),
       });
+      // R19: a pagar en la página de Wompi; vuelve a /checkout/<SOL> de esta misma tienda.
+      if (s.pagoWompi !== null) {
+        window.location.assign(urlPaginaWompi(s.pagoWompi, `${window.location.origin}/checkout/${s.codigo}`));
+        return;
+      }
       router.push(`/checkout/${s.codigo}`);
     } catch (err: unknown) {
       const enCurso = pagoEnCursoDeError(err);
@@ -149,6 +163,7 @@ export function CheckoutView() {
   };
 
   const elegirModo = (m: ModoEntrega): void => setValue('modoEntrega', m, { shouldValidate: false });
+  const elegirMedio = (m: MedioPago): void => setValue('medio', m, { shouldValidate: false });
 
   if (datos === null) {
     return (
@@ -208,7 +223,7 @@ export function CheckoutView() {
       <div className="mt-6 space-y-3" aria-live="polite">
         {datos.solicitudEnCurso !== null && (
           <Alert variant="info" title="Tienes un pago en curso">
-            Acéptalo o recházalo en la app de Nequi.{' '}
+            Termínalo o espera a que se confirme antes de empezar otra compra.{' '}
             <Link href={`/checkout/${datos.solicitudEnCurso}`} className="font-semibold underline">
               Ver ese pago
             </Link>
@@ -220,7 +235,7 @@ export function CheckoutView() {
           </Alert>
         )}
         {sinPasarela && (
-          <Alert variant="warning" title="El pago con Nequi no está disponible en este momento">
+          <Alert variant="warning" title="Los pagos no están disponibles en este momento">
             Inténtalo de nuevo en unos minutos. Si necesitas ayuda, escríbenos por WhatsApp desde el carrito.
           </Alert>
         )}
@@ -231,7 +246,7 @@ export function CheckoutView() {
                 <li key={`${c.tipo}-${i}`}>{textoCambio(c, datos.carrito)}</li>
               ))}
             </ul>
-            <p className="mt-2">Revisa el resumen. Si todo está bien, vuelve a pulsar «Pagar con Nequi».</p>
+            <p className="mt-2">Revisa el resumen. Si todo está bien, vuelve a pulsar el botón de pagar.</p>
           </Alert>
         )}
         {error !== null && <Alert variant="error">{error}</Alert>}
@@ -286,32 +301,37 @@ export function CheckoutView() {
             )}
           </section>
 
-          <section aria-labelledby="titulo-nequi" className="space-y-4 rounded-card border border-neutral-light/70 bg-neutral-white p-5 shadow-card">
-            <h2 id="titulo-nequi" className="font-title text-lg font-bold text-corporate">
-              Paga con Nequi
+          <section aria-labelledby="titulo-pago" className="space-y-4 rounded-card border border-neutral-light/70 bg-neutral-white p-5 shadow-card">
+            <h2 id="titulo-pago" className="font-title text-lg font-bold text-corporate">
+              ¿Cómo quieres pagar?
             </h2>
-            <Input
-              id="celularNequi"
-              label="Celular de Nequi"
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel-national"
-              leftIcon={<Smartphone aria-hidden className="h-4 w-4" />}
-              helperText="Te llegará una notificación a la app de Nequi de este celular para aceptar el pago."
-              error={errors.celularNequi?.message}
-              {...register('celularNequi')}
-            />
-            {datos.terminos !== null && (
-              <div className="space-y-3">
-                <Checkbox
-                  id="aceptaReglamento"
-                  label={
-                    <>
-                      Acepto el{' '}
-                      <a href={datos.terminos.enlaceReglamento} target="_blank" rel="noopener noreferrer" className="font-semibold text-action underline">
-                        reglamento de Wompi
-                      </a>
-                      .
+            <SelectorMedioPago valor={medio} onCambiar={elegirMedio} />
+            {medio === 'pagina_wompi' ? (
+              <AvisoPaginaWompi />
+            ) : (
+              <>
+                <Input
+                  id="celularNequi"
+                  label="Celular de Nequi"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  leftIcon={<Smartphone aria-hidden className="h-4 w-4" />}
+                  helperText="Te llegará una notificación a la app de Nequi de este celular para aceptar el pago."
+                  error={errors.celularNequi?.message}
+                  {...register('celularNequi')}
+                />
+                {datos.terminos !== null && (
+                  <div className="space-y-3">
+                    <Checkbox
+                      id="aceptaReglamento"
+                      label={
+                        <>
+                          Acepto el{' '}
+                          <a href={datos.terminos.enlaceReglamento} target="_blank" rel="noopener noreferrer" className="font-semibold text-action underline">
+                            reglamento de Wompi
+                          </a>
+                          .
                     </>
                   }
                   error={errors.aceptaReglamento?.message}
@@ -335,6 +355,8 @@ export function CheckoutView() {
                 />
               </div>
             )}
+              </>
+            )}
           </section>
         </div>
 
@@ -347,7 +369,7 @@ export function CheckoutView() {
             total={resumen.total + envio}
           >
             <Button type="submit" variant="primary-conversion" size="lg" fullWidth isLoading={isSubmitting} disabled={sinPasarela || noVendible || datos.solicitudEnCurso !== null}>
-              Pagar con Nequi
+              {medio === 'nequi' ? 'Pagar con Nequi' : 'Ir a pagar'}
             </Button>
           </ResumenCompra>
         </div>

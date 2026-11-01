@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.26 (v4.25 + M09: la marca «preparada» por línea; M11: cancelación iniciada por la tienda; M18: plantilla orden_cancelada)
+-- VERSIÓN: 4.27 (v4.26 + M07: intento_pago con el medio de pago, Nequi o la página de Wompi)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 98
@@ -1531,7 +1531,7 @@ COMMENT ON TABLE linea_solicitud IS 'Líneas congeladas de una solicitud de comp
 COMMENT ON COLUMN linea_solicitud.descuentos IS 'Descuentos de M06 de la línea: [{ordenAplicacion, origen, porcentaje, importe}] (pasan a linea_orden_descuento)';
 
 -- Tabla: intento_pago
--- Cada cobro enviado a la pasarela para una solicitud (M07 · R4, R11). Nunca guarda el celular completo (R12).
+-- Cada cobro enviado a la pasarela para una solicitud (M07 · R4, R11, R19). Nunca guarda el celular completo (R12).
 CREATE TABLE IF NOT EXISTS intento_pago (
     id_intento_pago SERIAL PRIMARY KEY,
     id_solicitud INT NOT NULL,
@@ -1540,7 +1540,9 @@ CREATE TABLE IF NOT EXISTS intento_pago (
     id_transaccion VARCHAR(100) UNIQUE,
     estado enum_estado_intento_pago NOT NULL DEFAULT 'pendiente',
     monto_centavos BIGINT NOT NULL,
-    celular_enmascarado VARCHAR(20) NOT NULL,
+    medio VARCHAR(20) NOT NULL DEFAULT 'nequi',
+    metodo_wompi VARCHAR(40),
+    celular_enmascarado VARCHAR(20),
     mensaje VARCHAR(255),
     ultima_consulta TIMESTAMPTZ,
     fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1549,10 +1551,25 @@ CREATE TABLE IF NOT EXISTS intento_pago (
         REFERENCES solicitud_compra (id_solicitud) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT uq_intento_pago_numero UNIQUE (id_solicitud, numero),
     CONSTRAINT chk_intento_pago_numero CHECK (numero > 0),
-    CONSTRAINT chk_intento_pago_monto CHECK (monto_centavos > 0)
+    CONSTRAINT chk_intento_pago_monto CHECK (monto_centavos > 0),
+    CONSTRAINT chk_intento_pago_medio CHECK (medio IN ('nequi', 'pagina_wompi'))
 );
 
-COMMENT ON TABLE intento_pago IS 'Intentos de cobro con Nequi por Wompi de una solicitud de compra (M07)';
+-- Bases creadas antes de v4.27 (solo Nequi): el medio, el método de Wompi y el celular opcional (M07 · R19).
+ALTER TABLE intento_pago ADD COLUMN IF NOT EXISTS medio VARCHAR(20) NOT NULL DEFAULT 'nequi';
+ALTER TABLE intento_pago ADD COLUMN IF NOT EXISTS metodo_wompi VARCHAR(40);
+ALTER TABLE intento_pago ALTER COLUMN celular_enmascarado DROP NOT NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_intento_pago_medio') THEN
+        ALTER TABLE intento_pago ADD CONSTRAINT chk_intento_pago_medio CHECK (medio IN ('nequi', 'pagina_wompi'));
+    END IF;
+END $$;
+
+COMMENT ON TABLE intento_pago IS 'Intentos de cobro por Wompi de una solicitud de compra: Nequi directo o la página de pago de Wompi (M07)';
+COMMENT ON COLUMN intento_pago.medio IS 'nequi = cobro por API a un celular (R11); pagina_wompi = el cliente paga en el Web Checkout de Wompi (R19)';
+COMMENT ON COLUMN intento_pago.metodo_wompi IS 'payment_method_type de la transacción en Wompi (CARD, PSE, DAVIPLATA, NEQUI…); null mientras no hay transacción';
+COMMENT ON COLUMN intento_pago.celular_enmascarado IS 'Celular de Nequi enmascarado (*** *** 1111); null en la página de Wompi (M07 · R12)';
 COMMENT ON COLUMN intento_pago.referencia IS 'Referencia enviada a la pasarela: <codigo SOL>-<numero> (única, como exige Wompi)';
 COMMENT ON COLUMN intento_pago.ultima_consulta IS 'Última vez que se preguntó su estado a la pasarela (M07 · R5)';
 

@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { estadoWompiSchema, type EstadoWompi, type PasarelaPagoPort, type TerminosWompi } from '../dtos/m07-checkout.dto';
+import {
+  estadoWompiSchema,
+  type EstadoWompi,
+  type PasarelaPagoPort,
+  type TerminosWompi,
+  type TransaccionWompi,
+} from '../dtos/m07-checkout.dto';
 import { PasarelaNoDisponibleError } from '../services/checkout-error';
 import { firmaEventoValida, firmaIntegridad } from '../services/firmas-wompi';
 
@@ -30,16 +36,31 @@ const aceptacionSchema = z.object({ acceptance_token: z.string().min(1), permali
 const comercioSchema = z.object({
   data: z.object({ presigned_acceptance: aceptacionSchema, presigned_personal_data_auth: aceptacionSchema }),
 });
-const transaccionSchema = z.object({
-  data: z.object({
-    id: z.string().min(1),
-    status: estadoWompiSchema,
-    reference: z.string(),
-    amount_in_cents: z.number().int(),
-    currency: z.string(),
-    status_message: z.string().nullable().optional(),
-  }),
+const datosTransaccionSchema = z.object({
+  id: z.string().min(1),
+  status: estadoWompiSchema,
+  reference: z.string(),
+  amount_in_cents: z.number().int(),
+  currency: z.string(),
+  status_message: z.string().nullable().optional(),
+  payment_method_type: z.string().nullable().optional(),
+  created_at: z.string().optional(),
 });
+type DatosTransaccion = z.infer<typeof datosTransaccionSchema>;
+const transaccionSchema = z.object({ data: datosTransaccionSchema });
+const transaccionesSchema = z.object({ data: z.array(datosTransaccionSchema) });
+
+function aTransaccion(t: DatosTransaccion): TransaccionWompi {
+  return {
+    idTransaccion: t.id,
+    estado: t.status,
+    referencia: t.reference,
+    montoEnCentavos: t.amount_in_cents,
+    moneda: t.currency,
+    mensaje: t.status_message ?? null,
+    metodo: t.payment_method_type ?? null,
+  };
+}
 
 /** Una respuesta con otra forma se trata como pasarela no disponible: no se adivina qué quiso decir. */
 function leer<T>(esquema: z.ZodType<T>, datos: unknown): T {
@@ -96,27 +117,40 @@ export class WompiAdapter implements PasarelaPagoPort {
     return { idTransaccion: r.data.id, estado: r.data.status };
   }
 
-  async consultarTransaccion(idTransaccion: string): Promise<{
-    idTransaccion: string;
-    estado: EstadoWompi;
-    referencia: string;
-    montoEnCentavos: number;
-    moneda: string;
-    mensaje: string | null;
-  }> {
+  async consultarTransaccion(idTransaccion: string): Promise<TransaccionWompi> {
     const c = this.exigir();
     const r = leer(transaccionSchema,
       await this.pedir(`${c.apiUrl}/transactions/${encodeURIComponent(idTransaccion)}`, {
         headers: { Authorization: `Bearer ${c.llavePublica}` },
       }),
     );
+    return aTransaccion(r.data);
+  }
+
+  /** R19: con la llave privada. Si hay varias, gana la aprobada; si no, la más reciente. */
+  async buscarPorReferencia(referencia: string): Promise<TransaccionWompi | null> {
+    const c = this.exigir();
+    const r = leer(transaccionesSchema,
+      await this.pedir(`${c.apiUrl}/transactions?reference=${encodeURIComponent(referencia)}`, {
+        headers: { Authorization: `Bearer ${c.llavePrivada}` },
+      }),
+    );
+    const propias = r.data.filter((t) => t.reference === referencia);
+    const elegida =
+      propias.find((t) => t.status === 'APPROVED') ??
+      [...propias].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0];
+    return elegida === undefined ? null : aTransaccion(elegida);
+  }
+
+  /** R19: la firma incluye el vencimiento con el mismo texto que viaja en `expiration-time`. */
+  datosPaginaPago(entrada: { referencia: string; montoEnCentavos: number; venceEn: Date }): {
+    llavePublica: string;
+    firmaIntegridad: string;
+  } {
+    const c = this.exigir();
     return {
-      idTransaccion: r.data.id,
-      estado: r.data.status,
-      referencia: r.data.reference,
-      montoEnCentavos: r.data.amount_in_cents,
-      moneda: r.data.currency,
-      mensaje: r.data.status_message ?? null,
+      llavePublica: c.llavePublica,
+      firmaIntegridad: firmaIntegridad(entrada.referencia, entrada.montoEnCentavos, MONEDA, c.secretoIntegridad, entrada.venceEn.toISOString()),
     };
   }
 

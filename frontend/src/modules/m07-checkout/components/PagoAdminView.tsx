@@ -7,7 +7,7 @@ import { AdminPageHeader, Alert, Button, Skeleton } from '@/core/components';
 import { formatCOP } from '@/core/utils/moneda';
 import type { SolicitudAdmin } from '../dtos/m07-checkout.dto';
 import { checkoutApi, mensajeDeError } from '../services/checkout-api';
-import { fechaHora } from '../services/textos-checkout';
+import { etiquetaMedio, fechaHora } from '../services/textos-checkout';
 import { EstadoSolicitudBadge } from './comunes';
 
 const ETIQUETA_WOMPI = {
@@ -115,7 +115,7 @@ export function PagoAdminView({ codigo }: { codigo: string }) {
 
             <section aria-labelledby="titulo-intentos" className="space-y-3 rounded-card border border-neutral-light/70 bg-neutral-white p-5 shadow-card">
               <h2 id="titulo-intentos" className="font-title text-lg font-bold text-corporate">
-                Intentos con Nequi
+                Intentos de pago
               </h2>
               {s.intentos.length === 0 ? (
                 <p className="text-sm text-neutral-medium">Sin intentos de pago.</p>
@@ -124,7 +124,8 @@ export function PagoAdminView({ codigo }: { codigo: string }) {
                   {s.intentos.map((i) => (
                     <li key={i.numero} className="flex flex-wrap items-center justify-between gap-2 py-2">
                       <span className="font-medium text-neutral-black">
-                        #{i.numero} · {i.celularEnmascarado}
+                        #{i.numero} · {etiquetaMedio(i)}
+                        {i.celularEnmascarado !== null && ` · ${i.celularEnmascarado}`}
                       </span>
                       <span className="text-neutral-dark">
                         {ETIQUETA_WOMPI[i.estadoWompi]} · {fechaHora(i.fecha)}

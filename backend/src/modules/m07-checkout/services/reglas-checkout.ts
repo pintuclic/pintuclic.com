@@ -5,8 +5,10 @@ import {
   type DireccionEntrega,
   type EstadoWompi,
   type IntentoPago,
+  type MedioPago,
   type ModoEntrega,
   type OrigenSolicitud,
+  type PagoWompi,
   type Solicitud,
 } from '../dtos/m07-checkout.dto';
 import type { LineaCongelada, SolicitudGuardada } from '../interfaces/checkout.interface';
@@ -121,17 +123,47 @@ export function congelarLineas(carrito: Carrito): LineaCongelada[] {
 }
 
 /** Texto para el cliente de un intento que no se aprobó. */
-export function mensajeIntento(estado: EstadoWompi): string | null {
+export function mensajeIntento(estado: EstadoWompi, medio: MedioPago = 'nequi'): string | null {
+  const nequi = medio === 'nequi';
   switch (estado) {
     case 'DECLINED':
-      return 'Nequi no aprobó el pago, o no lo aceptaste a tiempo en la app.';
+      return nequi
+        ? 'Nequi no aprobó el pago, o no lo aceptaste a tiempo en la app.'
+        : 'Tu banco o Wompi no aprobó el pago. Puedes intentarlo de nuevo, con el mismo medio o con otro.';
     case 'ERROR':
-      return 'No se pudo completar el pago con Nequi. Revisa que el número tenga Nequi e inténtalo de nuevo.';
+      return nequi
+        ? 'No se pudo completar el pago con Nequi. Revisa que el número tenga Nequi e inténtalo de nuevo.'
+        : 'No se pudo completar el pago en Wompi. Inténtalo de nuevo.';
     case 'VOIDED':
       return 'El pago fue anulado.';
     default:
       return null;
   }
+}
+
+/**
+ * R2 c, R3, R19: hay un pago en curso si el último intento está PENDING y es de Nequi, o es de la página de
+ * Wompi y ya tiene transacción. Uno de la página sin transacción solo espera a que el cliente vaya a pagar.
+ */
+export function pagoEnCurso(s: Pick<SolicitudGuardada, 'estado' | 'intentos'>): boolean {
+  const ultimo = s.intentos.at(-1);
+  return (
+    s.estado === 'en_pago' &&
+    ultimo?.estado === 'PENDING' &&
+    (ultimo.medio === 'nequi' || ultimo.idTransaccion !== null)
+  );
+}
+
+/** R19: el cliente aún puede ir a pagar a la página de Wompi con el último intento. */
+export function esperaPaginaWompi(s: Pick<SolicitudGuardada, 'estado' | 'intentos' | 'venceEn'>, ahora: Date): boolean {
+  const ultimo = s.intentos.at(-1);
+  return (
+    s.estado === 'en_pago' &&
+    ultimo?.medio === 'pagina_wompi' &&
+    ultimo.estado === 'PENDING' &&
+    ultimo.idTransaccion === null &&
+    s.venceEn.getTime() > ahora.getTime()
+  );
 }
 
 /** R6: cuándo reintentar la orden tras el fallo número `reintentos` (1, 2…); null si ya no quedan. */
@@ -140,12 +172,11 @@ export function proximoReintento(reintentos: number, ahora: Date): Date | null {
   return minutos === undefined ? null : new Date(ahora.getTime() + minutos * MS_POR_MINUTO);
 }
 
-/** R3: vence si pasó su plazo y no tiene un pago en curso. */
+/** R3: vence si pasó su plazo y no tiene un pago en curso (R19: la página de Wompi sin transacción no cuenta). */
 export function debeVencer(s: Pick<SolicitudGuardada, 'estado' | 'venceEn' | 'intentos'>, ahora: Date): boolean {
   if (s.estado !== 'en_pago' && s.estado !== 'rechazada') return false;
   if (s.venceEn.getTime() > ahora.getTime()) return false;
-  const ultimo = s.intentos.at(-1);
-  return !(s.estado === 'en_pago' && ultimo?.estado === 'PENDING');
+  return !pagoEnCurso(s);
 }
 
 /** Contrato de M08 (§2), con el mapeo de la sección 5 del contrato de M07. */
@@ -191,14 +222,16 @@ function aIntentoPago(i: SolicitudGuardada['intentos'][number]): IntentoPago {
   return {
     numero: i.numero,
     estadoWompi: i.estado,
+    medio: i.medio,
+    metodo: i.metodo,
     celularEnmascarado: i.celularEnmascarado,
     motivo: i.mensaje,
     fecha: i.fechaCreacion.toISOString(),
   };
 }
 
-/** La solicitud como la ve el cliente. */
-export function aSolicitud(s: SolicitudGuardada): Solicitud {
+/** La solicitud como la ve el cliente. `pagoWompi` lo arma el servicio (R19), que tiene la pasarela. */
+export function aSolicitud(s: SolicitudGuardada, pagoWompi: PagoWompi | null = null): Solicitud {
   return {
     codigo: s.codigo,
     estado: s.estado,
@@ -232,5 +265,6 @@ export function aSolicitud(s: SolicitudGuardada): Solicitud {
     codigoOrden: s.codigoOrden,
     compraDirecta: s.compraDirecta,
     creadaEn: s.fechaCreacion.toISOString(),
+    pagoWompi,
   };
 }

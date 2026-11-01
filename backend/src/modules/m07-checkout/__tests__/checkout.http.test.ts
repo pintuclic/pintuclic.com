@@ -103,6 +103,13 @@ describe('M07 · HTTP', () => {
     expect((await pedir('GET', '/checkout/solicitudes/no-es-codigo', CLIENTE)).status).toBe(400);
   });
 
+  it('R19: la página de Wompi no pide celular ni casillas; Nequi sí', async () => {
+    const { celularNequi: _c, aceptaciones: _a, ...sinNequi } = solicitud;
+    expect((await pedir('POST', '/checkout/solicitudes', CLIENTE, { ...sinNequi, medio: 'nequi' })).status).toBe(400);
+    expect((await pedir('POST', '/checkout/solicitudes', CLIENTE, sinNequi)).status).toBe(400);
+    expect((await pedir('POST', '/checkout/solicitudes', CLIENTE, { ...sinNequi, medio: 'tarjeta' })).status).toBe(400);
+  });
+
   it('R5: el aviso de Wompi no pide sesión; sin firma válida responde 401', async () => {
     pasarela.firmaOk = false;
     const r = await pedir('POST', '/checkout/wompi/eventos', null, { event: 'transaction.updated' });
