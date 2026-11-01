@@ -40,13 +40,16 @@ const RUTAS_CON_DOS_IMAGENES: ReadonlyArray<{ metodo: string; ruta: RegExp }> = 
 
 /**
  * M13 (D2 del contrato): una carga masiva de inventario viaja en bloques de hasta 500 filas
- * (cada una con su nota), que no caben en 100 kb. Solo estas dos rutas reciben 1 MB; la
+ * (cada una con su nota), que no caben en 100 kb. Solo estas rutas reciben 1 MB; la
  * cantidad de filas la valida el DTO (≤ 500).
  */
 export const LIMITE_JSON_CON_CARGA = '1mb';
 const RUTAS_CON_CARGA: ReadonlySet<string> = new Set([
   '/api/v1/admin/inventario/cargas/previsualizar',
   '/api/v1/admin/inventario/cargas/aplicar',
+  // M01 (carga masiva de productos): bloques de hasta 500 filas con sus listas y características.
+  '/api/v1/admin/catalogo/productos/importar/previsualizar',
+  '/api/v1/admin/catalogo/productos/importar/aplicar',
 ]);
 
 interface ErrorDeCuerpo {

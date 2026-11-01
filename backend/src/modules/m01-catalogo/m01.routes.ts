@@ -17,7 +17,9 @@ import { ImagenesController, ImagenMedidaController } from './controllers/imagen
 import { PaletaController } from './controllers/paleta.controller';
 import { ProductosController, VariantesController } from './controllers/productos.controller';
 import { PaletaRepository } from './repositories/paleta.repository';
+import { PrismaCargaProductosRepository } from './repositories/carga-productos.repository';
 import { PrismaCatalogosPlantilla } from './repositories/plantilla-productos.repository';
+import { CargaProductosService } from './services/carga-productos.service';
 import { PaletaService } from './services/paleta.service';
 import {
   crearAcabadoRequestSchema,
@@ -286,8 +288,13 @@ export function construirModuloM01(autorizacion: AutorizacionService, dependenci
   adminRouter.get('/colores/:idColor/impacto-desactivacion', ver, colores.impacto as RequestHandler);
 
   // Carga masiva de productos: la plantilla Excel. Va antes de `/productos/:idProducto`.
-  const cargaProductos = new CargaProductosController(new PrismaCatalogosPlantilla());
+  const cargaProductos = new CargaProductosController(
+    new PrismaCatalogosPlantilla(),
+    new CargaProductosService(new PrismaCargaProductosRepository()),
+  );
   adminRouter.get('/productos/importar/plantilla', crear, cargaProductos.plantilla as RequestHandler);
+  adminRouter.post('/productos/importar/previsualizar', crear, cargaProductos.previsualizar as RequestHandler);
+  adminRouter.post('/productos/importar/aplicar', crear, cargaProductos.aplicar as RequestHandler);
 
   // HU-CAT-02/09/10/12: productos
   adminRouter.get('/productos', ver, productos.listar as RequestHandler);
