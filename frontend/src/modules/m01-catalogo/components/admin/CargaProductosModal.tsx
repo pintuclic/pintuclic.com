@@ -45,6 +45,7 @@ const ROTULO_NUEVO: Record<CatalogoNuevo['tipo'], string> = {
   linea: 'línea',
   categoria: 'categoría',
   subcategoria: 'subcategoría',
+  medida: 'medida',
   superficie: 'superficie',
   acabado: 'acabado',
   base: 'base',

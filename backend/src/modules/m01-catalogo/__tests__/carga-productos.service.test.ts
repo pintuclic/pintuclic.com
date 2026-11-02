@@ -24,9 +24,15 @@ const CATALOGOS: CatalogosCarga = {
   categorias: [{ id: 100, nombre: 'Pinturas', activo: true }],
   subcategorias: [{ id: 1000, idCategoria: 100, nombre: 'Vinilos', activo: true }],
   medidas: [
-    { id: 5, nombre: 'Galón', activo: true },
-    { id: 6, nombre: 'Cuarto', activo: true },
-    { id: 7, nombre: 'Medida dormida', activo: false },
+    { id: 5, idTipoMedida: 1, valor: 1, nombre: 'Galón', activo: true },
+    { id: 6, idTipoMedida: 1, valor: 0.25, nombre: 'Cuarto', activo: true },
+    { id: 7, idTipoMedida: 3, valor: 7, nombre: 'Medida dormida', activo: false },
+  ],
+  tiposMedida: [
+    { id: 1, nombre: 'Galón', abreviatura: 'gal', activo: true },
+    { id: 2, nombre: 'Litro', abreviatura: 'L', activo: true },
+    { id: 3, nombre: 'Mililitro', abreviatura: 'ml', activo: true },
+    { id: 4, nombre: 'Pulgada', abreviatura: 'in', activo: false },
   ],
   superficies: [{ id: 20, nombre: 'Muros', activo: true }],
   acabados: [{ id: 30, nombre: 'Mate', activo: true }],
@@ -109,8 +115,8 @@ describe('carga masiva de productos · servicio', () => {
     expect(r.productos[0]).toMatchObject({ resultado: 'creado', idProducto: 901 });
     expect(r.productos[0]?.variantes.map((v) => v.resultado)).toEqual(['creada', 'creada']);
     expect(repo.creados[0]?.variantes).toEqual([
-      { idMedida: 5, precio: 98900, sku: 'VA-G', codigoProveedor: null },
-      { idMedida: 6, precio: 98900, sku: null, codigoProveedor: null },
+      { medida: { id: 5 }, precio: 98900, sku: 'VA-G', codigoProveedor: null },
+      { medida: { id: 6 }, precio: 98900, sku: null, codigoProveedor: null },
     ]);
   });
 
@@ -299,19 +305,66 @@ describe('carga masiva de productos · servicio', () => {
       expect(r.productos[2]?.variantes[0]?.detalle).toContain('inactivo');
     });
 
-    it('no crea medidas ni colores, y una marca nueva no puede traer colores de fábrica', async () => {
+    it('no crea colores, y una marca nueva no puede traer colores de fábrica', async () => {
       const { servicio: s } = servicio();
       const r = await s.previsualizar({
         filas: [
-          fila({ producto: 'A', medida: 'Medida nueva' }),
           fila({ producto: 'B', linea: 'Viniltex', tipoResina: 'Acrílica', coloresFabrica: ['Color nuevo'] }),
           fila({ producto: 'C', marca: 'Marca nueva', linea: 'L', tipoResina: 'Acrílica', coloresFabrica: ['Rojo Colonial'] }),
         ],
       });
-      expect(r.productos.map((p) => p.resultado)).toEqual(['rechazado', 'rechazado', 'rechazado']);
-      expect(r.productos[0]?.variantes[0]?.motivo).toBe('medida_no_encontrada');
+      expect(r.productos.map((p) => p.resultado)).toEqual(['rechazado', 'rechazado']);
+      expect(r.productos[0]?.motivo).toBe('color_no_encontrado');
       expect(r.productos[1]?.motivo).toBe('color_no_encontrado');
-      expect(r.productos[2]?.motivo).toBe('color_no_encontrado');
+    });
+
+    it('una medida que no existe se crea deduciendo su tipo y valor del texto', async () => {
+      const { repo, servicio: s } = servicio();
+      const r = await s.aplicar({ filas: [fila({ medida: '300 ML' }), fila({ medida: '0,5 litros' })] });
+      expect(r.productos[0]).toMatchObject({ resultado: 'creado' });
+      expect(r.productos[0]?.nuevos).toEqual([
+        { tipo: 'medida', nombre: '300 ML' },
+        { tipo: 'medida', nombre: '0,5 litros' },
+      ]);
+      expect(repo.creados[0]?.variantes.map((v) => v.medida)).toEqual([
+        { nueva: { nombre: '300 ML', idTipoMedida: 3, valor: 300 } },
+        { nueva: { nombre: '0,5 litros', idTipoMedida: 2, valor: 0.5 } },
+      ]);
+    });
+
+    it('otra forma de escribir una medida que ya existe se reconoce como esa misma', async () => {
+      const { repo, servicio: s } = servicio();
+      const r = await s.aplicar({ filas: [fila({ medida: '1 gal' }), fila({ medida: '1/4 de galón' })] });
+      expect(r.productos[0]).toMatchObject({ resultado: 'creado', nuevos: [] });
+      expect(repo.creados[0]?.variantes.map((v) => v.medida)).toEqual([{ id: 5 }, { id: 6 }]);
+    });
+
+    it('dos formas de escribir la misma medida nueva en un producto son una variante repetida', async () => {
+      const { servicio: s } = servicio();
+      const r = await s.previsualizar({ filas: [fila({ medida: '2 litros' }), fila({ medida: '2 L' })] });
+      expect(r.productos[0]?.variantes[1]?.motivo).toBe('variante_repetida_en_archivo');
+    });
+
+    it('una medida nueva repetida en otros productos se anuncia una vez', async () => {
+      const { servicio: s } = servicio();
+      const r = await s.previsualizar({ filas: [fila({ producto: 'A', medida: '2 litros' }), fila({ producto: 'B', medida: '2 L' })] });
+      expect(r.productos[0]?.nuevos).toEqual([{ tipo: 'medida', nombre: '2 litros' }]);
+      expect(r.productos[1]?.nuevos).toEqual([]);
+    });
+
+    it('una medida que no se entiende, de un tipo inactivo o inactiva se rechaza diciendo por qué', async () => {
+      const { servicio: s } = servicio();
+      const r = await s.previsualizar({
+        filas: [
+          fila({ producto: 'A', medida: 'Mediana' }),
+          fila({ producto: 'B', medida: '3 pulgadas' }),
+          fila({ producto: 'C', medida: '7 ml' }),
+        ],
+      });
+      expect(r.productos.map((p) => p.variantes[0]?.motivo)).toEqual(['medida_no_encontrada', 'medida_no_encontrada', 'medida_no_encontrada']);
+      expect(r.productos[0]?.variantes[0]?.detalle).toContain('cantidad + unidad');
+      expect(r.productos[1]?.variantes[0]?.detalle).toContain('ningún tipo de medida activo');
+      expect(r.productos[2]?.variantes[0]?.detalle).toContain('inactivo');
     });
 
     it('un nombre nuevo más largo que la columna se rechaza en vez de fallar al escribir', async () => {

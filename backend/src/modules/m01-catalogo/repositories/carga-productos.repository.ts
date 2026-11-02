@@ -4,6 +4,7 @@ import type {
   CargaProductosRepositoryPort,
   CatalogosCarga,
   ColorCarga,
+  MedidaReferencia,
   ProductoCargaDatos,
   ProductoExistenteCarga,
   Referencia,
@@ -86,6 +87,17 @@ async function idTipoResina(tx: Tx, ref: Referencia): Promise<number> {
   return (await tx.tipoResina.create({ data: { nombre: ref.nuevo }, select: { idTipoResina: true } })).idTipoResina;
 }
 
+async function idMedida(tx: Tx, ref: MedidaReferencia): Promise<number> {
+  if ('id' in ref) return ref.id;
+  const { nombre, idTipoMedida, valor } = ref.nueva;
+  const hallada = await tx.medida.findFirst({
+    where: { OR: [{ nombre: sinMayusculas(nombre) }, { idTipoMedida, valor }] },
+    select: { idMedida: true },
+  });
+  if (hallada !== null) return hallada.idMedida;
+  return (await tx.medida.create({ data: { idTipoMedida, valor, nombre }, select: { idMedida: true } })).idMedida;
+}
+
 /** Resuelve una lista en orden y sin repetir ids (dos nombres nuevos distintos nunca dan el mismo id). */
 async function ids(refs: readonly Referencia[], resolver: (ref: Referencia) => Promise<number>): Promise<number[]> {
   const resultado = new Set<number>();
@@ -96,12 +108,13 @@ async function ids(refs: readonly Referencia[], resolver: (ref: Referencia) => P
 /** Lee y escribe lo que necesita la carga masiva de productos. Solo crea (C1). */
 export class PrismaCargaProductosRepository implements CargaProductosRepositoryPort {
   async leerCatalogos(): Promise<CatalogosCarga> {
-    const [marcas, lineas, categorias, subcategorias, medidas, superficies, acabados, bases, resinas] = await Promise.all([
+    const [marcas, lineas, categorias, subcategorias, medidas, tiposMedida, superficies, acabados, bases, resinas] = await Promise.all([
       prisma.marca.findMany({ select: { idMarca: true, nombre: true, estado: true } }),
       prisma.linea.findMany({ select: { idLinea: true, idMarca: true, nombre: true, estado: true } }),
       prisma.categoria.findMany({ select: { idCategoria: true, nombre: true, estado: true } }),
       prisma.subcategoria.findMany({ select: { idSubcategoria: true, idCategoria: true, nombre: true, estado: true } }),
-      prisma.medida.findMany({ select: { idMedida: true, nombre: true, estado: true } }),
+      prisma.medida.findMany({ select: { idMedida: true, idTipoMedida: true, valor: true, nombre: true, estado: true } }),
+      prisma.tipoMedida.findMany({ select: { idTipoMedida: true, nombre: true, abreviatura: true, estado: true } }),
       prisma.superficie.findMany({ select: { idSuperficie: true, nombre: true, estado: true } }),
       prisma.acabado.findMany({ select: { idAcabado: true, nombre: true, estado: true } }),
       prisma.base.findMany({ select: { idBase: true, nombre: true, estado: true } }),
@@ -117,7 +130,14 @@ export class PrismaCargaProductosRepository implements CargaProductosRepositoryP
         nombre: r.nombre,
         activo: estaActivo(r.estado),
       })),
-      medidas: medidas.map((r) => ({ id: r.idMedida, nombre: r.nombre, activo: estaActivo(r.estado) })),
+      medidas: medidas.map((r) => ({
+        id: r.idMedida,
+        idTipoMedida: r.idTipoMedida,
+        valor: Number(r.valor),
+        nombre: r.nombre,
+        activo: estaActivo(r.estado),
+      })),
+      tiposMedida: tiposMedida.map((r) => ({ id: r.idTipoMedida, nombre: r.nombre, abreviatura: r.abreviatura, activo: estaActivo(r.estado) })),
       superficies: superficies.map((r) => ({ id: r.idSuperficie, nombre: r.nombre, activo: estaActivo(r.estado) })),
       acabados: acabados.map((r) => ({ id: r.idAcabado, nombre: r.nombre, activo: estaActivo(r.estado) })),
       bases: bases.map((r) => ({ id: r.idBase, nombre: r.nombre, activo: estaActivo(r.estado) })),
@@ -204,12 +224,13 @@ export class PrismaCargaProductosRepository implements CargaProductosRepositoryP
         select: { idProducto: true },
       });
       for (const v of variantes) {
+        const medida = await idMedida(tx, v.medida);
         const fila = await tx.variante.create({
           data: {
             idProducto: creado.idProducto,
-            idMedida: v.idMedida,
+            idMedida: medida,
             // Provisional y único; se reemplaza antes de terminar la transacción.
-            sku: v.sku ?? `tmp-${creado.idProducto}-${v.idMedida}-${Date.now()}`,
+            sku: v.sku ?? `tmp-${creado.idProducto}-${medida}-${Date.now()}`,
             precioVigente: v.precio,
             codigoProveedor: v.codigoProveedor,
           },

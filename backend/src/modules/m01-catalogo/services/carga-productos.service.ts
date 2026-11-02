@@ -13,12 +13,14 @@ import type {
   CargaProductosRepositoryPort,
   CatalogosCarga,
   ColorCarga,
+  MedidaReferencia,
   ProductoCargaDatos,
   Referencia,
   RegistroCarga,
   VarianteNuevaDatos,
 } from '../interfaces/carga-productos.interface';
 import { esViolacionUnica } from './catalogo-base.service';
+import { deducirMedida } from './medida-desde-texto';
 
 /** C2 / C9: sin tildes, sin mayúsculas y sin espacios sobrantes. */
 export function normalizar(texto: string): string {
@@ -73,7 +75,7 @@ const ambiguo = (nombre: string, fila: number): { ok: false; rechazo: Rechazo } 
 const inactivo = (motivo: MotivoRechazoProducto, quien: string, nombre: string, fila: number): { ok: false; rechazo: Rechazo } =>
   rechazo(motivo, `Fila ${fila}: ${quien} «${nombre}» existe pero está inactivo; actívelo en el catálogo antes de cargar.`);
 
-/** Para lo que la carga NO crea (medida, color): el nombre debe existir y estar activo. */
+/** Para lo que la carga NO crea (color): el nombre debe existir y estar activo. */
 function resolver(
   registros: readonly RegistroCarga[],
   nombre: string,
@@ -159,6 +161,47 @@ function resolverListaOCrear(
     referencias.push(r.valor);
   }
   return { ok: true, valor: referencias };
+}
+
+/**
+ * C16: una medida se busca por nombre; si no existe se deduce su tipo y valor del texto («300 ml», «1/4 de galón») y se
+ * busca por (tipo, valor), porque «1 gal» y «1 galón» son la misma medida; solo si tampoco existe se crea.
+ */
+function resolverMedida(
+  ctx: Contexto,
+  altas: Alta[],
+  nombre: string,
+  fila: number,
+): Resolucion<{ ref: MedidaReferencia; huella: string }> {
+  const { medidas, tiposMedida } = ctx.catalogos;
+  const h = hallar(medidas, nombre);
+  if (h.tipo === 'activo') return { ok: true, valor: { ref: { id: h.registro.id }, huella: `id:${h.registro.id}` } };
+  if (h.tipo === 'ambiguo') return ambiguo(nombre, fila);
+  if (h.tipo === 'inactivo') return inactivo('medida_no_encontrada', 'la medida', nombre, fila);
+
+  const deduccion = deducirMedida(
+    nombre,
+    tiposMedida.filter((t) => t.activo),
+  );
+  if (!deduccion.ok) {
+    return rechazo('medida_no_encontrada', `Fila ${fila}: la medida «${nombre}» no existe y no se pudo crear: ${deduccion.motivo}.`);
+  }
+  const { idTipoMedida, valor } = deduccion.valor;
+  const igual = medidas.find((m) => m.idTipoMedida === idTipoMedida && Math.abs(m.valor - valor) < 1e-9);
+  if (igual !== undefined) {
+    if (!igual.activo) return inactivo('medida_no_encontrada', 'la medida', igual.nombre, fila);
+    return { ok: true, valor: { ref: { id: igual.id }, huella: `id:${igual.id}` } };
+  }
+
+  const limpio = nombre.trim().replace(/\s+/g, ' ');
+  if (limpio.length > 60) return rechazo('dato_invalido', `Fila ${fila}: la medida «${limpio}» supera los 60 caracteres.`);
+  const clave = `medida|${idTipoMedida}|${valor}`;
+  const huella = `v:${idTipoMedida}|${valor}`;
+  const delProducto = altas.find((a) => a.clave === clave);
+  const canonico = delProducto?.nombre ?? ctx.pendientes.get(clave);
+  if (canonico !== undefined) return { ok: true, valor: { ref: { nueva: { nombre: canonico, idTipoMedida, valor } }, huella } };
+  altas.push({ tipo: 'medida', nombre: limpio, clave });
+  return { ok: true, valor: { ref: { nueva: { nombre: limpio, idTipoMedida, valor } }, huella } };
 }
 
 /** Ids de relleno que solo sirven para que el esquema del alta manual valide la forma del producto. */
@@ -348,7 +391,7 @@ export class CargaProductosService {
     const producto = this.armarProducto(primera, marca.valor, altas, ctx);
     if (!producto.ok) return rechazado(producto.rechazo);
 
-    const variantes = this.armarVariantes(filas, variantesVista, ctx);
+    const variantes = this.armarVariantes(filas, variantesVista, ctx, altas);
     if (!variantes.ok) {
       return {
         vista: { ...base, resultado: 'rechazado', motivo: 'producto_rechazado', detalle: variantes.detalle, variantes: variantes.vista },
@@ -562,8 +605,9 @@ export class CargaProductosService {
     filas: readonly FilaProductoCarga[],
     vista: readonly VarianteCarga[],
     ctx: Contexto,
+    altas: Alta[],
   ): { ok: true; valor: VarianteNuevaDatos[] } | { ok: false; detalle: string; vista: VarianteCarga[] } {
-    const medidasVistas = new Set<number>();
+    const medidasVistas = new Set<string>();
     const skusLocales = new Set<string>();
     const codigosLocales = new Set<string>();
     const nuevas: VarianteNuevaDatos[] = [];
@@ -575,17 +619,17 @@ export class CargaProductosService {
         marcadas[i] = { ...(marcadas[i] as VarianteCarga), motivo: rechazo.motivo, detalle: rechazo.detalle };
         errores.push(rechazo.detalle);
       };
-      const medida = resolver(ctx.catalogos.medidas, f.medida, 'medida_no_encontrada', 'la medida', f.fila);
+      const medida = resolverMedida(ctx, altas, f.medida, f.fila);
       if (!medida.ok) return poner(medida.rechazo);
-      if (medidasVistas.has(medida.valor.id)) {
+      if (medidasVistas.has(medida.valor.huella)) {
         return poner({ motivo: 'variante_repetida_en_archivo', detalle: `Fila ${f.fila}: la medida «${f.medida}» está repetida en este producto.` });
       }
-      medidasVistas.add(medida.valor.id);
+      medidasVistas.add(medida.valor.huella);
 
       const sku = nuloSiVacio(f.sku);
       const codigo = nuloSiVacio(f.codigoProveedor);
       const parseada = crearVarianteRequestSchema.safeParse({
-        idMedida: medida.valor.id,
+        idMedida: 'id' in medida.valor.ref ? medida.valor.ref.id : RELLENO,
         precio: f.precio,
         ...(sku === null ? {} : { sku }),
         codigoProveedor: codigo,
@@ -617,7 +661,7 @@ export class CargaProductosService {
         }
         codigosLocales.add(clave);
       }
-      nuevas.push({ idMedida: medida.valor.id, precio: f.precio, sku, codigoProveedor: codigo });
+      nuevas.push({ medida: medida.valor.ref, precio: f.precio, sku, codigoProveedor: codigo });
     });
 
     const [primerError] = errores;

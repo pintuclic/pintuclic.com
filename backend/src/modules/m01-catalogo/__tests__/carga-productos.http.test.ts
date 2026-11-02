@@ -225,6 +225,24 @@ describe.skipIf(URL_BD === undefined)('M01 · carga masiva de productos: plantil
         expect(await prisma.categoria.count({ where: { nombre: `Categoría fallida ${sufijo}` } })).toBe(0);
       });
 
+      it('una medida nueva se crea con su tipo y valor; una forma distinta de una existente no se duplica', async () => {
+        const nombreMedida = `${sufijo % 900} ml`;
+        const r = await servidor.peticion('admin', 'POST', '/productos/importar/aplicar', {
+          filas: [
+            fila({ producto: `Con medidas ${sufijo}`, medida: nombreMedida }),
+            fila({ producto: `Con medidas ${sufijo}`, fila: 3, medida: '1 gal', precio: 50000 }),
+          ],
+        });
+        const producto = (r.cuerpo as { data: { productos: Array<{ resultado: string; nuevos: Array<{ tipo: string }> }> } }).data.productos[0];
+        expect(producto?.resultado).toBe('creado');
+        expect(producto?.nuevos.map((n) => n.tipo)).toEqual(['medida']);
+        const creada = await prisma.medida.findUniqueOrThrow({ where: { nombre: nombreMedida }, include: { tipoMedida: true } });
+        expect(creada.tipoMedida.abreviatura).toBe('ml');
+        expect(Number(creada.valor)).toBe(sufijo % 900);
+        // «1 gal» es la medida existente «1 galón», no una nueva.
+        expect(await prisma.medida.count({ where: { idTipoMedida: 1, valor: 1 } })).toBe(1);
+      });
+
       it('un registro inactivo no se duplica: se rechaza avisando que está inactivo', async () => {
         const dormida = `Marca dormida ${sufijo}`;
         await prisma.marca.create({

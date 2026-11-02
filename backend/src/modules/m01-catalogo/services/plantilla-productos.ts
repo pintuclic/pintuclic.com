@@ -111,7 +111,8 @@ const INSTRUCCIONES: readonly string[] = [
   '3. Marca, línea, categoría, subcategoría, medida y tipo de resina se escriben por su NOMBRE. Elíjalos de la lista de cada celda;',
   '   las hojas «Catálogos» y «Colores» muestran todo lo que existe hoy.',
   '   Si una marca, línea, categoría, subcategoría, superficie, acabado, base o tipo de resina NO existe, se CREA al cargar (la marca',
-  '   sin logotipo: súbalo después en Marcas). Las MEDIDAS y los COLORES no se crean solos: deben existir, o el producto se rechaza.',
+  '   sin logotipo: súbalo después en Marcas). Una MEDIDA nueva se crea si la escribe como cantidad + unidad (1/4 de galón, 300 ml,',
+  '   5 galones, 0,5 L); una palabra suelta como «Cuarto» no se entiende. Los COLORES no se crean solos: deben existir.',
   '   Escriba cada nombre igual en todas las filas; no se distinguen mayúsculas ni tildes. Un nombre inactivo en el catálogo se rechaza.',
   '4. Obligatorios: Marca, Categoría, Subcategoría, Producto, Medida y Precio.',
   '5. Uso interior y Uso exterior: Sí o No.',
@@ -181,7 +182,7 @@ export async function construirPlantillaProductos(cat: CatalogosPlantilla): Prom
   listaDesde(productos, columna('Línea'), rLineas, 'Esa línea no está en el catálogo: se creará al cargar.');
   listaDesde(productos, columna('Categoría'), rCategorias, 'Esa categoría no está en el catálogo: se creará al cargar.');
   listaDesde(productos, columna('Subcategoría'), rSubcategorias, 'Esa subcategoría no está en el catálogo: se creará al cargar.');
-  listaDesde(productos, columna('Medida'), rMedidas, 'Esa medida no está en el catálogo y NO se crea sola: el producto será rechazado. Elíjala de la lista.');
+  listaDesde(productos, columna('Medida'), rMedidas, 'Esa medida no está en el catálogo: se creará al cargar si la escribe como cantidad + unidad (ej. 1/4 de galón, 300 ml).');
   listaDesde(productos, columna('Tipo de resina'), rResinas, 'Ese tipo de resina no está en el catálogo: se creará al cargar.');
   listaMultiple(productos, columna('Superficies'), rSuperficies, 'Superficies');
   listaMultiple(productos, columna('Acabados'), rAcabados, 'Acabados');

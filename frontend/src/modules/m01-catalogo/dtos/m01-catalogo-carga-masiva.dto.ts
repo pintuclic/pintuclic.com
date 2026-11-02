@@ -131,6 +131,7 @@ export const TIPOS_CATALOGO_NUEVO = [
   'linea',
   'categoria',
   'subcategoria',
+  'medida',
   'superficie',
   'acabado',
   'base',

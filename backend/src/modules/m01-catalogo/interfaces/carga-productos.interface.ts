@@ -13,7 +13,9 @@ export interface CatalogosCarga {
   lineas: Array<RegistroCarga & { idMarca: number }>;
   categorias: RegistroCarga[];
   subcategorias: Array<RegistroCarga & { idCategoria: number }>;
-  medidas: RegistroCarga[];
+  medidas: Array<RegistroCarga & { idTipoMedida: number; valor: number }>;
+  /** Para deducir el tipo de una medida nueva a partir de su unidad (C16). */
+  tiposMedida: Array<RegistroCarga & { abreviatura: string }>;
   superficies: RegistroCarga[];
   acabados: RegistroCarga[];
   bases: RegistroCarga[];
@@ -30,8 +32,11 @@ export interface ProductoExistenteCarga {
   nombre: string;
 }
 
+/** C16: una medida que existe (su id) o una que se creará con la variante (nombre, tipo y valor). */
+export type MedidaReferencia = { id: number } | { nueva: { nombre: string; idTipoMedida: number; valor: number } };
+
 export interface VarianteNuevaDatos {
-  idMedida: number;
+  medida: MedidaReferencia;
   precio: number;
   /** null → se genera `P{idProducto}-V{idVariante}` (C14). */
   sku: string | null;
