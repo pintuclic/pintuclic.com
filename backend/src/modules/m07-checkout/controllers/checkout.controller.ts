@@ -7,7 +7,7 @@ import {
   prepararCheckoutRequestSchema,
   reintentarPagoRequestSchema,
 } from '../dtos/m07-checkout.dto';
-import type { Pagina } from '../interfaces/checkout.interface';
+import type { PaginaPagos } from '../interfaces/checkout.interface';
 import { CheckoutError, errores } from '../services/checkout-error';
 import type { CheckoutService } from '../services/checkout.service';
 
@@ -27,12 +27,14 @@ function exito<T>(res: Response, data: T, status = 200): void {
   res.status(status).json({ success: true, data });
 }
 
-function pagina<T>(res: Response, p: Pagina<T>): void {
+/** R18: la lista del panel lleva además el resumen de todo lo filtrado. */
+function paginaPagos<T>(res: Response, p: PaginaPagos<T>): void {
   res.setHeader('Cache-Control', 'no-store');
   res.status(200).json({
     success: true,
     data: p.items,
     pagination: { pagina: p.pagina, limite: p.limite, total: p.total, totalPaginas: Math.ceil(p.total / p.limite) },
+    resumen: p.resumen,
   });
 }
 
@@ -116,7 +118,7 @@ export class CheckoutController {
   listar = manejar(async (req, res) => {
     const q = validar(res, listarSolicitudesAdminRequestSchema, req.query);
     if (q === null) return;
-    pagina(res, await this.servicio.listar(q));
+    paginaPagos(res, await this.servicio.listar(q));
   });
 
   obtenerAdmin = manejar(async (req, res) => {

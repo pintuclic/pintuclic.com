@@ -77,7 +77,7 @@ export function CompletarGoogleForm({ datosGoogle, onCompletado, onVolver }: Com
         label="Teléfono (WhatsApp)"
         type="tel"
         autoComplete="tel"
-        placeholder="300 000 0000"
+        placeholder="3000000000"
         error={errors.telefono?.message}
         {...register('telefono')}
       />

@@ -16,12 +16,12 @@ import type {
   CheckoutRepositoryPort,
   IntentoGuardado,
   IntentoNuevo,
-  Pagina,
+  PaginaPagos,
   SolicitudGuardada,
   SolicitudNueva,
 } from '../../interfaces/checkout.interface';
 import { PasarelaNoDisponibleError } from '../../services/checkout-error';
-import { formatearCodigo } from '../../services/reglas-checkout';
+import { formatearCodigo, rangoDiasColombia } from '../../services/reglas-checkout';
 
 export function lineaCarrito(cambios: Partial<LineaCarrito> & { subtotal?: number } = {}): LineaCarrito {
   const { subtotal = 100_000, ...resto } = cambios;
@@ -152,6 +152,7 @@ interface TransaccionFalsa {
   referencia: string;
   montoEnCentavos: number;
   moneda: string;
+  metodo: string | null;
 }
 
 export class PasarelaFalsa implements PasarelaPagoPort {
@@ -170,7 +171,7 @@ export class PasarelaFalsa implements PasarelaPagoPort {
     if (this.caida) throw new PasarelaNoDisponibleError();
     this.celulares.push(e.celular);
     const id = `${this.prefijo}-${this.siguiente++}`;
-    this.transacciones.set(id, { idTransaccion: id, estado: 'PENDING', referencia: e.referencia, montoEnCentavos: e.montoEnCentavos, moneda: 'COP' });
+    this.transacciones.set(id, { idTransaccion: id, estado: 'PENDING', referencia: e.referencia, montoEnCentavos: e.montoEnCentavos, moneda: 'COP', metodo: 'NEQUI' });
     return { idTransaccion: id, estado: 'PENDING' };
   }
   async consultarTransaccion(id: string): Promise<TransaccionFalsa & { mensaje: string | null }> {
@@ -178,6 +179,21 @@ export class PasarelaFalsa implements PasarelaPagoPort {
     const t = this.transacciones.get(id);
     if (t === undefined) throw new PasarelaNoDisponibleError();
     return { ...t, mensaje: null };
+  }
+  async buscarPorReferencia(referencia: string): Promise<(TransaccionFalsa & { mensaje: string | null }) | null> {
+    if (this.caida) throw new PasarelaNoDisponibleError();
+    const propias = [...this.transacciones.values()].filter((t) => t.referencia === referencia);
+    const t = propias.find((x) => x.estado === 'APPROVED') ?? propias.at(-1);
+    return t === undefined ? null : { ...t, mensaje: null };
+  }
+  datosPaginaPago(e: { referencia: string; montoEnCentavos: number; venceEn: Date }): { llavePublica: string; firmaIntegridad: string } {
+    return { llavePublica: 'pub_test_x', firmaIntegridad: `firma:${e.referencia}:${e.montoEnCentavos}:${e.venceEn.toISOString()}` };
+  }
+  /** R19: simula que el cliente paga en la página de Wompi con la referencia del intento. */
+  pagarEnPagina(referencia: string, montoEnCentavos: number, estado: EstadoWompi, metodo = 'CARD'): string {
+    const id = `${this.prefijo}-${this.siguiente++}`;
+    this.transacciones.set(id, { idTransaccion: id, estado, referencia, montoEnCentavos, moneda: 'COP', metodo });
+    return id;
   }
   /** Simula lo que el cliente hace en la app de Nequi. */
   resolver(id: string, estado: EstadoWompi, cambios: Partial<TransaccionFalsa> = {}): void {
@@ -245,6 +261,7 @@ export class RepoMemoria implements CheckoutRepositoryPort {
       ...intento,
       idIntento: this.idIntento,
       idTransaccion: null,
+      metodo: null,
       estado: 'PENDING',
       mensaje: null,
       ultimaConsulta: null,
@@ -289,8 +306,22 @@ export class RepoMemoria implements CheckoutRepositoryPort {
   async abiertasParaRevisar(): Promise<SolicitudGuardada[]> {
     return structuredClone(this.solicitudes.filter((s) => s.estado === 'en_pago' || s.estado === 'rechazada'));
   }
-  async listar(f: ListarSolicitudesAdminRequest): Promise<Pagina<SolicitudGuardada>> {
-    const items = this.solicitudes.filter((s) => f.estado === undefined || s.estado === f.estado);
-    return { items: structuredClone(items), pagina: f.pagina, limite: f.limite, total: items.length };
+  async listar(f: ListarSolicitudesAdminRequest): Promise<PaginaPagos<SolicitudGuardada>> {
+    const periodo = rangoDiasColombia(f.desde, f.hasta);
+    const items = this.solicitudes.filter(
+      (s) =>
+        (f.estado === undefined || s.estado === f.estado) &&
+        (f.idCliente === undefined || s.idUsuario === f.idCliente) &&
+        (periodo?.gte === undefined || s.fechaCreacion >= periodo.gte) &&
+        (periodo?.lt === undefined || s.fechaCreacion < periodo.lt),
+    );
+    const pagadas = items.filter((s) => s.transaccionPagoId !== null);
+    return {
+      items: structuredClone(items),
+      pagina: f.pagina,
+      limite: f.limite,
+      total: items.length,
+      resumen: { cantidad: items.length, pagadas: pagadas.length, totalPagado: pagadas.reduce((t, s) => t + s.total, 0) },
+    };
   }
 }

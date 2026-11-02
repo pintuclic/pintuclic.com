@@ -14,7 +14,7 @@ const direccionBase = {
 
 describe('Teléfono en M04 (regla transversal)', () => {
   it('la dirección acepta un número con formato y rechaza letras o símbolos', () => {
-    expect(crearDireccionRequestSchema.safeParse({ ...direccionBase, telefono: '+57 300 123 4567' }).success).toBe(true);
+    expect(crearDireccionRequestSchema.safeParse({ ...direccionBase, telefono: '601-234567' }).success).toBe(true);
 
     const res = crearDireccionRequestSchema.safeParse({ ...direccionBase, telefono: '300abc4567' });
     expect(res.success).toBe(false);

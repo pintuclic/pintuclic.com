@@ -78,6 +78,10 @@ export type OrigenSolicitud = z.infer<typeof origenSolicitudSchema>;
 export const estadoWompiSchema = z.enum(['PENDING', 'APPROVED', 'DECLINED', 'ERROR', 'VOIDED']);
 export type EstadoWompi = z.infer<typeof estadoWompiSchema>;
 
+/** R19: cómo paga el cliente: Nequi directo (R11) o la página de pago de Wompi. */
+export const medioPagoSchema = z.enum(['nequi', 'pagina_wompi']);
+export type MedioPago = z.infer<typeof medioPagoSchema>;
+
 /** R12: celular colombiano registrado en Nequi. */
 export const celularNequiSchema = z
   .string()
@@ -145,8 +149,15 @@ export const crearSolicitudRequestSchema = z
     modoEntrega: modoEntregaSchema,
     /** Obligatoria con `domicilio`; null con `recogida`. */
     direccion: direccionEntregaSchema.nullable(),
-    celularNequi: celularNequiSchema,
-    aceptaciones: aceptacionesWompiSchema,
+    /** R19: sin él, Nequi. */
+    medio: medioPagoSchema.default('nequi'),
+    /** Obligatorios con Nequi (R12, R13); la página de Wompi los pide en su lado. */
+    celularNequi: celularNequiSchema.optional(),
+    aceptaciones: aceptacionesWompiSchema.optional(),
+  })
+  .refine((v) => v.medio !== 'nequi' || (v.celularNequi !== undefined && v.aceptaciones !== undefined), {
+    message: 'Escribe tu celular de Nequi y acepta los términos de Wompi',
+    path: ['celularNequi'],
   })
   .refine((v) => v.modoEntrega !== 'domicilio' || v.direccion !== null, {
     message: 'Escribe la dirección de entrega',
@@ -159,18 +170,43 @@ export const crearSolicitudRequestSchema = z
 export type CrearSolicitudRequest = z.infer<typeof crearSolicitudRequestSchema>;
 
 /** POST /checkout/solicitudes/:codigo/reintentar (R4). */
-export const reintentarPagoRequestSchema = z.object({
-  celularNequi: celularNequiSchema,
-  aceptaciones: aceptacionesWompiSchema,
-});
+export const reintentarPagoRequestSchema = z
+  .object({
+    medio: medioPagoSchema.default('nequi'),
+    celularNequi: celularNequiSchema.optional(),
+    aceptaciones: aceptacionesWompiSchema.optional(),
+  })
+  .refine((v) => v.medio !== 'nequi' || (v.celularNequi !== undefined && v.aceptaciones !== undefined), {
+    message: 'Escribe tu celular de Nequi y acepta los términos de Wompi',
+    path: ['celularNequi'],
+  });
 export type ReintentarPagoRequest = z.infer<typeof reintentarPagoRequestSchema>;
 
+/** R18: un día del calendario de Colombia (America/Bogota), `AAAA-MM-DD`. */
+export const diaColombiaSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use el formato AAAA-MM-DD')
+  .refine((v) => {
+    const dia = new Date(`${v}T00:00:00Z`);
+    return !Number.isNaN(dia.getTime()) && dia.toISOString().slice(0, 10) === v;
+  }, 'La fecha no existe');
+
 /** GET /admin/pagos */
-export const listarSolicitudesAdminRequestSchema = paginacionQuerySchema.extend({
-  estado: estadoSolicitudSchema.optional(),
-  /** Código SOL, código de orden PC, o nombre / correo del cliente. */
-  busqueda: z.string().trim().max(100).optional(),
-});
+export const listarSolicitudesAdminRequestSchema = paginacionQuerySchema
+  .extend({
+    estado: estadoSolicitudSchema.optional(),
+    /** Código SOL, código de orden PC, o nombre / correo del cliente. */
+    busqueda: z.string().trim().max(100).optional(),
+    /** R18: periodo por el día en que se creó la compra; los dos extremos se incluyen. */
+    desde: diaColombiaSchema.optional(),
+    hasta: diaColombiaSchema.optional(),
+    /** R18: solo las compras de ese cliente (enlace desde su ficha en el panel). */
+    idCliente: z.coerce.number().int().positive().optional(),
+  })
+  .refine((v) => v.desde === undefined || v.hasta === undefined || v.desde <= v.hasta, {
+    message: 'La fecha inicial no puede ser posterior a la final',
+    path: ['desde'],
+  });
 export type ListarSolicitudesAdminRequest = z.infer<typeof listarSolicitudesAdminRequestSchema>;
 
 /**
@@ -246,13 +282,32 @@ export type LineaSolicitud = z.infer<typeof lineaSolicitudSchema>;
 export const intentoPagoSchema = z.object({
   numero: z.number().int().min(1).max(MAXIMO_INTENTOS_PAGO),
   estadoWompi: estadoWompiSchema,
-  /** R12: `*** *** 1111`. */
-  celularEnmascarado: z.string(),
+  /** R19 */
+  medio: medioPagoSchema,
+  /** R19: `payment_method_type` de Wompi (CARD, PSE, DAVIPLATA, NEQUI…); null mientras no hay transacción. */
+  metodo: z.string().nullable(),
+  /** R12: `*** *** 1111`; null en la página de Wompi. */
+  celularEnmascarado: z.string().nullable(),
   /** Mensaje en palabras simples cuando Wompi lo rechaza; null en los demás. */
   motivo: z.string().nullable(),
   fecha: fechaHoraSchema,
 });
 export type IntentoPago = z.infer<typeof intentoPagoSchema>;
+
+/** R19: lo que la pantalla necesita para llevar al cliente a https://checkout.wompi.co/p/. */
+export const pagoWompiSchema = z.object({
+  llavePublica: z.string(),
+  referencia: z.string(),
+  montoEnCentavos: z.number().int().positive(),
+  moneda: z.literal('COP'),
+  /** `expiration-time`: ISO 8601 en UTC; es el `venceEn` de la solicitud. */
+  venceEn: fechaHoraSchema,
+  /** `signature:integrity`, firmada en el backend con el vencimiento. */
+  firmaIntegridad: z.string(),
+  correo: z.string(),
+  nombre: z.string(),
+});
+export type PagoWompi = z.infer<typeof pagoWompiSchema>;
 
 export const solicitudSchema = z.object({
   codigo: codigoSolicitudSchema,
@@ -275,6 +330,8 @@ export const solicitudSchema = z.object({
   /** R17: se pagó desde la ficha, sin el carrito. */
   compraDirecta: z.boolean(),
   creadaEn: fechaHoraSchema,
+  /** R19: para ir (o volver) a pagar en la página de Wompi; null si no aplica. */
+  pagoWompi: pagoWompiSchema.nullable(),
 });
 export type Solicitud = z.infer<typeof solicitudSchema>;
 export const solicitudResponseEnvelopeSchema = respuestaUno(solicitudSchema);
@@ -292,7 +349,20 @@ export const solicitudAdminSchema = solicitudSchema.extend({
 export type SolicitudAdmin = z.infer<typeof solicitudAdminSchema>;
 export const solicitudAdminResponseEnvelopeSchema = respuestaUno(solicitudAdminSchema);
 export type SolicitudAdminResponseEnvelope = z.infer<typeof solicitudAdminResponseEnvelopeSchema>;
-export const listarSolicitudesResponseEnvelopeSchema = respuestaPaginada(solicitudAdminSchema);
+/** R18: cifras de TODAS las compras que cumplen los filtros (no solo las de la página). */
+export const resumenPagosSchema = z.object({
+  /** Compras que cumplen los filtros. */
+  cantidad: z.number().int().nonnegative(),
+  /** De ellas, las que tienen un pago aprobado por Wompi. */
+  pagadas: z.number().int().nonnegative(),
+  /** Lo que se cobró en las pagadas (total con IVA y envío). */
+  totalPagado: dineroSchema,
+});
+export type ResumenPagos = z.infer<typeof resumenPagosSchema>;
+
+export const listarSolicitudesResponseEnvelopeSchema = respuestaPaginada(solicitudAdminSchema).extend({
+  resumen: resumenPagosSchema,
+});
 export type ListarSolicitudesResponseEnvelope = z.infer<typeof listarSolicitudesResponseEnvelopeSchema>;
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -392,6 +462,17 @@ export interface OrdenesCheckoutPort {
 }
 
 /** Cliente de Wompi (adaptador del módulo; en pruebas, uno en memoria). */
+export interface TransaccionWompi {
+  idTransaccion: string;
+  estado: EstadoWompi;
+  referencia: string;
+  montoEnCentavos: number;
+  moneda: string;
+  mensaje: string | null;
+  /** R19: `payment_method_type`. */
+  metodo: string | null;
+}
+
 export interface PasarelaPagoPort {
   terminos(): Promise<TerminosWompi>;
   crearTransaccionNequi(entrada: {
@@ -402,14 +483,14 @@ export interface PasarelaPagoPort {
     tokenAceptacion: string;
     tokenDatosPersonales: string;
   }): Promise<{ idTransaccion: string; estado: EstadoWompi }>;
-  consultarTransaccion(idTransaccion: string): Promise<{
-    idTransaccion: string;
-    estado: EstadoWompi;
-    referencia: string;
-    montoEnCentavos: number;
-    moneda: string;
-    mensaje: string | null;
-  }>;
+  consultarTransaccion(idTransaccion: string): Promise<TransaccionWompi>;
+  /** R19: la transacción de una referencia (la APPROVED si hay, si no la más reciente); null si no hay. */
+  buscarPorReferencia(referencia: string): Promise<TransaccionWompi | null>;
+  /** R19: llave pública y firma de integridad con vencimiento para la página de Wompi. */
+  datosPaginaPago(entrada: { referencia: string; montoEnCentavos: number; venceEn: Date }): {
+    llavePublica: string;
+    firmaIntegridad: string;
+  };
   /** R5 a: valida el checksum del evento sobre el cuerpo recibido, antes de Zod. */
   firmaValida(cuerpo: unknown, checksumCabecera: string | null): boolean;
 }
@@ -421,14 +502,14 @@ export interface PasarelaPagoPort {
  *  GET  /preparar                        datos de la pantalla /checkout (?codigoCupon)
  *  POST /solicitudes                     iniciar el pago (R2)                     → 201 solicitud
  *  GET  /solicitudes/:codigo             estado de una mía (R5, consulta a Wompi de respaldo)
- *  POST /solicitudes/:codigo/reintentar  nuevo intento con Nequi (R4)
+ *  POST /solicitudes/:codigo/reintentar  nuevo intento con Nequi o la página de Wompi (R4, R19)
  *  POST /solicitudes/:codigo/cancelar    cancelar si no hay pago en curso (R3)
  *
  *  Wompi (montaje: /api/v1/checkout/wompi) — sin sesión; firma del evento (R5)
  *  POST /eventos                         evento transaction.updated → 200 vacío
  *
  *  Panel (montaje: /api/v1/admin/pagos) — sesión + permiso (R16)
- *  GET  /                                lista (?estado, ?busqueda)               ventas.ver
+ *  GET  /                                lista (?estado, ?busqueda, ?desde, ?hasta, ?idCliente) + resumen (R18)  ventas.ver
  *  GET  /:codigo                         detalle con intentos y cliente           ventas.ver
  *  POST /:codigo/consultar-wompi         pedir a Wompi el estado real (R5)        ventas.gestionar
  *  POST /:codigo/reintentar-orden        volver a encolar la orden (R6)           ventas.gestionar

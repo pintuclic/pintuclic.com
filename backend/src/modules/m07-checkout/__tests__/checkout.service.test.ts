@@ -18,6 +18,7 @@ const peticion: CrearSolicitudRequest = {
   pantalla: { lineas: [{ idLinea: 1, subtotal: 100_000 }], total: 100_000 },
   modoEntrega: 'recogida',
   direccion: null,
+  medio: 'nequi',
   celularNequi: '3991111111',
   aceptaciones: { tokenAceptacion: 'acc', tokenDatosPersonales: 'pd', aceptaTerminos: true },
 };
@@ -166,14 +167,14 @@ describe('M07 · CheckoutService', () => {
     const rechazada = await servicio.obtenerMia(CLIENTE, s.codigo);
     expect(rechazada.estado).toBe('rechazada');
     expect(rechazada.intentos[0]?.motivo).toContain('Nequi no aprobó');
-    const otra = await servicio.reintentar(CLIENTE, s.codigo, { celularNequi: '3992222222', aceptaciones: peticion.aceptaciones });
+    const otra = await servicio.reintentar(CLIENTE, s.codigo, { medio: 'nequi', celularNequi: '3992222222', aceptaciones: peticion.aceptaciones });
     expect(otra.estado).toBe('en_pago');
     expect(otra.intentos).toHaveLength(2);
     expect(pasarela.transacciones.get('tx-2')?.referencia).toBe(`${s.codigo}-2`);
     pasarela.resolver('tx-2', 'ERROR');
-    await servicio.reintentar(CLIENTE, s.codigo, { celularNequi: '3991111111', aceptaciones: peticion.aceptaciones });
+    await servicio.reintentar(CLIENTE, s.codigo, { medio: 'nequi', celularNequi: '3991111111', aceptaciones: peticion.aceptaciones });
     pasarela.resolver('tx-3', 'DECLINED');
-    expect(await codigoDeError(servicio.reintentar(CLIENTE, s.codigo, { celularNequi: '3991111111', aceptaciones: peticion.aceptaciones }))).toBe('LIMITE_INTENTOS');
+    expect(await codigoDeError(servicio.reintentar(CLIENTE, s.codigo, { medio: 'nequi', celularNequi: '3991111111', aceptaciones: peticion.aceptaciones }))).toBe('LIMITE_INTENTOS');
   });
 
   it('R3: vence sin pago en curso y libera el cupón; con el pago en curso no vence', async () => {
@@ -185,7 +186,7 @@ describe('M07 · CheckoutService', () => {
     ahora = new Date(ahora.getTime() + 10_000);
     expect((await servicio.obtenerMia(CLIENTE, s.codigo)).estado).toBe('vencida');
     expect(precios.liberados).toEqual([s.codigo]);
-    expect(await codigoDeError(servicio.reintentar(CLIENTE, s.codigo, { celularNequi: '3991111111', aceptaciones: peticion.aceptaciones }))).toBe('SOLICITUD_VENCIDA');
+    expect(await codigoDeError(servicio.reintentar(CLIENTE, s.codigo, { medio: 'nequi', celularNequi: '3991111111', aceptaciones: peticion.aceptaciones }))).toBe('SOLICITUD_VENCIDA');
   });
 
   it('R8: un aprobado que llega a una solicitud cancelada se respeta y crea la orden', async () => {
@@ -273,5 +274,126 @@ describe('M07 · CheckoutService', () => {
     expect(await codigoDeError(servicio.cancelar(CLIENTE, s.codigo))).toBe('ESTADO_NO_PERMITE');
     pasarela.resolver('tx-1', 'DECLINED');
     expect((await servicio.cancelar(CLIENTE, s.codigo)).estado).toBe('cancelada');
+  });
+
+  describe('R19 · página de pago de Wompi', () => {
+    const enPagina: CrearSolicitudRequest = {
+      pantalla: peticion.pantalla,
+      modoEntrega: 'recogida',
+      direccion: null,
+      medio: 'pagina_wompi',
+    };
+
+    it('crea el intento sin cobrar y entrega los datos firmados para ir a pagar', async () => {
+      const s = await servicio.crear(CLIENTE, enPagina);
+      expect(s.estado).toBe('en_pago');
+      expect(pasarela.celulares).toEqual([]);
+      expect(s.intentos[0]).toMatchObject({ medio: 'pagina_wompi', metodo: null, celularEnmascarado: null, estadoWompi: 'PENDING' });
+      expect(s.pagoWompi).toEqual({
+        llavePublica: 'pub_test_x',
+        referencia: `${s.codigo}-1`,
+        montoEnCentavos: 10_000_000,
+        moneda: 'COP',
+        venceEn: s.venceEn,
+        firmaIntegridad: `firma:${s.codigo}-1:10000000:${s.venceEn}`,
+        correo: expect.any(String),
+        nombre: expect.any(String),
+      });
+    });
+
+    it('al volver, encuentra la transacción por la referencia, guarda el medio y crea la orden', async () => {
+      const s = await servicio.crear(CLIENTE, enPagina);
+      pasarela.pagarEnPagina(`${s.codigo}-1`, 10_000_000, 'PENDING', 'PSE');
+      ahora = new Date(ahora.getTime() + 10_000);
+      const enCurso = await servicio.obtenerMia(CLIENTE, s.codigo);
+      expect(enCurso.pagoWompi).toBeNull();
+      expect(enCurso.intentos[0]?.metodo).toBe('PSE');
+      expect(await codigoDeError(servicio.cancelar(CLIENTE, s.codigo))).toBe('ESTADO_NO_PERMITE');
+      pasarela.resolver('tx-1', 'APPROVED');
+      ahora = new Date(ahora.getTime() + 10_000);
+      expect((await servicio.obtenerMia(CLIENTE, s.codigo)).estado).toBe('completada');
+      expect(ordenes.recibidas).toHaveLength(1);
+      // Otra transacción de la misma referencia que no se aprobó no pisa el intento aprobado.
+      const otra = pasarela.pagarEnPagina(`${s.codigo}-1`, 10_000_000, 'DECLINED');
+      await servicio.procesarEvento(
+        { event: 'transaction.updated', data: { transaction: { id: otra, status: 'DECLINED', reference: `${s.codigo}-1`, amount_in_cents: 10_000_000, currency: 'COP' } }, signature: { properties: ['transaction.id'], checksum: 'x' }, timestamp: 1 },
+        null,
+        null,
+      );
+      expect(repo.solicitudes[0]?.intentos[0]).toMatchObject({ estado: 'APPROVED', idTransaccion: 'tx-1' });
+    });
+
+    it('una compra que solo espera en la página de Wompi no bloquea el checkout: la nueva la cancela', async () => {
+      const vieja = await servicio.crear(CLIENTE, enPagina);
+      expect((await servicio.preparar(CLIENTE)).solicitudEnCurso).toBeNull();
+      const nueva = await servicio.crear(CLIENTE, peticion);
+      expect(nueva.codigo).not.toBe(vieja.codigo);
+      expect(repo.solicitudes.find((x) => x.codigo === vieja.codigo)?.estado).toBe('cancelada');
+      expect((await servicio.preparar(CLIENTE)).solicitudEnCurso).toBe(nueva.codigo);
+    });
+
+    it('tras un rechazo, otro medio en la misma página de Wompi se reconoce (pendiente y luego aprobado)', async () => {
+      const s = await servicio.crear(CLIENTE, enPagina);
+      pasarela.pagarEnPagina(`${s.codigo}-1`, 10_000_000, 'ERROR', 'NEQUI');
+      ahora = new Date(ahora.getTime() + 10_000);
+      expect((await servicio.obtenerMia(CLIENTE, s.codigo)).estado).toBe('rechazada');
+      const tarjeta = pasarela.pagarEnPagina(`${s.codigo}-1`, 10_000_000, 'PENDING', 'CARD');
+      ahora = new Date(ahora.getTime() + 10_000);
+      const enPago = await servicio.obtenerMia(CLIENTE, s.codigo);
+      expect(enPago.estado).toBe('en_pago');
+      expect(enPago.intentos[0]).toMatchObject({ estadoWompi: 'PENDING', metodo: 'CARD', motivo: null });
+      pasarela.resolver(tarjeta, 'APPROVED');
+      ahora = new Date(ahora.getTime() + 10_000);
+      const lista = await servicio.obtenerMia(CLIENTE, s.codigo);
+      expect(lista.estado).toBe('completada');
+      expect(lista.intentos[0]).toMatchObject({ estadoWompi: 'APPROVED', metodo: 'CARD' });
+    });
+
+    it('sin transacción no hay pago en curso: se puede cancelar y vence', async () => {
+      const s = await servicio.crear(CLIENTE, enPagina);
+      expect((await servicio.cancelar(CLIENTE, s.codigo)).estado).toBe('cancelada');
+      const otra = await servicio.crear(CLIENTE, enPagina);
+      ahora = new Date(ahora.getTime() + 31 * 60_000);
+      const vencida = await servicio.obtenerMia(CLIENTE, otra.codigo);
+      expect(vencida.estado).toBe('vencida');
+      expect(vencida.pagoWompi).toBeNull();
+    });
+
+    it('un rechazo en la página permite reintentar con Nequi, y un rechazo tardío no pisa el aprobado', async () => {
+      const s = await servicio.crear(CLIENTE, enPagina);
+      const rechazo = pasarela.pagarEnPagina(`${s.codigo}-1`, 10_000_000, 'DECLINED');
+      ahora = new Date(ahora.getTime() + 10_000);
+      const rechazada = await servicio.obtenerMia(CLIENTE, s.codigo);
+      expect(rechazada.estado).toBe('rechazada');
+      expect(rechazada.intentos[0]?.motivo).toContain('Wompi');
+      const nequi = await servicio.reintentar(CLIENTE, s.codigo, { medio: 'nequi', celularNequi: '3991111111', aceptaciones: peticion.aceptaciones });
+      expect(nequi.intentos[1]).toMatchObject({ medio: 'nequi', celularEnmascarado: '*** *** 1111' });
+      const idNequi = [...pasarela.transacciones.keys()].at(-1) ?? '';
+      pasarela.resolver(idNequi, 'APPROVED');
+      ahora = new Date(ahora.getTime() + 10_000);
+      expect((await servicio.obtenerMia(CLIENTE, s.codigo)).estado).toBe('completada');
+      // Un evento viejo del intento rechazado no cambia nada.
+      await servicio.procesarEvento(
+        { event: 'transaction.updated', data: { transaction: { id: rechazo, status: 'DECLINED', reference: `${s.codigo}-1`, amount_in_cents: 10_000_000, currency: 'COP' } }, signature: { properties: ['transaction.id'], checksum: 'x' }, timestamp: 1 },
+        null,
+        null,
+      );
+      expect(repo.solicitudes[0]?.estado).toBe('completada');
+      expect(repo.solicitudes[0]?.intentos[0]?.estado).toBe('DECLINED');
+      expect(repo.solicitudes[0]?.intentos[1]?.estado).toBe('APPROVED');
+    });
+
+    it('el aviso de Wompi encuentra un pago de la página por la referencia, aunque la compra se haya cancelado (R8)', async () => {
+      const s = await servicio.crear(CLIENTE, enPagina);
+      await servicio.cancelar(CLIENTE, s.codigo);
+      const id = pasarela.pagarEnPagina(`${s.codigo}-1`, 10_000_000, 'APPROVED', 'DAVIPLATA');
+      await servicio.procesarEvento(
+        { event: 'transaction.updated', data: { transaction: { id, status: 'APPROVED', reference: `${s.codigo}-1`, amount_in_cents: 10_000_000, currency: 'COP' } }, signature: { properties: ['transaction.id'], checksum: 'x' }, timestamp: 1 },
+        null,
+        null,
+      );
+      expect(repo.solicitudes[0]?.estado).toBe('completada');
+      expect(repo.solicitudes[0]?.intentos[0]?.metodo).toBe('DAVIPLATA');
+    });
   });
 });

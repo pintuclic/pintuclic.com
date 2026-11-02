@@ -4,9 +4,18 @@ function sha256(texto: string): string {
   return createHash('sha256').update(texto, 'utf8').digest('hex');
 }
 
-/** R11: firma de integridad de una transacción (SHA-256 de reference + amount_in_cents + currency + secreto). */
-export function firmaIntegridad(referencia: string, montoEnCentavos: number, moneda: string, secreto: string): string {
-  return sha256(`${referencia}${montoEnCentavos}${moneda}${secreto}`);
+/**
+ * R11, R19: firma de integridad (SHA-256 de reference + amount_in_cents + currency + secreto). Con `vencimiento`
+ * (el `expiration-time` de la página de Wompi), va entre la moneda y el secreto.
+ */
+export function firmaIntegridad(
+  referencia: string,
+  montoEnCentavos: number,
+  moneda: string,
+  secreto: string,
+  vencimiento?: string,
+): string {
+  return sha256(`${referencia}${montoEnCentavos}${moneda}${vencimiento ?? ''}${secreto}`);
 }
 
 function esObjeto(valor: unknown): valor is Record<string, unknown> {

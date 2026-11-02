@@ -104,6 +104,7 @@ describe.skipIf(URL_BD === undefined)('M07 · checkout (PostgreSQL + M05, M06 y 
       pantalla,
       modoEntrega: 'domicilio',
       direccion: { direccion: 'Calle 10 # 5-20', barrio: 'Centro', apartamentoCasa: null, nombreRecibe: 'Compra', telefonoRecibe: '3001234567' },
+      medio: 'nequi',
       celularNequi: '3991111111',
       aceptaciones: { tokenAceptacion: 'acc', tokenDatosPersonales: 'pd', aceptaTerminos: true },
     });
@@ -136,6 +137,7 @@ describe.skipIf(URL_BD === undefined)('M07 · checkout (PostgreSQL + M05, M06 y 
       directa,
       modoEntrega: 'recogida',
       direccion: null,
+      medio: 'nequi',
       celularNequi: '3991111111',
       aceptaciones: { tokenAceptacion: 'acc', tokenDatosPersonales: 'pd', aceptaTerminos: true },
     });

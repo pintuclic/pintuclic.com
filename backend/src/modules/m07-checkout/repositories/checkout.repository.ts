@@ -8,11 +8,11 @@ import type {
   DescuentoCongelado,
   IntentoGuardado,
   IntentoNuevo,
-  Pagina,
+  PaginaPagos,
   SolicitudGuardada,
   SolicitudNueva,
 } from '../interfaces/checkout.interface';
-import { formatearCodigo } from '../services/reglas-checkout';
+import { formatearCodigo, rangoDiasColombia } from '../services/reglas-checkout';
 
 const LIMITES_TRANSACCION = { maxWait: 5_000, timeout: 15_000 } as const;
 
@@ -59,6 +59,8 @@ function aIntento(i: Fila['intentos'][number]): IntentoGuardado {
     idTransaccion: i.idTransaccion,
     estado: A_WOMPI[i.estado],
     montoCentavos: Number(i.montoCentavos),
+    medio: i.medio === 'pagina_wompi' ? 'pagina_wompi' : 'nequi',
+    metodo: i.metodoWompi,
     celularEnmascarado: i.celularEnmascarado,
     mensaje: i.mensaje,
     ultimaConsulta: i.ultimaConsulta,
@@ -220,6 +222,7 @@ export class CheckoutRepository implements CheckoutRepositoryPort {
         numero: intento.numero,
         referencia: intento.referencia,
         montoCentavos: BigInt(intento.montoCentavos),
+        medio: intento.medio,
         celularEnmascarado: intento.celularEnmascarado,
       },
     });
@@ -232,6 +235,7 @@ export class CheckoutRepository implements CheckoutRepositoryPort {
       data: {
         ...(cambios.estado === undefined ? {} : { estado: DE_WOMPI[cambios.estado] }),
         ...(cambios.idTransaccion === undefined ? {} : { idTransaccion: cambios.idTransaccion }),
+        ...(cambios.metodo === undefined ? {} : { metodoWompi: cambios.metodo }),
         ...(cambios.mensaje === undefined ? {} : { mensaje: cambios.mensaje }),
         ...(cambios.ultimaConsulta === undefined ? {} : { ultimaConsulta: cambios.ultimaConsulta }),
         fechaActualizacion: new Date(),
@@ -294,10 +298,13 @@ export class CheckoutRepository implements CheckoutRepositoryPort {
     return filas.map(aSolicitud);
   }
 
-  async listar(filtros: ListarSolicitudesAdminRequest): Promise<Pagina<SolicitudGuardada>> {
+  async listar(filtros: ListarSolicitudesAdminRequest): Promise<PaginaPagos<SolicitudGuardada>> {
     const busqueda = filtros.busqueda?.trim();
+    const periodo = rangoDiasColombia(filtros.desde, filtros.hasta);
     const where: Prisma.SolicitudCompraWhereInput = {
       ...(filtros.estado === undefined ? {} : { estado: filtros.estado }),
+      ...(filtros.idCliente === undefined ? {} : { idUsuario: filtros.idCliente }),
+      ...(periodo === null ? {} : { fechaCreacion: periodo }),
       ...(busqueda === undefined || busqueda === ''
         ? {}
         : {
@@ -309,7 +316,7 @@ export class CheckoutRepository implements CheckoutRepositoryPort {
             ],
           }),
     };
-    const [total, filas] = await prisma.$transaction([
+    const [total, filas, pagadas] = await prisma.$transaction([
       prisma.solicitudCompra.count({ where }),
       prisma.solicitudCompra.findMany({
         where,
@@ -318,7 +325,19 @@ export class CheckoutRepository implements CheckoutRepositoryPort {
         take: filtros.limite,
         include: INCLUIR,
       }),
+      // Pagada = tiene un APPROVED de Wompi (D3), aunque la orden aún no exista o haya quedado en revisión.
+      prisma.solicitudCompra.aggregate({
+        where: { AND: [where, { transaccionPagoId: { not: null } }] },
+        _count: { _all: true },
+        _sum: { total: true },
+      }),
     ]);
-    return { items: filas.map(aSolicitud), pagina: filtros.pagina, limite: filtros.limite, total };
+    return {
+      items: filas.map(aSolicitud),
+      pagina: filtros.pagina,
+      limite: filtros.limite,
+      total,
+      resumen: { cantidad: total, pagadas: pagadas._count._all, totalPagado: Number(pagadas._sum.total ?? 0) },
+    };
   }
 }

@@ -13,7 +13,9 @@ import {
   type CompraDirecta,
   type CrearSolicitudRequest,
   type ListarSolicitudesAdminRequest,
+  type MedioPago,
   type OrdenesCheckoutPort,
+  type PagoWompi,
   type ParametrosCheckoutPort,
   type PasarelaPagoPort,
   type PerfilCheckoutPort,
@@ -24,7 +26,7 @@ import {
   type SolicitudAdmin,
   type TerminosWompi,
 } from '../dtos/m07-checkout.dto';
-import type { CheckoutRepositoryPort, IntentoGuardado, Pagina, SolicitudGuardada } from '../interfaces/checkout.interface';
+import type { CheckoutRepositoryPort, IntentoGuardado, PaginaPagos, SolicitudGuardada } from '../interfaces/checkout.interface';
 import { errores, OrdenDefinitivaError, PasarelaNoDisponibleError } from './checkout-error';
 import {
   aCentavos,
@@ -35,8 +37,10 @@ import {
   costoEnvio,
   debeVencer,
   enmascararCelular,
+  esperaPaginaWompi,
   mensajeIntento,
   origenDeLineas,
+  pagoEnCurso,
   proximoReintento,
   redondear2,
   referenciaIntento,
@@ -85,7 +89,8 @@ export class CheckoutService {
       this.dep.repo.abiertaDelUsuario(idUsuario),
     ]);
     const totalMercancia = carrito.calculo?.resumen.total ?? 0;
-    const enCurso = abierta !== null && abierta.estado === 'en_pago' && abierta.intentos.at(-1)?.estado === 'PENDING';
+    // R2 c, R19: una compra que solo espera a que el cliente vaya a la página de Wompi no bloquea otra.
+    const enCurso = abierta !== null && pagoEnCurso(abierta);
     return {
       carrito,
       envio: {
@@ -124,7 +129,7 @@ export class CheckoutService {
     const abierta = await this.dep.repo.abiertaDelUsuario(idUsuario);
     if (abierta !== null) {
       const actual = await this.refrescar(abierta, true);
-      if (actual.estado === 'en_pago' && actual.intentos.at(-1)?.estado === 'PENDING') throw errores.pagoEnCurso(actual.codigo);
+      if (pagoEnCurso(actual)) throw errores.pagoEnCurso(actual.codigo);
       if (actual.estado === 'en_pago' || actual.estado === 'rechazada') await this.cerrar(actual, 'cancelada');
     }
 
@@ -177,15 +182,15 @@ export class CheckoutService {
       solicitud.cuponRegistrado = true;
     }
 
-    // f) Intento 1 en Wompi.
-    await this.cobrar(solicitud, 1, req.celularNequi, req.aceptaciones);
-    return aSolicitud(await this.recargar(solicitud.codigo));
+    // f) Intento 1: Nequi en Wompi (R11) o la página de pago de Wompi (R19).
+    await this.iniciarIntento(solicitud, 1, req);
+    return this.paraCliente(await this.recargar(solicitud.codigo));
   }
 
   /** GET de la pantalla: consulta a Wompi de respaldo y crea la orden si ya toca (R5, R6). */
   async obtenerMia(idUsuario: number, codigo: string): Promise<Solicitud> {
     const s = await this.propia(idUsuario, codigo);
-    return aSolicitud(await this.refrescar(s, false));
+    return this.paraCliente(await this.refrescar(s, false));
   }
 
   /** R4 */
@@ -195,19 +200,23 @@ export class CheckoutService {
     if (s.estado !== 'rechazada') throw errores.estado('Esta compra no tiene un pago rechazado que reintentar.');
     if (s.intentos.length >= MAXIMO_INTENTOS_PAGO) throw errores.limiteIntentos();
     await this.dep.repo.actualizar(s.idSolicitud, { estado: 'en_pago' });
-    await this.cobrar(s, s.intentos.length + 1, req.celularNequi, req.aceptaciones);
-    return aSolicitud(await this.recargar(codigo));
+    await this.iniciarIntento(s, s.intentos.length + 1, req);
+    return this.paraCliente(await this.recargar(codigo));
   }
 
   /** R3: el cliente la cancela si no hay un pago en curso. */
   async cancelar(idUsuario: number, codigo: string): Promise<Solicitud> {
     const s = await this.refrescar(await this.propia(idUsuario, codigo), true);
-    if (s.estado === 'en_pago' && s.intentos.at(-1)?.estado === 'PENDING') {
-      throw errores.estado('Tienes un pago en curso en Nequi. Recházalo en la app o espera a que termine.');
+    if (pagoEnCurso(s)) {
+      throw errores.estado(
+        s.intentos.at(-1)?.medio === 'nequi'
+          ? 'Tienes un pago en curso en Nequi. Recházalo en la app o espera a que termine.'
+          : 'Tienes un pago en curso en Wompi. Espera a que tu banco lo confirme o lo rechace.',
+      );
     }
     if (s.estado !== 'en_pago' && s.estado !== 'rechazada') throw errores.estado('Esta compra ya no se puede cancelar.');
     await this.cerrar(s, 'cancelada');
-    return aSolicitud(await this.recargar(codigo));
+    return this.paraCliente(await this.recargar(codigo));
   }
 
   /* ── Wompi ────────────────────────────────────────────────────────────── */
@@ -226,15 +235,20 @@ export class CheckoutService {
     if (s === null) return;
     const intento = s.intentos.find((i) => i.referencia === evento.data.data.transaction.reference);
     if (intento === undefined) return;
-    // R5 b: nunca se confía solo en el evento.
-    const tx = await this.dep.pasarela.consultarTransaccion(evento.data.data.transaction.id);
+    // R5 b: nunca se confía solo en el evento. R19: en la página de Wompi una referencia puede tener varias
+    // transacciones (el cliente prueba otro medio); se pregunta por la referencia y gana la aprobada o la última.
+    const tx =
+      intento.medio === 'pagina_wompi'
+        ? await this.transaccionDe(intento)
+        : await this.dep.pasarela.consultarTransaccion(evento.data.data.transaction.id);
+    if (tx === null) return;
     await this.aplicarTransaccion(s, intento, tx);
     await this.crearOrdenSiToca(await this.recargar(codigo));
   }
 
   /* ── Panel ────────────────────────────────────────────────────────────── */
 
-  async listar(filtros: ListarSolicitudesAdminRequest): Promise<Pagina<SolicitudAdmin>> {
+  async listar(filtros: ListarSolicitudesAdminRequest): Promise<PaginaPagos<SolicitudAdmin>> {
     const p = await this.dep.repo.listar(filtros);
     return { ...p, items: p.items.map((s) => this.aAdmin(s)) };
   }
@@ -250,9 +264,10 @@ export class CheckoutService {
     const s = await this.dep.repo.buscarPorCodigo(codigo);
     if (s === null) throw errores.noDisponible();
     const intento = s.intentos.at(-1);
-    if (intento?.idTransaccion != null) {
+    if (intento !== undefined) {
       try {
-        await this.aplicarTransaccion(s, intento, await this.dep.pasarela.consultarTransaccion(intento.idTransaccion));
+        const tx = await this.transaccionDe(intento);
+        if (tx !== null) await this.aplicarTransaccion(s, intento, tx);
       } catch (error) {
         if (error instanceof PasarelaNoDisponibleError) throw errores.pasarela();
         throw error;
@@ -328,6 +343,26 @@ export class CheckoutService {
     }
   }
 
+  /** R2 f, R4, R19: con Nequi cobra en Wompi; con la página de Wompi solo crea el intento, que el cliente paga allá. */
+  private async iniciarIntento(
+    s: SolicitudGuardada,
+    numero: number,
+    req: { medio: MedioPago; celularNequi?: string | undefined; aceptaciones?: AceptacionesWompi | undefined },
+  ): Promise<void> {
+    if (req.medio === 'pagina_wompi') {
+      await this.dep.repo.agregarIntento(s.idSolicitud, {
+        numero,
+        referencia: referenciaIntento(s.codigo, numero),
+        montoCentavos: aCentavos(s.total),
+        medio: 'pagina_wompi',
+        celularEnmascarado: null,
+      });
+      return;
+    }
+    if (req.celularNequi === undefined || req.aceptaciones === undefined) throw errores.datosNequi();
+    await this.cobrar(s, numero, req.celularNequi, req.aceptaciones);
+  }
+
   /** R2 f, R4: crea el intento y la transacción NEQUI. Si Wompi no responde, la solicitud queda rechazada. */
   private async cobrar(s: SolicitudGuardada, numero: number, celular: string, aceptaciones: AceptacionesWompi): Promise<void> {
     const montoCentavos = aCentavos(s.total);
@@ -335,6 +370,7 @@ export class CheckoutService {
       numero,
       referencia: referenciaIntento(s.codigo, numero),
       montoCentavos,
+      medio: 'nequi',
       celularEnmascarado: enmascararCelular(celular),
     });
     try {
@@ -374,11 +410,17 @@ export class CheckoutService {
   private async refrescar(s: SolicitudGuardada, forzar: boolean): Promise<SolicitudGuardada> {
     const ahora = this.reloj();
     const intento = s.intentos.at(-1);
-    if (s.estado === 'en_pago' && intento?.estado === 'PENDING' && intento.idTransaccion !== null) {
+    const consultable = intento !== undefined && (intento.idTransaccion !== null || intento.medio === 'pagina_wompi');
+    const pendiente = s.estado === 'en_pago' && intento?.estado === 'PENDING' && consultable;
+    // R19: tras un rechazo en la página de Wompi el cliente puede pagar ahí mismo con otro medio y la misma referencia.
+    const otraOportunidad = s.estado === 'rechazada' && intento?.medio === 'pagina_wompi';
+    if (intento !== undefined && (pendiente || otraOportunidad)) {
       const ultima = intento.ultimaConsulta?.getTime() ?? 0;
       if (forzar || ahora.getTime() - ultima >= INTERVALO_CONSULTA_WOMPI_SEGUNDOS * 1000) {
         try {
-          await this.aplicarTransaccion(s, intento, await this.dep.pasarela.consultarTransaccion(intento.idTransaccion));
+          const tx = await this.transaccionDe(intento);
+          if (tx !== null) await this.aplicarTransaccion(s, intento, tx);
+          else await this.dep.repo.actualizarIntento(intento.idIntento, { ultimaConsulta: ahora });
         } catch (error) {
           if (!(error instanceof PasarelaNoDisponibleError)) throw error;
         }
@@ -399,15 +441,36 @@ export class CheckoutService {
   /** R5 b, R6, R8: aplica lo que Wompi dice de una transacción. */
   private async aplicarTransaccion(s: SolicitudGuardada, intento: IntentoGuardado, tx: Transaccion): Promise<void> {
     const ahora = this.reloj();
+    // R19: un intento ya aprobado no lo cambia otra transacción de la misma referencia que no se aprobó.
+    if (intento.estado === 'APPROVED' && tx.estado !== 'APPROVED') return;
+    if (tx.estado === 'PENDING' && intento.medio === 'pagina_wompi' && intento.estado !== 'PENDING') {
+      // R19: después de un rechazo, el cliente empezó otro pago en la página con la misma referencia.
+      await this.dep.repo.actualizarIntento(intento.idIntento, {
+        estado: 'PENDING',
+        idTransaccion: tx.idTransaccion,
+        ...(tx.metodo === null ? {} : { metodo: tx.metodo }),
+        mensaje: null,
+        ultimaConsulta: ahora,
+      });
+      const esElUltimo = s.intentos.at(-1)?.idIntento === intento.idIntento;
+      if (s.estado === 'rechazada' && esElUltimo) await this.dep.repo.actualizar(s.idSolicitud, { estado: 'en_pago' });
+      return;
+    }
     if (tx.estado === 'PENDING') {
-      await this.dep.repo.actualizarIntento(intento.idIntento, { ultimaConsulta: ahora });
+      // R19: en la página de Wompi la transacción se conoce aquí; desde ese momento el pago está en curso.
+      await this.dep.repo.actualizarIntento(intento.idIntento, {
+        ultimaConsulta: ahora,
+        ...(intento.idTransaccion === null ? { idTransaccion: tx.idTransaccion } : {}),
+        ...(tx.metodo === null ? {} : { metodo: tx.metodo }),
+      });
       return;
     }
     if (tx.estado !== 'APPROVED') {
       await this.dep.repo.actualizarIntento(intento.idIntento, {
         estado: tx.estado,
         idTransaccion: tx.idTransaccion,
-        mensaje: mensajeIntento(tx.estado),
+        ...(tx.metodo === null ? {} : { metodo: tx.metodo }),
+        mensaje: mensajeIntento(tx.estado, intento.medio),
         ultimaConsulta: ahora,
       });
       const esElUltimo = s.intentos.at(-1)?.idIntento === intento.idIntento;
@@ -417,6 +480,7 @@ export class CheckoutService {
 
     // Aprobado. Repetido (mismo id) → nada que hacer.
     if (s.transaccionPagoId === tx.idTransaccion) return;
+    if (tx.metodo !== null) await this.dep.repo.actualizarIntento(intento.idIntento, { metodo: tx.metodo });
     const coincide =
       tx.referencia === intento.referencia &&
       tx.moneda === 'COP' &&
@@ -512,6 +576,47 @@ export class CheckoutService {
       }
     }
     await this.dep.repo.actualizar(s.idSolicitud, { estado });
+  }
+
+  /**
+   * R5 b, R19: la transacción del intento. Con Nequi, por su id. En la página de Wompi siempre por la referencia: el
+   * cliente puede intentar varias veces con medios distintos y gana la aprobada o, si no hay, la más reciente.
+   */
+  private async transaccionDe(intento: IntentoGuardado): Promise<Transaccion | null> {
+    if (intento.medio === 'pagina_wompi') return this.dep.pasarela.buscarPorReferencia(intento.referencia);
+    if (intento.idTransaccion !== null) return this.dep.pasarela.consultarTransaccion(intento.idTransaccion);
+    return null;
+  }
+
+  /** La solicitud para el cliente, con los datos para ir a la página de Wompi si aún puede pagar allá (R19). */
+  private paraCliente(s: SolicitudGuardada): Solicitud {
+    return aSolicitud(s, this.pagoWompi(s));
+  }
+
+  private pagoWompi(s: SolicitudGuardada): PagoWompi | null {
+    const intento = s.intentos.at(-1);
+    if (intento === undefined || !esperaPaginaWompi(s, this.reloj())) return null;
+    try {
+      const datos = this.dep.pasarela.datosPaginaPago({
+        referencia: intento.referencia,
+        montoEnCentavos: intento.montoCentavos,
+        venceEn: s.venceEn,
+      });
+      return {
+        llavePublica: datos.llavePublica,
+        referencia: intento.referencia,
+        montoEnCentavos: intento.montoCentavos,
+        moneda: 'COP',
+        venceEn: s.venceEn.toISOString(),
+        firmaIntegridad: datos.firmaIntegridad,
+        correo: s.cliente.correo,
+        nombre: s.cliente.nombre,
+      };
+    } catch (error) {
+      // Sin llaves de Wompi no se puede ir a pagar; la pantalla lo muestra como pasarela no disponible.
+      if (error instanceof PasarelaNoDisponibleError) return null;
+      throw error;
+    }
   }
 
   private aAdmin(s: SolicitudGuardada): SolicitudAdmin {

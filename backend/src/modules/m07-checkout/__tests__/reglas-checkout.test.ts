@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { celularNequiSchema, crearSolicitudRequestSchema, prepararCheckoutRequestSchema } from '../dtos/m07-checkout.dto';
+import {
+  celularNequiSchema,
+  crearSolicitudRequestSchema,
+  listarSolicitudesAdminRequestSchema,
+  prepararCheckoutRequestSchema,
+} from '../dtos/m07-checkout.dto';
 import { checksumEsperado, firmaEventoValida, firmaIntegridad } from '../services/firmas-wompi';
 import {
   aCentavos,
@@ -11,6 +16,7 @@ import {
   formatearCodigo,
   origenDeLineas,
   proximoReintento,
+  rangoDiasColombia,
   referenciaIntento,
   textoDireccion,
 } from '../services/reglas-checkout';
@@ -18,6 +24,14 @@ import {
 const sha = (t: string): string => createHash('sha256').update(t).digest('hex');
 
 describe('M07 · firmas de Wompi', () => {
+  it('R19: con vencimiento, la firma concatena la fecha entre la moneda y el secreto (ejemplo de Wompi)', () => {
+    const secreto = 'prod_integrity_Z5mMke9x0k8gpErbDqwrJXMqsI6SFli6';
+    expect(firmaIntegridad('sk8-438k4-xmxm392-sn2m', 2490000, 'COP', secreto, '2023-06-09T20:28:50.000Z')).toBe(
+      sha('sk8-438k4-xmxm392-sn2m2490000COP2023-06-09T20:28:50.000Zprod_integrity_Z5mMke9x0k8gpErbDqwrJXMqsI6SFli6'),
+    );
+    expect(firmaIntegridad('R-1', 100, 'COP', 's')).toBe(sha('R-1100COPs'));
+  });
+
   it('R11: la firma de integridad es SHA-256 de referencia + centavos + moneda + secreto', () => {
     expect(firmaIntegridad('SOL-2026-00001-1', 4990000, 'COP', 'test_integrity_x')).toBe(
       sha('SOL-2026-00001-14990000COPtest_integrity_x'),
@@ -139,5 +153,27 @@ describe('M07 · reglas', () => {
     expect(proximoReintento(1, ahora)?.toISOString()).toBe('2026-10-27T15:01:00.000Z');
     expect(proximoReintento(2, ahora)?.toISOString()).toBe('2026-10-27T15:05:00.000Z');
     expect(proximoReintento(7, ahora)).toBeNull();
+  });
+});
+
+describe('M07 · periodo del panel (R18)', () => {
+  it('un día de Colombia va de las 00:00 a antes de las 00:00 del día siguiente (UTC−5)', () => {
+    expect(rangoDiasColombia('2026-10-01', '2026-10-31')).toEqual({
+      gte: new Date('2026-10-01T05:00:00.000Z'),
+      lt: new Date('2026-11-01T05:00:00.000Z'),
+    });
+    expect(rangoDiasColombia(undefined, '2026-12-31')).toEqual({ lt: new Date('2027-01-01T05:00:00.000Z') });
+    expect(rangoDiasColombia()).toBeNull();
+  });
+
+  it('valida las fechas, el orden del rango y el cliente', () => {
+    const base = { pagina: '1', limite: '20' };
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, desde: '2026-10-01', hasta: '2026-10-01' }).success).toBe(true);
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, desde: '2026-10-02', hasta: '2026-10-01' }).success).toBe(false);
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, desde: '2026-13-01' }).success).toBe(false);
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, hasta: '01/10/2026' }).success).toBe(false);
+    const r = listarSolicitudesAdminRequestSchema.safeParse({ ...base, idCliente: '7' });
+    expect(r.success && r.data.idCliente).toBe(7);
+    expect(listarSolicitudesAdminRequestSchema.safeParse({ ...base, idCliente: '0' }).success).toBe(false);
   });
 });

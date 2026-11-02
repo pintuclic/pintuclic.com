@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** M07 · Pago con Nequi. El cupón llega en la dirección desde el carrito; la sesión la exige el servidor (R1). */
+/** M07 · Pago con Nequi o en la página de Wompi (tarjeta, PSE, Daviplata y más). El cupón llega en la dirección desde el carrito; la sesión la exige el servidor (R1). */
 export default function CheckoutPage() {
   return (
     <Suspense fallback={null}>
