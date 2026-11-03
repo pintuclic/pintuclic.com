@@ -294,10 +294,10 @@ describe('Admin Core Kit (AdminLayout, AdminPageHeader, AdminStatCard)', () => {
 
     expect(html).toContain('aria-label="Navegación administrativa"');
     expect(html).not.toContain('Módulos M17');
-    // Nada de maqueta: ni tarjeta publicitaria abajo, ni buscador que no busca, ni campana de notificaciones sin función.
+    // Nada de maqueta: ni tarjeta publicitaria abajo ni buscador que no busca. La campanita es la real de FP-02.
     expect(html).not.toContain('Hacemos crecer tu negocio');
     expect(html).not.toContain('Buscar productos, marcas, categorías o pedidos');
-        expect(html).not.toMatch(/aria-label="Notificaciones/);
+    expect(html).toContain('aria-label="Notificaciones, sin avisos nuevos"');
     // Sin sesión no se inventa una persona.
     expect(html).not.toContain('Carlos');
     expect(html).toContain('¡Hola, equipo!');
