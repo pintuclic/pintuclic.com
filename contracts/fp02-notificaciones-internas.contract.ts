@@ -106,10 +106,10 @@ import { z } from 'zod';
  * Rutas (montaje /api/v1/notificaciones, todas con sesión, de cualquier rol):
  *   GET    /resumen                       → resumenResponse            (R6; la que se consulta cada pocos segundos)
  *   GET    /?pagina&limite                → listarResponse             (importantes y novedades, de más nuevo a más viejo)
- *   POST   /campana/vista                 → { vistas }                 (R7: apaga el número, deja el resalte)
- *   POST   /leer-todas                    → { leidas }                 (de los dos niveles)
+ *   POST   /campana/vista                 → conteoResponse { cantidad } (R7: apaga el número, deja el resalte)
+ *   POST   /leer-todas                    → conteoResponse { cantidad } (de los dos niveles)
  *   POST   /:idNotificacion/leer          → notificacionResponse       (R7)
- *   POST   /secciones/:seccion/leer       → { leidas }                 (R7: apaga el punto rojo de esa sección)
+ *   POST   /secciones/:seccion/leer       → conteoResponse { cantidad } (R7: apaga el punto rojo de esa sección)
  * ============================================================================
  */
 
