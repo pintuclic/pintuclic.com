@@ -29,10 +29,13 @@ describe('FP-02 · punto rojo con número', () => {
     expect(renderToStaticMarkup(<PuntoNovedad cantidad={0} />)).toBe('');
   });
   it('muestra el número y lo dice en texto, no solo con el color (R11)', () => {
-    const html = renderToStaticMarkup(<PuntoNovedad cantidad={15} etiqueta="novedades" />);
+    const html = renderToStaticMarkup(<PuntoNovedad cantidad={15} singular="novedad" plural="novedades" />);
     expect(html).toContain('>15<');
     expect(html).toContain('15 novedades');
     expect(html).toContain('sr-only');
+  });
+  it('con una sola dice «novedad» en singular', () => {
+    expect(renderToStaticMarkup(<PuntoNovedad cantidad={1} singular="novedad" plural="novedades" />)).toContain('1 novedad<');
   });
   it('topa en 99+', () => {
     expect(renderToStaticMarkup(<PuntoNovedad cantidad={250} />)).toContain('99+');

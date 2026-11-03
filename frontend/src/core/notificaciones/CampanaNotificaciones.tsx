@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { Bell, CircleAlert, Sparkles } from 'lucide-react';
 import { Button } from '../components/buttons/Button';
@@ -71,9 +71,12 @@ export function CampanaVista(props: CampanaVistaProps) {
   const { sinVer, sinLeer, abierta, lista, hayMas, cargando, hayError, alAbrir, alCerrar, alCargarMas, alLeerTodas, alLeer } = props;
   const raiz = useRef<HTMLDivElement>(null);
   const boton = useRef<HTMLButtonElement>(null);
+  // En pantallas angostas la lista ocupa el ancho de la pantalla, justo debajo del botón (la campanita no está en el borde derecho).
+  const [ancla, setAncla] = useState(72);
 
   useEffect(() => {
     if (!abierta) return undefined;
+    setAncla(Math.round((boton.current?.getBoundingClientRect().bottom ?? 64) + 8));
     const alTecla = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         alCerrar();
@@ -122,7 +125,8 @@ export function CampanaVista(props: CampanaVistaProps) {
           id={ID_PANEL}
           role="region"
           aria-label="Notificaciones"
-          className="absolute right-0 top-full z-50 mt-2 flex max-h-[70vh] w-[min(92vw,24rem)] flex-col overflow-hidden rounded-card border border-neutral-light bg-neutral-white shadow-card motion-safe:animate-in motion-safe:fade-in"
+          style={{ '--ancla': `${String(ancla)}px` } as CSSProperties}
+          className="fixed inset-x-3 top-(--ancla) z-50 flex max-h-[70vh] flex-col overflow-hidden rounded-card border border-neutral-light bg-neutral-white shadow-card motion-safe:animate-in motion-safe:fade-in sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96"
         >
           <div className="flex items-center justify-between gap-3 border-b border-neutral-light px-4 py-3">
             <h2 className="font-title text-base font-bold text-corporate">Notificaciones</h2>

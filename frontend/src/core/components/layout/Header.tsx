@@ -191,7 +191,7 @@ export function Header({
           >
             <span className="relative shrink-0">
               <User className="h-6 w-6 text-neutral-dark" aria-hidden="true" />
-              {!usuario?.esAdmin && <PuntoNovedad cantidad={novedadesCuenta} etiqueta="novedades en tu cuenta" superpuesto />}
+              {!usuario?.esAdmin && <PuntoNovedad cantidad={novedadesCuenta} singular="novedad en tu cuenta" plural="novedades en tu cuenta" superpuesto />}
             </span>
             <span className="hidden flex-col leading-tight whitespace-nowrap 2xl:flex">
               <span className="font-title text-sm font-semibold whitespace-nowrap text-neutral-black">{cuenta.label}</span>

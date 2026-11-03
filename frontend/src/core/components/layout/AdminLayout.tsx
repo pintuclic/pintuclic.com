@@ -390,7 +390,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                   <span>{item.label}</span>
                   {(total > 0 || novedades > 0) && (
                     <span className="ml-auto flex items-center gap-1.5">
-                      {novedades > 0 && <PuntoNovedad cantidad={novedades} etiqueta="novedades" />}
+                      {novedades > 0 && <PuntoNovedad cantidad={novedades} singular="novedad" plural="novedades" />}
                       {total > 0 && (
                         <span
                           className="rounded-full bg-offer px-2 py-0.5 text-xs font-semibold leading-4 text-neutral-white"
