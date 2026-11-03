@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- PROYECTO: PINTUCLIC
 -- DESCRIPCIÓN: Script DDL para PostgreSQL con tipos ENUM tipificados
--- VERSIÓN: 4.27 (v4.26 + M07: intento_pago con el medio de pago, Nequi o la página de Wompi)
+-- VERSIÓN: 4.28 (v4.27 + FP-02: notificaciones internas, campanita y puntos de novedad)
 -- MOTOR: PostgreSQL 15+ (usa UNIQUE NULLS NOT DISTINCT; compatible con PostgreSQL 18)
 -- CODIFICACIÓN: UTF-8
 -- TOTAL TABLAS: 98
@@ -3253,5 +3253,52 @@ CREATE INDEX IF NOT EXISTS idx_usr_permiso_permiso ON usuario_permiso(id_permiso
 COMMENT ON TABLE usuario_permiso IS 'Permisos atómicos concedidos individualmente a un empleado (M17 R-ACC-3). Solo cuentan si la cuenta está activa y tiene rol empleado (R-ACC-5)';
 
 -- ==============================================================================
--- FIN DEL SCRIPT DDL (98 TABLAS - v4.26)
+-- FP-02. NOTIFICACIONES INTERNAS — campanita y puntos de novedad (v4.28)
+-- ==============================================================================
+
+-- Tabla: notificacion_interna
+-- Un aviso DENTRO del sitio para una persona (cliente, empresa, colaborador o administrador). Los hechos del mismo grupo se
+-- SUMAN al aviso abierto (`cantidad`) en vez de crear uno por hecho (FP-02 · R4). El texto no se guarda: lo compone el catálogo
+-- del contrato a partir de `tipo`, `cantidad` y `referencias` (R5).
+CREATE TABLE IF NOT EXISTS notificacion_interna (
+    id_notificacion UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_usuario INT NOT NULL,
+    tipo VARCHAR(40) NOT NULL,
+    nivel VARCHAR(10) NOT NULL,
+    seccion VARCHAR(30) NOT NULL,
+    clave_grupo VARCHAR(120) NOT NULL,
+    cantidad INT NOT NULL DEFAULT 1,
+    referencias TEXT[] NOT NULL DEFAULT '{}',
+    fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_ultima TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fecha_vista TIMESTAMPTZ,
+    fecha_lectura TIMESTAMPTZ,
+    CONSTRAINT fk_notificacion_usuario FOREIGN KEY (id_usuario)
+        REFERENCES usuario (id_usuario) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_notificacion_nivel CHECK (nivel IN ('novedad', 'importante')),
+    CONSTRAINT ck_notificacion_cantidad CHECK (cantidad > 0),
+    CONSTRAINT ck_notificacion_referencias CHECK (cardinality(referencias) <= 5)
+);
+
+COMMENT ON TABLE notificacion_interna IS 'Avisos dentro del sitio (campanita y puntos de novedad), agrupados por persona y clave de grupo (FP-02)';
+COMMENT ON COLUMN notificacion_interna.clave_grupo IS 'El tipo, o el tipo y una entidad (p. ej. cambios de estado de UNA orden): lo que se suma en un solo aviso (FP-02 · R4)';
+COMMENT ON COLUMN notificacion_interna.fecha_vista IS 'Se marca al abrir la campanita: apaga el número, no el resalte (FP-02 · R7)';
+COMMENT ON COLUMN notificacion_interna.fecha_lectura IS 'Se marca al leerlo; un aviso leído deja de recibir hechos y se borra a los 30 días (FP-02 · R4, R8)';
+
+-- La agrupación es ATÓMICA: como mucho un aviso SIN LEER por persona y grupo. Dos hechos a la vez no crean dos avisos.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notificacion_grupo_abierto
+    ON notificacion_interna (id_usuario, clave_grupo) WHERE fecha_lectura IS NULL;
+
+-- El resumen (la consulta que se repite cada pocos segundos) lee solo lo no leído y no necesita tocar la tabla.
+CREATE INDEX IF NOT EXISTS idx_notificacion_sin_leer
+    ON notificacion_interna (id_usuario, nivel, seccion) INCLUDE (cantidad, fecha_vista) WHERE fecha_lectura IS NULL;
+
+-- La lista de la campanita: lo más reciente de cada persona primero.
+CREATE INDEX IF NOT EXISTS idx_notificacion_lista ON notificacion_interna (id_usuario, fecha_ultima DESC);
+
+-- La limpieza de leídos viejos (a los 30 días) recorre solo lo leído.
+CREATE INDEX IF NOT EXISTS idx_notificacion_leidas ON notificacion_interna (fecha_lectura) WHERE fecha_lectura IS NOT NULL;
+
+-- ==============================================================================
+-- FIN DEL SCRIPT DDL (99 TABLAS - v4.28)
 -- ==============================================================================

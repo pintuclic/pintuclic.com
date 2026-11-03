@@ -10,6 +10,16 @@ Este documento constituye el registro histórico y oficial del versionamiento de
 
 ---
 
+## [v3.29] - 2026-11-03
+### Esquema 4.28 (99 Tablas) - FP-02: notificaciones internas (campanita y puntos de novedad)
+- **Alcance General:** PR general de FP-02 (contrato `contracts/fp02-notificaciones-internas.contract.ts`). Cambio aditivo: una tabla nueva; no se toca nada de lo que existía.
+  - **`notificacion_interna`**: un aviso por persona y grupo, con su `cantidad` (los hechos del mismo grupo se suman), `referencias` (hasta 5 códigos), `fecha_vista` y `fecha_lectura`. Borrado en cascada con el usuario. El texto no se guarda: lo compone el catálogo del contrato.
+  - **Optimización pensada desde el esquema:** índice único PARCIAL `(id_usuario, clave_grupo) WHERE fecha_lectura IS NULL` (agrupación atómica); índice parcial `(id_usuario, nivel, seccion) INCLUDE (cantidad, fecha_vista) WHERE fecha_lectura IS NULL` (el resumen se resuelve solo con el índice, y solo sobre lo no leído); índice de lista por persona y fecha; índice de leídos para la limpieza por lotes.
+  - **Prisma:** modelo `NotificacionInterna` (los índices parciales viven en el DDL; Prisma no los expresa).
+  - **Bases existentes en 4.27:** `psql "$DATABASE_URL" -f bd/sql/schema_pintuclic.sql` (idempotente).
+
+---
+
 ## [v3.28] - 2026-11-01
 ### Esquema 4.27 (98 Tablas) - M07: más medios de pago con la página de Wompi
 - **Alcance General:** M07 (contrato `contracts/m07-checkout.contract.ts`, R19). Además de Nequi directo, el cliente puede pagar en el Web Checkout de Wompi (tarjeta, PSE, Daviplata y los demás medios habilitados en la cuenta). Cambio aditivo e idempotente: no borra ni reescribe datos.
