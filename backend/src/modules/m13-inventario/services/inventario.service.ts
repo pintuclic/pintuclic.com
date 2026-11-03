@@ -1,3 +1,4 @@
+import type { PublicadorNotificacionesPort } from '../../../core/notificaciones-internas/notificaciones.interface';
 import {
   MAXIMO_FILAS_PLANTILLA,
   type AjustarExistenciaRequest,
@@ -20,7 +21,11 @@ export interface ResultadoAjusteManual {
 
 /** M13: lectura de existencias, ajuste manual (R2–R4) e historial. */
 export class InventarioService {
-  constructor(private readonly repo: InventarioRepositoryPort) {}
+  constructor(
+    private readonly repo: InventarioRepositoryPort,
+    /** FP-02: avisos internos (campanita). Opcional; publicar nunca lanza. */
+    private readonly publicador?: PublicadorNotificacionesPort,
+  ) {}
 
   resumen(): Promise<ResumenInventario> {
     return this.repo.resumen();
@@ -58,7 +63,11 @@ export class InventarioService {
     if (resultado.tipo === 'conflicto') throw errores.conflicto(resultado.existenciaActual);
     const item = await this.obtener(idVariante);
     if (resultado.tipo === 'sin_cambios') return { item, ajuste: null };
-    return { item, ajuste: await this.repo.obtenerAjuste(resultado.idAjuste) };
+    const ajuste = await this.repo.obtenerAjuste(resultado.idAjuste);
+    if (ajuste !== null && ajuste.existenciaNueva === 0 && ajuste.existenciaAnterior > 0) {
+      await this.publicador?.publicar({ tipo: 'inventario_agotado', destino: { tipo: 'permiso', permiso: 'catalogo.ver' } });
+    }
+    return { item, ajuste };
   }
 
   /** D4 / R6: CSV con todas las variantes y su existencia actual. */

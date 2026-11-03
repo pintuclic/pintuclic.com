@@ -27,6 +27,7 @@ import { DireccionesController } from './controllers/direcciones.controller';
 import { RecuperacionPasswordController } from './controllers/recuperacion-password.controller';
 import { EmpresasController } from './controllers/empresas.controller';
 import type { DateProviderPort } from './interfaces/date-provider.port';
+import type { PublicadorNotificacionesPort } from '../../core/notificaciones-internas/notificaciones.interface';
 import type { NotificacionesPort } from '../m18-notificaciones/interfaces/notificaciones.port';
 import type { GoogleAuthPort } from './interfaces/google-auth.port';
 import type { ParametrosCuentasPort } from './interfaces/parametros-cuentas.port';
@@ -55,6 +56,8 @@ export interface ModuloM04Config {
   parametros?: ParametrosCuentasPort;
   /** M06 · D8: tipos de cliente empresa (los administra M06). Sin él no se puede aprobar una cuenta empresa. */
   tiposCliente?: TiposClientePort;
+  /** FP-02: avisos internos (campanita y puntos de novedad). */
+  publicador?: PublicadorNotificacionesPort;
 }
 
 export function construirModuloM04(
@@ -128,6 +131,7 @@ export function construirModuloM04(
     documentosRepo,
     notificaciones,
     config?.tiposCliente ?? TIPOS_CLIENTE_NO_DISPONIBLES,
+    config?.publicador,
   );
 
   // Controladores

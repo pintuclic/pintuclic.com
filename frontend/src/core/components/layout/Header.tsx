@@ -9,6 +9,10 @@ import { IconButton } from '../buttons/IconButton';
 import { Badge } from '../data-display/Badge';
 import { Modal } from '../overlays/Modal';
 import { useResumenCarrito } from '../../hooks/useResumenCarrito';
+import { CampanaNotificaciones } from '../../notificaciones/CampanaNotificaciones';
+import { totalNovedades, useNotificacionesStore } from '../../notificaciones/notificacionesStore';
+import { PuntoNovedad } from '../../notificaciones/PuntoNovedad';
+import { useSondeoNotificaciones } from '../../notificaciones/useSondeoNotificaciones';
 import { useAuthStore } from '../../store/authStore';
 import { useFavoritosStore } from '../../store/favoritosStore';
 import type { UsuarioAutenticado } from '../../types/usuario.type';
@@ -92,6 +96,10 @@ export function Header({
   const pathname = usePathname();
   const usuario = useAuthStore((s) => s.usuario);
   const cuenta = cuentaDeEncabezado(usuario, account);
+  // FP-02: avisos internos de la persona con sesión (campanita y punto en «Mi cuenta» con lo nuevo de sus pedidos y cotizaciones).
+  useSondeoNotificaciones();
+  const avisos = useNotificacionesStore((s) => s.resumen);
+  const novedadesCuenta = totalNovedades(avisos, ['mis_pedidos', 'mis_cotizaciones', 'cuenta']);
   const [megaAbierto, setMegaAbierto] = useState(false);
   const [movilAbierto, setMovilAbierto] = useState(false);
   const cerrarMega = useCallback(() => setMegaAbierto(false), []);
@@ -178,15 +186,20 @@ export function Header({
         <div className="ml-auto flex shrink-0 items-center gap-2 xl:gap-3 2xl:gap-6">
           <Link
             href={cuenta.href}
-            aria-label={`${cuenta.label}, ${cuenta.sublabel}`}
+            aria-label={`${cuenta.label}, ${cuenta.sublabel}${usuario?.esAdmin || novedadesCuenta === 0 ? '' : `, ${String(novedadesCuenta)} ${novedadesCuenta === 1 ? 'novedad' : 'novedades'}`}`}
             className={`flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-btn p-2 ${FOCO}`}
           >
-            <User className="h-6 w-6 shrink-0 text-neutral-dark" aria-hidden="true" />
+            <span className="relative shrink-0">
+              <User className="h-6 w-6 text-neutral-dark" aria-hidden="true" />
+              {!usuario?.esAdmin && <PuntoNovedad cantidad={novedadesCuenta} singular="novedad en tu cuenta" plural="novedades en tu cuenta" superpuesto />}
+            </span>
             <span className="hidden flex-col leading-tight whitespace-nowrap 2xl:flex">
               <span className="font-title text-sm font-semibold whitespace-nowrap text-neutral-black">{cuenta.label}</span>
               <span className="text-xs whitespace-nowrap text-neutral-medium">{cuenta.sublabel}</span>
             </span>
           </Link>
+
+          {usuario !== null && <CampanaNotificaciones />}
 
           <Link
             href="/favoritos"

@@ -36,6 +36,11 @@ import { apiClient } from '../../api/apiClient';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../buttons/Button';
 import { IconButton } from '../buttons/IconButton';
+import { CampanaNotificaciones } from '../../notificaciones/CampanaNotificaciones';
+import { cantidadDeSeccion, useNotificacionesStore } from '../../notificaciones/notificacionesStore';
+import { PuntoNovedad } from '../../notificaciones/PuntoNovedad';
+import { seccionDeHref } from '../../notificaciones/sondeo';
+import { useSondeoNotificaciones } from '../../notificaciones/useSondeoNotificaciones';
 import { Logo } from './Logo';
 
 export interface AdminNavItem {
@@ -207,6 +212,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const usuario = useAuthStore((s) => s.usuario);
   const establecerUsuario = useAuthStore((s) => s.establecerUsuario);
   const limpiarSesion = useAuthStore((s) => s.limpiarSesion);
+  // FP-02: avisos internos. Un solo sondeo compartido; al entrar a una sección con novedades se apagan sus puntos.
+  useSondeoNotificaciones();
+  const avisos = useNotificacionesStore((s) => s.resumen);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const perfilRef = useRef<HTMLDivElement>(null);
@@ -360,6 +368,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             const active = isNavActive(item);
             const conteos = navConteos?.[item.href] ?? [];
             const total = conteos.reduce((suma, c) => suma + c.cantidad, 0);
+            const seccionAvisos = seccionDeHref(item.href);
+            const novedades = seccionAvisos === null ? 0 : cantidadDeSeccion(avisos, seccionAvisos);
             return (
               <div key={item.href}>
                 <Link
@@ -378,12 +388,17 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 >
                   {item.icon}
                   <span>{item.label}</span>
-                  {total > 0 && (
-                    <span
-                      className="ml-auto rounded-full bg-offer px-2 py-0.5 text-xs font-semibold leading-4 text-neutral-white"
-                      aria-label={`${total} esperando`}
-                    >
-                      {total}
+                  {(total > 0 || novedades > 0) && (
+                    <span className="ml-auto flex items-center gap-1.5">
+                      {novedades > 0 && <PuntoNovedad cantidad={novedades} singular="novedad" plural="novedades" />}
+                      {total > 0 && (
+                        <span
+                          className="rounded-full bg-offer px-2 py-0.5 text-xs font-semibold leading-4 text-neutral-white"
+                          aria-label={`${total} esperando`}
+                        >
+                          {total}
+                        </span>
+                      )}
                     </span>
                   )}
                 </Link>
@@ -439,6 +454,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
           {/* Lado derecho: Perfil de la persona que entró */}
           <div className="flex items-center gap-3 sm:gap-5">
+            <CampanaNotificaciones />
             {/* Perfil Administrador */}
             <div className="relative" ref={perfilRef}>
               <Button

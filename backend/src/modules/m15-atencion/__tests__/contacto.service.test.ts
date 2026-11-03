@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   LIMITE_SOLICITUDES_POR_VENTANA,
   VENTANA_LIMITE_MINUTOS,
@@ -396,5 +396,15 @@ describe('ConfiguracionAtencionService (HU-ATC-03, HU-ATC-04)', () => {
       code: 'RECURSO_NO_DISPONIBLE',
       status: 404,
     });
+  });
+});
+describe('FP-02 · avisos internos de atención', () => {
+  it('una solicitud nueva avisa al personal y la respuesta del equipo, al cliente titular', async () => {
+    const publicar = vi.fn(async () => undefined);
+    const servicio = new ContactoService(new ContactoRepositorioFalso(), new ConfiguracionRepositorioFalso(), { publicar });
+    const { solicitud } = await servicio.crear(7, { tipo: 'consulta', descripcion: 'Una duda' }, LUNES_10_00);
+    expect(publicar).toHaveBeenLastCalledWith({ tipo: 'solicitud_contacto', destino: { tipo: 'permiso', permiso: 'atencion.ver' } });
+    await servicio.agregarMensajeEquipo(1, solicitud.idSolicitud, { contenido: 'Hola, te ayudamos' });
+    expect(publicar).toHaveBeenLastCalledWith({ tipo: 'respuesta_atencion', destino: { tipo: 'usuario', idUsuario: 7 } });
   });
 });

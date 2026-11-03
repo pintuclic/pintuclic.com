@@ -1,5 +1,8 @@
 import { Router, type RequestHandler } from 'express';
 import { construirRutasLandingBanners } from './core/landing/banners.routes';
+import { NotificacionesCotizacionFp02Adapter } from './core/notificaciones-internas/adapters/cotizacion-fp02.adapter';
+import { EventosOrdenFp02Adapter, NotificacionesOrdenFp02Adapter } from './core/notificaciones-internas/adapters/orden-fp02.adapter';
+import { construirModuloNotificacionesInternas } from './core/notificaciones-internas/notificaciones.routes';
 import { construirAuthMiddleware } from './core/middlewares/auth.middleware';
 import { construirModuloM01 } from './modules/m01-catalogo/m01.routes';
 import { BusquedaM02Adapter } from './modules/m03-asesoria/adapters/busqueda-m02.adapter';
@@ -52,6 +55,10 @@ export function construirAppRoutes(): Router {
   const router = Router();
   const m20 = construirModuloM20();
   const auth = construirAuthMiddleware(m20.sesionService);
+  // FP-02: avisos dentro del sitio (campanita y puntos de novedad). Se construye primero porque los módulos le publican.
+  // Cada persona, lo suyo: cualquier rol con sesión vigente. Va antes de `/admin` por lo mismo que M01.
+  const fp02 = construirModuloNotificacionesInternas();
+  router.use('/notificaciones', exigirSesionSalvo(auth, []), fp02.router);
   const m17 = construirModuloM17(m20.sesionService, m20.auditoria, {
     // HU-ADM-01: M04 envía el enlace de activación de los empleados que crea M17.
     // M04 se construye después (usa la autorización de M17); la llamada ocurre por
@@ -82,6 +89,8 @@ export function construirAppRoutes(): Router {
     },
     // ADR-009 (migrado a M18): M04 ya no construye su propio adapter SMTP.
     notificaciones: m18.notificaciones,
+    // FP-02: solicitudes de empresa y de NIT al personal; dictamen al titular.
+    publicador: fp02.publicador,
     // M06 · D8: los tipos de cliente empresa los administra M06. M06 se construye más abajo (necesita M01); la
     // llamada ocurre por petición, cuando `m06` ya existe.
     tiposCliente: {
@@ -130,17 +139,33 @@ export function construirAppRoutes(): Router {
   // El aviso «orden cancelada» (M08 R10) sale por M18; «creada» sigue siendo el comprobante de M12.
   const m08 = construirModuloM08(m17.autorizacionService, {
     auditoria: m20.auditoria,
-    estados: { notificaciones: new NotificacionesOrdenM18Adapter(m18.notificaciones, m12.alCrearOrden) },
+    // FP-02 envuelve los avisos de M08 (pedido nuevo, anulado, comprobante) y publica cada cambio de estado al titular.
+    estados: {
+      eventos: new EventosOrdenFp02Adapter(fp02.publicador),
+      notificaciones: new NotificacionesOrdenFp02Adapter(
+        new NotificacionesOrdenM18Adapter(m18.notificaciones, m12.alCrearOrden),
+        fp02.publicador,
+        m12.comprobantes,
+      ),
+    },
   });
   router.use('/ordenes', exigirSesionSalvo(auth, []), m08.router);
 
   // M11: postventa (cancelaciones, devoluciones y reembolsos). Se construye antes que M09 porque M09 le pide abrir la
   // cancelación cuando falta un producto (M09 R18) y al aprobarse una cancelación avisa al cliente por M08 y M18.
-  const m11 = construirModuloM11(m17.autorizacionService, { auditoria: m20.auditoria, avisos: m08.notificaciones });
+  const m11 = construirModuloM11(m17.autorizacionService, {
+    auditoria: m20.auditoria,
+    avisos: m08.notificaciones,
+    publicador: fp02.publicador,
+  });
   router.use('/postventa', exigirSesionSalvo(auth, []), m11.router);
 
   // M09: cumplimiento y preparación (lista de chequeo por línea, retenidas y hoja de preparación). Solo personal.
-  const m09 = construirModuloM09(m17.autorizacionService, { auditoria: m20.auditoria, cancelaciones: m11.service });
+  const m09 = construirModuloM09(m17.autorizacionService, {
+    auditoria: m20.auditoria,
+    cancelaciones: m11.service,
+    eventos: new EventosOrdenFp02Adapter(fp02.publicador),
+  });
   router.use('/cumplimiento', exigirSesionSalvo(auth, []), m09.router);
 
   // M19: reportes y analítica de ventas (solo lectura). `ventas.ver` para verlos, `ventas.exportar` para el CSV y
@@ -164,7 +189,7 @@ export function construirAppRoutes(): Router {
 
   // M13: inventario referencial (existencias, historial y carga masiva). Exige sesión y los permisos
   // `catalogo.ver` / `catalogo.editar`, resueltos en servidor. Va antes de `/admin` por la misma razón.
-  const m13 = construirModuloM13(m17.autorizacionService);
+  const m13 = construirModuloM13(m17.autorizacionService, { publicador: fp02.publicador });
   router.use('/admin/inventario', exigirSesionSalvo(auth, []), m13.router);
 
   // M06: precios, eventos de descuento, cupones y descuentos de empresa. La administración exige sesión y los
@@ -206,6 +231,9 @@ export function construirAppRoutes(): Router {
   // acordado. Va antes de `/admin` por lo mismo que M01.
   const m21 = construirModuloM21(m17.autorizacionService, {
     carrito: m05.carrito,
+    // FP-02: «respondimos tu cotización» / «no pudimos atenderla» llegan a la campanita del cliente.
+    notificaciones: new NotificacionesCotizacionFp02Adapter(fp02.publicador),
+    publicador: fp02.publicador,
     parametros: {
       obtenerNumero: async (clave) => {
         const { parametros } = await m17.configService.obtenerCatalogo();
@@ -239,7 +267,7 @@ export function construirAppRoutes(): Router {
   // M15: atención al cliente. El horario y el canal son públicos; el formulario de
   // contacto exige sesión (RF-ATC-02-01). Las preguntas frecuentes no son de M15:
   // las sirve M16 en /contenido/faq. Va antes de `/admin` por lo mismo que M01.
-  const m15 = construirModuloM15(m17.autorizacionService);
+  const m15 = construirModuloM15(m17.autorizacionService, { publicador: fp02.publicador });
   router.use('/admin/atencion', exigirSesionSalvo(auth, []), m15.adminRouter);
   router.use(
     '/atencion',

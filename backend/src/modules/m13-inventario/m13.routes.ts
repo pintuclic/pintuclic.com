@@ -1,3 +1,4 @@
+import type { PublicadorNotificacionesPort } from '../../core/notificaciones-internas/notificaciones.interface';
 import { Router, type RequestHandler } from 'express';
 import { requirePermission } from '../../core/middlewares/autorizacion.middleware';
 import type { AutorizacionService } from '../m20-seguridad/services/autorizacion.service';
@@ -26,12 +27,15 @@ export interface ModuloM13 {
   existenciaCombo: ExistenciaComboService;
 }
 
-export function construirModuloM13(autorizacion: AutorizacionService): ModuloM13 {
+export function construirModuloM13(
+  autorizacion: AutorizacionService,
+  deps: { publicador?: PublicadorNotificacionesPort } = {},
+): ModuloM13 {
   const ver = requirePermission(autorizacion, PERMISOS_INVENTARIO.ver) as RequestHandler;
   const editar = requirePermission(autorizacion, PERMISOS_INVENTARIO.editar) as RequestHandler;
 
   const repositorio = new InventarioRepository();
-  const inventarioService = new InventarioService(repositorio);
+  const inventarioService = new InventarioService(repositorio, deps.publicador);
   const cargaService = new CargaService(repositorio);
   const controlador = new InventarioController(inventarioService, cargaService);
 

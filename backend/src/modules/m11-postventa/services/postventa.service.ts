@@ -1,3 +1,4 @@
+import type { PublicadorNotificacionesPort } from '../../../core/notificaciones-internas/notificaciones.interface';
 import type { Prisma } from '@prisma/client';
 import type {
   SolicitarCancelacionRequest,
@@ -52,7 +53,9 @@ export class PostventaService implements PostventaServicePort {
     private readonly auditoria?: AuditoriaPort,
     private readonly reloj: () => Date = () => new Date(),
     /** R-POS-B: por dónde se avisa al cliente cuando se aprueba una cancelación. Sin esto, no se avisa. */
-    private readonly avisos?: Pick<NotificacionesOrdenPort, 'notificarOrdenCancelada'>
+    private readonly avisos?: Pick<NotificacionesOrdenPort, 'notificarOrdenCancelada'>,
+    /** FP-02: avisos internos (campanita). Opcional; publicar nunca lanza. */
+    private readonly publicador?: PublicadorNotificacionesPort
   ) {}
 
   async solicitarCancelacion(
@@ -65,6 +68,7 @@ export class PostventaService implements PostventaServicePort {
     }
 
     const codigo = await this.radicarCancelacion(orden, input.motivo, input.datosReembolso, undefined);
+    await this.publicador?.publicar({ tipo: 'postventa_solicitada', destino: { tipo: 'permiso', permiso: 'ventas.ver' } });
     return this.consultarMiSolicitud(idUsuario, codigo);
   }
 
@@ -178,6 +182,7 @@ export class PostventaService implements PostventaServicePort {
       return codigo;
     });
 
+    await this.publicador?.publicar({ tipo: 'postventa_solicitada', destino: { tipo: 'permiso', permiso: 'ventas.ver' } });
     return this.consultarMiSolicitud(idUsuario, codigo);
   }
 
@@ -329,6 +334,10 @@ export class PostventaService implements PostventaServicePort {
 
     await this.auditar(idEmpleado, `postventa.solicitud.${input.accion}`, codigo, anterior, estadoNuevo, ip);
     if (input.accion === 'aprobar') await this.avisarCancelacion(actualizado);
+    // Una cancelación aprobada ya llega al cliente como cambio de estado de su pedido (arriba): no se repite.
+    if (!(input.accion === 'aprobar' && actualizado.tipo === 'cancelacion')) {
+      await this.publicador?.publicar({ tipo: 'postventa_resuelta', destino: { tipo: 'usuario', idUsuario: actualizado.idUsuario }, referencia: actualizado.orden.codigoVisible });
+    }
     return this.mapearADetalle(actualizado);
   }
 

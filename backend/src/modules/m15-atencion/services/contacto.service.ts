@@ -16,6 +16,7 @@ import type {
   ContactoRepositoryPort,
   PaginaSolicitudes,
 } from '../interfaces/atencion.interface';
+import type { PublicadorNotificacionesPort } from '../../../core/notificaciones-internas/notificaciones.interface';
 import { errores } from './atencion.error';
 import { estaAbierto } from './horario';
 
@@ -27,6 +28,8 @@ export class ContactoService {
   constructor(
     private readonly repo: ContactoRepositoryPort,
     private readonly configRepo: ConfiguracionAtencionRepositoryPort,
+    /** FP-02: avisos internos (campanita). Opcional; publicar nunca lanza. */
+    private readonly publicador?: PublicadorNotificacionesPort,
   ) {}
 
   /**
@@ -45,6 +48,7 @@ export class ContactoService {
     }
 
     const solicitud = await this.repo.crear(idUsuario, datos.tipo, datos.descripcion);
+    await this.publicador?.publicar({ tipo: 'solicitud_contacto', destino: { tipo: 'permiso', permiso: 'atencion.ver' } });
     const franjas = await this.configRepo.obtenerHorario();
 
     return {
@@ -141,7 +145,9 @@ export class ContactoService {
     if (solicitud === null) {
       throw errores.noDisponible();
     }
-    return this.repo.agregarMensaje(idSolicitud, idAutor, 'equipo', datos.contenido);
+    const mensaje = await this.repo.agregarMensaje(idSolicitud, idAutor, 'equipo', datos.contenido);
+    await this.publicador?.publicar({ tipo: 'respuesta_atencion', destino: { tipo: 'usuario', idUsuario: solicitud.idUsuario } });
+    return mensaje;
   }
 
   /** Cambia el estado de la solicitud (`en_revision`, `atendida` o `rechazada`). */
