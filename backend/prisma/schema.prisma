@@ -419,6 +419,7 @@ model Usuario {
   contactoActualizado    ContactoInstitucional[] @relation("ContactoInstitucionalUsuarioActualizo")
   imagenesCategoriaInicio ImagenCategoriaInicio[] @relation("ImagenCategoriaInicioUsuarioActualizo")
   datosFacturacionActualizados DatosFacturacion[] @relation("DatosFacturacionUsuarioActualizo")
+  notificacionesInternas NotificacionInterna[] @relation("NotificacionInternaUsuario")
 
   // M05 Relaciones
   carrito Carrito?
@@ -2000,6 +2001,27 @@ model LineaComprobanteVenta {
 
   @@unique([idComprobante, orden], map: "uq_linea_comprobante_orden")
   @@map("linea_comprobante_venta")
+}
+
+/// Aviso dentro del sitio (campanita y puntos de novedad) para una persona; los hechos del mismo grupo se suman en `cantidad` (FP-02)
+model NotificacionInterna {
+  idNotificacion String    @id @default(uuid()) @map("id_notificacion") @db.Uuid
+  idUsuario      Int       @map("id_usuario")
+  tipo           String    @db.VarChar(40)
+  nivel          String    @db.VarChar(10)
+  seccion        String    @db.VarChar(30)
+  claveGrupo     String    @map("clave_grupo") @db.VarChar(120)
+  cantidad       Int       @default(1)
+  referencias    String[]  @default([])
+  fechaCreacion  DateTime  @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  fechaUltima    DateTime  @default(now()) @map("fecha_ultima") @db.Timestamptz(6)
+  fechaVista     DateTime? @map("fecha_vista") @db.Timestamptz(6)
+  fechaLectura   DateTime? @map("fecha_lectura") @db.Timestamptz(6)
+
+  usuario Usuario @relation("NotificacionInternaUsuario", fields: [idUsuario], references: [idUsuario], onDelete: Cascade, map: "fk_notificacion_usuario")
+
+  @@index([idUsuario, fechaUltima(sort: Desc)], map: "idx_notificacion_lista")
+  @@map("notificacion_interna")
 }
 
 /// Entrada del catálogo de preguntas frecuentes (FAQ) para el Centro de Ayuda y puerto hacia M15

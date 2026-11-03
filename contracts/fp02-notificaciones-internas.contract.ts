@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * ============================================================================
- * CONTRATO DE API REST — FP-02. Notificaciones internas (campanita y puntos de novedad)  (PROPUESTA)
+ * CONTRATO DE API REST — FP-02. Notificaciones internas (campanita y puntos de novedad)  (APROBADO)
  * ============================================================================
  * Scope: transversal · complemento de M18 (M18 = correo; FP-02 = avisos DENTRO del sitio) · para todos los roles
  *
@@ -10,7 +10,7 @@ import { z } from 'zod';
  *  Avisa dentro de la plataforma, sin correo, a cada persona según su rol:
  *   · PUNTO ROJO CON NÚMERO («novedad»): sobre el ítem del menú al que pertenece lo nuevo (por ejemplo «Pedidos 15»). Se apaga
  *     al entrar a esa sección.
- *   · CAMPANITA («importante»): una lista de avisos que conviene ver aunque no se esté en esa pantalla, con su contador.
+ *   · CAMPANITA: la lista de todos los avisos (los «importantes» y también las «novedades»), con su contador.
  *   · AGRUPACIÓN (como YouTube): los avisos del mismo tipo se juntan en uno solo con su cantidad («Han llegado 15 pedidos
  *     nuevos») en vez de 15 avisos sueltos.
  *  Lo ven: el administrador y los colaboradores (cabecera del panel `/admin`), y los clientes, también de empresa (cabecera de
@@ -29,8 +29,9 @@ import { z } from 'zod';
  * REGLAS
  *  R1  CADA PERSONA, LO SUYO. Todas las rutas exigen sesión y solo devuelven o cambian avisos DE QUIEN LAS LLAMA. Un aviso ajeno
  *      o inexistente responde el 404 opaco `RECURSO_NO_DISPONIBLE` (ADR-003). Sirve para cualquier rol, sin permiso propio.
- *  R2  DOS NIVELES. Cada tipo de aviso (catálogo `TIPOS_NOTIFICACION`) es `novedad` o `importante`. Una novedad solo suma al punto
- *      rojo de su sección del menú; un importante va a la campanita. Un tipo no es las dos cosas.
+ *  R2  DOS NIVELES. Cada tipo de aviso (catálogo `TIPOS_NOTIFICACION`) es `novedad` o `importante`. Los dos se listan en la
+ *      campanita; la novedad, además, suma al punto rojo con número de su sección del menú (y se apaga al entrar a ella). Un
+ *      importante solo vive en la campanita. En la lista, el importante se distingue de la novedad (`nivel`).
  *  R3  A QUIÉN LLEGA. Un hecho se publica con un destino: `usuario` (el titular: por ejemplo el cliente de una orden) o `permiso`
  *      (todo el personal que tenga ese permiso, más la cuenta de administrador, que los recibe todos). Se resuelve al publicar
  *      (una fila por persona), hasta MAXIMO_DESTINATARIOS; quien no tiene el permiso en ese momento no lo recibe aunque lo
@@ -43,17 +44,27 @@ import { z } from 'zod';
  *  R5  TEXTO. Lo escribe el catálogo (plantilla singular y plural con `{n}` y los datos del hecho), nunca el módulo de origen ni el
  *      usuario: no se guarda HTML ni texto libre. El plural lleva el enlace a la lista ya filtrada; el singular, al detalle.
  *  R6  CONTEO. El punto rojo de una sección suma las `cantidad` de sus novedades SIN LEER («Pedidos 15»). La campanita cuenta
- *      AVISOS (filas) importantes sin ver, no hechos: 15 cambios agrupados en 1 aviso suman 1. Los dos topan en 99 («99+»).
+ *      AVISOS (filas) sin ver, importantes y novedades, no hechos: «Han llegado 15 pedidos» es 1 aviso en la campanita (y 15 en el
+ *      punto del menú). Los dos topan en 99 («99+»).
  *  R7  VISTO Y LEÍDO. «Visto» apaga el número de la campanita sin quitar el resalte del aviso: se marca al abrir la campanita.
  *      «Leído» lo apaga del todo: se marca al hacer clic en el aviso, con «Marcar todo como leído», o (en una novedad) al entrar a
  *      su sección. Un hecho nuevo que se suma a un aviso lo vuelve a poner como no visto y no leído.
- *  R8  RETENCIÓN. Los avisos leídos se borran a los RETENCION_DIAS días, y cada persona conserva como máximo MAXIMO_AVISOS_POR_PERSONA
+ *  R8  RETENCIÓN. Los avisos leídos se borran a los RETENCION_DIAS días (30), y cada persona conserva como máximo MAXIMO_AVISOS_POR_PERSONA
  *      (se van los leídos más viejos). Se limpia al publicar, no con un programador.
  *  R9  SIN DATOS AJENOS. Un aviso para el personal nunca lleva nombres, correos ni teléfonos de clientes (solo códigos de
  *      orden, cantidades y secciones); uno para un cliente solo habla de lo suyo.
  *  R10 RENDIMIENTO. El resumen (`/resumen`) es la ruta que se consulta cada pocos segundos: una sola consulta agregada sobre un
  *      índice por persona, sin traer filas. Publicar es una escritura corta y nunca debe demorar ni romper la operación que la
  *      origina: un fallo al publicar se registra y se sigue (como en M12 y M03).
+ *  R13 OPTIMIZACIÓN (es requisito, no un extra). (a) El resumen lee solo lo NO leído, por un índice parcial que contiene todo lo que
+ *      necesita (sin tocar la tabla): una persona nunca tiene más de MAXIMO_AVISOS_POR_PERSONA filas sin leer, así que cuesta
+ *      microsegundos aunque la tabla crezca. (b) El resumen responde con `ETag`; si nada cambió, `304` sin cuerpo. (c) Publicar es
+ *      UNA sola sentencia en la base para todos los destinatarios (insertar o sumar al aviso abierto), no un ciclo por persona; la
+ *      lista de destinatarios de un permiso se recuerda MINUTOS_CACHE_DESTINATARIOS minuto(s) en memoria. (d) La limpieza (R8) es
+ *      por lotes de LOTE_LIMPIEZA, como mucho una vez por minuto por proceso, nunca en la ruta de una petición del usuario. (e) La
+ *      interfaz consulta SOLO con la pestaña visible, con un pequeño desfase aleatorio para no sincronizar a todos, UNA sola
+ *      consulta por navegador aunque haya varias pestañas abiertas, y alarga el intervalo si la respuesta no cambia (hasta
+ *      INTERVALO_CONSULTA_MAXIMO_SEGUNDOS). (f) Las peticiones de marcar vistas o leídas no devuelven listas, solo conteos.
  *  R11 ACCESIBILIDAD. La campanita es un botón con nombre que dice cuántos avisos hay («Notificaciones, 3 sin ver»); la lista
  *      se abre y se cierra con teclado (Escape) y no atrapa el foco; el número nunca es el único indicio (también dice «sin
  *      leer» en texto); respeta `prefers-reduced-motion`.
@@ -68,8 +79,7 @@ import { z } from 'zod';
  *        cotizacion_respondida     cliente  · titular              importante  M21 · puerto de notificaciones de cotización
  *        cotizacion_rechazada      cliente  · titular              importante  M21 · idem
  *        cuenta_empresa_dictamen   cliente  · titular              importante  M04 · aviso de dictamen (vía el puerto de M18)
- *      Fase 2 (los tipos ya están en el catálogo; quien mantiene cada módulo debe llamar al publicador, y por eso necesita
- *      autorización para tocar ese código): cotizacion_solicitada, solicitud_contacto, solicitud_empresa, solicitud_nit,
+ *      Fase 2 (AUTORIZADA por el Tech Lead, Q1: una sola llamada al publicador en cada módulo, sin otro cambio): cotizacion_solicitada, solicitud_contacto, solicitud_empresa, solicitud_nit,
  *      postventa_solicitada, postventa_resuelta, inventario_agotado, respuesta_atencion.
  *
  * PANTALLAS
@@ -79,12 +89,13 @@ import { z } from 'zod';
  *    su hora relativa y su enlace; y «Marcar todo como leído».
  *
  * PREGUNTAS ABIERTAS (dependen del cliente; no frenan la construcción)
- *  Q1  ¿Se autoriza tocar los módulos de la fase 2 (una llamada al publicador en cada uno)? Mientras no, esos tipos no se emiten.
- *  Q2  ¿Consulta cada 30 s (hoy) o conexión abierta (SSE)? Con pocos usuarios simultáneos la consulta es más simple y robusta.
- *  Q3  ¿Cuánto se guardan los avisos leídos? Hoy 60 días.
- *  Q4  ¿Las novedades también se listan en la campanita? Hoy no: solo su punto rojo.
- *  Q5  ¿Cada persona debe poder silenciar tipos de aviso? Hoy no.
- *  Q6  ¿El administrador debe poder publicar avisos a todos los clientes o a un rol (promociones, mantenimientos)? Hoy no.
+ *  DECISIONES DEL TECH LEAD (cerradas)
+ *  Q1  Se autoriza tocar los módulos de la fase 2: una llamada al publicador, y nada más, en cada uno.
+ *  Q2  Consulta cada 30 s, muy optimizada (R13). Sin conexión abierta.
+ *  Q3  Los avisos leídos duran 30 días.
+ *  Q4  Las novedades también se listan en la campanita (R2, R6).
+ *  Q5  No se pueden silenciar tipos de aviso.
+ *  Q6  No hay avisos publicados por el administrador ni módulos nuevos: los avisos se aplican solo a lo que ya existe.
  *
  * FUERA DEL MÓDULO (PR general aparte, con aviso al equipo)
  *  - BD: tabla `notificacion_interna` (una fila por persona y aviso, índice único parcial por persona y `clave_grupo` mientras no
@@ -94,9 +105,9 @@ import { z } from 'zod';
  *
  * Rutas (montaje /api/v1/notificaciones, todas con sesión, de cualquier rol):
  *   GET    /resumen                       → resumenResponse            (R6; la que se consulta cada pocos segundos)
- *   GET    /?pagina&limite                → listarResponse             (importantes, de más nuevo a más viejo)
+ *   GET    /?pagina&limite                → listarResponse             (importantes y novedades, de más nuevo a más viejo)
  *   POST   /campana/vista                 → { vistas }                 (R7: apaga el número, deja el resalte)
- *   POST   /leer-todas                    → { leidas }                 (importantes)
+ *   POST   /leer-todas                    → { leidas }                 (de los dos niveles)
  *   POST   /:idNotificacion/leer          → notificacionResponse       (R7)
  *   POST   /secciones/:seccion/leer       → { leidas }                 (R7: apaga el punto rojo de esa sección)
  * ============================================================================
@@ -108,8 +119,11 @@ export const CODIGOS_ERROR_FP02 = {
 } as const;
 
 export const INTERVALO_CONSULTA_SEGUNDOS = 30;
+export const INTERVALO_CONSULTA_MAXIMO_SEGUNDOS = 120;
+export const MINUTOS_CACHE_DESTINATARIOS = 1;
+export const LOTE_LIMPIEZA = 500;
 export const VENTANA_AGRUPACION_HORAS = 24;
-export const RETENCION_DIAS = 60;
+export const RETENCION_DIAS = 30;
 export const MAXIMO_AVISOS_POR_PERSONA = 200;
 export const MAXIMO_DESTINATARIOS = 200;
 export const TOPE_CONTADOR = 99;
@@ -224,9 +238,9 @@ export type Notificacion = z.infer<typeof notificacionSchema>;
 
 export const resumenSchema = z.object({
   campana: z.object({
-    /** Avisos importantes sin ver (R6), con tope TOPE_CONTADOR. */
+    /** Avisos sin ver, de los dos niveles (R6), con tope TOPE_CONTADOR. */
     sinVer: z.number().int().nonnegative(),
-    /** Importantes sin leer (para el texto accesible, R11). */
+    /** Sin leer, de los dos niveles (para el texto accesible, R11). */
     sinLeer: z.number().int().nonnegative(),
   }),
   /** Una entrada por sección con novedades sin leer (R6); las secciones sin novedades no vienen. */
