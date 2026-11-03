@@ -89,6 +89,8 @@ export function construirAppRoutes(): Router {
     },
     // ADR-009 (migrado a M18): M04 ya no construye su propio adapter SMTP.
     notificaciones: m18.notificaciones,
+    // FP-02: solicitudes de empresa y de NIT al personal; dictamen al titular.
+    publicador: fp02.publicador,
     // M06 · D8: los tipos de cliente empresa los administra M06. M06 se construye más abajo (necesita M01); la
     // llamada ocurre por petición, cuando `m06` ya existe.
     tiposCliente: {
@@ -151,7 +153,11 @@ export function construirAppRoutes(): Router {
 
   // M11: postventa (cancelaciones, devoluciones y reembolsos). Se construye antes que M09 porque M09 le pide abrir la
   // cancelación cuando falta un producto (M09 R18) y al aprobarse una cancelación avisa al cliente por M08 y M18.
-  const m11 = construirModuloM11(m17.autorizacionService, { auditoria: m20.auditoria, avisos: m08.notificaciones });
+  const m11 = construirModuloM11(m17.autorizacionService, {
+    auditoria: m20.auditoria,
+    avisos: m08.notificaciones,
+    publicador: fp02.publicador,
+  });
   router.use('/postventa', exigirSesionSalvo(auth, []), m11.router);
 
   // M09: cumplimiento y preparación (lista de chequeo por línea, retenidas y hoja de preparación). Solo personal.
@@ -183,7 +189,7 @@ export function construirAppRoutes(): Router {
 
   // M13: inventario referencial (existencias, historial y carga masiva). Exige sesión y los permisos
   // `catalogo.ver` / `catalogo.editar`, resueltos en servidor. Va antes de `/admin` por la misma razón.
-  const m13 = construirModuloM13(m17.autorizacionService);
+  const m13 = construirModuloM13(m17.autorizacionService, { publicador: fp02.publicador });
   router.use('/admin/inventario', exigirSesionSalvo(auth, []), m13.router);
 
   // M06: precios, eventos de descuento, cupones y descuentos de empresa. La administración exige sesión y los
@@ -227,6 +233,7 @@ export function construirAppRoutes(): Router {
     carrito: m05.carrito,
     // FP-02: «respondimos tu cotización» / «no pudimos atenderla» llegan a la campanita del cliente.
     notificaciones: new NotificacionesCotizacionFp02Adapter(fp02.publicador),
+    publicador: fp02.publicador,
     parametros: {
       obtenerNumero: async (clave) => {
         const { parametros } = await m17.configService.obtenerCatalogo();
@@ -260,7 +267,7 @@ export function construirAppRoutes(): Router {
   // M15: atención al cliente. El horario y el canal son públicos; el formulario de
   // contacto exige sesión (RF-ATC-02-01). Las preguntas frecuentes no son de M15:
   // las sirve M16 en /contenido/faq. Va antes de `/admin` por lo mismo que M01.
-  const m15 = construirModuloM15(m17.autorizacionService);
+  const m15 = construirModuloM15(m17.autorizacionService, { publicador: fp02.publicador });
   router.use('/admin/atencion', exigirSesionSalvo(auth, []), m15.adminRouter);
   router.use(
     '/atencion',

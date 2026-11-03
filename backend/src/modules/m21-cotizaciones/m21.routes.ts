@@ -1,5 +1,6 @@
 import { Router, type RequestHandler } from 'express';
 import { requirePermission } from '../../core/middlewares/autorizacion.middleware';
+import type { PublicadorNotificacionesPort } from '../../core/notificaciones-internas/notificaciones.interface';
 import type { AutorizacionService } from '../m20-seguridad/services/autorizacion.service';
 import { CotizacionesController } from './controllers/cotizaciones.controller';
 import {
@@ -19,6 +20,8 @@ export interface DependenciasM21 {
   parametros?: ParametrosCotizacionPort;
   /** M18 (D8): hasta que exista, no se avisa nada. */
   notificaciones?: NotificacionesCotizacionPort;
+  /** FP-02: avisos internos al personal. */
+  publicador?: PublicadorNotificacionesPort;
   /** Solo pruebas. */
   repo?: CotizacionesRepositoryPort;
   reloj?: () => Date;
@@ -41,6 +44,7 @@ export function construirModuloM21(autorizacion: AutorizacionService, dep: Depen
     carrito: dep.carrito,
     ...(dep.parametros === undefined ? {} : { parametros: dep.parametros }),
     ...(dep.notificaciones === undefined ? {} : { notificaciones: dep.notificaciones }),
+    ...(dep.publicador === undefined ? {} : { publicador: dep.publicador }),
     ...(dep.reloj === undefined ? {} : { reloj: dep.reloj }),
   });
   const c = new CotizacionesController(cotizaciones);

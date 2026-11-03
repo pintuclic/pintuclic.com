@@ -5,6 +5,7 @@ import type { SolicitudesEmpresaRepository } from '../repositories/solicitudes-e
 import type { AlmacenDocumentosPort } from '../interfaces/almacen-documentos.port';
 import type { TiposClientePort } from '../interfaces/tipos-cliente.port';
 import type { EntidadDocumentoSoporte, MisSolicitudesEmpresa } from '../interfaces/cuentas.interfaces';
+import type { PublicadorNotificacionesPort } from '../../../core/notificaciones-internas/notificaciones.interface';
 import type { NotificacionesPort } from '../../m18-notificaciones/interfaces/notificaciones.port';
 import type {
   CuentaEmpresaAdminItem,
@@ -40,6 +41,8 @@ export class EmpresasService {
     private readonly almacenDocumentos: AlmacenDocumentosPort,
     private readonly notificaciones: NotificacionesPort,
     private readonly tiposCliente: TiposClientePort,
+    /** FP-02: avisos internos (campanita). Opcional; publicar nunca lanza. */
+    private readonly publicador?: PublicadorNotificacionesPort,
   ) {}
 
   /**
@@ -120,6 +123,7 @@ export class EmpresasService {
       nit: nitNormalizado,
       tipoSolicitud: 'registro',
     });
+    await this.publicador?.publicar({ tipo: 'solicitud_empresa', destino: { tipo: 'permiso', permiso: 'empresas.validar' } });
 
     return {
       idSolicitud: solicitud.idSolicitud,
@@ -177,6 +181,7 @@ export class EmpresasService {
       nit: nitNormalizado,
       tipoSolicitud: 'ascenso_particular',
     });
+    await this.publicador?.publicar({ tipo: 'solicitud_empresa', destino: { tipo: 'permiso', permiso: 'empresas.validar' } });
 
     return {
       idSolicitud: solicitud.idSolicitud,
@@ -356,6 +361,7 @@ export class EmpresasService {
         motivo ?? undefined,
       );
     }
+    await this.publicador?.publicar({ tipo: 'cuenta_empresa_dictamen', destino: { tipo: 'usuario', idUsuario: solicitud.idUsuario } });
 
     return {
       solicitud: decision.solicitud,
@@ -483,6 +489,7 @@ export class EmpresasService {
       nitNuevo: nitNuevoNormalizado,
       idDocumento: doc.idDocumento,
     });
+    await this.publicador?.publicar({ tipo: 'solicitud_nit', destino: { tipo: 'permiso', permiso: 'empresas.validar' } });
 
     return {
       idSolicitud: solicitud.idSolicitud,

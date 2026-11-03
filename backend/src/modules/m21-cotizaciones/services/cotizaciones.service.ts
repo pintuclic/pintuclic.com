@@ -25,6 +25,7 @@ import type {
   FiltroCotizaciones,
 } from '../interfaces/cotizaciones.interface';
 import { CotizacionesError, errores } from './cotizaciones-error';
+import type { PublicadorNotificacionesPort } from '../../../core/notificaciones-internas/notificaciones.interface';
 import { diaEnBogota, redondear, sumarDias } from './fechas';
 
 export interface DependenciasCotizaciones {
@@ -35,6 +36,8 @@ export interface DependenciasCotizaciones {
   parametros?: ParametrosCotizacionPort;
   /** M18 (D8). Sin él no se avisa nada. */
   notificaciones?: NotificacionesCotizacionPort;
+  /** FP-02: aviso interno al personal cuando llega una cotización. Publicar nunca lanza. */
+  publicador?: PublicadorNotificacionesPort;
   reloj?: () => Date;
 }
 
@@ -177,6 +180,7 @@ export class CotizacionesService {
       totalReferencia: redondear(totalReferencia),
       lineas,
     });
+    await this.dep.publicador?.publicar({ tipo: 'cotizacion_solicitada', destino: { tipo: 'permiso', permiso: 'ventas.ver' } });
     return aDetalle(await this.cargar(id), false);
   }
 

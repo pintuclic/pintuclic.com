@@ -1,3 +1,4 @@
+import type { PublicadorNotificacionesPort } from '../../core/notificaciones-internas/notificaciones.interface';
 import { Router, type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import { requirePermission } from '../../core/middlewares/autorizacion.middleware';
 import { responderRecursoNoDisponible } from '../../core/utils/apiResponse';
@@ -48,7 +49,10 @@ function exigirPermisoAtencionSolicitudes(autorizacion: AutorizacionService): Re
  *    POST /contacto + /mis-solicitudes* exigen sesión (la aplica app.routes.ts con exigirSesionSalvo).
  *  · `adminRouter`, montado en /admin/atencion: todo exige sesión y permiso.
  */
-export function construirModuloM15(autorizacion: AutorizacionService): {
+export function construirModuloM15(
+  autorizacion: AutorizacionService,
+  deps: { publicador?: PublicadorNotificacionesPort } = {},
+): {
   publicRouter: Router;
   adminRouter: Router;
   contactoService: ContactoService;
@@ -57,7 +61,7 @@ export function construirModuloM15(autorizacion: AutorizacionService): {
   const contactoRepo = new PrismaContactoRepository();
   const configuracionRepo = new PrismaConfiguracionAtencionRepository();
 
-  const contactoService = new ContactoService(contactoRepo, configuracionRepo);
+  const contactoService = new ContactoService(contactoRepo, configuracionRepo, deps.publicador);
   const configuracionService = new ConfiguracionAtencionService(configuracionRepo);
 
   const contacto = new ContactoController(contactoService);

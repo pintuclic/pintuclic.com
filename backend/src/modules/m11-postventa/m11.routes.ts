@@ -1,3 +1,4 @@
+import type { PublicadorNotificacionesPort } from '../../core/notificaciones-internas/notificaciones.interface';
 import { Router, type RequestHandler } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { responderRecursoNoDisponible } from '../../core/utils/apiResponse';
@@ -46,6 +47,8 @@ export interface DependenciasModuloM11 {
   service?: PostventaServicePort | undefined;
   /** R-POS-B: por dónde sale el aviso al cliente al aprobarse una cancelación (M08 lo ofrece, M18 lo envía). */
   avisos?: Pick<NotificacionesOrdenPort, 'notificarOrdenCancelada'> | undefined;
+  /** FP-02: avisos internos (campanita y puntos de novedad). */
+  publicador?: PublicadorNotificacionesPort | undefined;
 }
 
 export function construirModuloM11(
@@ -59,7 +62,7 @@ export function construirModuloM11(
   const prisma = deps.prisma ?? new PrismaClient();
   const repo = new PrismaPostventaRepository(prisma);
   const ordenesPort = new PrismaOrdenesAdapterM11(prisma);
-  const service = deps.service ?? new PostventaService(repo, ordenesPort, deps.auditoria, undefined, deps.avisos);
+  const service = deps.service ?? new PostventaService(repo, ordenesPort, deps.auditoria, undefined, deps.avisos, deps.publicador);
   const controller = new PostventaController(service);
 
   const router = Router();
